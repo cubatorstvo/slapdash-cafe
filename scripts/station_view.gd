@@ -1,7 +1,7 @@
 extends Node3D
 
 const Props = preload("res://scripts/props.gd")
-const Model = preload("res://scripts/station_model.gd")
+const Model = preload("res://scripts/cooking_model.gd")
 const TABLE_HEIGHT := Model.SURFACE_Y
 const WINE_COLOR := Color("ba4058")
 
@@ -25,6 +25,10 @@ var right_hand: MeshInstance3D
 var left_arm: MeshInstance3D
 var right_arm: MeshInstance3D
 var is_production := false
+var dish := "wine"
+var name_label: Label3D
+var station_label: Label3D
+var kitchen: Node3D
 
 func build(production: bool) -> void:
 	is_production = production
@@ -36,7 +40,7 @@ func build(production: bool) -> void:
 		for z in [-0.85, 0.85]:
 			Props.box(self, Vector3(0.13, 0.83, 0.13), Vector3(x, 0.415, z), Color("244047"))
 	Props.box(self, Vector3(4.3, 0.22, 0.08), Vector3(0, 0.78, 1.14), accent)
-	Props.text(self, "02 / КЛОН" if production else "01 / ПОКАЖИ КАК", Vector3(0, 0.76, 1.20), 25, Color("19353b"))
+	station_label = Props.text(self, "КЛОН" if production else "ПОКАЖИ КАК", Vector3(0, 0.76, 1.20), 25, Color("19353b"))
 	# Work boundary markings also make the recording's spatial limits legible.
 	for z in [-0.96, 0.96]:
 		Props.box(self, Vector3(3.9, 0.007, 0.018), Vector3(0, TABLE_HEIGHT + 0.004, z), accent.darkened(0.25))
@@ -60,6 +64,8 @@ func build(production: bool) -> void:
 	fill_label = Props.text(self, "0 / 250 мл", Vector3(0, 2.2, 0), 20, Color("ffffff"))
 	fill_label.pixel_size = 0.004
 	fill_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	kitchen = preload("res://scripts/kitchen_props.gd").new()
+	add_child(kitchen)
 	if production:
 		_build_worker()
 
@@ -142,6 +148,8 @@ func _build_worker() -> void:
 	add_child(worker)
 	worker.position = Vector3(0, 0, 1.8)
 	worker.rotation.y = PI
+	name_label = Props.text(worker, "Клон", Vector3(0, 2.25, 0), 22, Color("a6efdb"))
+	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	for x in [-0.16, 0.16]:
 		Props.box(worker, Vector3(0.19, 0.66, 0.21), Vector3(x, 0.43, 0), Color("243940"))
 		Props.box(worker, Vector3(0.23, 0.15, 0.38), Vector3(x, 0.10, 0.09), Color("172c32"))
@@ -161,6 +169,9 @@ func _build_worker() -> void:
 	right_arm = Props.line(self, Vector3.ZERO, Vector3.UP, 0.065, Color("63aa98"))
 
 func update_view(model, animation_time := 0.0, resting := false) -> void:
+	dish = model.dish
+	kitchen.update_view(model)
+	for node in [jug, cup, rag, fill_label]: node.visible = dish == "wine"
 	jug.position = item_point(model.jug)
 	jug_body.rotation.z = -deg_to_rad(model.tilt)
 	cup.position = item_point(model.cup)
@@ -181,7 +192,7 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 	_update_grip_marker(model)
 	for mesh in spill_meshes:
 		mesh.visible = false
-	for index in range(model.puddles.size()):
+	for index in range(model.puddles.size() if dish == "wine" else 0):
 		if index == spill_meshes.size():
 			spill_meshes.append(Props.cylinder(self, 1.0, 0.008, Vector3.ZERO, WINE_COLOR.darkened(0.12)))
 		var data: Array = model.puddles[index]
@@ -190,13 +201,13 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 		mesh.position = Vector3(data[0], TABLE_HEIGHT + 0.008, data[1])
 		var radius := clampf(sqrt(float(data[2])) * 0.026, 0.025, 0.34)
 		mesh.scale = Vector3(radius, 1.0, radius * 0.8)
-	target_ring.visible = not is_production and model.held in ["jug", "rag"]
+	target_ring.visible = dish == "wine" and not is_production and model.held in ["jug", "rag"]
 	var aim: Vector2 = model.rag if model.held == "rag" else model.spout_target()
 	var aimed: bool = model.can_fill_at(aim, model.source_height())
 	target_ring.position = item_point(aim)
 	if aimed: target_ring.position.y += float(model.elevations.cup) + 0.50
 	target_ring.material_override.albedo_color = Color("6fd7ae") if aimed else Color("e9a164")
-	stream.visible = model.flowing or model.squeezing
+	stream.visible = dish == "wine" and (model.flowing or model.squeezing)
 	if stream.visible:
 		var start: Vector3 = model.spout_position()
 		if model.squeezing: start = rag.position + Vector3(0, 0.04, 0)
@@ -215,6 +226,9 @@ func _update_worker(model, time: float, resting: bool) -> void:
 		"jug": target = jug.position + Vector3(0, 0.35, 0)
 		"cup": target = cup.position + Vector3(0, 0.22, 0)
 		"rag": target = rag.position + Vector3(0, 0.06, 0)
+		"pan": target = kitchen.pan.position + kitchen.pan.basis * Vector3(0, 0.08, 1.0)
+		"potato": target = kitchen.potato.position + Vector3(0, 0.14, 0)
+		"sausage": target = kitchen.sausage.position + Vector3(0, 0.1, 0)
 	if resting and model.held.is_empty(): target.y += sin(time * 2.0) * 0.02
 	left_hand.position = target + worker.basis * Vector3(-0.16, 0, 0)
 	right_hand.position = target + worker.basis * Vector3(0.16, 0, 0)
@@ -225,6 +239,7 @@ func item_point(point: Vector2) -> Vector3:
 	return Vector3(point.x, Model.BASE_Y, point.y)
 
 func pick_item(camera: Camera3D) -> String:
+	if dish != "wine": return kitchen.pick_item(camera, dish)
 	var selected := ""
 	var nearest := 3.4
 	var ray_origin := camera.global_position

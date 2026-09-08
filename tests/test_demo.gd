@@ -97,7 +97,7 @@ func check_item_controls(game) -> void:
 	check(not game.training.grip_marker.visible and not game.training.height_dashes[0].visible, "Putting item down hides its guides")
 
 func run() -> void:
-	var save_path := "user://fps_station_recording.json"
+	var save_path := "user://cafe_staff.json"
 	var had_save := FileAccess.file_exists(save_path)
 	var original_save := FileAccess.get_file_as_string(save_path) if had_save else ""
 	print("[1/8] Pouring, elevation limits and liquid conservation")
@@ -152,7 +152,8 @@ func run() -> void:
 	await process_frame
 	game.set_physics_process(false)
 	game.session_paused = false
-	game.deployed.clear()
+	game.service.open_for_business = false
+	game.service.clones[0].recipes.clear()
 	game.start_recording()
 	check(not game.recording, "Cannot teach remotely")
 	game.player.global_position = game.training.to_global(Vector3(0, 0.02, 2.0))
@@ -163,7 +164,9 @@ func run() -> void:
 	var start_position: Vector3 = game.player.global_position
 	press_key(KEY_E, true)
 	press_key(KEY_E, false)
-	check(game.recording and game.player.constrained, "E starts teaching")
+	check(game.hud.teaching_panel.visible and not game.recording, "E opens dish and employee selection")
+	game._begin_selected_training("wine", game.service.clones[0].id, 1)
+	check(game.recording and game.player.constrained, "Selection starts teaching")
 	check(game.player.global_position.is_equal_approx(start_position), "Starting does not teleport player")
 	for wall in game.barrier_bodies: check(wall.collision_layer == 1, "Training barriers enabled")
 	for tick in range(140):
@@ -233,27 +236,23 @@ func run() -> void:
 	game.live.filled = 225
 	game.live.wine = 775
 	game.finish_recording()
-	check(not game.recording and not game.player.constrained and not game.deployed.is_empty(), "Success commits and releases zone immediately")
-	check(not game.production_running, "No mandatory full replay")
+	check(not game.recording and not game.player.constrained and not game.service.get_clone(game.selected_clone_id).recipes.is_empty(), "Success commits and releases zone immediately")
+	check(game.service.stations[1].state == "training", "Only the final echo tail holds the employee")
 	for wall in game.barrier_bodies: check(wall.collision_layer == 0, "Barriers released")
-	var saved: Array = game.deployed.duplicate(true)
+	var saved: Array = game.service.get_clone(game.selected_clone_id).recipes.wine.frames.duplicate(true)
 	for tick in range(121): game._advance_echo()
 	check(not game.echo_active and game.playback.success(), "Remaining delayed frames finish")
-	game.toggle_production()
-	for index in range(saved.size()):
-		game._advance_production(DELTA)
-		check(game.playback.snapshot() == saved[index], "On-demand replay is exact")
-	check(game.completed_orders == 1, "Serving counted")
+	check(game.service.stations[1].state == "idle", "Employee returns to customer service")
 	game.start_recording()
 	game.finish_recording()
-	check(game.recording and game.deployed == saved, "Failed attempt preserves earlier training")
+	check(game.recording and game.service.get_clone(game.selected_clone_id).recipes.wine.frames == saved, "Failed attempt preserves earlier training")
 	game.cancel_recording()
-	check(game.deployed == saved, "Cancellation preserves training")
+	check(game.service.get_clone(game.selected_clone_id).recipes.wine.frames == saved, "Cancellation preserves training")
 
 	print("[7/8] Save roundtrip and validation")
-	game.deployed.clear()
-	game._load_recording()
-	check(game.deployed.size() == saved.size(), "FPS recording loads")
+	game.service.get_clone(game.selected_clone_id).recipes.clear()
+	game._load_staff()
+	check(game.service.get_clone(game.selected_clone_id).recipes.wine.frames.size() == saved.size(), "FPS recording loads")
 	check(not game._valid_frame({}), "Incomplete save rejected")
 	var invalid: Dictionary = saved[0].duplicate(true)
 	invalid.elevations.jug = -1

@@ -1,16 +1,17 @@
 extends Node3D
-## Both actors use one station-local workspace, rotated 180 degrees in the room.
+## FPS teaching feeds employee recordings into the three-counter cafe.
 
-const Model = preload("res://scripts/station_model.gd")
+const Model = preload("res://scripts/cooking_model.gd")
 const View = preload("res://scripts/station_view.gd")
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Hud = preload("res://scripts/cafe_hud.gd")
-const SAVE_PATH := "user://fps_station_recording.json"
+const SAVE_PATH := "user://cafe_staff.json"
+const Service = preload("res://scripts/cafe_service.gd")
 const TICK := 1.0 / 60.0
 const DELAY_TICKS := 120
 const ITEM_MOVE_SPEED := 6.0
-const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка"}
+const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска"}
 
 var live := Model.new()
 var playback := Model.new()
@@ -20,17 +21,16 @@ var player: CharacterBody3D
 var camera: Camera3D
 var hud: CanvasLayer
 var frames: Array = []
-var deployed: Array = []
+var service: Node3D
+var clone_machine: Node3D
+var selected_clone_id := 1
+var selected_slot := 1
+var selected_dish := "wine"
 var recording := false
 var echo_active := false
 var echo_clock := 0
 var echo_index := -1
-var production_running := false
 var elapsed := 0.0
-var deployed_duration := 0.0
-var replay_tick := 0
-var completed_orders := 0
-var cycle_time := 0.0
 var session_paused := false
 var precision_active := false
 var grip_direction := Vector3.FORWARD
@@ -42,24 +42,25 @@ func _ready() -> void:
 	_build_room()
 	training = View.new()
 	add_child(training)
-	training.position.z = 1.9
+	training.position.z = 4.8
 	training.build(false)
-	production = View.new()
-	add_child(production)
-	production.position.z = -1.9
-	production.rotation.y = PI
-	production.build(true)
+	service = Service.new()
+	add_child(service)
+	production = service.stations[selected_slot].view
+	playback = service.stations[selected_slot].model
 	_build_zone()
 	player = Player.new()
 	add_child(player)
-	player.global_position = Vector3(0, 0.02, 6.2)
+	player.global_position = Vector3(0, 0.02, 8.6)
 	player.station = training
 	camera = player.camera
 	camera.rotation.x = -0.15
 	hud = Hud.new()
 	add_child(hud)
 	hud.resume_requested.connect(toggle_pause)
-	_load_recording()
+	hud.training_requested.connect(_begin_selected_training)
+	hud.teaching_closed.connect(close_teaching_menu)
+	_load_staff()
 	_refresh_views()
 	_refresh_hud()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -79,28 +80,41 @@ func _build_room() -> void:
 	sun.light_color = Color("fff4e2")
 	sun.light_energy = 0.75
 	sun.shadow_enabled = true
-	for x in range(-7, 7):
-		for z in range(-7, 9):
+	for x in range(-10, 10):
+		for z in range(-8, 11):
 			var color := Color("6c7c73") if (x + z) % 2 == 0 else Color("79887b")
 			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
-	Props.collision_box(self, Vector3(14, 0.2, 16), Vector3(0, -0.10, 1))
-	Props.solid_box(self, Vector3(14, 4.7, 0.18), Vector3(0, 2.3, -6.6), Color("244c50"))
-	Props.solid_box(self, Vector3(14, 4.7, 0.18), Vector3(0, 2.3, 8.6), Color("244c50"))
-	for x in [-6.8, 6.8]:
-		Props.solid_box(self, Vector3(0.18, 4.7, 15.4), Vector3(x, 2.3, 1), Color("2e5355"))
-	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -6.45), Color("bb8d5e"))
-	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -6.40), Color("183237"))
-	Props.text(self, "SLAPDASH CAFE", Vector3(0, 3.49, -6.31), 62, Color("f4cc86"))
-	Props.text(self, "ПОКАЗЫВАЙ. Я ПОВТОРЮ.", Vector3(0, 2.85, -6.31), 25, Color("a5c8b6"))
+	Props.collision_box(self, Vector3(20, 0.2, 19), Vector3(0, -0.10, 1.5))
+	Props.solid_box(self, Vector3(20, 4.7, 0.18), Vector3(0, 2.3, -7.6), Color("244c50"))
+	Props.solid_box(self, Vector3(20, 4.7, 0.18), Vector3(0, 2.3, 10.6), Color("244c50"))
+	for x in [-9.8, 9.8]:
+		Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
+	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
+	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
+	Props.text(self, "SLAPDASH CAFE", Vector3(0, 3.49, -7.31), 62, Color("f4cc86"))
+	Props.text(self, "ПОКАЗЫВАЙ. Я ПОВТОРЮ.", Vector3(0, 2.85, -7.31), 25, Color("a5c8b6"))
 	for x in [-5.1, 5.1]:
-		Props.box(self, Vector3(1.6, 1.35, 0.13), Vector3(x, 2.7, -6.35), Color("edcb89"))
-		Props.box(self, Vector3(1.37, 1.12, 0.07), Vector3(x, 2.7, -6.26), Color("9cc9c5"))
-		Props.box(self, Vector3(0.05, 1.18, 0.06), Vector3(x, 2.7, -6.20), Color("edcb89"))
+		Props.box(self, Vector3(1.6, 1.35, 0.13), Vector3(x, 2.7, -7.35), Color("edcb89"))
+		Props.box(self, Vector3(1.37, 1.12, 0.07), Vector3(x, 2.7, -7.26), Color("9cc9c5"))
+		Props.box(self, Vector3(0.05, 1.18, 0.06), Vector3(x, 2.7, -7.20), Color("edcb89"))
 		Props.cylinder(self, 0.28, 0.44, Vector3(x, 0.22, -4.9), Color("bb7c56"), 0.35)
 		for index in range(5):
 			var leaf := Props.ball(self, 0.22, Vector3(x + sin(index * 1.4) * 0.18, 0.8 + index * 0.12, -4.9), Color("649b71"))
 			leaf.scale = Vector3(0.8, 1.7, 0.8)
-	Props.box(self, Vector3(2.0, 0.018, 0.65), Vector3(0, 0.006, 4.2), Color("c09b63"))
+	Props.box(self, Vector3(2.0, 0.018, 0.65), Vector3(0, 0.006, 7.1), Color("c09b63"))
+
+	clone_machine = Node3D.new()
+	add_child(clone_machine)
+	clone_machine.position = Vector3(-5.8, 0, 5.3)
+	Props.solid_box(clone_machine, Vector3(1.25, 1.1, 1.0), Vector3(0, 0.55, 0), Color("53687a"))
+	Props.cylinder(clone_machine, 0.42, 0.60, Vector3(0, 1.40, 0), Color("88c6b8"))
+	Props.cylinder(clone_machine, 0.48, 0.12, Vector3(0, 1.75, 0), Color("e5c184"))
+	Props.box(clone_machine, Vector3(0.28, 0.20, 0.10), Vector3(0, 0.9, 0.55), Color("d77570"))
+	var machine_label := Props.text(clone_machine, "КЛОНОМАТ\n[E] Новый сотрудник", Vector3(0, 2.30, 0), 25, Color("f3cf8b"))
+	machine_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	for x in [-9.2, 9.2]:
+		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
+		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
 func _build_zone() -> void:
 	var lower: Vector2 = Player.ZONE_MIN
@@ -143,18 +157,21 @@ func can_start_recording() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_ESCAPE:
-			toggle_pause()
+			if hud.teaching_panel.visible: close_teaching_menu()
+			else: toggle_pause()
 			return
-		if session_paused: return
+		if session_paused or hud.teaching_panel.visible: return
 		match event.physical_keycode:
-			KEY_E: start_recording()
+			KEY_E: interact()
 			KEY_ENTER, KEY_KP_ENTER: finish_recording()
 			KEY_X: cancel_recording()
-			KEY_G: toggle_production()
-	if session_paused: return
+			KEY_G: service.open_for_business = not service.open_for_business
+	if session_paused or hud.teaching_panel.visible: return
 	if event is InputEventMouseMotion:
 		var movement: Vector2 = event.screen_relative
-		if recording and not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
+		if recording and live.held == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			live.tilt_pan(movement)
+		elif recording and not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
 			_move_precisely(movement)
 		else:
 			player.look(movement)
@@ -195,7 +212,7 @@ func _move_precisely(movement: Vector2) -> void:
 	_reanchor_grip()
 
 func _physics_process(delta: float) -> void:
-	if session_paused: return
+	if session_paused or hud.teaching_panel.visible: return
 	tick_count += 1
 	var movement := Vector2(
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
@@ -206,19 +223,18 @@ func _physics_process(delta: float) -> void:
 		if precision_active and not precise: _reanchor_grip()
 		precision_active = precise
 		if not live.held.is_empty():
-			if not precise:
+			if not precise and live.held != "pan":
 				var current: Vector2 = live.get(live.held)
 				live.move_item(live.held, current.move_toward(_held_target(), ITEM_MOVE_SPEED * delta))
 			var lift := float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 			live.lift_held(lift * 0.55 * delta)
 		var using_item := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-		var tipping := live.held == "jug" and using_item
-		live.step(delta, tipping, not tipping, live.held == "rag" and using_item)
+		live.step(delta, using_item, not using_item, using_item)
 		_capture_pose()
 		frames.append(live.snapshot())
 		elapsed = frames.size() * TICK
 	if echo_active: _advance_echo()
-	elif production_running: _advance_production(delta)
+	service.advance(delta)
 	_refresh_views()
 	_refresh_hud()
 
@@ -236,31 +252,51 @@ func _advance_echo() -> void:
 		echo_index = target
 	if not recording and target >= frames.size() - 1:
 		echo_active = false
+		service.release_station(selected_slot)
 
-func _advance_production(delta: float) -> void:
-	if deployed.is_empty(): return
-	cycle_time += delta
-	if replay_tick < deployed.size():
-		playback.restore(deployed[replay_tick])
-		replay_tick += 1
-		if replay_tick == deployed.size(): completed_orders += 1
-	else:
-		playback.flowing = false
-		playback.squeezing = false
-	if cycle_time >= maxf(60.0, deployed_duration + 1.0):
-		cycle_time = 0.0
-		replay_tick = 0
+func near_machine() -> bool:
+	if recording: return false
+	var offset := clone_machine.global_position + Vector3(0, 1.1, 0) - camera.global_position
+	return offset.length() < 2.8 and (-camera.global_basis.z).dot(offset.normalized()) > 0.6
+
+func interact() -> void:
+	if near_machine():
+		var clone: Dictionary = service.create_clone()
+		_save_staff()
+		hud.notice.text = "%s появился. Первые три сотрудника занимают стойки; остальных выбирай в меню обучения." % clone.name
+	elif can_start_recording():
+		var assigned: Array = []
+		for station in service.stations: assigned.append(station.clone_id)
+		hud.show_teaching(service.clones, assigned, selected_clone_id, selected_dish)
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func close_teaching_menu() -> void:
+	hud.teaching_panel.hide()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if session_paused else Input.MOUSE_MODE_CAPTURED
+
+func _begin_selected_training(recipe: String, clone_id: int, slot: int) -> void:
+	close_teaching_menu()
+	if echo_active:
+		service.release_station(selected_slot)
+		echo_active = false
+	selected_dish = recipe
+	selected_clone_id = clone_id
+	selected_slot = slot
+	start_recording()
 
 func start_recording() -> void:
 	if not can_start_recording(): return
-	live.reset()
+	if echo_active: service.release_station(selected_slot)
+	service.reserve_station(selected_slot, selected_clone_id)
+	production = service.stations[selected_slot].view
+	playback = service.stations[selected_slot].model
+	live.reset(selected_dish)
 	_capture_pose()
 	frames.clear()
 	elapsed = 0.0
 	echo_clock = 0
 	echo_index = -1
 	echo_active = true
-	production_running = false
 	recording = true
 	precision_active = false
 	playback.restore(live.snapshot())
@@ -272,18 +308,18 @@ func start_recording() -> void:
 func finish_recording() -> void:
 	if not recording or session_paused: return
 	if not live.success():
-		hud.notice.text = "Пока %d мл. Нужно минимум 225 мл — запись продолжается." % roundi(live.filled)
+		hud.notice.text = "Показ продолжается. " + live.goal_text()
 		return
 	live.put_down()
 	_capture_pose()
 	frames.append(live.snapshot())
 	elapsed = frames.size() * TICK
-	deployed = frames.duplicate(true)
-	deployed_duration = elapsed
+	var clone: Dictionary = service.get_clone(selected_clone_id)
+	clone.recipes[selected_dish] = {"frames": frames.duplicate(true), "duration": elapsed}
 	recording = false
 	_set_zone(false)
-	var saved := _save_recording()
-	hud.notice.text = "Клон обучен: %s / %d%%. Можно идти дальше. G — посмотреть работу, когда захочешь." % [Model.pace(elapsed), roundi(Model.efficiency(elapsed) * 100)]
+	var saved := _save_staff()
+	hud.notice.text = "%s: %s, %s. Через 2 секунды вернётся к заказам." % [clone.name, Service.SHORT_NAMES[selected_dish], Model.pace(elapsed)]
 	if not saved: hud.notice.text += " Запись действует до выхода: сохранить файл не удалось."
 	_refresh_hud()
 
@@ -293,23 +329,11 @@ func cancel_recording() -> void:
 	echo_active = false
 	frames.clear()
 	live.reset()
-	playback.reset()
+	playback.reset(selected_dish)
+	service.release_station(selected_slot)
 	_set_zone(false)
 	hud.notice.text = "Показ отменён. Прежнее обучение сохранено. E — начать заново у стойки."
 	_refresh_views()
-	_refresh_hud()
-
-func toggle_production() -> void:
-	if session_paused or recording or deployed.is_empty(): return
-	production_running = not production_running
-	echo_active = false
-	if production_running:
-		replay_tick = 0
-		cycle_time = 0.0
-		playback.restore(deployed[0])
-	else:
-		playback.flowing = false
-		playback.squeezing = false
 	_refresh_hud()
 
 func toggle_pause() -> void:
@@ -319,12 +343,13 @@ func toggle_pause() -> void:
 	_refresh_hud()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(hud) and not session_paused:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(hud) and not session_paused and not hud.teaching_panel.visible:
 		toggle_pause()
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(service): _save_staff()
 
 func _refresh_views() -> void:
 	training.update_view(live, tick_count * TICK)
-	production.update_view(playback, tick_count * TICK, not recording and not echo_active and not production_running)
+	service.refresh_views()
 	if recording:
 		var local := training.to_local(player.global_position)
 		var distances := [absf(local.x - Player.ZONE_MIN.x), absf(local.x - Player.ZONE_MAX.x), absf(local.z - Player.ZONE_MIN.y), absf(local.z - Player.ZONE_MAX.y)]
@@ -332,63 +357,76 @@ func _refresh_views() -> void:
 			barrier_meshes[index].material_override.albedo_color.a = lerpf(0.16, 0.025, clampf(distances[index] / 0.8, 0, 1))
 
 func _refresh_hud() -> void:
-	hud.goal.text = "ВИНО: %d / 225 мл" % roundi(live.filled)
-	hud.progress.value = live.filled
-	hud.clock.text = "%s  %05.1f с / %s" % ["●" if recording else "", elapsed, Model.pace(elapsed)]
-	hud.supplies.text = "Кувшин: %d мл  •  На столе: %d мл  •  Тряпка: %d / 300 мл  •  На полу: %d мл" % [roundi(live.wine), roundi(live.spilled()), roundi(live.soaked), roundi(live.lost)]
-	hud.controls.text = "WASD — ходить  •  Мышь — обзор  •  E — обучение у стойки  •  G — работа клона  •  Esc — пауза"
-	hud.prompt.text = "[E] Обучить клона" if can_start_recording() else ""
+	hud.prompt.offset_top = 34
+	hud.prompt.offset_bottom = 94
+	hud.goal.text = live.goal_text()
+	hud.progress.value = live.progress_value()
+	hud.clock.text = "%s %05.1f с / %s" % ["●" if recording else "", elapsed, Model.pace(elapsed)]
+	hud.clone_status.text = "Сотрудники: %d · Подано: %d · $%d" % [service.clones.size(), service.served, service.revenue]
+	hud.supplies.text = "Кафе %s · Гостей: %d · Ушли без заказа: %d" % ["открыто" if service.open_for_business else "закрыто", service.customers.size(), service.missed]
+	hud.controls.text = "WASD — ходить  •  E — обучение / клономат  •  G — открыть / закрыть кафе  •  Esc — пауза"
+	hud.prompt.text = "[E] Выбрать блюдо и клона" if can_start_recording() else ("[E] Создать сотрудника" if near_machine() else "")
 	if recording:
-		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить  •  Голубой — предмет, цветной — струя"
+		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить"
+		if live.dish == "wine":
+			hud.supplies.text = "Кувшин: %d мл  •  На столе: %d мл  •  Тряпка: %d мл  •  Голубой — предмет, цветной — струя" % [roundi(live.wine), roundi(live.spilled()), roundi(live.soaked)]
+		elif live.dish == "potato":
+			var sides: Array[String] = []
+			for index in range(6): sides.append("%s %d%%" % [Model.FACE_NAMES[index], roundi(live.potato_heat[index] * 100)])
+			hud.supplies.text = "Бока: " + " · ".join(sides) + " · Падений: %d" % live.falls
+		else:
+			hud.supplies.text = "Соус: %d%%  •  Выскальзывание: %d%%  •  Падений: %d  •  У стола можно катить, вертикально — нести" % [roundi(live.sausage_coating * 100), roundi(live.sausage_slip * 100), live.falls]
 		if live.held.is_empty():
 			var hovered: String = training.pick_item(camera)
 			hud.prompt.text = "[ЛКМ] Взять: " + ITEM_NAMES[hovered] if not hovered.is_empty() else "Наведи прицел на предмет"
 		else:
 			var height := float(live.elevations[live.held])
-			hud.prompt.text = "%s  /  Высота: %d см" % [ITEM_NAMES[live.held].capitalize(), roundi(height * 100)]
-			if live.held == "jug": hud.prompt.text += "\n[ПКМ] Наклонять и наливать"
-			if live.held == "rag":
-				hud.prompt.text += "\n[ПКМ] Выжать тряпку" if live.soaked > 0 else "\nТряпка сухая — опусти её на лужу"
-				if live.soaked > 0 and height > 0.10 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-					hud.prompt.text += "\nДля вытирания опусти к столу"
-			var aim: Vector2 = live.rag if live.held == "rag" else live.spout_target()
-			if live.held in ["jug", "rag"] and aim.distance_to(live.cup) <= Model.CUP_RADIUS and not live.can_fill_at(aim, live.source_height()):
-				hud.prompt.text += "\nПодними выше края стакана: колесо ↑"
+			hud.prompt.text = "%s / Высота: %d см" % [ITEM_NAMES[live.held].capitalize(), roundi(height * 100)]
+			match live.held:
+				"jug": hud.prompt.text += "\n[ПКМ] Наклонять и наливать"
+				"rag": hud.prompt.text += "\n[ПКМ] Выжать над стаканом" if live.soaked > 0 else "\nОпусти на лужу, чтобы вытереть"
+				"pan":
+					hud.prompt.text = "[ПКМ + мышь] Наклонять сковороду\nОтпусти ПКМ — выровнять. ЛКМ — отпустить ручку."
+					hud.prompt.offset_top = 150
+					hud.prompt.offset_bottom = 220
+				"potato": hud.prompt.text += "\n[ЛКМ] Положить на сковороду или тарелку"
+				"sausage": hud.prompt.text += "\n[ПКМ] Держать вертикально · F — опустить к соусу / столу"
+			if live.held in ["jug", "rag"]:
+				var aim: Vector2 = live.rag if live.held == "rag" else live.spout_target()
+				if aim.distance_to(live.cup) <= Model.CUP_RADIUS and not live.can_fill_at(aim, live.source_height()): hud.prompt.text += "\nПодними выше края стакана: колесо ↑"
 	if recording or echo_active:
-		hud.clone_status.text = "Клон повторяет с задержкой 2 с" if echo_index >= 0 else "Клон наблюдает…"
-	elif production_running:
-		hud.clone_status.text = "Работает: %s  •  Подано: %d" % [Model.pace(deployed_duration), completed_orders]
-	elif not deployed.is_empty():
-		hud.clone_status.text = "Обучен: %s  •  G — запустить" % Model.pace(deployed_duration)
-	else:
-		hud.clone_status.text = "Клон ждёт первого показа"
-	hud.crosshair.visible = not session_paused
-	hud.prompt.visible = not session_paused
+		var clone: Dictionary = service.get_clone(selected_clone_id)
+		hud.clone_status.text = "%s · повтор через 2 с" % clone.name
+	hud.crosshair.visible = not session_paused and not hud.teaching_panel.visible
+	hud.prompt.visible = hud.crosshair.visible
 
-func _save_recording() -> bool:
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+func _save_staff() -> bool:
+	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
 	if file == null: return false
-	file.store_string(JSON.stringify({"format": "fps-station", "tick": TICK, "frames": deployed}))
+	file.store_string(JSON.stringify(service.save_data()))
 	file.close()
-	return true
+	return DirAccess.rename_absolute(SAVE_PATH + ".tmp", SAVE_PATH) == OK
 
-func _load_recording() -> void:
-	if not FileAccess.file_exists(SAVE_PATH): return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if file == null: return
-	var data = JSON.parse_string(file.get_as_text())
-	if not data is Dictionary or data.get("format") != "fps-station": return
-	if not is_equal_approx(float(data.get("tick", 0)), TICK): return
-	var saved = data.get("frames", [])
-	if not saved is Array or saved.is_empty(): return
-	for frame in saved:
+func _load_staff() -> void:
+	if FileAccess.file_exists(SAVE_PATH):
+		var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+		if data is Dictionary and service.load_data(data, _valid_frame):
+			selected_clone_id = service.clones[0].id
+			hud.notice.text = "Сотрудники и их записи загружены. Обслуживание начнётся автоматически."
+		return
+	# One-time import preserves the user's successful wine demonstration.
+	var old_path := "user://fps_station_recording.json"
+	if not FileAccess.file_exists(old_path): return
+	var old = JSON.parse_string(FileAccess.get_file_as_string(old_path))
+	if not old is Dictionary or old.get("format") != "fps-station" or not old.get("frames") is Array or old.frames.is_empty(): return
+	for frame in old.frames:
 		if not _valid_frame(frame): return
-	var check := Model.new()
-	check.restore(saved.back())
-	if not check.success(): return
-	deployed = saved
-	deployed_duration = deployed.size() * TICK
-	hud.notice.text = "Обучение загружено. E у стойки — новый показ. G — запустить клона."
+	var result := Model.new()
+	result.restore(old.frames.back())
+	if not result.success(): return
+	service.clones[0].recipes.wine = {"frames": old.frames, "duration": old.frames.size() * TICK}
+	_save_staff()
+	hud.notice.text = "Первый сотрудник получил прежнюю запись вина. Можно обучать новым блюдам."
 
 func _valid_frame(frame: Variant) -> bool:
 	if not frame is Dictionary: return false
@@ -399,7 +437,7 @@ func _valid_frame(frame: Variant) -> bool:
 			if not _finite_number(value): return false
 	for key in ["tilt", "wine", "filled", "soaked", "lost", "squeezed_total", "actor_yaw", "actor_pitch"]:
 		if not _finite_number(frame.get(key)): return false
-	if not frame.get("held") in ["", "jug", "cup", "rag"]: return false
+	if not frame.get("held") in ["", "jug", "cup", "rag", "pan", "potato", "sausage"]: return false
 	if not frame.get("flowing") is bool or not frame.get("squeezing") is bool: return false
 	if not frame.get("elevations") is Dictionary: return false
 	for key in ["jug", "cup", "rag"]:
@@ -410,6 +448,23 @@ func _valid_frame(frame: Variant) -> bool:
 		if not puddle is Array or puddle.size() != 3: return false
 		for value in puddle:
 			if not _finite_number(value): return false
+	var recipe: String = str(frame.get("dish", "wine"))
+	if not recipe in Model.DISHES: return false
+	if recipe != "wine":
+		for key in ["pan", "potato", "sausage"]:
+			var height = frame.elevations.get(key)
+			if not _finite_number(height) or height < 0 or height > Model.MAX_LIFT: return false
+		var food = frame.get("food")
+		if not food is Dictionary: return false
+		for key in ["pan_tilt", "potato", "potato_velocity", "sausage", "sausage_velocity", "potato_orientation", "potato_heat"]:
+			var count := 4 if key == "potato_orientation" else (6 if key == "potato_heat" else 2)
+			if not food.get(key) is Array or food[key].size() != count: return false
+			for number in food[key]:
+				if not _finite_number(number): return false
+		for key in ["fall_speed", "falls", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip"]:
+			if not _finite_number(food.get(key)): return false
+		if not food.get("potato_state") in ["pan", "falling", "table", "held", "plate"]: return false
+		if not food.get("sausage_state") in ["falling", "table", "held", "plate"]: return false
 	return true
 
 func _finite_number(value: Variant) -> bool:
