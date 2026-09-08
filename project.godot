@@ -1,10 +1,10 @@
-; Open in Godot 4.6 and press F6/F5.
+; Open in Godot 4.7 and press F5.
 config_version=5
 
 [application]
 config/name="Slapdash Cafe"
 run/main_scene="res://scenes/cafe.tscn"
-config/features=PackedStringArray("4.6", "GL Compatibility")
+config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [display]
