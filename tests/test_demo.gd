@@ -24,6 +24,78 @@ func press_key(code: Key, pressed: bool) -> void:
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
 
+func press_mouse(button: MouseButton, pressed: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = button
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+
+func check_item_controls(game) -> void:
+	game.live.reset()
+	game.player.rotation.y = 0
+	game.camera.rotation = Vector3(-0.35, 0, 0)
+	game._grab("jug")
+	check(game._held_target().is_equal_approx(game.live.jug), "Pickup anchors the actual item without a jump")
+	game.camera.rotation.x = 0.30
+	var right_edge: Vector2
+	for angle in [-0.4, 0.4]:
+		game.player.rotation.y = angle
+		var target: Vector2 = game._held_target()
+		check(target.is_finite() and is_equal_approx(target.y, -Model.BOUNDS.y), "Looking above table keeps a finite far-edge target")
+		if angle < 0: right_edge = target
+		else: check(target.distance_to(right_edge) > 0.5, "Turning off-table moves the target along the edge")
+	for tick in range(60):
+		var before: Vector2 = game.live.jug
+		game._physics_process(DELTA)
+		check(before.distance_to(game.live.jug) <= game.ITEM_MOVE_SPEED * DELTA + 0.0001, "Off-table motion is bounded per frame")
+	check(game.live.jug.is_equal_approx(game._held_target()), "Item reaches edge while gaze remains off table")
+	game.player.rotation.y = 0
+	game.camera.rotation.x = -0.8
+	var before_return: Vector2 = game.live.jug
+	game._physics_process(DELTA)
+	check(before_return.distance_to(game.live.jug) <= game.ITEM_MOVE_SPEED * DELTA + 0.0001, "Re-entering table never teleports the item")
+	for tick in range(40): game._physics_process(DELTA)
+	check(game.live.jug.is_equal_approx(game._held_target()), "Item follows gaze back into the work area")
+	press_key(KEY_SHIFT, true)
+	game._physics_process(DELTA)
+	game._move_precisely(Vector2(40, 10))
+	var precise_position: Vector2 = game.live.jug
+	press_key(KEY_SHIFT, false)
+	game._physics_process(DELTA)
+	check(game.live.jug.is_equal_approx(precise_position), "Releasing precision preserves the new position")
+	game._refresh_views()
+	var anchor: Vector3 = game.training.grip_marker.position
+	check(game.training.grip_marker.visible and is_equal_approx(anchor.x, game.live.jug.x) and is_equal_approx(anchor.z, game.live.jug.y), "Blue marker projects the item centre")
+	check(game.training.target_ring.position.distance_to(anchor) > 0.2, "Pour target stays distinct from item centre")
+	check(game.training.height_dashes[0].visible and not game.production.grip_marker.visible, "Height guide belongs only to held player item")
+	press_mouse(MOUSE_BUTTON_RIGHT, true)
+	game._physics_process(DELTA)
+	press_mouse(MOUSE_BUTTON_RIGHT, false)
+	check(game.live.tilt > 0, "RMB uses the jug")
+	var previous_tilt: float = game.live.tilt
+	game._physics_process(DELTA)
+	check(game.live.tilt < previous_tilt, "Releasing RMB straightens the jug")
+	game.live.reset()
+	game.live.rag = game.live.cup
+	game._grab("rag")
+	game.live.lift_held(0.6)
+	game.live.soaked = 250
+	game.live.wine = 750
+	press_key(KEY_SPACE, true)
+	game._physics_process(DELTA)
+	press_key(KEY_SPACE, false)
+	check(not game.live.squeezing and game.live.filled == 0, "Space no longer activates the rag")
+	press_mouse(MOUSE_BUTTON_RIGHT, true)
+	for tick in range(160): game._physics_process(DELTA)
+	press_mouse(MOUSE_BUTTON_RIGHT, false)
+	check(game.live.success() and game.live.squeezed_total >= 225 and conserved(game.live), "RMB alone squeezes a valid serving")
+	game._physics_process(DELTA)
+	check(not game.live.squeezing, "Releasing RMB stops squeezing")
+	game.live.put_down()
+	game._refresh_views()
+	check(not game.training.grip_marker.visible and not game.training.height_dashes[0].visible, "Putting item down hides its guides")
+
 func run() -> void:
 	var save_path := "user://fps_station_recording.json"
 	var had_save := FileAccess.file_exists(save_path)
@@ -106,7 +178,7 @@ func run() -> void:
 	local = game.training.to_local(game.player.global_position)
 	check(local.z >= 1.35, "Player cannot pass through the table")
 
-	print("[4/8] Crosshair pickup, scroll, R/F and precision look separation")
+	print("[4/8] Pickup, height, edge continuity, guides, precision and RMB actions")
 	game.player.global_position = game.training.to_global(Vector3(0, 0.02, 1.9))
 	game.camera.look_at(game.training.jug.global_position + Vector3(0, 0.4, 0))
 	check(game.training.pick_item(game.camera) == "jug", "Ray selects the jug")
@@ -132,6 +204,7 @@ func run() -> void:
 	game._physics_process(DELTA)
 	press_key(KEY_R, false)
 	check(game.live.elevations.jug > previous_lift, "R raises the item")
+	check_item_controls(game)
 
 	print("[5/8] Exact 2-second delay includes actor pose and object height")
 	game.cancel_recording()

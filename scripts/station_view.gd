@@ -14,6 +14,8 @@ var rag_surface: MeshInstance3D
 var jug_liquid: MeshInstance3D
 var stream: MeshInstance3D
 var target_ring: MeshInstance3D
+var grip_marker: Node3D
+var height_dashes: Array[MeshInstance3D] = []
 var spill_meshes: Array[MeshInstance3D] = []
 var fill_label: Label3D
 var worker: Node3D
@@ -54,11 +56,50 @@ func build(production: bool) -> void:
 	ring.outer_radius = 0.18
 	target_ring = Props.shape(self, ring, Vector3.ZERO, Color("f3a963"))
 	target_ring.visible = false
+	_build_grip_marker()
 	fill_label = Props.text(self, "0 / 250 мл", Vector3(0, 2.2, 0), 20, Color("ffffff"))
 	fill_label.pixel_size = 0.004
 	fill_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	if production:
 		_build_worker()
+
+func _build_grip_marker() -> void:
+	grip_marker = Node3D.new()
+	add_child(grip_marker)
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.31
+	ring.outer_radius = 0.335
+	var parts: Array[MeshInstance3D] = [Props.shape(grip_marker, ring, Vector3.ZERO, Color("76d7ff"))]
+	parts.append(Props.box(grip_marker, Vector3(0.13, 0.006, 0.014), Vector3.ZERO, Color("76d7ff")))
+	parts.append(Props.box(grip_marker, Vector3(0.014, 0.006, 0.13), Vector3.ZERO, Color("76d7ff")))
+	for index in range(12):
+		var dash := Props.line(self, Vector3.ZERO, Vector3.UP, 0.008, Color("76d7ff"))
+		height_dashes.append(dash)
+		parts.append(dash)
+	for part in parts:
+		part.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		part.visible = false
+	# Children follow the marker; dashes remain station-local at their actual heights.
+	for child in grip_marker.get_children(): child.visible = true
+	grip_marker.visible = false
+
+func _update_grip_marker(model) -> void:
+	grip_marker.visible = not is_production and not model.held.is_empty()
+	for dash in height_dashes: dash.visible = false
+	if not grip_marker.visible: return
+	var point: Vector2 = model.get(model.held)
+	grip_marker.position = Vector3(point.x, TABLE_HEIGHT + 0.025, point.y)
+	var radius_scale := 1.0 if model.held == "jug" else 0.85
+	grip_marker.scale = Vector3(radius_scale, 1, radius_scale)
+	var lift: float = model.elevations[model.held]
+	for index in range(height_dashes.size()):
+		var bottom := 0.025 + index * 0.09
+		var top := minf(bottom + 0.045, lift)
+		if top <= bottom: break
+		var dash := height_dashes[index]
+		dash.visible = true
+		Props.align_line(dash, item_point(point) + Vector3.UP * bottom, item_point(point) + Vector3.UP * top)
 
 func _build_jug() -> void:
 	jug = Node3D.new()
@@ -137,6 +178,7 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 	fill_label.position = cup.position + Vector3(0, 0.65, 0)
 	fill_label.text = "%d / 250 мл" % roundi(model.filled)
 	fill_label.modulate = Color("8bf1b9") if model.success() else Color("ffffff")
+	_update_grip_marker(model)
 	for mesh in spill_meshes:
 		mesh.visible = false
 	for index in range(model.puddles.size()):

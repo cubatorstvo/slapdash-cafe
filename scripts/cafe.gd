@@ -9,6 +9,7 @@ const Hud = preload("res://scripts/cafe_hud.gd")
 const SAVE_PATH := "user://fps_station_recording.json"
 const TICK := 1.0 / 60.0
 const DELAY_TICKS := 120
+const ITEM_MOVE_SPEED := 6.0
 const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка"}
 
 var live := Model.new()
@@ -32,7 +33,7 @@ var completed_orders := 0
 var cycle_time := 0.0
 var session_paused := false
 var precision_active := false
-var grip_offset := Vector2.ZERO
+var grip_direction := Vector3.FORWARD
 var tick_count := 0
 var barrier_bodies: Array[StaticBody3D] = []
 var barrier_meshes: Array[MeshInstance3D] = []
@@ -165,14 +166,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			MOUSE_BUTTON_WHEEL_UP: live.lift_held(0.08)
 			MOUSE_BUTTON_WHEEL_DOWN: live.lift_held(-0.08)
 
-func _aim_on_table() -> Variant:
-	var ray := -camera.global_basis.z
-	if ray.y > -0.035: return null
-	var plane := Plane(Vector3.UP, training.global_position.y + Model.BASE_Y)
-	var hit = plane.intersects_ray(camera.global_position, ray)
-	if hit == null or camera.global_position.distance_to(hit) > 3.4: return null
-	var local := training.to_local(hit)
-	return Vector2(local.x, local.z)
+func _held_target() -> Vector2:
+	var origin := training.to_local(camera.global_position)
+	var ray := training.global_basis.inverse() * camera.global_basis * grip_direction
+	# A shallow/upward gaze continues along the far edge instead of losing the ray.
+	var reach := maxf(origin.y - Model.BASE_Y, 0.01) / maxf(-ray.y, 0.08)
+	var point := origin + ray * reach
+	return Vector2(point.x, point.z).clamp(-Model.BOUNDS, Model.BOUNDS)
 
 func _grab(item: String) -> void:
 	if not recording or session_paused or item.is_empty(): return
@@ -180,8 +180,11 @@ func _grab(item: String) -> void:
 	_reanchor_grip()
 
 func _reanchor_grip() -> void:
-	var aim = _aim_on_table()
-	if aim != null and not live.held.is_empty(): grip_offset = live.get(live.held) - aim
+	if live.held.is_empty(): return
+	var point: Vector2 = live.get(live.held)
+	var anchor := training.to_global(Vector3(point.x, Model.BASE_Y, point.y))
+	# Anchor the actual item, even when the crosshair picked its handle or upper rim.
+	grip_direction = camera.global_basis.inverse() * (anchor - camera.global_position).normalized()
 
 func _move_precisely(movement: Vector2) -> void:
 	var right := training.global_basis.inverse() * camera.global_basis.x
@@ -204,12 +207,13 @@ func _physics_process(delta: float) -> void:
 		precision_active = precise
 		if not live.held.is_empty():
 			if not precise:
-				var aim = _aim_on_table()
-				if aim != null: live.move_item(live.held, aim + grip_offset)
+				var current: Vector2 = live.get(live.held)
+				live.move_item(live.held, current.move_toward(_held_target(), ITEM_MOVE_SPEED * delta))
 			var lift := float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
 			live.lift_held(lift * 0.55 * delta)
-		var tipping := live.held == "jug" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-		live.step(delta, tipping, not tipping, Input.is_physical_key_pressed(KEY_SPACE))
+		var using_item := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+		var tipping := live.held == "jug" and using_item
+		live.step(delta, tipping, not tipping, live.held == "rag" and using_item)
 		_capture_pose()
 		frames.append(live.snapshot())
 		elapsed = frames.size() * TICK
@@ -335,15 +339,18 @@ func _refresh_hud() -> void:
 	hud.controls.text = "WASD — ходить  •  Мышь — обзор  •  E — обучение у стойки  •  G — работа клона  •  Esc — пауза"
 	hud.prompt.text = "[E] Обучить клона" if can_start_recording() else ""
 	if recording:
-		hud.controls.text = "ЛКМ — взять / поставить  •  Колесо или R/F — высота  •  Shift + мышь — точное движение\nПКМ — наклон кувшина  •  Пробел — выжать тряпку  •  Enter — закончить  •  X — отменить"
+		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить  •  Голубой — предмет, цветной — струя"
 		if live.held.is_empty():
 			var hovered: String = training.pick_item(camera)
 			hud.prompt.text = "[ЛКМ] Взять: " + ITEM_NAMES[hovered] if not hovered.is_empty() else "Наведи прицел на предмет"
 		else:
 			var height := float(live.elevations[live.held])
 			hud.prompt.text = "%s  /  Высота: %d см" % [ITEM_NAMES[live.held].capitalize(), roundi(height * 100)]
+			if live.held == "jug": hud.prompt.text += "\n[ПКМ] Наклонять и наливать"
 			if live.held == "rag":
-				hud.prompt.text += "\nОпусти к столу, чтобы вытереть" if height > 0.10 and not Input.is_physical_key_pressed(KEY_SPACE) else ""
+				hud.prompt.text += "\n[ПКМ] Выжать тряпку" if live.soaked > 0 else "\nТряпка сухая — опусти её на лужу"
+				if live.soaked > 0 and height > 0.10 and not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+					hud.prompt.text += "\nДля вытирания опусти к столу"
 			var aim: Vector2 = live.rag if live.held == "rag" else live.spout_target()
 			if live.held in ["jug", "rag"] and aim.distance_to(live.cup) <= Model.CUP_RADIUS and not live.can_fill_at(aim, live.source_height()):
 				hud.prompt.text += "\nПодними выше края стакана: колесо ↑"
