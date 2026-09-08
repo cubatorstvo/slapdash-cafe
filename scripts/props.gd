@@ -13,6 +13,23 @@ static func box(parent: Node3D, size: Vector3, point: Vector3, color: Color) -> 
 	mesh.size = size
 	return shape(parent, mesh, point, color)
 
+static func solid_box(parent: Node3D, size: Vector3, point: Vector3, color: Color) -> StaticBody3D:
+	box(parent, size, point, color)
+	return collision_box(parent, size, point)
+
+static func collision_box(parent: Node3D, size: Vector3, point: Vector3) -> StaticBody3D:
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 2
+	parent.add_child(body)
+	body.position = point
+	var collider := CollisionShape3D.new()
+	var shape_box := BoxShape3D.new()
+	shape_box.size = size
+	collider.shape = shape_box
+	body.add_child(collider)
+	return body
+
 static func cylinder(parent: Node3D, radius: float, height: float, point: Vector3, color: Color, top := -1.0) -> MeshInstance3D:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = radius if top < 0.0 else top
