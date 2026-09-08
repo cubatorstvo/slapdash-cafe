@@ -9,6 +9,8 @@ const LOOK_SENSITIVITY := 0.0022
 var camera: Camera3D
 var station: Node3D
 var constrained := false
+var zone_min := ZONE_MIN
+var zone_max := ZONE_MAX
 
 func _ready() -> void:
 	collision_layer = 2
@@ -41,8 +43,8 @@ func advance(delta: float, movement: Vector2) -> void:
 	# Clamp supplements physical barriers during their deferred enable/disable tick.
 	if constrained and is_instance_valid(station):
 		var local := station.to_local(global_position)
-		local.x = clampf(local.x, ZONE_MIN.x + BODY_RADIUS, ZONE_MAX.x - BODY_RADIUS)
-		local.z = clampf(local.z, ZONE_MIN.y + BODY_RADIUS, ZONE_MAX.y - BODY_RADIUS)
+		local.x = clampf(local.x, zone_min.x + BODY_RADIUS, zone_max.x - BODY_RADIUS)
+		local.z = clampf(local.z, zone_min.y + BODY_RADIUS, zone_max.y - BODY_RADIUS)
 		global_position = station.to_global(local)
 
 func pose_in(reference: Node3D) -> Dictionary:

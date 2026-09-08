@@ -9,7 +9,10 @@ const Hud = preload("res://scripts/cafe_hud.gd")
 const SAVE_PATH := "user://cafe_staff.json"
 const Service = preload("res://scripts/cafe_service.gd")
 const TICK := 1.0 / 60.0
-const DELAY_TICKS := 120
+const Team = preload("res://scripts/team_training.gd")
+const Lecture = preload("res://scripts/lecture_group.gd")
+const TeamMenu = preload("res://scripts/team_menu.gd")
+const Session = preload("res://scripts/coop_session.gd")
 const ITEM_MOVE_SPEED := 6.0
 const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска"}
 
@@ -27,9 +30,10 @@ var selected_clone_id := 1
 var selected_slot := 1
 var selected_dish := "wine"
 var recording := false
-var echo_active := false
-var echo_clock := 0
-var echo_index := -1
+var team: Node3D
+var lecture: Node3D
+var menu: CanvasLayer
+var session: Node
 var elapsed := 0.0
 var session_paused := false
 var precision_active := false
@@ -60,6 +64,19 @@ func _ready() -> void:
 	hud.resume_requested.connect(toggle_pause)
 	hud.training_requested.connect(_begin_selected_training)
 	hud.teaching_closed.connect(close_teaching_menu)
+	lecture = Lecture.new()
+	add_child(lecture)
+	team = Team.new()
+	add_child(team)
+	team.setup(self)
+	menu = TeamMenu.new()
+	add_child(menu)
+	menu.start_requested.connect(team.start)
+	session = Session.new()
+	session.name = "Session"
+	add_child(session)
+	session.setup(self)
+	menu.network_requested.connect(session.configure)
 	_load_staff()
 	_refresh_views()
 	_refresh_hud()
@@ -80,14 +97,14 @@ func _build_room() -> void:
 	sun.light_color = Color("fff4e2")
 	sun.light_energy = 0.75
 	sun.shadow_enabled = true
-	for x in range(-10, 10):
+	for x in range(-10, 16):
 		for z in range(-8, 11):
 			var color := Color("6c7c73") if (x + z) % 2 == 0 else Color("79887b")
 			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
-	Props.collision_box(self, Vector3(20, 0.2, 19), Vector3(0, -0.10, 1.5))
-	Props.solid_box(self, Vector3(20, 4.7, 0.18), Vector3(0, 2.3, -7.6), Color("244c50"))
-	Props.solid_box(self, Vector3(20, 4.7, 0.18), Vector3(0, 2.3, 10.6), Color("244c50"))
-	for x in [-9.8, 9.8]:
+	Props.collision_box(self, Vector3(26, 0.2, 19), Vector3(3, -0.10, 1.5))
+	Props.solid_box(self, Vector3(26, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
+	Props.solid_box(self, Vector3(26, 4.7, 0.18), Vector3(3, 2.3, 10.6), Color("244c50"))
+	for x in [-9.8, 15.8]:
 		Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
 	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
 	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
@@ -112,7 +129,7 @@ func _build_room() -> void:
 	Props.box(clone_machine, Vector3(0.28, 0.20, 0.10), Vector3(0, 0.9, 0.55), Color("d77570"))
 	var machine_label := Props.text(clone_machine, "КЛОНОМАТ\n[E] Новый сотрудник", Vector3(0, 2.30, 0), 25, Color("f3cf8b"))
 	machine_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	for x in [-9.2, 9.2]:
+	for x in [-9.2, 15.2]:
 		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
@@ -148,13 +165,25 @@ func _set_zone(enabled: bool) -> void:
 	if is_instance_valid(player): player.constrained = enabled
 
 func can_start_recording() -> bool:
-	if recording or session_paused: return false
+	if recording or session_paused or (is_instance_valid(team) and team.active()): return false
 	var local := training.to_local(player.global_position)
 	var facing := -camera.global_basis.z
 	var towards := (training.global_position + Vector3(0, 1, 0) - camera.global_position).normalized()
 	return absf(local.x) < 2.25 and local.z > 1.25 and local.z < 2.55 and facing.dot(towards) > 0.25
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F2:
+		if not recording and not team.active():
+			menu.net_panel.visible = not menu.net_panel.visible
+			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if menu.opened() else Input.MOUSE_MODE_CAPTURED
+		return
+	if menu.opened():
+		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: menu.close()
+		return
+	if team.active() and not session_paused:
+		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: toggle_pause()
+		else: team.handle(event)
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_ESCAPE:
 			if hud.teaching_panel.visible: close_teaching_menu()
@@ -165,7 +194,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E: interact()
 			KEY_ENTER, KEY_KP_ENTER: finish_recording()
 			KEY_X: cancel_recording()
-			KEY_G: service.open_for_business = not service.open_for_business
+			KEY_G:
+				if not session.is_guest(): service.open_for_business = not service.open_for_business
 	if session_paused or hud.teaching_panel.visible: return
 	if event is InputEventMouseMotion:
 		var movement: Vector2 = event.screen_relative
@@ -212,7 +242,9 @@ func _move_precisely(movement: Vector2) -> void:
 	_reanchor_grip()
 
 func _physics_process(delta: float) -> void:
-	if session_paused or hud.teaching_panel.visible: return
+	if session_paused or hud.teaching_panel.visible or menu.opened():
+		session.advance(delta)
+		return
 	tick_count += 1
 	var movement := Vector2(
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
@@ -233,8 +265,11 @@ func _physics_process(delta: float) -> void:
 		_capture_pose()
 		frames.append(live.snapshot())
 		elapsed = frames.size() * TICK
-	if echo_active: _advance_echo()
-	service.advance(delta)
+	team.advance(delta)
+	if not session.is_guest():
+		lecture.advance(delta)
+		service.advance(delta)
+	session.advance(delta)
 	_refresh_views()
 	_refresh_hud()
 
@@ -244,15 +279,18 @@ func _capture_pose() -> void:
 	live.actor_yaw = pose.yaw
 	live.actor_pitch = pose.pitch
 
-func _advance_echo() -> void:
-	echo_clock += 1
-	var target := echo_clock - DELAY_TICKS - 1
-	if target >= 0 and target < frames.size():
-		playback.restore(frames[target])
-		echo_index = target
-	if not recording and target >= frames.size() - 1:
-		echo_active = false
-		service.release_station(selected_slot)
+func clone_home(id: int) -> Vector3:
+	var slot: int = service.slot_of(id)
+	if slot < 0:
+		var clone: Dictionary = service.get_clone(id)
+		for person in service.reserve_people:
+			if person.caption.text.begins_with(clone.get("name", "?") + "\n"): return person.global_position
+		return Vector3(-6.5, 0, -6.6)
+	var station: Dictionary = service.stations[slot]
+	if slot == 3:
+		var role: int = station.clone_ids.find(id)
+		return station.view.to_global(Vector3(-1.35 if role == 0 else 1.35, 0, 1.85))
+	return station.view.to_global(Vector3(0, 0, 1.85))
 
 func near_machine() -> bool:
 	if recording: return false
@@ -260,13 +298,19 @@ func near_machine() -> bool:
 	return offset.length() < 2.8 and (-camera.global_basis.z).dot(offset.normalized()) > 0.6
 
 func interact() -> void:
+	if session.is_guest():
+		hud.notice.text = "Хост выбирает сотрудников и запускает совместный показ у стола II."
+		return
+	if team.near() and not recording:
+		menu.show_training(service.clones, session.members)
+		return
 	if near_machine():
 		var clone: Dictionary = service.create_clone()
 		_save_staff()
 		hud.notice.text = "%s появился. Первые три сотрудника занимают стойки; остальных выбирай в меню обучения." % clone.name
 	elif can_start_recording():
 		var assigned: Array = []
-		for station in service.stations: assigned.append(station.clone_id)
+		for index in range(3): assigned.append(service.stations[index].clone_id)
 		hud.show_teaching(service.clones, assigned, selected_clone_id, selected_dish)
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
@@ -276,9 +320,7 @@ func close_teaching_menu() -> void:
 
 func _begin_selected_training(recipe: String, clone_id: int, slot: int) -> void:
 	close_teaching_menu()
-	if echo_active:
-		service.release_station(selected_slot)
-		echo_active = false
+	lecture.clear_now()
 	selected_dish = recipe
 	selected_clone_id = clone_id
 	selected_slot = slot
@@ -286,7 +328,8 @@ func _begin_selected_training(recipe: String, clone_id: int, slot: int) -> void:
 
 func start_recording() -> void:
 	if not can_start_recording(): return
-	if echo_active: service.release_station(selected_slot)
+	lecture.clear_now()
+	var home := clone_home(selected_clone_id)
 	service.reserve_station(selected_slot, selected_clone_id)
 	production = service.stations[selected_slot].view
 	playback = service.stations[selected_slot].model
@@ -294,14 +337,14 @@ func start_recording() -> void:
 	_capture_pose()
 	frames.clear()
 	elapsed = 0.0
-	echo_clock = 0
-	echo_index = -1
-	echo_active = true
+	lecture.begin([service.get_clone(selected_clone_id).name], [home], training, player, func(): service.release_station(selected_slot), [production.to_global(Vector3(0, 0, 1.85))])
 	recording = true
 	precision_active = false
-	playback.restore(live.snapshot())
+	player.station = training
+	player.zone_min = Player.ZONE_MIN
+	player.zone_max = Player.ZONE_MAX
 	_set_zone(true)
-	hud.notice.text = "Запись началась. Клон повторяет через 2 секунды. Enter — закончить; X — отменить."
+	hud.notice.text = "Запись началась. Клон подходит с блокнотом и наблюдает. Enter — закончить; X — отменить."
 	_refresh_views()
 	_refresh_hud()
 
@@ -317,20 +360,20 @@ func finish_recording() -> void:
 	var clone: Dictionary = service.get_clone(selected_clone_id)
 	clone.recipes[selected_dish] = {"frames": frames.duplicate(true), "duration": elapsed}
 	recording = false
+	lecture.finish()
 	_set_zone(false)
 	var saved := _save_staff()
-	hud.notice.text = "%s: %s, %s. Через 2 секунды вернётся к заказам." % [clone.name, Service.SHORT_NAMES[selected_dish], Model.pace(elapsed)]
+	hud.notice.text = "%s: %s, %s. Возвращается к стойке; покажет запись на реальном заказе." % [clone.name, Service.SHORT_NAMES[selected_dish], Model.pace(elapsed)]
 	if not saved: hud.notice.text += " Запись действует до выхода: сохранить файл не удалось."
 	_refresh_hud()
 
 func cancel_recording() -> void:
 	if not recording or session_paused: return
 	recording = false
-	echo_active = false
 	frames.clear()
 	live.reset()
 	playback.reset(selected_dish)
-	service.release_station(selected_slot)
+	lecture.finish()
 	_set_zone(false)
 	hud.notice.text = "Показ отменён. Прежнее обучение сохранено. E — начать заново у стойки."
 	_refresh_views()
@@ -343,7 +386,7 @@ func toggle_pause() -> void:
 	_refresh_hud()
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(hud) and not session_paused and not hud.teaching_panel.visible:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(hud) and not session_paused and not hud.teaching_panel.visible and (not is_instance_valid(session) or not session.online()):
 		toggle_pause()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(service): _save_staff()
 
@@ -357,14 +400,15 @@ func _refresh_views() -> void:
 			barrier_meshes[index].material_override.albedo_color.a = lerpf(0.16, 0.025, clampf(distances[index] / 0.8, 0, 1))
 
 func _refresh_hud() -> void:
+	hud.bottom.offset_top = -200 if team.active() else -136
 	hud.prompt.offset_top = 34
 	hud.prompt.offset_bottom = 94
 	hud.goal.text = live.goal_text()
 	hud.progress.value = live.progress_value()
 	hud.clock.text = "%s %05.1f с / %s" % ["●" if recording else "", elapsed, Model.pace(elapsed)]
 	hud.clone_status.text = "Сотрудники: %d · Подано: %d · $%d" % [service.clones.size(), service.served, service.revenue]
-	hud.supplies.text = "Кафе %s · Гостей: %d · Ушли без заказа: %d" % ["открыто" if service.open_for_business else "закрыто", service.customers.size(), service.missed]
-	hud.controls.text = "WASD — ходить  •  E — обучение / клономат  •  G — открыть / закрыть кафе  •  Esc — пауза"
+	hud.supplies.text = "Кафе %s · Гостей: %d · Ушли без заказа: %d" % ["открыто" if service.open_for_business else "закрыто", session.remote_customers.size() if session.is_guest() else service.customers.size(), service.missed]
+	hud.controls.text = "WASD — ходить  •  E — обучение / клономат  •  G — открыть / закрыть кафе  •  F2 — онлайн  •  Esc — пауза"
 	hud.prompt.text = "[E] Выбрать блюдо и клона" if can_start_recording() else ("[E] Создать сотрудника" if near_machine() else "")
 	if recording:
 		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить"
@@ -394,13 +438,16 @@ func _refresh_hud() -> void:
 			if live.held in ["jug", "rag"]:
 				var aim: Vector2 = live.rag if live.held == "rag" else live.spout_target()
 				if aim.distance_to(live.cup) <= Model.CUP_RADIUS and not live.can_fill_at(aim, live.source_height()): hud.prompt.text += "\nПодними выше края стакана: колесо ↑"
-	if recording or echo_active:
+	if recording:
 		var clone: Dictionary = service.get_clone(selected_clone_id)
-		hud.clone_status.text = "%s · повтор через 2 с" % clone.name
+		hud.clone_status.text = "%s · наблюдает и записывает" % clone.name
 	hud.crosshair.visible = not session_paused and not hud.teaching_panel.visible
 	hud.prompt.visible = hud.crosshair.visible
+	if not recording and team.near(): hud.prompt.text = "[E] Стол II · Обучить бригаду"
+	team.refresh_hud()
 
 func _save_staff() -> bool:
+	if is_instance_valid(session) and session.is_guest(): return false
 	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
 	if file == null: return false
 	file.store_string(JSON.stringify(service.save_data()))

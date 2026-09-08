@@ -11,6 +11,7 @@ var recipe_description: Label
 var roster: Array = []
 var assignments: Array = []
 const Model = preload("res://scripts/cooking_model.gd")
+var bottom: PanelContainer
 var goal: Label
 var clock: Label
 var clone_status: Label
@@ -61,7 +62,7 @@ func _ready() -> void:
 	row.add_child(timing)
 	clock = _label(timing, "", 21, Color("f2c578"))
 	_label(timing, "Fast <15с   Medium ≤60с   Slow >60с", 14)
-	var bottom := _panel(root)
+	bottom = _panel(root)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 20
 	bottom.offset_right = -20

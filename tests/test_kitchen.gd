@@ -121,6 +121,7 @@ func run() -> void:
 	Input.parse_input_event(release)
 	Input.flush_buffered_events()
 	game.cancel_recording()
+	game.lecture.clear_now()
 	var first: Dictionary = service.clones[0]
 	first.recipes = {"potato": {"frames": potato, "duration": potato.size() * DELTA}}
 	var second: Dictionary = service.create_clone()

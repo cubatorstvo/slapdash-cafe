@@ -209,39 +209,28 @@ func run() -> void:
 	check(game.live.elevations.jug > previous_lift, "R raises the item")
 	check_item_controls(game)
 
-	print("[5/8] Exact 2-second delay includes actor pose and object height")
+	print("[5/8] Students observe instead of echoing cooking")
 	game.cancel_recording()
 	game.player.rotation.y = 0
 	game.camera.rotation = Vector3(-0.15, 0, 0)
 	game.start_recording()
-	for tick in range(160):
-		game.live.actor_position = Vector3(tick * 0.002, 0, 1.8)
-		game.live.actor_yaw = tick * 0.001
-		game.live.actor_pitch = -tick * 0.0005
-		game.live.elevations.rag = tick * 0.001
-		game.frames.append(game.live.snapshot())
-		game._advance_echo()
-		if tick < 120:
-			check(game.echo_index == -1, "Clone waits first 120 ticks")
-		else:
-			check(game.echo_index == tick - 120, "Clone delay is precisely 120 ticks")
-			check(game.playback.snapshot() == game.frames[tick - 120], "Pose and contents replay exactly")
-	game.production.update_view(game.playback)
-	var expected: Vector3 = game.production.to_global(game.playback.actor_position)
-	check(game.production.worker.global_position.is_equal_approx(expected), "Actor is transformed into facing station")
-	var forward: Vector3 = game.production.global_basis * (Basis(Vector3.UP, game.playback.actor_yaw) * Vector3.FORWARD)
-	check(game.production.worker.global_basis.z.is_equal_approx(forward), "Clone faces same local direction as player")
+	check(game.lecture.students.size() == 1, "Selected clone attends the presentation")
+	var production_before: Dictionary = game.playback.snapshot()
+	for tick in range(160): game._physics_process(DELTA)
+	check(game.playback.snapshot() == production_before, "Production does not echo the demonstration")
+	for tick in range(1000): game.lecture.advance(DELTA)
+	check(game.lecture.students[0].actor.notebook.visible, "Student takes notes at the table")
 
-	print("[6/8] Immediate result, tail drain, cancellation and on-demand playback")
+	print("[6/8] Success, walk home, cancellation and on-demand playback")
 	game.live.filled = 225
 	game.live.wine = 775
 	game.finish_recording()
 	check(not game.recording and not game.player.constrained and not game.service.get_clone(game.selected_clone_id).recipes.is_empty(), "Success commits and releases zone immediately")
-	check(game.service.stations[1].state == "training", "Only the final echo tail holds the employee")
+	check(game.service.stations[1].state == "training", "Employee finishes walking home before taking orders")
 	for wall in game.barrier_bodies: check(wall.collision_layer == 0, "Barriers released")
 	var saved: Array = game.service.get_clone(game.selected_clone_id).recipes.wine.frames.duplicate(true)
-	for tick in range(121): game._advance_echo()
-	check(not game.echo_active and game.playback.success(), "Remaining delayed frames finish")
+	for tick in range(1800): game.lecture.advance(DELTA)
+	check(game.lecture.students.is_empty(), "Employee has returned home")
 	check(game.service.stations[1].state == "idle", "Employee returns to customer service")
 	game.start_recording()
 	game.finish_recording()
@@ -261,12 +250,12 @@ func run() -> void:
 	loaded.restore(JSON.parse_string(JSON.stringify(saved.back())))
 	check(loaded.success(), "JSON roundtrip preserves success")
 
-	print("[8/8] Pause freezes player and delayed playback")
+	print("[8/8] Pause freezes player and teaching")
 	game.toggle_pause()
-	var old_tick: int = game.echo_clock
+	var old_tick: int = game.tick_count
 	var old_position: Vector3 = game.player.global_position
 	game._physics_process(DELTA)
-	check(game.echo_clock == old_tick and game.player.global_position == old_position, "Paused state remains still")
+	check(game.tick_count == old_tick and game.player.global_position == old_position, "Paused state remains still")
 	game.queue_free()
 	await process_frame
 	if had_save:
