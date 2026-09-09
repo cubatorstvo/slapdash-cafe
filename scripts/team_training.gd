@@ -8,13 +8,14 @@ var phase := "idle"
 var mode := "roles"
 var crew: Array = []
 var partner := -1
+var lead_peer := 1
 var tapes: Array = [[], []]
 var frames: Array = []
 var tick := 0
 var local_role := 0
 var pending := {}
-var remote := {}
-var remote_events: Array = []
+var remote_by_role: Array = [{}, {}]
+var events_by_role: Array = [[], []]
 var grip := Vector3.FORWARD
 var height := 0.4
 var precision := false
@@ -30,17 +31,25 @@ func setup(root_game: Node3D) -> void:
 	view.update_view(model)
 
 func active() -> bool: return phase != "idle"
+func participating() -> bool: return active() and local_role >= 0
+func role_for(peer_id: int) -> int:
+	if not active(): return -1
+	if mode == "together" or phase == "together":
+		return 0 if peer_id == lead_peer else (1 if peer_id == partner else -1)
+	return (1 if phase == "role2" else 0) if peer_id == lead_peer else -1
 func running() -> bool: return phase in ["role1", "role2", "together"]
 func near() -> bool:
 	var p: Vector3 = view.to_local(game.player.global_position)
 	return absf(p.x) < 3.2 and p.z > 1.2 and p.z < 3.1
 
-func start(selected_mode: String, ids: Array, selected_peer: int) -> void:
+func start(selected_mode: String, ids: Array, selected_peer: int, initiator := 1) -> void:
 	if game.session.is_guest() or game.recording or active(): return
 	if ids.size() != 2 or ids[0] == ids[1]: return
 	for id in ids:
 		if game.service.get_clone(id).is_empty(): return
-	if selected_mode == "together" and not game.session.members.has(selected_peer): return
+	if not selected_mode in ["roles", "together"]: return
+	if selected_mode == "together" and (selected_peer == initiator or not game.session.members.has(selected_peer)): return
+	lead_peer = initiator
 	game.menu.close()
 	game.lecture.clear_now()
 	mode = selected_mode
@@ -54,7 +63,7 @@ func start(selected_mode: String, ids: Array, selected_peer: int) -> void:
 		starts.append(game.clone_home(ids[role]))
 		homes.append(game.service.stations[3].view.to_global(Vector3(-1.35 if role == 0 else 1.35, 0, 1.85)))
 	game.service.reserve_team(ids)
-	game.lecture.begin(names, starts, view, game.player, func(): game.service.release_station(3), homes)
+	game.lecture.begin(names, starts, view, game.session.actor_for(lead_peer), func(): game.service.release_station(3), homes)
 	tapes = [[], []]
 	_reset("role1" if mode == "roles" else "together", 0)
 	info = "Роль 1: покажи свою часть. Enter — записывать роль 2." if mode == "roles" else "Готовьте вместе. Общие предметы берутся по очереди. Enter — сохранить."
@@ -64,16 +73,17 @@ func _reset(next_phase: String, role: int) -> void:
 	frames.clear()
 	tick = 0
 	pending.clear()
-	remote.clear()
-	remote_events.clear()
+	remote_by_role = [{}, {}]
+	events_by_role = [[], []]
 	view.station_label.hide()
 	view.status.hide()
 	phase = next_phase
-	local_role = role
+	game.session.restart_id += 1
+	local_role = role_for(game.session.local_id())
 	height = 0.4
 	need_anchor = false
 	precision = false
-	_place_player(role)
+	if local_role >= 0: _place_player(local_role)
 
 func _place_player(role: int) -> void:
 	game.player.station = view
@@ -87,7 +97,7 @@ func _place_player(role: int) -> void:
 	for wall in view.bounds: wall.show()
 
 func handle(event: InputEvent) -> void:
-	if not active(): return
+	if not participating(): return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_ENTER, KEY_KP_ENTER:
@@ -157,15 +167,18 @@ func advance(delta: float) -> void:
 		view.update_view(model)
 		return
 	if game.session.is_guest():
-		game.session.send_motion(command(delta))
+		if participating() and not game.input_blocked(): game.session.send_motion(command(delta))
 		view.update_view(model)
+		_update_actors()
 		return
 	var commands: Array = [{}, {}]
-	commands[local_role] = command(delta)
+	for role in range(2):
+		if role == local_role:
+			commands[role] = command(delta) if not game.input_blocked() else {"pose": model.poses[role], "use": false}
+		else:
+			commands[role] = remote_by_role[role].duplicate(true)
+			if not events_by_role[role].is_empty(): commands[role].merge(events_by_role[role].pop_front(), true)
 	if phase == "role2" and tick < tapes[0].size(): commands[0] = tapes[0][tick]
-	if phase == "together":
-		commands[1] = remote.duplicate(true)
-		if not remote_events.is_empty(): commands[1].merge(remote_events.pop_front(), true)
 	model.step(commands, delta)
 	if phase == "role1": tapes[0].append(commands[0].duplicate(true))
 	else: tapes[1].append(commands[1].duplicate(true))
@@ -176,10 +189,10 @@ func advance(delta: float) -> void:
 	_update_actors()
 
 func _update_actors() -> void:
-	view.actors[0].visible = phase == "role2" or (phase == "together" and local_role == 1)
-	view.actors[1].visible = phase == "together" and local_role == 0
-	view.actors[0].caption.text = "Дубль роли 1" if phase == "role2" else "Напарник · роль 1"
-	view.actors[1].caption.text = "Напарник · роль 2"
+	view.actors[0].visible = phase == "role2" or (active() and local_role != 0)
+	view.actors[1].visible = phase == "together" and local_role != 1
+	view.actors[0].caption.text = "Дубль роли 1" if phase == "role2" else str(game.session.members.get(lead_peer, "Напарник")) + " · роль 1"
+	view.actors[1].caption.text = str(game.session.members.get(partner, "Напарник")) + " · роль 2"
 
 func finish() -> void:
 	if phase == "role1":
@@ -217,7 +230,6 @@ func retake() -> void:
 	elif phase == "together":
 		tapes = [[], []]
 		_reset("together", 0)
-		game.session.restart_id += 1
 	info = "Кухня сброшена. Запиши текущую роль заново."
 
 func cancel() -> void:
@@ -227,6 +239,8 @@ func cancel() -> void:
 
 func _end() -> void:
 	phase = "idle"
+	game.session.restart_id += 1
+	local_role = -1
 	view.station_label.show()
 	view.status.show()
 	partner = -1
@@ -239,22 +253,30 @@ func _end() -> void:
 	game.lecture.finish()
 	game.hud.notice.text = info
 
-func apply_remote(data: Dictionary, selected: bool) -> void:
-	var was_active := active()
+func apply_remote(data: Dictionary) -> void:
+	var was_participating := participating()
 	var old_phase := phase
-	view.station_label.visible = data.phase == "idle"
-	view.status.visible = data.phase == "idle"
 	model.restore(data.model)
-	phase = data.phase if selected else "idle"
-	if selected and (not was_active or old_phase != phase or data.restart != game.session.seen_restart): _place_player(1)
+	phase = data.phase
+	mode = "together" if phase == "together" else "roles"
+	partner = data.partner
+	lead_peer = data.lead
+	local_role = role_for(game.session.local_id())
+	view.station_label.visible = not active()
+	view.status.visible = not active()
+	if participating() and (not was_participating or old_phase != phase or data.restart != game.session.seen_restart):
+		game.menu.close()
+		_place_player(local_role)
+		pending.clear()
+		precision = false
+		need_anchor = false
 	game.session.seen_restart = data.restart
-	local_role = 1
 	info = data.info
-	if was_active and not selected:
+	if was_participating and not participating():
 		game.player.constrained = false
 		for wall in view.bounds: wall.hide()
 	view.update_view(model)
-	for role in range(2): view.actors[role].visible = data.phase == "together" and (not selected or role == 0)
+	_update_actors()
 
 func refresh_hud() -> void:
 	if not active(): return
@@ -263,6 +285,9 @@ func refresh_hud() -> void:
 	game.hud.progress.value = 100 if model.success() else (float(model.meat_sides[0]) + float(model.meat_sides[1]) + model.cooked + model.stirred) * 20
 	game.hud.supplies.text = "Мясо: %d%% / %d%% · Вода: %d/500 мл · Макароны: %d/100 г · %d°C · Варка: %d%%\nСоль: мясо %s / макароны %s · Перемешано: %d%% · На тарелке: %d г" % [model.meat_sides[0] * 100, model.meat_sides[1] * 100, model.water, model.pasta + model.served_pasta, model.temperature, model.cooked * 100, "✓" if model.meat_salt >= 1 else "—", "✓" if model.pasta_salt >= 1 else "—", model.stirred * 100, model.served_pasta]
 	game.hud.controls.text = "ЛКМ — взять / поставить · ПКМ — налить / посолить / перевернуть / мешать\nКолесо, R/F — высота · Shift + мышь — точнее · Enter — готово · Backspace — дубль заново · X — отмена"
+	if not participating():
+		game.hud.prompt.text = "Идёт показ другой бригады"
+		return
 	var item: String = model.hands[local_role]
 	if item.is_empty():
 		var hovered: String = view.pick_item(game.camera)

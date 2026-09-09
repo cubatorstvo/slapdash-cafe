@@ -178,7 +178,7 @@ func show_teaching(clones: Array, assigned: Array, selected_id: int, recipe: Str
 	clone_choice.clear()
 	var selection := 0
 	for index in range(clones.size()):
-		clone_choice.add_item("%s — знает блюд: %d/3" % [clones[index].name, clones[index].recipes.size()])
+		clone_choice.add_item("%s — знает блюд: %d/3" % [clones[index].name, clones[index].get("known", clones[index].recipes.keys()).size()])
 		if clones[index].id == selected_id: selection = index
 	clone_choice.select(selection)
 	dish_choice.clear()

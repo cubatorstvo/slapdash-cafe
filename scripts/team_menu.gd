@@ -1,6 +1,7 @@
 extends CanvasLayer
 signal start_requested(mode: String, ids: Array, peer_id: int)
 signal network_requested(action: String, address: String, port: int, player_name: String)
+signal steam_requested(action: String)
 signal closed
 var panel: PanelContainer
 var net_panel: PanelContainer
@@ -35,9 +36,13 @@ func _ready() -> void:
 	_button(box, "Начать показ", _start)
 	_button(box, "Закрыть", close)
 	panel.hide()
-	net_panel = _panel(580, 420)
+	net_panel = _panel(620, 650)
 	box = _column(net_panel)
-	_label(box, "СОВМЕСТНОЕ ОБУЧЕНИЕ · ENet / IP", 23)
+	_label(box, "ИГРАТЬ С ДРУЗЬЯМИ", 23)
+	_button(box, "Пригласить друга через Steam", func(): steam_requested.emit("invite"))
+	_button(box, "Создать Steam-кафе", func(): steam_requested.emit("host"))
+	_label(box, "Shift+Tab → друзья → пригласить в игру", 17)
+	_label(box, "Прямое подключение по IP (для локальной проверки)", 15)
 	player_name = LineEdit.new()
 	player_name.text = "Повар"
 	player_name.placeholder_text = "Имя игрока"
@@ -54,7 +59,9 @@ func _ready() -> void:
 	_button(box, "Создать сессию", func(): network_requested.emit("host", address.text, int(port.value), player_name.text))
 	_button(box, "Подключиться", func(): network_requested.emit("join", address.text, int(port.value), player_name.text))
 	_button(box, "Отключиться", func(): network_requested.emit("leave", "", 0, ""))
-	net_status = _label(box, "Хост выбирает напарника у стола II. Для интернета нужен\nдоступный UDP-порт хоста или общая VPN-сеть. Без Steam-лобби.")
+	net_status = _label(box, "Steam: проверяю подключение…")
+	net_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	net_status.custom_minimum_size = Vector2(540, 62)
 	_button(box, "Вернуться в кафе", close)
 	net_panel.hide()
 
@@ -94,14 +101,14 @@ func _button(parent: Control, value: String, callback: Callable) -> void:
 	button.pressed.connect(callback)
 	parent.add_child(button)
 
-func show_training(clones: Array, members: Dictionary) -> void:
+func show_training(clones: Array, members: Dictionary, own_id := 1) -> void:
 	for role in range(2):
 		employees[role].clear()
 		for clone in clones: employees[role].add_item(clone.name, clone.id)
 		if clones.size() > role: employees[role].select(role)
 	peers.clear()
 	for id in members:
-		if int(id) != 1: peers.add_item(str(members[id]), int(id))
+		if int(id) != own_id: peers.add_item(str(members[id]), int(id))
 	if peers.item_count == 0: peers.add_item("Нет подключённых игроков", -1)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -114,8 +121,8 @@ func _start() -> void:
 	if ids[0] == ids[1]:
 		description.text = "Выбери двух разных сотрудников."
 		return
-	if mode.selected == 1 and peers.get_selected_id() < 2:
-		description.text = "Сначала подключи напарника через F2. Показ запускает хост."
+	if mode.selected == 1 and peers.get_selected_id() < 1:
+		description.text = "Сначала подключи напарника через F2. Затем выбери его в списке."
 		return
 	start_requested.emit("roles" if mode.selected == 0 else "together", ids, peers.get_selected_id())
 
