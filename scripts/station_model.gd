@@ -7,7 +7,7 @@ const TARGET := 225.0
 const JUG_CAPACITY := 1000.0
 const RAG_CAPACITY := 300.0
 const CUP_RADIUS := 0.24
-const BOUNDS := Vector2(1.75, 0.8)
+const BOUNDS := Vector2(2.05, 0.85)
 const SURFACE_Y := 1.0
 const BASE_Y := 1.015
 const MAX_LIFT := 1.10
@@ -157,19 +157,6 @@ func spilled() -> float:
 	for puddle in puddles:
 		total += float(puddle[2])
 	return total
-
-static func pace(seconds: float) -> String:
-	if seconds < 15.0:
-		return "Fast"
-	if seconds <= 60.0:
-		return "Medium"
-	return "Slow"
-
-static func efficiency(seconds: float) -> float:
-	match pace(seconds):
-		"Fast": return 1.1
-		"Slow": return 0.9
-	return 1.0
 
 func snapshot() -> Dictionary:
 	return {"jug": [jug.x, jug.y], "cup": [cup.x, cup.y], "rag": [rag.x, rag.y],

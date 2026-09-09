@@ -21,7 +21,7 @@ func build(production := false) -> void:
 		P.box(self, Vector3(1.08, 0.06, 0.9), Vector3(point.x, 1.02, point.y), Color("303d42"))
 		P.cylinder(self, 0.37, 0.035, Vector3(point.x, 1.07, point.y), Color("da7846"))
 	for n in range(7): P.box(self, Vector3(0.85, 0.035, 0.035), Vector3(M.GRILL.x, 1.1, M.GRILL.y - 0.3 + n * 0.1), Color("384046"))
-	P.cylinder(self, 0.47, 0.025, Vector3(M.PLATE.x, 1.03, M.PLATE.y), Color("fff0d4"))
+	for plate in [M.PLATE, M.PASTA_PLATE]: P.cylinder(self, 0.44, 0.025, Vector3(plate.x, 1.03, plate.y), Color("fff0d4"))
 	for item in M.ITEMS:
 		var node := Node3D.new()
 		add_child(node)
@@ -42,7 +42,7 @@ func build(production := false) -> void:
 	items.pot.add_child(noodles)
 	plated = Node3D.new()
 	add_child(plated)
-	plated.position = Vector3(0.12, 1.06, M.PLATE.y)
+	plated.position = Vector3(M.PASTA_PLATE.x, 1.06, M.PASTA_PLATE.y)
 	for group in [noodles, plated]:
 		for n in range(18):
 			var noodle := P.cylinder(group, 0.017, 0.12, Vector3(sin(n * 2.3) * 0.23, 0.04 + (n % 3) * 0.025, cos(n * 3.1) * 0.2), Color("edcf74"))
@@ -52,10 +52,12 @@ func build(production := false) -> void:
 	P.box(items.water, Vector3(0.09, 0.3, 0.13), Vector3(0.25, 0.23, 0), Color("80b5c1"))
 	P.box(items.pasta_bag, Vector3(0.35, 0.48, 0.22), Vector3(0, 0.24, 0), Color("d7b168"))
 	P.text(items.pasta_bag, "PASTA", Vector3(0, 0.25, 0.12), 12).pixel_size = 0.003
-	P.cylinder(items.salt, 0.075, 0.17, Vector3(0, 0.085, 0), Color("efe9d6"))
-	P.cylinder(items.salt, 0.078, 0.035, Vector3(0, 0.18, 0), Color("718188"))
-	P.box(items.spatula, Vector3(0.10, 0.035, 0.48), Vector3(0, 0.03, 0), Color("96744e"))
-	P.box(items.spatula, Vector3(0.24, 0.025, 0.26), Vector3(0, 0.03, -0.32), Color("a2b4b4"))
+	for key in ["salt", "pasta_salt_tool"]:
+		P.cylinder(items[key], 0.075, 0.17, Vector3(0, 0.085, 0), Color("efe9d6"))
+		P.cylinder(items[key], 0.078, 0.035, Vector3(0, 0.18, 0), Color("718188"))
+	for key in ["spatula", "pasta_spatula"]:
+		P.box(items[key], Vector3(0.10, 0.035, 0.48), Vector3(0, 0.03, 0), Color("96744e"))
+		P.box(items[key], Vector3(0.24, 0.025, 0.26), Vector3(0, 0.03, -0.32), Color("a2b4b4"))
 	for role in range(2):
 		var actor := Avatar.new()
 		actor.tint = Color("689fb8") if role == 0 else Color("b58b69")
@@ -89,8 +91,8 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 		var owner: int = model.owners[item]
 		if owner >= 0 and model.using[owner]:
 			if item in ["water", "pasta_bag", "pot"]: node.rotation.x = -0.8
-			elif item == "salt": node.rotation.z = PI + sin(model.elapsed * 22) * 0.25
-			elif item == "spatula": node.rotation.y = sin(model.elapsed * 8) * 0.7
+			elif item in ["salt", "pasta_salt_tool"]: node.rotation.z = PI + sin(model.elapsed * 22) * 0.25
+			elif item in ["spatula", "pasta_spatula"]: node.rotation.y = sin(model.elapsed * 8) * 0.7
 	meat.material_override.albedo_color = Color("bc6355").lerp(Color("74513a"), model.meat_sides[1 - model.meat_face])
 	if model.flip_time > 0: items.steak.rotation.z = (model.flip_time / 0.35) * PI
 	liquid.visible = model.water > 0
@@ -104,7 +106,7 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 		actors[role].perform(model.poses[role], target, not item.is_empty())
 		streams[role].visible = model.pouring[role] and not item.is_empty()
 		if streams[role].visible:
-			streams[role].material_override.albedo_color = Color("a0d5e2") if item == "water" else (Color("fff5d8") if item == "salt" else Color("edcf74"))
+			streams[role].material_override.albedo_color = Color("a0d5e2") if item == "water" else (Color("fff5d8") if item in ["salt", "pasta_salt_tool"] else Color("edcf74"))
 			P.align_line(streams[role], target, Vector3(target.x, M.BASE_Y + 0.08, target.z))
 	status.text = "МЯСО %d%% / %d%% · соль %s\nВОДА %d/500 мл · МАКАРОНЫ %d/100 г\nВарка %d%% · мешать %d%% · соль %s" % [model.meat_sides[0] * 100, model.meat_sides[1] * 100, "✓" if model.meat_salt >= 1 else "—", model.water, model.pasta + model.served_pasta, model.cooked * 100, model.stirred * 100, "✓" if model.pasta_salt >= 1 else "—"]
 
@@ -114,9 +116,9 @@ func pick_item(camera: Camera3D) -> String:
 	var best := ""
 	var distance := 100.0
 	for item in M.ITEMS:
-		var center: Vector3 = items[item].position + Vector3(0, 0.16, -0.12 if item == "spatula" else 0)
+		var center: Vector3 = items[item].position + Vector3(0, 0.16, -0.12 if item in ["spatula", "pasta_spatula"] else 0)
 		var reach := (center - origin).dot(ray)
-		var radius := 0.17 if item == "salt" else (0.32 if item == "spatula" else 0.37)
+		var radius := 0.17 if item in ["salt", "pasta_salt_tool"] else (0.32 if item in ["spatula", "pasta_spatula"] else 0.37)
 		if reach > 0 and reach < distance and (origin + ray * reach).distance_to(center) < radius:
 			distance = reach
 			best = item

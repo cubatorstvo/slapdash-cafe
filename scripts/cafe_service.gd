@@ -1,128 +1,74 @@
 extends Node3D
-## Three counters share a staff roster; each employee owns independent recipe recordings.
-const Model = preload("res://scripts/cooking_model.gd")
-const View = preload("res://scripts/station_view.gd")
-const TeamModel = preload("res://scripts/team_cooking_model.gd")
-const TeamView = preload("res://scripts/team_station_view.gd")
+const Station = preload("res://scripts/work_station.gd")
+const Definition = preload("res://scripts/station_definition.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const NAMES := ["Боря", "Жора", "Лёва", "Сёма", "Кеша", "Веня", "Федя", "Толя"]
-const SHORT_NAMES := {"wine": "Вино", "potato": "Картошка", "sausage": "Сосиска", "meal": "Стейк с макаронами"}
-var team_recipe: Dictionary = {}
-var clones: Array = []
 var stations: Array = []
 var customers: Array = []
-var reserve_people: Array[Node3D] = []
-var next_clone_id := 1
+var next_station_id := 1
 var next_customer_id := 1
 var served := 0
 var missed := 0
 var revenue := 0
 var open_for_business := true
 var spawn_clock := 3.0
+var game: Node3D
 var rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	rng.randomize()
-	for index in range(3):
-		var view := View.new()
-		add_child(view)
-		view.position = Vector3((index - 1) * 5.1, 0, -1.4)
-		view.rotation.y = PI
-		view.build(true)
-		view.station_label.text = "СТОЙКА %d" % (index + 1)
-		view.station_label.position = Vector3(0, 1.2, -1.15)
-		view.station_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		view.station_label.modulate = Color("f3cf8b")
-		var model := Model.new()
-		model.reset(Model.DISHES.keys()[index])
-		stations.append({"view": view, "model": model, "clone_id": -1, "state": "idle", "customer_id": -1, "frames": [], "tick": 0})
-	var team_view := TeamView.new()
-	add_child(team_view)
-	team_view.position = Vector3(11.2, 0, -1.4)
-	team_view.rotation.y = PI
-	team_view.build(true)
-	stations.append({"view": team_view, "model": TeamModel.new(), "clone_id": -1, "clone_ids": [-1, -1], "state": "idle", "customer_id": -1, "frames": [], "tick": 0})
-	create_clone()
-	refresh_views()
 
-func create_clone() -> Dictionary:
-	var clone := {"id": next_clone_id, "name": "%s №%d" % [NAMES[(next_clone_id - 1) % NAMES.size()], next_clone_id], "recipes": {}}
-	next_clone_id += 1
-	clones.append(clone)
-	for slot in [1, 0, 2]:
-		if stations[slot].clone_id < 0:
-			stations[slot].clone_id = clone.id
-			break
-	refresh_reserve()
-	return clone
+func initial_stations() -> void:
+	for index in range(3): add_station("counter", Vector3((index - 1) * 5.1, 0, -1.4))
+	add_station("kitchen", Vector3(11.2, 0, -1.4))
 
-func get_clone(id: int) -> Dictionary:
-	for clone in clones:
-		if clone.id == id: return clone
-	return {}
+func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
+	var station := Station.new()
+	station.station_id = next_station_id if id == 0 else id
+	next_station_id = maxi(next_station_id, station.station_id + 1)
+	station.type_id = type_id
+	station.position = point
+	station.rotation.y = PI
+	add_child(station)
+	stations.append(station)
+	return station
 
-func slot_of(id: int) -> int:
-	for index in range(stations.size()):
-		if stations[index].clone_id == id or (index == 3 and id in stations[index].clone_ids): return index
-	return -1
+func by_id(id: int) -> Node3D:
+	for station in stations:
+		if station.station_id == id: return station
+	return null
 
-func reserve_station(slot: int, clone_id: int) -> void:
-	var previous := slot_of(clone_id)
-	for index in range(stations.size()):
-		if index != slot and index != previous: continue
-		var station: Dictionary = stations[index]
-		if station.customer_id >= 0: _leave_customer(station.customer_id, "Повар ушёл учиться")
-		station.state = "idle"
-		station.frames = []
-		station.clone_id = -1
-		if index == 3: station.clone_ids = [-1, -1]
-	stations[slot].clone_id = clone_id
-	stations[slot].state = "training"
-	refresh_reserve()
+func training_for(peer: int) -> Node3D:
+	for station in stations:
+		if station.training.active() and (station.training.lead == peer or station.training.role_for(peer) >= 0): return station
+	return null
 
-func reserve_team(ids: Array) -> void:
-	for id in ids:
-		var previous := slot_of(id)
-		if previous >= 0:
-			if stations[previous].customer_id >= 0: _leave_customer(stations[previous].customer_id, "Бригада учится")
-			stations[previous].clone_id = -1
-			stations[previous].state = "idle"
-			stations[previous].frames = []
-			if previous == 3: stations[3].clone_ids = [-1, -1]
-	if stations[3].customer_id >= 0: _leave_customer(stations[3].customer_id, "Бригада учится")
-	stations[3].clone_ids = ids.duplicate()
-	stations[3].state = "training"
-	stations[3].frames = []
-	refresh_reserve()
+func any_training() -> bool:
+	for station in stations:
+		if station.training.active() or station.pending_teacher > 0: return true
+	return false
 
-func record_for(slot: int, dish: String) -> Dictionary:
-	if slot == 3:
-		if dish == "meal" and team_recipe.get("clone_ids", []) == stations[3].clone_ids: return team_recipe
-		return {}
-	var clone := get_clone(stations[slot].clone_id)
-	return clone.recipes.get(dish, {}) if not clone.is_empty() else {}
+func request_training(station: Node3D, dish: String, peer: int) -> bool:
+	if station == null or not dish in station.dishes(): return false
+	if station.training.active(): return station.training.lead == peer
+	if training_for(peer) != null or station.pending_teacher > 0: return false
+	if station.state == "cooking":
+		station.pending_teacher = peer
+		station.pending_dish = dish
+		return true
+	station.training.dish = dish
+	_attach_customer(station)
+	station.training.open(dish, peer)
+	return true
 
-func release_station(slot: int) -> void:
-	stations[slot].state = "idle"
-	stations[slot].frames = []
-
-func refresh_reserve() -> void:
-	for person in reserve_people: person.queue_free()
-	reserve_people.clear()
-	var count := 0
-	for clone in clones:
-		if slot_of(clone.id) >= 0: continue
-		# Staff count is unlimited; a few visible reserves keep the small room readable.
-		if count >= 10: break
-		var person := Person.new()
-		person.chef = true
-		person.color = Color("63aa98")
-		add_child(person)
-		person.position = Vector3(-6.5 + count * 1.35, 0, -6.6)
-		person.rotation.y = PI
-		person.caption.text = clone.name + "\nРезерв"
-		reserve_people.append(person)
-		count += 1
+func _attach_customer(station: Node3D) -> void:
+	for customer in customers:
+		if customer.id == station.customer_id and customer.dish == station.training.dish:
+			station.taster = customer.view
+			station.taster_real = true
+			customer.state = "training"
+			customer.path.clear()
+			return
+	if station.customer_id >= 0: finish_customer(station.customer_id, false)
 
 func advance(delta: float) -> void:
 	if open_for_business:
@@ -131,15 +77,20 @@ func advance(delta: float) -> void:
 			spawn_customer()
 			spawn_clock = 6.0
 	for station in stations:
+		station.training.advance(delta)
 		if station.state != "cooking": continue
-		if station.tick < station.frames.size():
-			station.model.restore(station.frames[station.tick])
-			station.tick += 1
-		if station.tick >= station.frames.size():
-			served += 1
-			var price := roundi((65 if station.has("clone_ids") else 25) * Model.efficiency(station.frames.size() / 60.0))
-			revenue += price
-			_leave_customer(station.customer_id, "Спасибо! +%d" % price)
+		var record: Dictionary = station.recipes[station.order_dish]
+		station.show_tracks(record.tracks, station.order_tick)
+		station.order_tick += 1
+		if station.type_id == "counter":
+			for customer in customers:
+				if customer.id == station.customer_id: customer.view.react(station.model.customer_reaction)
+		if station.order_tick >= station.Run.duration_ticks(record.tracks):
+			finish_customer(station.customer_id, true)
+			if station.pending_teacher > 0:
+				var teacher: int = station.pending_teacher
+				station.pending_teacher = 0
+				station.training.open(station.pending_dish, teacher)
 	for index in range(customers.size() - 1, -1, -1):
 		var customer: Dictionary = customers[index]
 		if not customer.path.is_empty():
@@ -148,142 +99,146 @@ func advance(delta: float) -> void:
 		if customer.state == "leaving":
 			customer.view.queue_free()
 			customers.remove_at(index)
-		elif customer.state == "walking":
+		elif customer.state in ["walking", "waiting"]:
 			customer.state = "waiting"
-			customer.wait = 0.0
-		elif customer.state == "waiting":
-			var station: Dictionary = stations[customer.slot]
-			var record := record_for(customer.slot, customer.dish)
-			if not record.is_empty():
-				station.frames = record.frames
-				station.tick = 0
+			var station: Node3D = by_id(customer.station)
+			customer.view.rotation.y = station.global_rotation.y + PI
+			if station.recipes.has(customer.dish):
 				station.state = "cooking"
+				station.order_dish = customer.dish
+				station.order_tick = 0
+				station.reset_model()
 				customer.state = "cooking"
-				customer.view.caption.text = SHORT_NAMES[customer.dish] + "\nЖду свой заказ…"
 			else:
 				customer.wait += delta
-				customer.view.caption.text = SHORT_NAMES[customer.dish] + "\nПовар пока не умеет"
-				if customer.wait >= 9:
+				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут твоего показа · [E]"
+				if customer.wait >= 35:
 					missed += 1
-					_leave_customer(customer.id, "Зайду после обучения")
+					finish_customer(customer.id, false)
 
 func spawn_customer(recipe := "") -> bool:
-	if customers.size() >= 9: return false
-	if recipe.is_empty(): recipe = SHORT_NAMES.keys()[rng.randi_range(0, 3)]
-	var available: Array = []
-	var trained: Array = []
-	for index in range(stations.size()):
-		var station: Dictionary = stations[index]
-		if station.state != "idle" or (recipe == "meal") != (index == 3): continue
-		available.append(index)
-		if not record_for(index, recipe).is_empty(): trained.append(index)
-	if available.is_empty(): return false
-	var candidates: Array = trained if not trained.is_empty() else available
-	var slot: int = candidates[rng.randi_range(0, candidates.size() - 1)]
-	var station: Dictionary = stations[slot]
+	if customers.size() >= 12: return false
+	if recipe.is_empty(): recipe = Definition.DISHES.keys()[rng.randi_range(0, 3)]
+	var candidates: Array = []
+	for station in stations:
+		if station.state == "idle" and station.pending_teacher == 0 and recipe in station.dishes(): candidates.append(station)
+	if candidates.is_empty():
+		missed += 1
+		return false
+	var station: Node3D = candidates[rng.randi_range(0, candidates.size() - 1)]
 	var person := Person.new()
 	person.color = [Color("ae7381"), Color("839fbb"), Color("c6a66b"), Color("91aa78")][next_customer_id % 4]
 	add_child(person)
 	person.position = Vector3(-9.4, 0, 1.65)
-	person.caption.text = SHORT_NAMES[recipe]
-	var x: float = station.view.position.x
-	customers.append({"id": next_customer_id, "view": person, "dish": recipe, "slot": slot, "state": "walking", "wait": 0.0,
-		"path": [Vector3(x, 0, 1.65), Vector3(x, 0, 0.22)]})
+	person.caption.text = Definition.DISHES[recipe]
+	var destination: Vector3 = station.to_global(Vector3(0, 0, -1.85))
+	customers.append({"id": next_customer_id, "view": person, "station": station.station_id, "dish": recipe, "state": "walking", "wait": 0.0, "path": [destination]})
 	station.customer_id = next_customer_id
 	station.state = "waiting"
-	if slot == 3: station.model.reset()
-	else: station.model.reset(recipe)
 	next_customer_id += 1
 	return true
 
-func _leave_customer(id: int, message: String) -> void:
+func finish_customer(id: int, accepted: bool) -> void:
 	for customer in customers:
-		if customer.id != id: continue
+		if customer.id != id or customer.state == "leaving": continue
 		customer.state = "leaving"
-		customer.view.caption.text = message
-		customer.view.caption.modulate = Color("a0ebbd")
-		customer.path = [Vector3(customer.view.position.x, 0, 1.65), Vector3(15.4, 0, 1.65)]
-		var station: Dictionary = stations[customer.slot]
+		customer.view.caption.text = "Спасибо!" if accepted else "Загляну позже"
+		customer.path = [Vector3(15.4, 0, 1.65)]
+		var station: Node3D = by_id(customer.station)
 		station.customer_id = -1
-		station.state = "idle"
-		station.frames = []
+		if not station.training.active(): station.state = "idle"
+		if accepted:
+			served += 1
+			revenue += 65 if customer.dish == "meal" else 25
 		return
 
-func refresh_views() -> void:
-	for station in stations:
-		station.view.update_view(station.model, 0, station.state == "idle")
-		if station.has("clone_ids"):
-			station.view.status.visible = station.state == "cooking"
-			for role in range(2):
-				var member := get_clone(station.clone_ids[role])
-				station.view.actors[role].visible = not member.is_empty() and station.state != "training"
-				station.view.actors[role].caption.text = member.get("name", "") + "\n" + ("Готовит" if station.state == "cooking" else "Ждёт заказ")
-			continue
-		var clone := get_clone(station.clone_id)
-		var occupied := not clone.is_empty()
-		for node in [station.view.worker, station.view.left_hand, station.view.right_hand, station.view.left_arm, station.view.right_arm]: node.visible = occupied and station.state != "training"
-		if occupied:
-			var state_text := "Учится" if station.state == "training" else ("Готовит" if station.state == "cooking" else "Ждёт заказ")
-			station.view.name_label.text = clone.name + "\n" + state_text
+func refresh_views(delta := 0.016) -> void:
+	for station in stations: station.refresh(game.session.local_id(), delta)
 
 func save_data() -> Dictionary:
-	var assigned: Array = []
-	for index in range(3): assigned.append(stations[index].clone_id)
-	return {"format": "slapdash-cafe", "clones": clones, "assigned": assigned, "team_assigned": stations[3].clone_ids, "team_recipe": team_recipe, "served": served, "revenue": revenue}
+	var entries: Array = []
+	for station in stations: entries.append(station.save_entry())
+	return {"format": "station-cafe", "version": 1, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
-func load_data(data: Dictionary, validate_frame: Callable) -> bool:
-	if data.get("format") != "slapdash-cafe" or not data.get("clones") is Array or data.clones.is_empty(): return false
-	var checked: Array = []
+func clear_world() -> void:
+	for station in stations:
+		remove_child(station)
+		station.queue_free()
+	for customer in customers:
+		remove_child(customer.view)
+		customer.view.queue_free()
+	stations.clear()
+	customers.clear()
+	next_station_id = 1
+
+func load_data(data: Dictionary) -> bool:
+	if data.get("format") != "station-cafe" or data.get("version") != 1 or not data.get("stations") is Array: return false
 	var ids: Array = []
-	for entry in data.clones:
-		if not entry is Dictionary or not entry.get("id") is float and not entry.get("id") is int: return false
-		var id := int(entry.id)
-		if id < 1 or id in ids or not entry.get("name") is String or not entry.get("recipes") is Dictionary: return false
-		ids.append(id)
-		var recipes := {}
-		for recipe in entry.recipes:
-			if not recipe in Model.DISHES: return false
-			var record = entry.recipes[recipe]
-			if not record is Dictionary or not record.get("frames") is Array or record.frames.is_empty(): return false
-			for frame in record.frames:
-				if not validate_frame.call(frame) or frame.get("dish", "wine") != recipe: return false
-			var result := Model.new()
-			result.restore(record.frames.back())
-			if not result.success(): return false
-			recipes[recipe] = {"frames": record.frames, "duration": record.frames.size() / 60.0}
-		checked.append({"id": id, "name": entry.name, "recipes": recipes})
-	var assigned = data.get("assigned")
-	if not assigned is Array or assigned.size() != 3: return false
-	var used: Array = []
-	for id in assigned:
-		if not id is float and not id is int: return false
-		if id != -1 and (not int(id) in ids or int(id) in used): return false
-		used.append(int(id))
-	var team_ids = data.get("team_assigned", [-1, -1])
-	if not team_ids is Array or team_ids.size() != 2: return false
-	for id in team_ids:
-		if not id is float and not id is int: return false
-		if id != -1 and (not int(id) in ids or int(id) in used): return false
-		used.append(int(id))
-	var record = data.get("team_recipe", {})
-	if not record is Dictionary: return false
-	if not record.is_empty():
-		if not record.get("clone_ids") is Array or record.clone_ids.size() != 2 or record.clone_ids[0] == record.clone_ids[1]: return false
-		for id in record.clone_ids:
-			if not TeamModel.finite(id) or not int(id) in ids: return false
-		if not record.get("frames") is Array or record.frames.is_empty(): return false
-		for frame in record.frames:
-			if not TeamModel.valid(frame): return false
-		var result := TeamModel.new()
-		result.restore(record.frames.back())
-		if not result.success(): return false
-	team_recipe = record.duplicate(true)
-	if not team_recipe.is_empty(): team_recipe.clone_ids = [int(record.clone_ids[0]), int(record.clone_ids[1])]
-	stations[3].clone_ids = [int(team_ids[0]), int(team_ids[1])]
-	clones = checked
-	next_clone_id = int(ids.max()) + 1
-	for index in range(3): stations[index].clone_id = int(assigned[index])
+	for entry in data.stations:
+		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES or not entry.get("id") is int or entry.id <= 0 or entry.id in ids: return false
+		ids.append(entry.id)
+		if not Station.TeamModel.numbers(entry.get("position"), 3) or not Station.TeamModel.finite(entry.get("yaw")): return false
+		if not entry.get("crew") is Array or entry.crew.size() != Definition.TYPES[entry.type].roles.size(): return false
+		for member in entry.crew:
+			if not member is Dictionary or not member.get("name") is String: return false
+		if not entry.get("recipes") is Dictionary or not entry.get("drafts") is Dictionary or not entry.get("upgrades") is Array: return false
+		for collection in [entry.recipes, entry.drafts]:
+			for dish in collection:
+				if not dish in Definition.TYPES[entry.type].dishes: return false
+				if collection == entry.recipes and not collection[dish] is Dictionary: return false
+				var tracks = collection[dish].get("tracks", []) if collection == entry.recipes else collection[dish]
+				if not valid_tracks(tracks, entry.type): return false
+				if collection == entry.recipes:
+					if not Station.TeamModel.finite(collection[dish].get("duration")): return false
+					for track in tracks:
+						if track.is_empty() or track.frames.is_empty(): return false
+	clear_world()
+	for entry in data.stations:
+		var station := add_station(entry.type, Vector3(entry.position[0], entry.position[1], entry.position[2]), entry.id)
+		station.rotation.y = entry.yaw
+		station.crew = entry.crew.duplicate(true)
+		station.upgrades = entry.upgrades.duplicate(true)
+		station.recipes = entry.recipes.duplicate(true)
+		station.drafts = entry.drafts.duplicate(true)
+		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	served = int(data.get("served", 0))
 	revenue = int(data.get("revenue", 0))
-	refresh_reserve()
+	missed = int(data.get("missed", 0))
+	open_for_business = data.get("open", true)
+	return true
+
+func valid_tracks(tracks: Variant, type_id: String) -> bool:
+	if not tracks is Array or tracks.size() != Definition.TYPES[type_id].roles.size(): return false
+	var sample = Station.Model.new() if type_id == "counter" else Station.TeamModel.new()
+	for role in range(tracks.size()):
+		var track = tracks[role]
+		if not track is Dictionary: return false
+		if track.is_empty(): continue
+		if not track.get("group") is int or not track.get("frames") is Array: return false
+		var schema: Dictionary = sample.snapshot() if type_id == "counter" else sample.zone_snapshot(role)
+		for frame in track.frames:
+			if not matches_schema(frame, schema): return false
+			if type_id == "counter":
+				if not frame.held in ["", "jug", "cup", "rag", "pan", "potato", "sausage", "tomato"]: return false
+				for puddle in frame.puddles:
+					if not Station.TeamModel.numbers(puddle, 3): return false
+			else:
+				if not frame.hand in Station.TeamModel.ITEMS + [""]: return false
+				for item in frame.owners:
+					if not frame.owners[item] in [-1, 0, 1]: return false
+	return true
+
+func matches_schema(value: Variant, schema: Variant) -> bool:
+	if schema is Dictionary:
+		if not value is Dictionary: return false
+		for key in schema:
+			if not value.has(key) or not matches_schema(value[key], schema[key]): return false
+	elif schema is Array:
+		if not value is Array: return false
+		if not schema.is_empty():
+			if value.size() != schema.size(): return false
+			for i in range(schema.size()):
+				if not matches_schema(value[i], schema[i]): return false
+	elif schema is float or schema is int: return Station.TeamModel.finite(value)
+	elif typeof(value) != typeof(schema): return false
 	return true

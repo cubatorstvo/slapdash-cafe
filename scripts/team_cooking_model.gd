@@ -4,9 +4,13 @@ const BOUNDS := Vector2(2.75, 0.90)
 const BASE_Y := 1.015
 const GRILL := Vector2(-1.4, -0.15)
 const STOVE := Vector2(1.4, -0.15)
-const PLATE := Vector2(0, 0.65)
-const ITEMS := ["steak", "pot", "water", "pasta_bag", "salt", "spatula"]
-const NAMES := {"steak": "стейк", "pot": "кастрюля", "water": "кувшин воды", "pasta_bag": "мешок макарон", "salt": "солонка", "spatula": "лопатка"}
+const PLATE := Vector2(-0.5, 0.65)
+const PASTA_PLATE := Vector2(0.5, 0.65)
+const ITEMS := ["steak", "pot", "water", "pasta_bag", "salt", "spatula", "pasta_salt_tool", "pasta_spatula"]
+const NAMES := {"steak": "стейк", "pot": "кастрюля", "water": "кувшин воды", "pasta_bag": "мешок макарон", "salt": "солонка", "spatula": "лопатка для мяса", "pasta_salt_tool": "соль для макарон", "pasta_spatula": "лопатка для макарон"}
+const ZONE_ITEMS := [["steak", "salt", "spatula"], ["pot", "water", "pasta_bag", "pasta_salt_tool", "pasta_spatula"]]
+const ZONE_VALUES := [["meat_sides", "meat_face", "meat_state", "meat_salt", "flip_time"], ["water", "pasta", "bag", "temperature", "cooked", "stirred", "pasta_salt", "served_pasta"]]
+var live_roles: Array = [0, 1]
 var positions: Dictionary
 var heights: Dictionary
 var owners: Dictionary
@@ -33,7 +37,7 @@ var elapsed := 0.0
 func _init() -> void: reset()
 
 func reset() -> void:
-	positions = {"steak": Vector2(-2.25, 0.45), "pot": STOVE, "water": Vector2(2.3, 0.45), "pasta_bag": Vector2(2.25, -0.55), "salt": Vector2(0, -0.48), "spatula": Vector2(0, 0.02)}
+	positions = {"steak": Vector2(-2.25, 0.45), "pot": STOVE, "water": Vector2(2.3, 0.45), "pasta_bag": Vector2(2.25, -0.55), "salt": Vector2(-0.48, -0.48), "spatula": Vector2(-0.45, 0.02), "pasta_salt_tool": Vector2(0.48, -0.48), "pasta_spatula": Vector2(0.45, 0.02)}
 	heights = {}
 	owners = {}
 	for item in ITEMS:
@@ -63,13 +67,13 @@ static func default_pose(role: int) -> Dictionary:
 	return {"position": [-1.35 if role == 0 else 1.35, 0.0, 1.85], "yaw": 0.0, "pitch": -0.2}
 
 func grab(role: int, item: String) -> bool:
-	if not item in ITEMS or not hands[role].is_empty(): return false
+	if not item in ITEMS or not hands[role].is_empty() or not can_touch(role, item): return false
 	if owners[item] != -1:
 		conflicts.append("Роль %d: %s занята другим участником" % [role + 1, NAMES[item]])
 		return false
 	owners[item] = role
 	hands[role] = item
-	heights[item] = 0.50 if item in ["water", "pasta_bag", "salt"] else 0.30
+	heights[item] = 0.50 if item in ["water", "pasta_bag", "salt", "pasta_salt_tool"] else 0.30
 	if item == "steak": meat_state = "held"
 	return true
 
@@ -99,6 +103,7 @@ func step(commands: Array, delta: float) -> void:
 		if not item.is_empty():
 			if command.has("target"):
 				var target := Vector2(command.target[0], command.target[1]).clamp(-BOUNDS, BOUNDS)
+				if live_roles.size() == 1: target.x = clampf(target.x, -BOUNDS.x if role == 0 else 0.12, -0.12 if role == 0 else BOUNDS.x)
 				positions[item] = positions[item].move_toward(target, delta * 5.0)
 			if command.has("height"): heights[item] = clampf(float(command.height), 0, 1.1)
 			if use_item: _use(role, item, not using[role], delta)
@@ -127,19 +132,19 @@ func _use(role: int, item: String, pressed: bool, delta: float) -> void:
 				var amount := minf(bag, delta * 50)
 				bag -= amount
 				pasta += amount
-		"salt":
+		"salt", "pasta_salt_tool":
 			pouring[role] = true
-			if point.distance_to(positions.steak) < 0.40 and heights.salt > float(heights.steak) + 0.18: meat_salt = minf(9, meat_salt + delta * 2)
+			if point.distance_to(positions.steak) < 0.40 and heights[item] > float(heights.steak) + 0.18: meat_salt = minf(9, meat_salt + delta * 2)
 			if over_pot and above_pot: pasta_salt = minf(9, pasta_salt + delta * 2)
-			elif point.distance_to(PLATE) < 0.45 and served_pasta > 0 and heights.salt > 0.20: pasta_salt = minf(9, pasta_salt + delta * 2)
-		"spatula":
-			if over_pot and heights.spatula < float(heights.pot) + 0.65:
+			elif point.distance_to(PASTA_PLATE) < 0.45 and served_pasta > 0 and heights[item] > 0.20: pasta_salt = minf(9, pasta_salt + delta * 2)
+		"spatula", "pasta_spatula":
+			if over_pot and heights[item] < float(heights.pot) + 0.65:
 				if pasta > 0 and water > 0: stirred = minf(1, stirred + delta / 2.0)
-			elif pressed and meat_state == "grill" and point.distance_to(positions.steak) < 0.48 and heights.spatula < 0.60:
+			elif pressed and meat_state == "grill" and point.distance_to(positions.steak) < 0.48 and heights[item] < 0.60:
 				meat_face = 1 - meat_face
 				flip_time = 0.35
 		"pot":
-			if point.distance_to(PLATE) < 0.55 and heights.pot > 0.2 and cooked >= 0.999 and stirred >= 0.999:
+			if point.distance_to(PASTA_PLATE) < 0.55 and heights.pot > 0.2 and cooked >= 0.999 and stirred >= 0.999:
 				pouring[role] = true
 				var amount := minf(pasta, delta * 160)
 				pasta -= amount
@@ -147,9 +152,6 @@ func _use(role: int, item: String, pressed: bool, delta: float) -> void:
 
 func success() -> bool:
 	return meat_state == "plate" and float(meat_sides[0]) >= 0.999 and float(meat_sides[1]) >= 0.999 and meat_salt >= 1 and served_pasta >= 99.9 and pasta_salt >= 1 and cooked >= 0.999 and stirred >= 0.999
-
-static func pace(seconds: float) -> String:
-	return "Fast" if seconds < 15 else ("Medium" if seconds <= 60 else "Slow")
 
 func snapshot() -> Dictionary:
 	var points := {}
@@ -193,3 +195,28 @@ static func numbers(data: Variant, count: int) -> bool:
 
 static func finite(value: Variant) -> bool:
 	return (value is float or value is int) and is_finite(float(value))
+
+func can_touch(role: int, item: String) -> bool:
+	if not role in live_roles: return false
+	for zone in range(ZONE_ITEMS.size()):
+		if item in ZONE_ITEMS[zone]: return zone in live_roles
+	return false
+
+func zone_snapshot(role: int) -> Dictionary:
+	var data := snapshot()
+	var result := {"positions": {}, "heights": {}, "owners": {}, "hand": hands[role], "pose": poses[role].duplicate(true), "using": using[role], "pouring": pouring[role]}
+	for item in ZONE_ITEMS[role]:
+		for key in ["positions", "heights", "owners"]: result[key][item] = data[key][item]
+	for key in ZONE_VALUES[role]: result[key] = data[key]
+	return result.duplicate(true)
+
+func restore_zone(role: int, data: Dictionary) -> void:
+	for item in ZONE_ITEMS[role]:
+		positions[item] = Vector2(data.positions[item][0], data.positions[item][1])
+		heights[item] = data.heights[item]
+		owners[item] = int(data.owners[item])
+	hands[role] = data.hand
+	poses[role] = data.pose.duplicate(true)
+	using[role] = data.using
+	pouring[role] = data.pouring
+	for key in ZONE_VALUES[role]: set(key, data[key].duplicate(true) if data[key] is Array else data[key])

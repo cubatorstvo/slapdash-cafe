@@ -1,96 +1,262 @@
 extends Node3D
-## FPS teaching feeds employee recordings into the three-counter cafe.
-
-const Model = preload("res://scripts/cooking_model.gd")
-const View = preload("res://scripts/station_view.gd")
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
-const Hud = preload("res://scripts/cafe_hud.gd")
-const SAVE_PATH := "user://cafe_staff.json"
 const Service = preload("res://scripts/cafe_service.gd")
-const TICK := 1.0 / 60.0
-const Team = preload("res://scripts/team_training.gd")
-const Lecture = preload("res://scripts/lecture_group.gd")
-const TeamMenu = preload("res://scripts/team_menu.gd")
-const Session = preload("res://scripts/coop_session.gd")
-const ITEM_MOVE_SPEED := 6.0
-const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска"}
-
-var live := Model.new()
-var playback := Model.new()
-var training: Node3D
-var production: Node3D
+const SAVE_PATH := "user://station_cafe.save"
+const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
 var player: CharacterBody3D
 var camera: Camera3D
-var hud: CanvasLayer
-var frames: Array = []
 var service: Node3D
-var clone_machine: Node3D
-var selected_clone_id := 1
-var selected_slot := 1
-var selected_dish := "wine"
-var recording := false
-var teacher_peer := 1
-var steam: Node
-var team: Node3D
-var lecture: Node3D
+var hud: CanvasLayer
 var menu: CanvasLayer
 var session: Node
-var elapsed := 0.0
+var steam: Node
 var session_paused := false
-var precision_active := false
-var grip_direction := Vector3.FORWARD
-var tick_count := 0
-var barrier_bodies: Array[StaticBody3D] = []
-var barrier_meshes: Array[MeshInstance3D] = []
+var bound_station := 0
+var bound_revision := -1
+var local_role := -1
+var grip := Vector3.FORWARD
+var height := 0.4
+var target := Vector2.ZERO
+var pan_tilt := Vector2.ZERO
+var anchored_item := ""
+var precise := false
+var last_menu_revision := ""
 
 func _ready() -> void:
 	_build_room()
-	training = View.new()
-	add_child(training)
-	training.position.z = 4.8
-	training.build(false)
-	service = Service.new()
-	add_child(service)
-	production = service.stations[selected_slot].view
-	playback = service.stations[selected_slot].model
-	_build_zone()
 	player = Player.new()
 	add_child(player)
-	player.global_position = Vector3(0, 0.02, 8.6)
-	player.station = training
+	player.position = Vector3(0, 0.02, 6)
 	camera = player.camera
-	camera.rotation.x = -0.15
-	hud = Hud.new()
+	camera.rotation.x = -0.2
+	hud = preload("res://scripts/cafe_hud.gd").new()
 	add_child(hud)
 	hud.resume_requested.connect(toggle_pause)
-	hud.training_requested.connect(_begin_selected_training)
-	hud.teaching_closed.connect(close_teaching_menu)
-	lecture = Lecture.new()
-	add_child(lecture)
-	team = Team.new()
-	add_child(team)
-	team.setup(self)
-	menu = TeamMenu.new()
+	menu = preload("res://scripts/cafe_menu.gd").new()
 	add_child(menu)
-	menu.start_requested.connect(_request_team)
-	menu.closed.connect(func(): sync_mouse_mode.call_deferred())
-	session = Session.new()
+	menu.game = self
+	service = Service.new()
+	service.game = self
+	add_child(service)
+	service.initial_stations()
+	session = preload("res://scripts/coop_session.gd").new()
 	session.name = "Session"
 	add_child(session)
 	session.setup(self)
+	menu.command_requested.connect(func(action): menu.close(); session.request_action(action))
 	menu.network_requested.connect(session.configure)
+	menu.closed.connect(sync_mouse_mode)
 	steam = preload("res://scripts/steam_lobby.gd").new()
 	add_child(steam)
-	menu.steam_requested.connect(func(action):
-		if action == "invite": steam.invite_friends()
-		else: steam.create_lobby())
+	menu.steam_requested.connect(func(action): steam.invite_friends() if action == "invite" else steam.create_lobby())
 	steam.setup(self)
-	_load_staff()
-	_refresh_views()
-	_refresh_hud()
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	load_cafe()
+	sync_mouse_mode()
 
+func input_blocked() -> bool:
+	return session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+
+func sync_mouse_mode() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if input_blocked() else Input.MOUSE_MODE_CAPTURED
+
+func toggle_pause() -> void:
+	session_paused = not session_paused
+	hud.pause_panel.visible = session_paused
+	session.suspend_input()
+	sync_mouse_mode()
+
+func local_station() -> Node3D: return service.training_for(session.local_id())
+
+func nearest_station() -> Node3D:
+	var best: Node3D
+	var distance := 4.6
+	for station in service.stations:
+		var direction: Vector3 = station.global_position + Vector3.UP - camera.global_position
+		if direction.length() < distance and (-camera.global_basis.z).dot(direction.normalized()) > 0.3:
+			distance = direction.length()
+			best = station
+	return best
+
+func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(steam) and steam.overlay_open: return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_ESCAPE:
+			if menu.opened(): menu.close()
+			else: toggle_pause()
+			return
+		if event.physical_keycode == KEY_F2:
+			menu.net_panel.visible = not menu.net_panel.visible
+			sync_mouse_mode()
+			return
+	if input_blocked(): return
+	var station := local_station()
+	var recording: bool = station != null and station.training.phase == "recording" and local_role >= 0
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.physical_keycode:
+			KEY_E:
+				var selected := station if station != null else nearest_station()
+				if selected != null: menu.show_station(selected)
+			KEY_ENTER, KEY_KP_ENTER:
+				if recording: session.request_action({"action": "finish", "station": station.station_id})
+			KEY_BACKSPACE:
+				if recording: session.request_action({"action": "retake", "station": station.station_id})
+			KEY_X:
+				if station != null: session.request_action({"action": "cancel", "station": station.station_id})
+			KEY_G: session.request_action({"action": "business"})
+			KEY_SPACE:
+				if player.is_on_floor(): player.velocity.y = 6.2
+	if event is InputEventMouseMotion:
+		if recording and held_item(station) == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			pan_tilt = (pan_tilt + event.screen_relative * 0.003).limit_length(0.18)
+		elif recording and not held_item(station).is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
+			var right: Vector3 = station.global_basis.inverse() * camera.global_basis.x
+			var forward: Vector3 = station.global_basis.inverse() * -camera.global_basis.z
+			target += (Vector2(right.x, right.z).normalized() * event.screen_relative.x - Vector2(forward.x, forward.z).normalized() * event.screen_relative.y) * 0.0035
+			precise = true
+		else:
+			player.look(event.screen_relative)
+			if recording and precise: anchor(station)
+			precise = false
+	if recording and event is InputEventMouseButton and event.pressed:
+		match event.button_index:
+			MOUSE_BUTTON_LEFT:
+				var item: String = held_item(station)
+				var command: Dictionary = {"drop": true} if not item.is_empty() else {"grab": station.view.pick_item(camera)}
+				session.send_input(station, {}, command)
+			MOUSE_BUTTON_WHEEL_UP: height = minf(1.1, height + 0.08)
+			MOUSE_BUTTON_WHEEL_DOWN: height = maxf(0, height - 0.08)
+
+func held_item(station: Node3D) -> String:
+	if local_role < 0: return ""
+	return station.model.held if station.type_id == "counter" else station.model.hands[local_role]
+
+func anchor(station: Node3D) -> void:
+	var item := held_item(station)
+	if item.is_empty(): return
+	target = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
+	height = station.model.elevations[item] if station.type_id == "counter" else station.model.heights[item]
+	var at := station.to_global(Vector3(target.x, 1.015, target.y))
+	grip = camera.global_basis.inverse() * (at - camera.global_position).normalized()
+
+func bind_training() -> void:
+	var station := local_station()
+	if station == null:
+		bound_station = 0
+		local_role = -1
+		player.constrained = false
+		return
+	var run = station.training
+	local_role = run.role_for(session.local_id())
+	if run.phase == "recording" and local_role >= 0:
+		if bound_station != station.station_id or bound_revision != run.revision:
+			player.station = station
+			var width: float = station.Definition.TYPES[station.type_id].width / 2 + 0.5
+			player.zone_min = Vector2(-width, -2.3)
+			player.zone_max = Vector2(width, 2.9)
+			if station.role_count() > 1 and run.live_roles.size() == 1:
+				if local_role == 0: player.zone_max.x = 0
+				else: player.zone_min.x = 0
+			player.global_position = station.to_global(Vector3((-1.35 if local_role == 0 else 1.35) if station.role_count() > 1 else 0, 0.02, 1.85))
+			player.rotation.y = station.global_rotation.y
+			camera.rotation.x = -0.35
+			player.velocity = Vector3.ZERO
+			anchored_item = ""
+			precise = false
+			pan_tilt = Vector2.ZERO
+			menu.close()
+			bound_station = station.station_id
+			bound_revision = run.revision
+		player.constrained = true
+	else:
+		player.constrained = false
+		var stamp := "%d:%d:%s" % [station.station_id, run.revision, run.phase]
+		if run.lead == session.local_id() and run.phase in ["ready", "review"] and stamp != last_menu_revision:
+			last_menu_revision = stamp
+			menu.show_station(station)
+
+func build_motion(station: Node3D, delta: float) -> Dictionary:
+	var item := held_item(station)
+	if item != anchored_item:
+		anchor(station)
+		anchored_item = item
+	var pose: Dictionary = player.pose_in(station)
+	var command := {"pose": {"position": [pose.position.x, pose.position.y, pose.position.z], "yaw": pose.yaw, "pitch": pose.pitch}, "use": not input_blocked() and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)}
+	var aim: Vector3 = station.global_basis.inverse() * -camera.global_basis.z
+	command.aim = [aim.x, aim.y, aim.z]
+	if not item.is_empty():
+		if not input_blocked(): height = clampf(height + (float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))) * delta * 0.55, 0, 1.1)
+		if not precise:
+			var origin: Vector3 = station.to_local(camera.global_position)
+			var ray: Vector3 = station.global_basis.inverse() * camera.global_basis * grip
+			var reach := maxf(origin.y - 1.015, 0.01) / maxf(-ray.y, 0.08)
+			var point := origin + ray * reach
+			target = Vector2(point.x, point.z)
+		command.target = [target.x, target.y]
+		command.height = height
+		command.pan_tilt = [pan_tilt.x, pan_tilt.y]
+	return command
+
+func _physics_process(delta: float) -> void:
+	bind_training()
+	if session_paused and not session.online(): return
+	var move := Vector2.ZERO if input_blocked() else Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
+	player.advance(delta, move.limit_length())
+	var station := local_station()
+	if station != null and station.training.phase == "recording" and local_role >= 0: session.send_input(station, build_motion(station, delta))
+	if not session.is_guest(): service.advance(delta)
+	session.advance(delta)
+	service.refresh_views(delta)
+	refresh_hud()
+
+func refresh_hud() -> void:
+	hud.clone_status.text = "%d станций · обслужено %d · выручка %d" % [service.stations.size(), service.served, service.revenue]
+	hud.controls.text = "WASD — ходить · Space — прыгнуть · E — станция · F2 — друзья · G — гости"
+	hud.supplies.text = "Каждая станция обучается отдельно. Готовые бригады работают самостоятельно."
+	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "ГОСТИ: ПАУЗА"
+	hud.goal.text = "Подойди к рабочей станции · [E]"
+	hud.progress.value = 0
+	hud.prompt.text = ""
+	var station := local_station()
+	if station == null:
+		station = nearest_station()
+		if station != null: hud.prompt.text = "[E] Станция %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title]
+		return
+	hud.notice.text = station.training.info
+	hud.goal.text = station.Definition.DISHES[station.training.dish]
+	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
+	hud.progress.value = 100 if station.model.success() else 0
+	hud.supplies.text = station.model.goal_text() if station.type_id == "counter" else station.view.status.text.replace("\n", " · ")
+	hud.controls.text = "ЛКМ — взять/положить · ПКМ — использовать · Колесо / R,F — высота · Shift — точнее\nEnter — завершить проход · Backspace — повторить проход · X — закончить обучение"
+	if local_role >= 0 and station.training.phase == "recording":
+		var item := held_item(station)
+		if item.is_empty():
+			item = station.view.pick_item(camera)
+			if item.is_empty(): return
+			var allowed: bool = station.type_id == "counter" or station.model.can_touch(local_role, item)
+			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + str(ITEM_NAMES.get(item, station.TeamModel.NAMES.get(item, "")))
+		else: hud.prompt.text = "[ПКМ] Использовать · " + str(ITEM_NAMES.get(item, station.TeamModel.NAMES.get(item, "")))
+
+func save_cafe() -> bool:
+	if session.is_guest(): return false
+	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
+	if file == null: return false
+	file.store_buffer(var_to_bytes(service.save_data()).compress(FileAccess.COMPRESSION_DEFLATE))
+	var error := file.get_error()
+	file.close()
+	if error != OK: return false
+	return DirAccess.rename_absolute(SAVE_PATH + ".tmp", SAVE_PATH) == OK
+
+func load_cafe() -> void:
+	if not FileAccess.file_exists(SAVE_PATH): return
+	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null or file.get_length() > 134217728: return
+	var bytes := file.get_buffer(file.get_length()).decompress_dynamic(268435456, FileAccess.COMPRESSION_DEFLATE)
+	var data = bytes_to_var(bytes)
+	if not data is Dictionary or not service.load_data(data): hud.notice.text = "Сохранение не прочитано. Открыто новое кафе."
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(session): save_cafe()
 func _build_room() -> void:
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()
@@ -129,470 +295,6 @@ func _build_room() -> void:
 			leaf.scale = Vector3(0.8, 1.7, 0.8)
 	Props.box(self, Vector3(2.0, 0.018, 0.65), Vector3(0, 0.006, 7.1), Color("c09b63"))
 
-	clone_machine = Node3D.new()
-	add_child(clone_machine)
-	clone_machine.position = Vector3(-5.8, 0, 5.3)
-	Props.solid_box(clone_machine, Vector3(1.25, 1.1, 1.0), Vector3(0, 0.55, 0), Color("53687a"))
-	Props.cylinder(clone_machine, 0.42, 0.60, Vector3(0, 1.40, 0), Color("88c6b8"))
-	Props.cylinder(clone_machine, 0.48, 0.12, Vector3(0, 1.75, 0), Color("e5c184"))
-	Props.box(clone_machine, Vector3(0.28, 0.20, 0.10), Vector3(0, 0.9, 0.55), Color("d77570"))
-	var machine_label := Props.text(clone_machine, "КЛОНОМАТ\n[E] Новый сотрудник", Vector3(0, 2.30, 0), 25, Color("f3cf8b"))
-	machine_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	for x in [-9.2, 15.2]:
 		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-
-func _build_zone() -> void:
-	var lower: Vector2 = Player.ZONE_MIN
-	var upper: Vector2 = Player.ZONE_MAX
-	var depth := upper.y - lower.y
-	var width := upper.x - lower.x
-	var walls := [
-		[Vector3(0.035, 2.7, depth), Vector3(lower.x, 1.35, (lower.y + upper.y) * 0.5)],
-		[Vector3(0.035, 2.7, depth), Vector3(upper.x, 1.35, (lower.y + upper.y) * 0.5)],
-		[Vector3(width, 2.7, 0.035), Vector3(0, 1.35, lower.y)],
-		[Vector3(width, 2.7, 0.035), Vector3(0, 1.35, upper.y)]]
-	for wall in walls:
-		var mesh := Props.box(training, wall[0], wall[1], Color("86d7c2"))
-		var material := mesh.material_override as StandardMaterial3D
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.albedo_color.a = 0.025
-		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		barrier_meshes.append(mesh)
-		barrier_bodies.append(Props.collision_box(training, wall[0], wall[1]))
-		var stripe_size: Vector3 = wall[0]
-		stripe_size.y = 0.01
-		var stripe_position: Vector3 = wall[1]
-		stripe_position.y = 0.01
-		Props.box(training, stripe_size, stripe_position, Color("d3b775"))
-	_set_zone(false)
-
-func _set_zone(enabled: bool) -> void:
-	for body in barrier_bodies: body.collision_layer = 1 if enabled else 0
-	for mesh in barrier_meshes: mesh.visible = enabled
-	if is_instance_valid(player): player.constrained = enabled
-
-func can_start_recording() -> bool:
-	if recording or session_paused or (is_instance_valid(team) and team.active()): return false
-	var local := training.to_local(player.global_position)
-	var facing := -camera.global_basis.z
-	var towards := (training.global_position + Vector3(0, 1, 0) - camera.global_position).normalized()
-	return absf(local.x) < 2.25 and local.z > 1.25 and local.z < 2.55 and facing.dot(towards) > 0.25
-
-func _unhandled_input(event: InputEvent) -> void:
-	if is_instance_valid(steam) and steam.overlay_open: return
-	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F2:
-		if not is_local_teaching() and not team.participating():
-			menu.net_panel.visible = not menu.net_panel.visible
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if menu.opened() else Input.MOUSE_MODE_CAPTURED
-		return
-	if menu.opened():
-		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: menu.close()
-		return
-	if team.participating() and not session_paused:
-		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: toggle_pause()
-		else: team.handle(event)
-		return
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == KEY_ESCAPE:
-			if hud.teaching_panel.visible: close_teaching_menu()
-			else: toggle_pause()
-			return
-		if session_paused or hud.teaching_panel.visible: return
-		match event.physical_keycode:
-			KEY_E: interact()
-			KEY_ENTER, KEY_KP_ENTER:
-				if is_local_teaching(): finish_recording()
-			KEY_X:
-				if is_local_teaching(): cancel_recording()
-			KEY_G:
-				session.request_action({"action": "business"})
-	if session_paused or hud.teaching_panel.visible: return
-	if event is InputEventMouseMotion:
-		var movement: Vector2 = event.screen_relative
-		if is_local_teaching() and live.held == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			live.tilt_pan(movement)
-		elif is_local_teaching() and not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
-			_move_precisely(movement)
-		else:
-			player.look(movement)
-	if event is InputEventMouseButton and event.pressed and is_local_teaching():
-		match event.button_index:
-			MOUSE_BUTTON_LEFT:
-				if live.held.is_empty(): _grab(training.pick_item(camera))
-				else:
-					live.put_down()
-					if session.is_guest(): session.send_single_event({"drop": true})
-			MOUSE_BUTTON_WHEEL_UP: live.lift_held(0.08)
-			MOUSE_BUTTON_WHEEL_DOWN: live.lift_held(-0.08)
-
-func _held_target() -> Vector2:
-	var origin := training.to_local(camera.global_position)
-	var ray := training.global_basis.inverse() * camera.global_basis * grip_direction
-	# A shallow/upward gaze continues along the far edge instead of losing the ray.
-	var reach := maxf(origin.y - Model.BASE_Y, 0.01) / maxf(-ray.y, 0.08)
-	var point := origin + ray * reach
-	return Vector2(point.x, point.z).clamp(-Model.BOUNDS, Model.BOUNDS)
-
-func _grab(item: String) -> void:
-	if not is_local_teaching() or session_paused or item.is_empty(): return
-	live.pick_up(item)
-	if session.is_guest(): session.send_single_event({"grab": item})
-	_reanchor_grip()
-
-func _reanchor_grip() -> void:
-	if live.held.is_empty(): return
-	var point: Vector2 = live.get(live.held)
-	var anchor := training.to_global(Vector3(point.x, Model.BASE_Y, point.y))
-	# Anchor the actual item, even when the crosshair picked its handle or upper rim.
-	grip_direction = camera.global_basis.inverse() * (anchor - camera.global_position).normalized()
-
-func _move_precisely(movement: Vector2) -> void:
-	var right := training.global_basis.inverse() * camera.global_basis.x
-	var forward := training.global_basis.inverse() * -camera.global_basis.z
-	var horizontal := Vector2(right.x, right.z).normalized() * movement.x
-	horizontal -= Vector2(forward.x, forward.z).normalized() * movement.y
-	live.move_item(live.held, live.get(live.held) + horizontal * 0.0035)
-	_reanchor_grip()
-
-func input_blocked() -> bool:
-	return session_paused or hud.teaching_panel.visible or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
-
-func sync_mouse_mode() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if input_blocked() else Input.MOUSE_MODE_CAPTURED
-
-func is_local_teaching() -> bool:
-	return recording and teacher_peer == session.local_id()
-
-func _physics_process(delta: float) -> void:
-	var blocked := input_blocked()
-	if blocked and not session.online(): return
-	tick_count += 1
-	var movement := Vector2.ZERO if blocked else Vector2(
-		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
-		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
-	player.advance(delta, movement.limit_length())
-	if recording:
-		if is_local_teaching():
-			var precise := not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT)
-			if precision_active and not precise: _reanchor_grip()
-			precision_active = precise
-			if not blocked and not live.held.is_empty():
-				if not precise and live.held != "pan":
-					var current: Vector2 = live.get(live.held)
-					live.move_item(live.held, current.move_toward(_held_target(), ITEM_MOVE_SPEED * delta))
-				var lift := float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
-				live.lift_held(lift * 0.55 * delta)
-			var using_item := not blocked and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-			live.step(delta, using_item, not using_item, using_item)
-			_capture_pose()
-			if session.is_guest():
-				var command := {"use": using_item, "pose": {"position": [live.actor_position.x, live.actor_position.y, live.actor_position.z], "yaw": live.actor_yaw, "pitch": live.actor_pitch}}
-				if not live.held.is_empty():
-					var point: Vector2 = live.get(live.held)
-					command.target = [point.x, point.y]
-					command.height = live.elevations[live.held]
-				if live.dish == "potato": command.pan_tilt = [live.pan_tilt.x, live.pan_tilt.y]
-				session.send_single_motion(command)
-		elif not session.is_guest(): session.advance_single(delta)
-		if not session.is_guest():
-			frames.append(live.snapshot())
-			elapsed = frames.size() * TICK
-	team.advance(delta)
-	if not session.is_guest():
-		lecture.advance(delta)
-		service.advance(delta)
-	session.advance(delta)
-	_refresh_views()
-	_refresh_hud()
-
-func _capture_pose() -> void:
-	if recording and not is_local_teaching(): return
-	var pose: Dictionary = player.pose_in(training)
-	live.actor_position = pose.position
-	live.actor_yaw = pose.yaw
-	live.actor_pitch = pose.pitch
-
-func clone_home(id: int) -> Vector3:
-	var slot: int = service.slot_of(id)
-	if slot < 0:
-		var clone: Dictionary = service.get_clone(id)
-		for person in service.reserve_people:
-			if person.caption.text.begins_with(clone.get("name", "?") + "\n"): return person.global_position
-		return Vector3(-6.5, 0, -6.6)
-	var station: Dictionary = service.stations[slot]
-	if slot == 3:
-		var role: int = station.clone_ids.find(id)
-		return station.view.to_global(Vector3(-1.35 if role == 0 else 1.35, 0, 1.85))
-	return station.view.to_global(Vector3(0, 0, 1.85))
-
-func near_machine() -> bool:
-	if is_local_teaching(): return false
-	var offset := clone_machine.global_position + Vector3(0, 1.1, 0) - camera.global_position
-	return offset.length() < 2.8 and (-camera.global_basis.z).dot(offset.normalized()) > 0.6
-
-func interact() -> void:
-	if session.is_guest() and not session.synced: return
-	if team.near() and not recording and not team.active():
-		menu.show_training(service.clones, session.members, session.local_id())
-		return
-	if near_machine():
-		session.request_action({"action": "clone"})
-		hud.notice.text = "Новый сотрудник появится у свободной стойки или в резерве."
-	elif can_start_recording():
-		var assigned: Array = []
-		for index in range(3): assigned.append(service.stations[index].clone_id)
-		hud.show_teaching(service.clones, assigned, selected_clone_id, selected_dish)
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-
-func _request_team(mode: String, ids: Array, peer: int) -> void:
-	menu.close()
-	session.request_action({"action": "team", "mode": mode, "ids": ids, "partner": peer})
-
-func close_teaching_menu() -> void:
-	hud.teaching_panel.hide()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if session_paused else Input.MOUSE_MODE_CAPTURED
-
-func _begin_selected_training(recipe: String, clone_id: int, slot: int) -> void:
-	close_teaching_menu()
-	session.request_action({"action": "single", "dish": recipe, "clone": clone_id, "slot": slot})
-
-func start_recording() -> void:
-	if not can_start_recording(): return
-	teacher_peer = 1
-	_start_teaching_authority()
-
-func begin_network_teaching(recipe: String, clone_id: int, slot: int, teacher: int) -> void:
-	if recording or team.active(): return
-	selected_dish = recipe
-	selected_clone_id = clone_id
-	selected_slot = slot
-	teacher_peer = teacher
-	_start_teaching_authority()
-
-func _start_teaching_authority() -> void:
-	lecture.clear_now()
-	session.single_revision += 1
-	session.single_motion.clear()
-	session.single_events.clear()
-	var home := clone_home(selected_clone_id)
-	service.reserve_station(selected_slot, selected_clone_id)
-	production = service.stations[selected_slot].view
-	playback = service.stations[selected_slot].model
-	live.reset(selected_dish)
-	if teacher_peer == session.local_id():
-		_capture_pose()
-	else:
-		var pose: Dictionary = session.player_poses[teacher_peer]
-		live.actor_position = training.to_local(Vector3(pose.position[0], pose.position[1], pose.position[2]))
-		live.actor_yaw = pose.yaw - training.global_rotation.y
-		live.actor_pitch = pose.pitch
-	frames.clear()
-	elapsed = 0.0
-	lecture.begin([service.get_clone(selected_clone_id).name], [home], training, session.actor_for(teacher_peer), func(): service.release_station(selected_slot), [production.to_global(Vector3(0, 0, 1.85))])
-	recording = true
-	precision_active = false
-	if teacher_peer == session.local_id():
-		player.station = training
-		player.zone_min = Player.ZONE_MIN
-		player.zone_max = Player.ZONE_MAX
-		_set_zone(true)
-	hud.notice.text = "Запись началась. Клон подходит с блокнотом и наблюдает. Enter — закончить; X — отменить."
-	_refresh_views()
-	_refresh_hud()
-
-func finish_recording() -> void:
-	if session.is_guest():
-		if is_local_teaching(): session.send_single_event({"finish": true})
-		return
-	if not recording or (session_paused and not session.online()): return
-	if not live.success():
-		session.message_to(teacher_peer, "Показ продолжается. " + live.goal_text())
-		return
-	live.put_down()
-	_capture_pose()
-	frames.append(live.snapshot())
-	elapsed = frames.size() * TICK
-	var clone: Dictionary = service.get_clone(selected_clone_id)
-	clone.recipes[selected_dish] = {"frames": frames.duplicate(true), "duration": elapsed}
-	recording = false
-	lecture.finish()
-	_set_zone(false)
-	var saved := _save_staff()
-	hud.notice.text = "%s: %s, %s. Возвращается к стойке; покажет запись на реальном заказе." % [clone.name, Service.SHORT_NAMES[selected_dish], Model.pace(elapsed)]
-	if not saved: hud.notice.text += " Запись действует до выхода: сохранить файл не удалось."
-	_refresh_hud()
-
-func cancel_recording(force_local := false) -> void:
-	if session.is_guest() and not force_local:
-		if is_local_teaching(): session.send_single_event({"cancel": true})
-		return
-	if not recording or (session_paused and not session.online() and not force_local): return
-	recording = false
-	frames.clear()
-	live.reset()
-	playback.reset(selected_dish)
-	lecture.finish()
-	_set_zone(false)
-	hud.notice.text = "Показ отменён. Прежнее обучение сохранено. E — начать заново у стойки."
-	_refresh_views()
-	_refresh_hud()
-
-func toggle_pause() -> void:
-	session_paused = not session_paused
-	if session_paused: session.suspend_input()
-	sync_mouse_mode()
-	hud.pause_panel.visible = session_paused
-	_refresh_hud()
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and is_instance_valid(hud) and not session_paused and not hud.teaching_panel.visible and (not is_instance_valid(session) or not session.online()):
-		toggle_pause()
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(service): _save_staff()
-
-func _refresh_views() -> void:
-	training.update_view(live, tick_count * TICK)
-	service.refresh_views()
-	if is_local_teaching():
-		var local := training.to_local(player.global_position)
-		var distances := [absf(local.x - Player.ZONE_MIN.x), absf(local.x - Player.ZONE_MAX.x), absf(local.z - Player.ZONE_MIN.y), absf(local.z - Player.ZONE_MAX.y)]
-		for index in range(barrier_meshes.size()):
-			barrier_meshes[index].material_override.albedo_color.a = lerpf(0.16, 0.025, clampf(distances[index] / 0.8, 0, 1))
-
-func _refresh_hud() -> void:
-	hud.bottom.offset_top = -200 if team.active() else -136
-	hud.prompt.offset_top = 34
-	hud.prompt.offset_bottom = 94
-	hud.goal.text = live.goal_text()
-	hud.progress.value = live.progress_value()
-	hud.clock.text = "%s %05.1f с / %s" % ["●" if recording else "", elapsed, Model.pace(elapsed)]
-	hud.clone_status.text = "Сотрудники: %d · Подано: %d · $%d" % [service.clones.size(), service.served, service.revenue]
-	hud.supplies.text = "Кафе %s · Гостей: %d · Ушли без заказа: %d" % ["открыто" if service.open_for_business else "закрыто", session.remote_customers.size() if session.is_guest() else service.customers.size(), service.missed]
-	hud.controls.text = "WASD — ходить  •  E — обучение / клономат  •  G — открыть / закрыть кафе  •  F2 — онлайн  •  Esc — пауза"
-	hud.prompt.text = "[E] Выбрать блюдо и клона" if can_start_recording() else ("[E] Создать сотрудника" if near_machine() else "")
-	if is_local_teaching():
-		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить"
-		if live.dish == "wine":
-			hud.supplies.text = "Кувшин: %d мл  •  На столе: %d мл  •  Тряпка: %d мл  •  Голубой — предмет, цветной — струя" % [roundi(live.wine), roundi(live.spilled()), roundi(live.soaked)]
-		elif live.dish == "potato":
-			var sides: Array[String] = []
-			for index in range(6): sides.append("%s %d%%" % [Model.FACE_NAMES[index], roundi(live.potato_heat[index] * 100)])
-			hud.supplies.text = "Бока: " + " · ".join(sides) + " · Падений: %d" % live.falls
-		else:
-			hud.supplies.text = "Соус: %d%%  •  Выскальзывание: %d%%  •  Падений: %d  •  У стола можно катить, вертикально — нести" % [roundi(live.sausage_coating * 100), roundi(live.sausage_slip * 100), live.falls]
-		if live.held.is_empty():
-			var hovered: String = training.pick_item(camera)
-			hud.prompt.text = "[ЛКМ] Взять: " + ITEM_NAMES[hovered] if not hovered.is_empty() else "Наведи прицел на предмет"
-		else:
-			var height := float(live.elevations[live.held])
-			hud.prompt.text = "%s / Высота: %d см" % [ITEM_NAMES[live.held].capitalize(), roundi(height * 100)]
-			match live.held:
-				"jug": hud.prompt.text += "\n[ПКМ] Наклонять и наливать"
-				"rag": hud.prompt.text += "\n[ПКМ] Выжать над стаканом" if live.soaked > 0 else "\nОпусти на лужу, чтобы вытереть"
-				"pan":
-					hud.prompt.text = "[ПКМ + мышь] Наклонять сковороду\nОтпусти ПКМ — выровнять. ЛКМ — отпустить ручку."
-					hud.prompt.offset_top = 150
-					hud.prompt.offset_bottom = 220
-				"potato": hud.prompt.text += "\n[ЛКМ] Положить на сковороду или тарелку"
-				"sausage": hud.prompt.text += "\n[ПКМ] Держать вертикально · F — опустить к соусу / столу"
-			if live.held in ["jug", "rag"]:
-				var aim: Vector2 = live.rag if live.held == "rag" else live.spout_target()
-				if aim.distance_to(live.cup) <= Model.CUP_RADIUS and not live.can_fill_at(aim, live.source_height()): hud.prompt.text += "\nПодними выше края стакана: колесо ↑"
-	if recording:
-		var clone: Dictionary = service.get_clone(selected_clone_id)
-		hud.clone_status.text = "%s · наблюдает и записывает" % clone.name
-	hud.crosshair.visible = not input_blocked()
-	hud.prompt.visible = hud.crosshair.visible
-	if not recording and not team.active() and team.near(): hud.prompt.text = "[E] Стол II · Обучить бригаду"
-	team.refresh_hud()
-
-func _save_staff() -> bool:
-	if is_instance_valid(session) and session.is_guest(): return false
-	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
-	if file == null: return false
-	file.store_string(JSON.stringify(service.save_data()))
-	file.close()
-	return DirAccess.rename_absolute(SAVE_PATH + ".tmp", SAVE_PATH) == OK
-
-func _load_staff() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		var data = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
-		if data is Dictionary and service.load_data(data, _valid_frame):
-			selected_clone_id = service.clones[0].id
-			hud.notice.text = "Сотрудники и их записи загружены. Обслуживание начнётся автоматически."
-		return
-	# One-time import preserves the user's successful wine demonstration.
-	var old_path := "user://fps_station_recording.json"
-	if not FileAccess.file_exists(old_path): return
-	var old = JSON.parse_string(FileAccess.get_file_as_string(old_path))
-	if not old is Dictionary or old.get("format") != "fps-station" or not old.get("frames") is Array or old.frames.is_empty(): return
-	for frame in old.frames:
-		if not _valid_frame(frame): return
-	var result := Model.new()
-	result.restore(old.frames.back())
-	if not result.success(): return
-	service.clones[0].recipes.wine = {"frames": old.frames, "duration": old.frames.size() * TICK}
-	_save_staff()
-	hud.notice.text = "Первый сотрудник получил прежнюю запись вина. Можно обучать новым блюдам."
-
-func _valid_frame(frame: Variant) -> bool:
-	if not frame is Dictionary: return false
-	for key in ["jug", "cup", "rag", "landing", "actor_position"]:
-		var pair = frame.get(key)
-		if not pair is Array or pair.size() != (3 if key == "actor_position" else 2): return false
-		for value in pair:
-			if not _finite_number(value): return false
-	for key in ["tilt", "wine", "filled", "soaked", "lost", "squeezed_total", "actor_yaw", "actor_pitch"]:
-		if not _finite_number(frame.get(key)): return false
-	if not frame.get("held") in ["", "jug", "cup", "rag", "pan", "potato", "sausage"]: return false
-	if not frame.get("flowing") is bool or not frame.get("squeezing") is bool: return false
-	if not frame.get("elevations") is Dictionary: return false
-	for key in ["jug", "cup", "rag"]:
-		var elevation = frame.elevations.get(key)
-		if not _finite_number(elevation) or elevation < 0 or elevation > Model.MAX_LIFT: return false
-	if not frame.get("puddles") is Array: return false
-	for puddle in frame.puddles:
-		if not puddle is Array or puddle.size() != 3: return false
-		for value in puddle:
-			if not _finite_number(value): return false
-	var recipe: String = str(frame.get("dish", "wine"))
-	if not recipe in Model.DISHES: return false
-	if recipe != "wine":
-		for key in ["pan", "potato", "sausage"]:
-			var height = frame.elevations.get(key)
-			if not _finite_number(height) or height < 0 or height > Model.MAX_LIFT: return false
-		var food = frame.get("food")
-		if not food is Dictionary: return false
-		for key in ["pan_tilt", "potato", "potato_velocity", "sausage", "sausage_velocity", "potato_orientation", "potato_heat"]:
-			var count := 4 if key == "potato_orientation" else (6 if key == "potato_heat" else 2)
-			if not food.get(key) is Array or food[key].size() != count: return false
-			for number in food[key]:
-				if not _finite_number(number): return false
-		for key in ["fall_speed", "falls", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip"]:
-			if not _finite_number(food.get(key)): return false
-		if not food.get("potato_state") in ["pan", "falling", "table", "held", "plate"]: return false
-		if not food.get("sausage_state") in ["falling", "table", "held", "plate"]: return false
-	return true
-
-func _finite_number(value: Variant) -> bool:
-	return (value is float or value is int) and is_finite(float(value))
-
-func apply_single_remote(data: Dictionary) -> void:
-	var was_local := is_local_teaching()
-	recording = data.active
-	teacher_peer = data.teacher
-	selected_clone_id = data.clone
-	selected_slot = data.slot
-	selected_dish = data.dish
-	elapsed = data.elapsed
-	session.single_revision = data.revision
-	if is_local_teaching() and not was_local:
-		close_teaching_menu()
-		player.station = training
-		player.zone_min = Player.ZONE_MIN
-		player.zone_max = Player.ZONE_MAX
-		_set_zone(true)
-	elif was_local and not is_local_teaching():
-		_set_zone(false)
-		hud.notice.text = "Показ завершён. Результат и сотрудники синхронизированы с хостом."

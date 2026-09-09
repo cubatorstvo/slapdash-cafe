@@ -1,122 +1,126 @@
 extends SceneTree
-## Real peers exercise guest-led teaching, late join, overlay and save isolation.
 const Scene = preload("res://scenes/cafe.tscn")
 var game
-var role := ""
-var active := false
-var elapsed := 0.0
-var saw_three := false
-var saw_team := false
-var saw_wine := false
-var saw_overlay_progress := false
-var checked_busy := false
-var team_start := 0.0
-func _initialize() -> void:
+var role := "host"
+var stage := 0
+var timer := 0.0
+var started := 0
+var quit_at := 0.0
+var saw_parallel := false
+func _initialize() -> void: setup.call_deferred()
+func setup() -> void:
 	role = OS.get_cmdline_user_args()[0]
-	run.call_deferred()
-func check(value: bool, message: String) -> void:
-	if not value:
-		printerr("FAIL: ", role, ": ", message)
-		quit(1)
-func wait_for(predicate: Callable) -> void:
-	while not predicate.call(): await process_frame
-func _process(delta: float) -> bool:
-	if not active: return false
-	elapsed += delta
-	if elapsed > 30:
-		printerr("FAIL: timeout ", role)
-		quit(1)
-	if role != "host": game.session.advance(delta)
-	else:
-		if game.session.members.size() == 3: saw_three = true
-		if game.recording and not checked_busy:
-			checked_busy = true
-			game._begin_selected_training("potato", game.service.clones[1].id, 1)
-			check(game.selected_dish == "wine" and game.recording, "stale host menu cannot replace guest lesson")
-		if game.service.clones.size() >= 2 and game.service.clones[0].recipes.has("wine"): saw_wine = true
-		if game.team.active():
-			if not saw_team:
-				saw_team = true
-				team_start = game.team.model.elapsed
-				game.steam._overlay(true, true, 480)
-				print("READY: late join")
-			if game.team.model.elapsed > team_start + 0.4: saw_overlay_progress = true
-	return false
-func run() -> void:
 	game = Scene.instantiate()
-	game.name = "Cafe"
 	root.add_child(game)
 	await process_frame
+	game.set_physics_process(false)
 	game.service.open_for_business = false
-	game.service.revenue = 42 if role == "host" else 1234
-	if role != "host": game.set_physics_process(false)
-	game.session.configure("host" if role == "host" else "join", "127.0.0.1", 28768, role)
-	active = true
-	if role == "host": await host_run()
-	elif role == "guest": await guest_run()
-	else: await observer_run()
-func host_run() -> void:
-	await wait_for(func(): return saw_three and saw_team and game.session.members.size() == 1)
-	check(not game.team.active(), "disconnect cancels guest-led team")
-	check(saw_wine, "guest's successful wine lesson saved on host")
-	check(saw_overlay_progress, "overlay must not pause shared simulation")
-	check(game.service.clones.size() == 2, "guest can create employees")
-	check(game.service.clones[0].recipes.wine.frames[-1].filled >= 225, "recorded goal is complete")
-	var saved = JSON.parse_string(FileAccess.get_file_as_string(game.SAVE_PATH))
-	check(saved != null, "host writes staff save")
-	print("PASS: host authority, guest lessons, overlay, late join and disconnect")
-	quit(0)
-func guest_run() -> void:
-	await wait_for(func(): return game.session.synced)
-	check(game.service.revenue == 42, "joined host's cafe")
-	game.player.global_position = game.clone_machine.global_position + Vector3(0, 0.02, 2)
-	await create_timer(0.2).timeout
-	game.session.request_action({"action": "clone"})
-	await wait_for(func(): return game.service.clones.size() == 2)
-	game.player.global_position = game.training.to_global(Vector3(0, 0.02, 2.1))
-	await create_timer(0.2).timeout
-	game.session.request_action({"action": "single", "dish": "wine", "clone": game.service.clones[0].id, "slot": 0})
-	await wait_for(func(): return game.is_local_teaching())
-	check(game.player.constrained, "guest placed inside teaching boundary")
-	game.session.send_single_event({"grab": "jug"})
-	while not game.live.success():
-		var target: Vector2 = game.live.cup - (game.live.spout_target() - game.live.jug)
-		game.session.send_single_motion({"pose": {"position": [0, 0.02, 2.1], "yaw": 0, "pitch": -0.3}, "target": [target.x, target.y], "height": 0.9, "use": true})
-		await create_timer(1.0 / 30.0).timeout
-	game.session.send_single_event({"finish": true})
-	await wait_for(func(): return not game.recording)
-	check(not game.player.constrained, "successful lesson releases guest")
-	check("wine" in game.service.clones[0].known, "guest receives employee knowledge")
-	game.player.global_position = game.team.view.to_global(Vector3(0, 0.02, 2.1))
-	await create_timer(0.2).timeout
-	game.session.request_action({"action": "team", "mode": "together", "ids": [game.service.clones[0].id, game.service.clones[1].id], "partner": 1})
-	await wait_for(func(): return game.team.phase == "together")
-	check(game.team.local_role == 0, "guest can lead with host in second role")
-	game.session.send_event({"grab": "salt"})
-	while game.session.members.size() < 3 or game.team.model.meat_salt < 1:
-		game.session.send_motion({"pose": {"position": [-1.2, 0, 1.8], "yaw": 0, "pitch": -0.2}, "target": [-2.25, 0.45], "height": 0.6, "use": true})
-		await create_timer(1.0 / 30.0).timeout
-	check(game.team.model.owners.salt == 0, "guest lead owns shared salt")
-	await create_timer(0.4).timeout
-	var old_revision: int = game.session.seen_restart
-	game.session.send_event({"retake": true})
-	await wait_for(func(): return game.session.seen_restart != old_revision)
-	game.session._event.rpc_id(1, {"revision": old_revision, "cancel": true})
-	await create_timer(0.4).timeout
-	check(game.team.active(), "old commands cannot cancel new take")
-	game.session.leave("Test done")
-	check(game.service.revenue == 1234 and game.service.clones.size() == 1, "guest's original cafe restored")
-	check(game.service.clones[0].recipes.is_empty(), "host's recordings not written into guest cafe")
-	print("PASS: guest creates staff, teaches wine, leads team, retakes and restores local cafe")
-	quit(0)
-func observer_run() -> void:
-	await wait_for(func(): return game.session.synced and game.team.active())
-	check(game.team.local_role == -1 and not game.player.constrained, "late spectator stays free")
-	await wait_for(func(): return game.session.remote_students.size() == 2 and game.session.player_avatars.size() == 2)
-	check(game.team.view.actors[0].visible and game.team.view.actors[1].visible, "spectator sees both cooks")
-	check("wine" in game.service.clones[0].known, "late join receives prior knowledge")
-	await wait_for(func(): return not game.team.active())
-	game.session.leave("Observer done")
-	check(game.service.revenue == 1234, "observer restores local progress")
-	print("PASS: late spectator receives players, students, knowledge and cancellation")
-	quit(0)
+	game.service.clear_world()
+	game.service.initial_stations()
+	game.service.revenue = 73 if role == "guest" else 0
+	if role == "host": game.service.add_station("counter", Vector3(0, 0, 5), 27)
+	game.session.configure("host" if role == "host" else "join", "127.0.0.1", 27843, role)
+	started = Time.get_ticks_msec()
+func fail(message: String) -> void:
+	printerr("FAIL: ", role, " ", message)
+	quit(1)
+func act(action: String, station: int, extra := {}) -> void:
+	var value := {"action": action, "station": station}
+	value.merge(extra)
+	game.session.request_action(value)
+func _process(delta: float) -> bool:
+	if started == 0: return false
+	timer += delta
+	if Time.get_ticks_msec() - started > 30000:
+		fail("Timeout at stage %d" % stage)
+		return false
+	if not game.session.is_guest(): game.service.advance(delta)
+	game.session.advance(delta)
+	game.service.refresh_views(delta)
+	if role == "host": host_tick()
+	elif role == "guest": guest_tick()
+	else: observer_tick()
+	return false
+func host_tick() -> void:
+	var first = game.service.by_id(1)
+	var second = game.service.by_id(2)
+	var kitchen = game.service.by_id(4)
+	if stage == 0 and game.session.members.size() >= 2:
+		game.player.global_position = first.to_global(Vector3(0, 0.02, 1.8))
+		act("open", 1, {"dish": "wine"})
+		act("pass", 1, {"participants": [1]})
+		stage = 1
+	elif stage == 1 and first.training.phase == "recording" and second.training.phase == "recording":
+		print("READY: late join")
+		saw_parallel = true
+		stage = 2
+	elif stage == 2 and game.session.members.size() == 3 and second.training.phase == "idle":
+		act("cancel", 1)
+		game.player.global_position = kitchen.to_global(Vector3(-1.3, 0.02, 1.8))
+		act("open", 4, {"dish": "meal"})
+		var guest_id := 0
+		for id in game.session.members:
+			if game.session.members[id] == "guest": guest_id = id
+		act("pass", 4, {"participants": [1, guest_id]})
+		game.session.send_input(kitchen, {}, {"grab": "pasta_salt_tool"})
+		stage = 3
+	elif stage == 3 and kitchen.model.hands[1] == "salt":
+		if kitchen.model.hands[0] != "pasta_salt_tool": fail("Host cross-zone tool missing")
+		print("CHECK: both live roles share zones")
+		stage = 4
+	elif stage == 4 and kitchen.training.phase == "idle" and game.session.members.size() < 3:
+		if not saw_parallel: fail("No concurrent sessions")
+		print("PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup")
+		stage = 5
+		quit_at = timer + 2
+	elif stage == 5 and timer > quit_at:
+		game.session.leave("")
+		quit(0)
+func guest_tick() -> void:
+	if stage == 6:
+		if game.service.revenue != 73 or game.service.stations.size() != 4: fail("Guest local cafe not restored")
+		print("PASS: guest independent lesson, mixed participants, cross-zone access and local backup")
+		quit(0)
+		return
+	if not game.session.synced: return
+	var first = game.service.by_id(1)
+	var second = game.service.by_id(2)
+	var kitchen = game.service.by_id(4)
+	if game.service.by_id(27) == null: fail("Fifth station not replicated")
+	if stage == 0 and first.training.phase == "recording":
+		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
+		stage = 1
+		quit_at = timer + 0.3
+	elif stage == 1 and timer > quit_at:
+		act("open", 2, {"dish": "potato"})
+		stage = 2
+	elif stage == 2 and second.training.phase == "ready":
+		act("pass", 2, {"participants": [game.session.local_id()]})
+		stage = 3
+	elif stage == 3 and game.session.members.size() == 3 and second.training.phase == "recording":
+		saw_parallel = true
+		act("cancel", 2)
+		stage = 4
+	elif stage == 4 and kitchen.training.phase == "recording":
+		if kitchen.training.role_for(game.session.local_id()) != 1: fail("Wrong assignment")
+		game.session.send_input(kitchen, {}, {"grab": "salt"})
+		stage = 5
+	elif stage == 5 and kitchen.model.hands[1] == "salt" and kitchen.model.hands[0] == "pasta_salt_tool":
+		if not saw_parallel: fail("Parallel training not seen")
+		game.session.leave("")
+		stage = 6
+func observer_tick() -> void:
+	if not game.session.synced: return
+	var first = game.service.by_id(1)
+	var second = game.service.by_id(2)
+	var kitchen = game.service.by_id(4)
+	if stage == 0:
+		if game.service.stations.size() != 5: fail("Late observer did not receive dynamic stations")
+		# Both lessons can end shortly after the roster update; their station sessions remain valid.
+		stage = 1
+	elif stage == 1 and kitchen.training.phase == "recording":
+		stage = 2
+	elif stage == 2 and kitchen.training.phase == "idle":
+		print("PASS: late observer sees station sessions and cancelled live take")
+		game.session.leave("")
+		quit(0)

@@ -8,13 +8,19 @@ const PAN_HALF := Vector2(0.75, 0.60)
 const HOLES := [Vector2(-0.30, -0.15), Vector2(0.30, 0.15)]
 const FACES := [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD]
 const FACE_NAMES := ["правый", "левый", "верх", "низ", "перед", "зад"]
-const SAUCE_CENTER := Vector2(-0.9, 0.05)
-const PLATE_CENTER := Vector2(1.1, 0.05)
+const SAUCE_CENTER := Vector2(1.45, -0.50)
+const PLATE_CENTER := Vector2(1.35, 0.40)
 
+var tomato := Vector2(1.85, -0.1)
+var tomato_velocity := Vector3.ZERO
+var tomato_flying := false
+var tomato_hit := false
+var customer_reaction := 0.0
+var throw_direction := Vector3(0, 0.1, -1)
 var dish := "wine"
 var pan := PAN_CENTER
 var potato := PAN_CENTER + Vector2(-0.05, 0.28)
-var sausage := Vector2(-1.0, 0.55)
+var sausage := Vector2(0.8, 0.65)
 var pan_tilt := Vector2.ZERO
 var potato_velocity := Vector2.ZERO
 var potato_orientation := Quaternion.IDENTITY
@@ -36,9 +42,18 @@ func _init() -> void:
 func reset(recipe := "") -> void:
 	if not recipe.is_empty(): dish = recipe
 	super.reset()
+	jug = Vector2(-1.65, -0.65)
+	cup = Vector2(0.65, -0.65)
+	rag = Vector2(1.85, 0.65)
+	tomato = Vector2(1.85, -0.1)
+	tomato_velocity = Vector3.ZERO
+	tomato_flying = false
+	tomato_hit = false
+	customer_reaction = 0
+	throw_direction = Vector3(0, 0.1, -1)
 	pan = PAN_CENTER
 	potato = PAN_CENTER + Vector2(-0.05, 0.28)
-	sausage = Vector2(-1.0, 0.55)
+	sausage = Vector2(0.8, 0.65)
 	pan_tilt = Vector2.ZERO
 	potato_velocity = Vector2.ZERO
 	potato_orientation = Quaternion.IDENTITY
@@ -53,13 +68,20 @@ func reset(recipe := "") -> void:
 	sausage_state = "table"
 	sausage_velocity = Vector2.ZERO
 	previous_sausage = sausage
-	elevations.merge({"pan": PAN_LIFT, "potato": PAN_LIFT, "sausage": 0.0})
+	elevations.merge({"pan": PAN_LIFT, "potato": PAN_LIFT, "sausage": 0.0, "tomato": 0.0})
 
 func pick_up(item: String) -> void:
-	if dish == "wine":
+	if item == "tomato":
+		put_down()
+		held = item
+		elevations.tomato = 0.4
+		tomato_flying = false
+		tomato_hit = false
+		return
+	if item in ["jug", "cup", "rag"]:
 		super.pick_up(item)
 		return
-	if not item in (['pan', 'potato'] if dish == "potato" else ['sausage']): return
+	if not item in ["pan", "potato", "sausage"]: return
 	put_down()
 	held = item
 	if item == "potato":
@@ -74,7 +96,11 @@ func pick_up(item: String) -> void:
 		sausage_slip = 0
 
 func put_down() -> void:
-	if dish == "wine":
+	if held == "tomato":
+		elevations.tomato = 0.0
+		held = ""
+		return
+	if held in ["jug", "cup", "rag"]:
 		super.put_down()
 		return
 	if held == "potato":
@@ -100,7 +126,8 @@ func lift_held(amount: float) -> void:
 func move_item(item: String, point: Vector2) -> void:
 	if item == "pan": return
 	point = point.clamp(-BOUNDS, BOUNDS)
-	if item == "potato": potato = point
+	if item == "tomato": tomato = point
+	elif item == "potato": potato = point
 	elif item == "sausage": sausage = point
 	else: super.move_item(item, point)
 
@@ -108,10 +135,10 @@ func tilt_pan(motion: Vector2) -> void:
 	pan_tilt = (pan_tilt + motion * 0.003).limit_length(0.18)
 
 func step(delta: float, use_item: bool, straighten: bool, squeeze: bool) -> void:
-	match dish:
-		"wine": super.step(delta, use_item and held == "jug", straighten, squeeze and held == "rag")
-		"potato": _step_potato(delta, use_item)
-		"sausage": _step_sausage(delta, use_item)
+	super.step(delta, use_item and held == "jug", straighten, squeeze and held == "rag")
+	_step_potato(delta, use_item)
+	_step_sausage(delta, use_item)
+	_step_tomato(delta, use_item)
 
 func _step_potato(delta: float, use_item: bool) -> void:
 	if held != "pan" or not use_item: pan_tilt = pan_tilt.move_toward(Vector2.ZERO, 1.5 * delta)
@@ -213,8 +240,8 @@ func progress_value() -> float:
 func snapshot() -> Dictionary:
 	var data := super.snapshot()
 	data.dish = dish
-	if dish != "wine":
-		data.food = {"pan_tilt": [pan_tilt.x, pan_tilt.y], "potato": [potato.x, potato.y],
+	data.tomato = {"position": [tomato.x, tomato.y], "velocity": [tomato_velocity.x, tomato_velocity.y, tomato_velocity.z], "flying": tomato_flying, "hit": tomato_hit, "reaction": customer_reaction}
+	data.food = {"pan_tilt": [pan_tilt.x, pan_tilt.y], "potato": [potato.x, potato.y],
 			"potato_velocity": [potato_velocity.x, potato_velocity.y], "potato_orientation": [potato_orientation.x, potato_orientation.y, potato_orientation.z, potato_orientation.w],
 			"potato_heat": potato_heat.duplicate(), "potato_state": potato_state, "fall_speed": fall_speed, "falls": falls,
 			"sausage": [sausage.x, sausage.y], "sausage_angle": sausage_angle, "sausage_phase": sausage_phase,
@@ -225,7 +252,11 @@ func snapshot() -> Dictionary:
 func restore(data: Dictionary) -> void:
 	super.restore(data)
 	dish = str(data.get("dish", "wine"))
-	if dish == "wine": return
+	tomato = Vector2(data.tomato.position[0], data.tomato.position[1])
+	tomato_velocity = Vector3(data.tomato.velocity[0], data.tomato.velocity[1], data.tomato.velocity[2])
+	tomato_flying = data.tomato.flying
+	tomato_hit = data.tomato.hit
+	customer_reaction = data.tomato.reaction
 	var food: Dictionary = data.food
 	pan_tilt = Vector2(food.pan_tilt[0], food.pan_tilt[1])
 	potato = Vector2(food.potato[0], food.potato[1])
@@ -243,3 +274,26 @@ func restore(data: Dictionary) -> void:
 	sausage_state = str(food.sausage_state)
 	sausage_velocity = Vector2(food.sausage_velocity[0], food.sausage_velocity[1])
 	previous_sausage = sausage
+
+func _step_tomato(delta: float, use_item: bool) -> void:
+	customer_reaction = maxf(0, customer_reaction - delta)
+	if held == "tomato" and use_item:
+		held = ""
+		tomato_flying = true
+		tomato_velocity = throw_direction.normalized() * 6.5
+	if not tomato_flying: return
+	var point := Vector3(tomato.x, BASE_Y + float(elevations.tomato) + 0.12, tomato.y)
+	var next := point + tomato_velocity * delta
+	var receiver := Vector3(0, 1.5, -1.85)
+	if Geometry3D.get_closest_point_to_segment(receiver, point, next).distance_to(receiver) < 0.38:
+		tomato_hit = true
+		tomato_flying = false
+		customer_reaction = 1.8
+		next = receiver
+	tomato_velocity.y -= delta * 6
+	var floor_y := BASE_Y + 0.12 if absf(next.x) < 2.15 and absf(next.z) < 1.12 else 0.12
+	if next.y <= floor_y:
+		next.y = floor_y
+		tomato_flying = false
+	tomato = Vector2(next.x, next.z)
+	elevations.tomato = next.y - BASE_Y - 0.12

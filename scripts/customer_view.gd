@@ -1,5 +1,6 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+var stain: MeshInstance3D
 var caption: Label3D
 var legs: Array[Node3D] = []
 var color := Color("a66c76")
@@ -24,6 +25,9 @@ func _ready() -> void:
 		Props.cylinder(self, 0.26, 0.22, Vector3(0, 1.78, 0), Color("fff0cb"))
 		Props.box(self, Vector3(0.38, 0.5, 0.04), Vector3(0, 0.91, -0.185), Color("f3deb1"))
 	else: Props.ball(self, 0.25, Vector3(0, 1.64, 0.025), color.darkened(0.3)).scale.y = 0.48
+	stain = Props.ball(self, 0.13, Vector3(0, 1.5, -0.235), Color("d9483b"))
+	stain.scale.z = 0.15
+	stain.hide()
 	caption = Props.text(self, "", Vector3(0, 2.05, 0), 19, Color("f6dfa9"))
 	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	caption.pixel_size = 0.005
@@ -39,3 +43,7 @@ func walk_to(target: Vector3, delta: float) -> bool:
 	legs[0].rotation.x = sin(phase) * 0.32
 	legs[1].rotation.x = -sin(phase) * 0.32
 	return false
+
+func react(time_left: float) -> void:
+	stain.visible = time_left > 0
+	rotation.z = sin(time_left * 10) * 0.12 if time_left > 0 else 0.0

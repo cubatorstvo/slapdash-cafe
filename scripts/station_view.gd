@@ -5,6 +5,7 @@ const Model = preload("res://scripts/cooking_model.gd")
 const TABLE_HEIGHT := Model.SURFACE_Y
 const WINE_COLOR := Color("ba4058")
 
+var tomato: Node3D
 var jug: Node3D
 var jug_body: Node3D
 var cup: Node3D
@@ -46,6 +47,10 @@ func build(production: bool) -> void:
 		Props.box(self, Vector3(3.9, 0.007, 0.018), Vector3(0, TABLE_HEIGHT + 0.004, z), accent.darkened(0.25))
 	for x in [-1.95, 1.95]:
 		Props.box(self, Vector3(0.018, 0.007, 1.94), Vector3(x, TABLE_HEIGHT + 0.004, 0), accent.darkened(0.25))
+	tomato = Node3D.new()
+	add_child(tomato)
+	Props.ball(tomato, 0.12, Vector3(0, 0.12, 0), Color("d9483b"))
+	Props.box(tomato, Vector3(0.12, 0.02, 0.04), Vector3(0, 0.24, 0), Color("6a9c56"))
 	_build_jug()
 	_build_cup()
 	rag = Node3D.new()
@@ -170,8 +175,10 @@ func _build_worker() -> void:
 
 func update_view(model, animation_time := 0.0, resting := false) -> void:
 	dish = model.dish
+	tomato.position = item_point(model.tomato) + Vector3.UP * model.elevations.tomato
+	tomato.visible = not model.tomato_hit
 	kitchen.update_view(model)
-	for node in [jug, cup, rag, fill_label]: node.visible = dish == "wine"
+	for node in [jug, cup, rag, fill_label]: node.visible = true
 	jug.position = item_point(model.jug)
 	jug_body.rotation.z = -deg_to_rad(model.tilt)
 	cup.position = item_point(model.cup)
@@ -192,7 +199,7 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 	_update_grip_marker(model)
 	for mesh in spill_meshes:
 		mesh.visible = false
-	for index in range(model.puddles.size() if dish == "wine" else 0):
+	for index in range(model.puddles.size()):
 		if index == spill_meshes.size():
 			spill_meshes.append(Props.cylinder(self, 1.0, 0.008, Vector3.ZERO, WINE_COLOR.darkened(0.12)))
 		var data: Array = model.puddles[index]
@@ -201,13 +208,13 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 		mesh.position = Vector3(data[0], TABLE_HEIGHT + 0.008, data[1])
 		var radius := clampf(sqrt(float(data[2])) * 0.026, 0.025, 0.34)
 		mesh.scale = Vector3(radius, 1.0, radius * 0.8)
-	target_ring.visible = dish == "wine" and not is_production and model.held in ["jug", "rag"]
+	target_ring.visible = not is_production and model.held in ["jug", "rag"]
 	var aim: Vector2 = model.rag if model.held == "rag" else model.spout_target()
 	var aimed: bool = model.can_fill_at(aim, model.source_height())
 	target_ring.position = item_point(aim)
 	if aimed: target_ring.position.y += float(model.elevations.cup) + 0.50
 	target_ring.material_override.albedo_color = Color("6fd7ae") if aimed else Color("e9a164")
-	stream.visible = dish == "wine" and (model.flowing or model.squeezing)
+	stream.visible = (model.flowing or model.squeezing)
 	if stream.visible:
 		var start: Vector3 = model.spout_position()
 		if model.squeezing: start = rag.position + Vector3(0, 0.04, 0)
@@ -225,6 +232,7 @@ func _update_worker(model, time: float, resting: bool) -> void:
 	match model.held:
 		"jug": target = jug.position + Vector3(0, 0.35, 0)
 		"cup": target = cup.position + Vector3(0, 0.22, 0)
+		"tomato": target = tomato.position + Vector3(0, 0.12, 0)
 		"rag": target = rag.position + Vector3(0, 0.06, 0)
 		"pan": target = kitchen.pan.position + kitchen.pan.basis * Vector3(0, 0.08, 1.0)
 		"potato": target = kitchen.potato.position + Vector3(0, 0.14, 0)
@@ -239,15 +247,16 @@ func item_point(point: Vector2) -> Vector3:
 	return Vector3(point.x, Model.BASE_Y, point.y)
 
 func pick_item(camera: Camera3D) -> String:
-	if dish != "wine": return kitchen.pick_item(camera, dish)
+	var food_pick: String = kitchen.pick_item(camera, "all")
 	var selected := ""
 	var nearest := 3.4
 	var ray_origin := camera.global_position
 	var ray_direction := -camera.global_basis.z
-	for entry in [["jug", jug, AABB(Vector3(-0.66, 0, -0.36), Vector3(1.16, 0.87, 0.72))],
+	for entry in [["tomato", tomato, AABB(Vector3(-0.15, 0, -0.15), Vector3(0.3, 0.27, 0.3))], ["jug", jug, AABB(Vector3(-0.66, 0, -0.36), Vector3(1.16, 0.87, 0.72))],
 		["cup", cup, AABB(Vector3(-0.27, 0, -0.27), Vector3(0.54, 0.54, 0.54))],
 		["rag", rag, AABB(Vector3(-0.25, 0, -0.19), Vector3(0.5, 0.12, 0.38))]]:
 		var node: Node3D = entry[1]
+		if not node.visible: continue
 		var bounds: AABB = entry[2]
 		var hit = bounds.intersects_ray(node.to_local(ray_origin), node.global_basis.inverse() * ray_direction)
 		if hit == null: continue
@@ -255,4 +264,4 @@ func pick_item(camera: Camera3D) -> String:
 		if distance < nearest:
 			nearest = distance
 			selected = entry[0]
-	return selected
+	return selected if not selected.is_empty() else food_pick

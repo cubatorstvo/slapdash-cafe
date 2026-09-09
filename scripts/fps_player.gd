@@ -38,7 +38,8 @@ func advance(delta: float, movement: Vector2) -> void:
 	var speed := 2.2 if constrained else 3.5
 	velocity.x = desired.x * speed
 	velocity.z = desired.z * speed
-	velocity.y = -0.5 if is_on_floor() else velocity.y - 18.0 * delta
+	if not is_on_floor(): velocity.y -= 18.0 * delta
+	elif velocity.y <= 0: velocity.y = -0.5
 	move_and_slide()
 	# Clamp supplements physical barriers during their deferred enable/disable tick.
 	if constrained and is_instance_valid(station):

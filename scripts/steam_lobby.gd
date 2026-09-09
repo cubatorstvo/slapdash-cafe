@@ -2,7 +2,7 @@ extends Node
 ## Steam owns lobby membership and invitations; Session owns the shared cafe.
 const APP_ID := 480
 const GAME_KEY := "slapdash-cafe"
-const PROTOCOL := "slapdash-cafe-steam-3"
+const PROTOCOL := "slapdash-cafe-stations-4"
 const MAX_PLAYERS := 4
 var game: Node3D
 var api: Object
@@ -65,7 +65,7 @@ func create_lobby() -> void:
 		_set_status(status)
 		return
 	if creating or lobby_id > 0: return
-	if game.recording or game.team.active():
+	if game.service.any_training():
 		_set_status("Сначала заверши или отмени текущий показ.")
 		return
 	if game.session.online(): game.session.leave("")

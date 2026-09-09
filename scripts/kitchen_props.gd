@@ -112,28 +112,26 @@ func _bend_sausage(phase: float, amplitude: float) -> void:
 	sausage_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 
 func update_view(model) -> void:
-	potato_set.visible = model.dish == "potato"
-	sausage_set.visible = model.dish == "sausage"
-	if model.dish == "potato":
-		pan.rotation = Vector3(model.pan_tilt.y, 0, -model.pan_tilt.x)
-		potato.position = point(model.potato, model.elevations.potato)
-		potato_body.quaternion = model.potato_orientation
-		var orientation := Basis(model.potato_orientation)
-		potato_body.position.y = Vector3(orientation.x.y * 0.22, orientation.y.y * 0.14, orientation.z.y * 0.15).length()
-		for index in range(6):
-			potato_sides[index].material_override.albedo_color = Color("dcaf70").lerp(Color("875034"), float(model.potato_heat[index]))
-	elif model.dish == "sausage":
-		sausage.position = point(model.sausage, model.elevations.sausage)
-		sausage.rotation.z = model.sausage_angle
-		sausage.position.y += absf(sin(model.sausage_angle)) * 0.30
-		var amplitude: float = 0.018 if model.held.is_empty() else 0.025 + model.sausage_slip * 0.05
-		_bend_sausage(model.sausage_phase, amplitude)
-		sausage_skin.material_override.albedo_color = Color("cd8869").lerp(Color("b8324a"), model.sausage_coating)
+	potato_set.visible = true
+	sausage_set.visible = true
+	pan.rotation = Vector3(model.pan_tilt.y, 0, -model.pan_tilt.x)
+	potato.position = point(model.potato, model.elevations.potato)
+	potato_body.quaternion = model.potato_orientation
+	var orientation := Basis(model.potato_orientation)
+	potato_body.position.y = Vector3(orientation.x.y * 0.22, orientation.y.y * 0.14, orientation.z.y * 0.15).length()
+	for index in range(6):
+		potato_sides[index].material_override.albedo_color = Color("dcaf70").lerp(Color("875034"), float(model.potato_heat[index]))
+	sausage.position = point(model.sausage, model.elevations.sausage)
+	sausage.rotation.z = model.sausage_angle
+	sausage.position.y += absf(sin(model.sausage_angle)) * 0.30
+	var amplitude: float = 0.018 if model.held.is_empty() else 0.025 + model.sausage_slip * 0.05
+	_bend_sausage(model.sausage_phase, amplitude)
+	sausage_skin.material_override.albedo_color = Color("cd8869").lerp(Color("b8324a"), model.sausage_coating)
 
 func pick_item(camera: Camera3D, dish: String) -> String:
 	# Potato first allows retrieval through a hole, below the pan's broad hit box.
 	var entries := [["potato", potato, AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.46, 0.44))],
-		["pan", pan, AABB(Vector3(-0.80, -0.08, -0.65), Vector3(1.6, 0.25, 1.9))]] if dish == "potato" else [
+		["pan", pan, AABB(Vector3(-0.80, -0.08, -0.65), Vector3(1.6, 0.25, 1.9))]] + [
 		["sausage", sausage, AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))]]
 	for entry in entries:
 		var node: Node3D = entry[1]
