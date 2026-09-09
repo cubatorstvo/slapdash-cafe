@@ -30,6 +30,8 @@ var selected_clone_id := 1
 var selected_slot := 1
 var selected_dish := "wine"
 var recording := false
+var teacher_peer := 1
+var steam: Node
 var team: Node3D
 var lecture: Node3D
 var menu: CanvasLayer
@@ -71,12 +73,19 @@ func _ready() -> void:
 	team.setup(self)
 	menu = TeamMenu.new()
 	add_child(menu)
-	menu.start_requested.connect(team.start)
+	menu.start_requested.connect(_request_team)
+	menu.closed.connect(func(): sync_mouse_mode.call_deferred())
 	session = Session.new()
 	session.name = "Session"
 	add_child(session)
 	session.setup(self)
 	menu.network_requested.connect(session.configure)
+	steam = preload("res://scripts/steam_lobby.gd").new()
+	add_child(steam)
+	menu.steam_requested.connect(func(action):
+		if action == "invite": steam.invite_friends()
+		else: steam.create_lobby())
+	steam.setup(self)
 	_load_staff()
 	_refresh_views()
 	_refresh_hud()
@@ -172,15 +181,16 @@ func can_start_recording() -> bool:
 	return absf(local.x) < 2.25 and local.z > 1.25 and local.z < 2.55 and facing.dot(towards) > 0.25
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_instance_valid(steam) and steam.overlay_open: return
 	if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_F2:
-		if not recording and not team.active():
+		if not is_local_teaching() and not team.participating():
 			menu.net_panel.visible = not menu.net_panel.visible
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if menu.opened() else Input.MOUSE_MODE_CAPTURED
 		return
 	if menu.opened():
 		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: menu.close()
 		return
-	if team.active() and not session_paused:
+	if team.participating() and not session_paused:
 		if event is InputEventKey and event.pressed and event.physical_keycode == KEY_ESCAPE: toggle_pause()
 		else: team.handle(event)
 		return
@@ -192,24 +202,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		if session_paused or hud.teaching_panel.visible: return
 		match event.physical_keycode:
 			KEY_E: interact()
-			KEY_ENTER, KEY_KP_ENTER: finish_recording()
-			KEY_X: cancel_recording()
+			KEY_ENTER, KEY_KP_ENTER:
+				if is_local_teaching(): finish_recording()
+			KEY_X:
+				if is_local_teaching(): cancel_recording()
 			KEY_G:
-				if not session.is_guest(): service.open_for_business = not service.open_for_business
+				session.request_action({"action": "business"})
 	if session_paused or hud.teaching_panel.visible: return
 	if event is InputEventMouseMotion:
 		var movement: Vector2 = event.screen_relative
-		if recording and live.held == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		if is_local_teaching() and live.held == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 			live.tilt_pan(movement)
-		elif recording and not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
+		elif is_local_teaching() and not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
 			_move_precisely(movement)
 		else:
 			player.look(movement)
-	if event is InputEventMouseButton and event.pressed and recording:
+	if event is InputEventMouseButton and event.pressed and is_local_teaching():
 		match event.button_index:
 			MOUSE_BUTTON_LEFT:
 				if live.held.is_empty(): _grab(training.pick_item(camera))
-				else: live.put_down()
+				else:
+					live.put_down()
+					if session.is_guest(): session.send_single_event({"drop": true})
 			MOUSE_BUTTON_WHEEL_UP: live.lift_held(0.08)
 			MOUSE_BUTTON_WHEEL_DOWN: live.lift_held(-0.08)
 
@@ -222,8 +236,9 @@ func _held_target() -> Vector2:
 	return Vector2(point.x, point.z).clamp(-Model.BOUNDS, Model.BOUNDS)
 
 func _grab(item: String) -> void:
-	if not recording or session_paused or item.is_empty(): return
+	if not is_local_teaching() or session_paused or item.is_empty(): return
 	live.pick_up(item)
+	if session.is_guest(): session.send_single_event({"grab": item})
 	_reanchor_grip()
 
 func _reanchor_grip() -> void:
@@ -241,30 +256,49 @@ func _move_precisely(movement: Vector2) -> void:
 	live.move_item(live.held, live.get(live.held) + horizontal * 0.0035)
 	_reanchor_grip()
 
+func input_blocked() -> bool:
+	return session_paused or hud.teaching_panel.visible or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+
+func sync_mouse_mode() -> void:
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if input_blocked() else Input.MOUSE_MODE_CAPTURED
+
+func is_local_teaching() -> bool:
+	return recording and teacher_peer == session.local_id()
+
 func _physics_process(delta: float) -> void:
-	if session_paused or hud.teaching_panel.visible or menu.opened():
-		session.advance(delta)
-		return
+	var blocked := input_blocked()
+	if blocked and not session.online(): return
 	tick_count += 1
-	var movement := Vector2(
+	var movement := Vector2.ZERO if blocked else Vector2(
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
 	player.advance(delta, movement.limit_length())
 	if recording:
-		var precise := not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT)
-		if precision_active and not precise: _reanchor_grip()
-		precision_active = precise
-		if not live.held.is_empty():
-			if not precise and live.held != "pan":
-				var current: Vector2 = live.get(live.held)
-				live.move_item(live.held, current.move_toward(_held_target(), ITEM_MOVE_SPEED * delta))
-			var lift := float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
-			live.lift_held(lift * 0.55 * delta)
-		var using_item := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-		live.step(delta, using_item, not using_item, using_item)
-		_capture_pose()
-		frames.append(live.snapshot())
-		elapsed = frames.size() * TICK
+		if is_local_teaching():
+			var precise := not live.held.is_empty() and Input.is_physical_key_pressed(KEY_SHIFT)
+			if precision_active and not precise: _reanchor_grip()
+			precision_active = precise
+			if not blocked and not live.held.is_empty():
+				if not precise and live.held != "pan":
+					var current: Vector2 = live.get(live.held)
+					live.move_item(live.held, current.move_toward(_held_target(), ITEM_MOVE_SPEED * delta))
+				var lift := float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))
+				live.lift_held(lift * 0.55 * delta)
+			var using_item := not blocked and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+			live.step(delta, using_item, not using_item, using_item)
+			_capture_pose()
+			if session.is_guest():
+				var command := {"use": using_item, "pose": {"position": [live.actor_position.x, live.actor_position.y, live.actor_position.z], "yaw": live.actor_yaw, "pitch": live.actor_pitch}}
+				if not live.held.is_empty():
+					var point: Vector2 = live.get(live.held)
+					command.target = [point.x, point.y]
+					command.height = live.elevations[live.held]
+				if live.dish == "potato": command.pan_tilt = [live.pan_tilt.x, live.pan_tilt.y]
+				session.send_single_motion(command)
+		elif not session.is_guest(): session.advance_single(delta)
+		if not session.is_guest():
+			frames.append(live.snapshot())
+			elapsed = frames.size() * TICK
 	team.advance(delta)
 	if not session.is_guest():
 		lecture.advance(delta)
@@ -274,6 +308,7 @@ func _physics_process(delta: float) -> void:
 	_refresh_hud()
 
 func _capture_pose() -> void:
+	if recording and not is_local_teaching(): return
 	var pose: Dictionary = player.pose_in(training)
 	live.actor_position = pose.position
 	live.actor_yaw = pose.yaw
@@ -293,26 +328,27 @@ func clone_home(id: int) -> Vector3:
 	return station.view.to_global(Vector3(0, 0, 1.85))
 
 func near_machine() -> bool:
-	if recording: return false
+	if is_local_teaching(): return false
 	var offset := clone_machine.global_position + Vector3(0, 1.1, 0) - camera.global_position
 	return offset.length() < 2.8 and (-camera.global_basis.z).dot(offset.normalized()) > 0.6
 
 func interact() -> void:
-	if session.is_guest():
-		hud.notice.text = "Хост выбирает сотрудников и запускает совместный показ у стола II."
-		return
-	if team.near() and not recording:
-		menu.show_training(service.clones, session.members)
+	if session.is_guest() and not session.synced: return
+	if team.near() and not recording and not team.active():
+		menu.show_training(service.clones, session.members, session.local_id())
 		return
 	if near_machine():
-		var clone: Dictionary = service.create_clone()
-		_save_staff()
-		hud.notice.text = "%s появился. Первые три сотрудника занимают стойки; остальных выбирай в меню обучения." % clone.name
+		session.request_action({"action": "clone"})
+		hud.notice.text = "Новый сотрудник появится у свободной стойки или в резерве."
 	elif can_start_recording():
 		var assigned: Array = []
 		for index in range(3): assigned.append(service.stations[index].clone_id)
 		hud.show_teaching(service.clones, assigned, selected_clone_id, selected_dish)
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _request_team(mode: String, ids: Array, peer: int) -> void:
+	menu.close()
+	session.request_action({"action": "team", "mode": mode, "ids": ids, "partner": peer})
 
 func close_teaching_menu() -> void:
 	hud.teaching_panel.hide()
@@ -320,38 +356,59 @@ func close_teaching_menu() -> void:
 
 func _begin_selected_training(recipe: String, clone_id: int, slot: int) -> void:
 	close_teaching_menu()
-	lecture.clear_now()
-	selected_dish = recipe
-	selected_clone_id = clone_id
-	selected_slot = slot
-	start_recording()
+	session.request_action({"action": "single", "dish": recipe, "clone": clone_id, "slot": slot})
 
 func start_recording() -> void:
 	if not can_start_recording(): return
+	teacher_peer = 1
+	_start_teaching_authority()
+
+func begin_network_teaching(recipe: String, clone_id: int, slot: int, teacher: int) -> void:
+	if recording or team.active(): return
+	selected_dish = recipe
+	selected_clone_id = clone_id
+	selected_slot = slot
+	teacher_peer = teacher
+	_start_teaching_authority()
+
+func _start_teaching_authority() -> void:
 	lecture.clear_now()
+	session.single_revision += 1
+	session.single_motion.clear()
+	session.single_events.clear()
 	var home := clone_home(selected_clone_id)
 	service.reserve_station(selected_slot, selected_clone_id)
 	production = service.stations[selected_slot].view
 	playback = service.stations[selected_slot].model
 	live.reset(selected_dish)
-	_capture_pose()
+	if teacher_peer == session.local_id():
+		_capture_pose()
+	else:
+		var pose: Dictionary = session.player_poses[teacher_peer]
+		live.actor_position = training.to_local(Vector3(pose.position[0], pose.position[1], pose.position[2]))
+		live.actor_yaw = pose.yaw - training.global_rotation.y
+		live.actor_pitch = pose.pitch
 	frames.clear()
 	elapsed = 0.0
-	lecture.begin([service.get_clone(selected_clone_id).name], [home], training, player, func(): service.release_station(selected_slot), [production.to_global(Vector3(0, 0, 1.85))])
+	lecture.begin([service.get_clone(selected_clone_id).name], [home], training, session.actor_for(teacher_peer), func(): service.release_station(selected_slot), [production.to_global(Vector3(0, 0, 1.85))])
 	recording = true
 	precision_active = false
-	player.station = training
-	player.zone_min = Player.ZONE_MIN
-	player.zone_max = Player.ZONE_MAX
-	_set_zone(true)
+	if teacher_peer == session.local_id():
+		player.station = training
+		player.zone_min = Player.ZONE_MIN
+		player.zone_max = Player.ZONE_MAX
+		_set_zone(true)
 	hud.notice.text = "Запись началась. Клон подходит с блокнотом и наблюдает. Enter — закончить; X — отменить."
 	_refresh_views()
 	_refresh_hud()
 
 func finish_recording() -> void:
-	if not recording or session_paused: return
+	if session.is_guest():
+		if is_local_teaching(): session.send_single_event({"finish": true})
+		return
+	if not recording or (session_paused and not session.online()): return
 	if not live.success():
-		hud.notice.text = "Показ продолжается. " + live.goal_text()
+		session.message_to(teacher_peer, "Показ продолжается. " + live.goal_text())
 		return
 	live.put_down()
 	_capture_pose()
@@ -367,8 +424,11 @@ func finish_recording() -> void:
 	if not saved: hud.notice.text += " Запись действует до выхода: сохранить файл не удалось."
 	_refresh_hud()
 
-func cancel_recording() -> void:
-	if not recording or session_paused: return
+func cancel_recording(force_local := false) -> void:
+	if session.is_guest() and not force_local:
+		if is_local_teaching(): session.send_single_event({"cancel": true})
+		return
+	if not recording or (session_paused and not session.online() and not force_local): return
 	recording = false
 	frames.clear()
 	live.reset()
@@ -381,7 +441,8 @@ func cancel_recording() -> void:
 
 func toggle_pause() -> void:
 	session_paused = not session_paused
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if session_paused else Input.MOUSE_MODE_CAPTURED
+	if session_paused: session.suspend_input()
+	sync_mouse_mode()
 	hud.pause_panel.visible = session_paused
 	_refresh_hud()
 
@@ -393,7 +454,7 @@ func _notification(what: int) -> void:
 func _refresh_views() -> void:
 	training.update_view(live, tick_count * TICK)
 	service.refresh_views()
-	if recording:
+	if is_local_teaching():
 		var local := training.to_local(player.global_position)
 		var distances := [absf(local.x - Player.ZONE_MIN.x), absf(local.x - Player.ZONE_MAX.x), absf(local.z - Player.ZONE_MIN.y), absf(local.z - Player.ZONE_MAX.y)]
 		for index in range(barrier_meshes.size()):
@@ -410,7 +471,7 @@ func _refresh_hud() -> void:
 	hud.supplies.text = "Кафе %s · Гостей: %d · Ушли без заказа: %d" % ["открыто" if service.open_for_business else "закрыто", session.remote_customers.size() if session.is_guest() else service.customers.size(), service.missed]
 	hud.controls.text = "WASD — ходить  •  E — обучение / клономат  •  G — открыть / закрыть кафе  •  F2 — онлайн  •  Esc — пауза"
 	hud.prompt.text = "[E] Выбрать блюдо и клона" if can_start_recording() else ("[E] Создать сотрудника" if near_machine() else "")
-	if recording:
+	if is_local_teaching():
 		hud.controls.text = "ЛКМ — взять / поставить  •  ПКМ — использовать  •  Колесо или R/F — высота\nShift + мышь — точное движение  •  Enter — закончить  •  X — отменить"
 		if live.dish == "wine":
 			hud.supplies.text = "Кувшин: %d мл  •  На столе: %d мл  •  Тряпка: %d мл  •  Голубой — предмет, цветной — струя" % [roundi(live.wine), roundi(live.spilled()), roundi(live.soaked)]
@@ -441,9 +502,9 @@ func _refresh_hud() -> void:
 	if recording:
 		var clone: Dictionary = service.get_clone(selected_clone_id)
 		hud.clone_status.text = "%s · наблюдает и записывает" % clone.name
-	hud.crosshair.visible = not session_paused and not hud.teaching_panel.visible
+	hud.crosshair.visible = not input_blocked()
 	hud.prompt.visible = hud.crosshair.visible
-	if not recording and team.near(): hud.prompt.text = "[E] Стол II · Обучить бригаду"
+	if not recording and not team.active() and team.near(): hud.prompt.text = "[E] Стол II · Обучить бригаду"
 	team.refresh_hud()
 
 func _save_staff() -> bool:
@@ -516,3 +577,22 @@ func _valid_frame(frame: Variant) -> bool:
 
 func _finite_number(value: Variant) -> bool:
 	return (value is float or value is int) and is_finite(float(value))
+
+func apply_single_remote(data: Dictionary) -> void:
+	var was_local := is_local_teaching()
+	recording = data.active
+	teacher_peer = data.teacher
+	selected_clone_id = data.clone
+	selected_slot = data.slot
+	selected_dish = data.dish
+	elapsed = data.elapsed
+	session.single_revision = data.revision
+	if is_local_teaching() and not was_local:
+		close_teaching_menu()
+		player.station = training
+		player.zone_min = Player.ZONE_MIN
+		player.zone_max = Player.ZONE_MAX
+		_set_zone(true)
+	elif was_local and not is_local_teaching():
+		_set_zone(false)
+		hud.notice.text = "Показ завершён. Результат и сотрудники синхронизированы с хостом."
