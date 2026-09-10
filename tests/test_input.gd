@@ -57,7 +57,17 @@ func run() -> void:
 		game.height = requested_height
 		var changed: Dictionary = game.build_motion(station, 0)
 		check(Vector2(changed.target[0], changed.target[1]).distance_to(Vector2(initial.target[0], initial.target[1])) < 0.00001, "Height change preserves horizontal position above floor and table")
-		check(changed.height == requested_height, "Height command still changes independently")
+		check(changed.height == maxf(0, requested_height), "Requested height clamps to table without accumulating hidden scroll")
+	game.precise = true
+	station.model.positions.pot = Vector2(1.4, 2.0)
+	game.target = station.model.positions.pot
+	game.height = -1.0
+	check(is_equal_approx(game.build_motion(station, 0).height, -1.0), "Floor permits lowering")
+	game.target = station.TeamModel.STOVE
+	check(game.build_motion(station, 0).height == 0.0 and game.height == 0.0, "Floor-to-table raises stored height")
+	game.target = Vector2(1.4, 2.0)
+	check(game.build_motion(station, 0).height == 0.0, "Returning over floor retains table height")
+	game.precise = false
 	station.training.close()
 	game.bind_training()
 	check(not game.player.constrained, "Leaving lesson restores free movement")

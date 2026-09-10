@@ -133,7 +133,7 @@ func refresh(local_peer: int, delta: float) -> void:
 	var active: bool = training.active()
 	view.station_label.visible = not active
 	var local_role: int = training.role_for(local_peer)
-	for wall in walls: wall.visible = active and local_role >= 0 and training.phase == "recording"
+	for wall in walls: wall.visible = active and local_role >= 0 and training.phase in ["recording", "confirm_finish"]
 	if active and not observing:
 		for role in range(role_count()):
 			var side := -1 if role == 0 else 1
@@ -141,7 +141,7 @@ func refresh(local_peer: int, delta: float) -> void:
 			students[role].position = Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0, 0, 1.85)
 			student_paths[role] = [Vector3(edge, 0, 1.65), Vector3(edge, 0, -1.6), Vector3(-1.4 + role * 2.8 if role_count() == 2 else 1.5, 0, -1.6)]
 	observing = active
-	var performing: bool = training.phase in ["recording", "review"]
+	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
 		view._update_worker(model, age, state != "cooking")

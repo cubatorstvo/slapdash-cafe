@@ -100,6 +100,13 @@ func guest_tick() -> void:
 		stage = 3
 	elif stage == 3 and game.session.members.size() == 3 and second.training.phase == "recording":
 		saw_parallel = true
+		act("finish", 2)
+		stage = 30
+	elif stage == 30 and second.training.phase == "confirm_finish":
+		act("resume", 2)
+		stage = 31
+	elif stage == 31 and second.training.phase == "recording":
+		print("CHECK: guest confirmation and resume replicated")
 		act("cancel", 2)
 		stage = 4
 	elif stage == 4 and kitchen.training.phase == "recording":

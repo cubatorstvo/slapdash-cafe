@@ -100,14 +100,26 @@ func _restore_inactive(at_tick: int) -> void:
 			var empty = station.TeamModel.new()
 			station.model.restore_zone(role, empty.zone_snapshot(role))
 
-func finish_pass() -> void:
-	if phase != "recording" or tick == 0: return
+func finish_pass(confirmed := false) -> void:
+	if phase not in ["recording", "confirm_finish"] or tick == 0: return
+	var missing: Array = preload("res://scripts/dish_quality.gd").missing(station.model.quality(), live_roles)
+	if not confirmed and not missing.is_empty():
+		phase = "confirm_finish"
+		inputs.clear()
+		events.clear()
+		info = "Не на подаче: %s. Завершить проход так или продолжить готовку? Отсутствующие компоненты снижают оценку." % ", ".join(missing)
+		return
 	for role in live_roles:
 		station.model.put_down() if station.type_id == "counter" else station.model.drop(role)
 	for role in live_roles:
 		pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
 	phase = "review"
 	info = "Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний."
+
+func resume_pass() -> void:
+	if phase != "confirm_finish": return
+	phase = "recording"
+	info = "Показ продолжается. Положи нужные компоненты на подачу."
 
 func keep_pass() -> void:
 	if phase != "review": return
@@ -124,11 +136,11 @@ func can_accept() -> bool:
 	for track in tracks:
 		if track.is_empty() or track.frames.is_empty(): return false
 	station.show_tracks(tracks, duration_ticks(tracks) - 1)
-	return station.model.quality().present
+	return true
 
 func accept() -> bool:
 	if not can_accept():
-		info = "Запиши все роли и положи еду на подачу. Любое качество D–S можно сохранить."
+		info = "Запиши все роли. Подтверждённый неполный результат тоже можно сохранить."
 		return false
 	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
 	station.drafts.erase(dish)

@@ -57,7 +57,12 @@ func _ready() -> void:
 	sync_mouse_mode()
 
 func input_blocked() -> bool:
-	return session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+	return awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+
+func awaiting_serving_confirmation() -> bool:
+	if not is_instance_valid(service) or not is_instance_valid(session): return false
+	var station := local_station()
+	return station != null and station.training.phase == "confirm_finish"
 
 func sync_mouse_mode() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if input_blocked() else Input.MOUSE_MODE_CAPTURED
@@ -84,7 +89,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode == KEY_ESCAPE:
-			if menu.opened(): menu.close()
+			if awaiting_serving_confirmation():
+				var current := local_station()
+				if current.training.lead == session.local_id():
+					menu.close()
+					session.request_action({"action": "resume", "station": current.station_id})
+			elif menu.opened(): menu.close()
 			else: toggle_pause()
 			return
 		if event.physical_keycode == KEY_F2:
@@ -152,6 +162,7 @@ func bind_training() -> void:
 	var run = station.training
 	local_role = run.role_for(session.local_id())
 	if run.phase == "recording" and local_role >= 0:
+		last_menu_revision = ""
 		if bound_station != station.station_id or bound_revision != run.revision:
 			player.station = station
 			var width: float = station.Definition.TYPES[station.type_id].width / 2 + 0.5
@@ -172,11 +183,13 @@ func bind_training() -> void:
 			bound_revision = run.revision
 		player.constrained = true
 	else:
-		player.constrained = false
+		player.constrained = run.phase == "confirm_finish"
 		var stamp := "%d:%d:%s" % [station.station_id, run.revision, run.phase]
-		if run.lead == session.local_id() and run.phase in ["ready", "review"] and stamp != last_menu_revision:
+		if run.lead == session.local_id() and run.phase in ["ready", "review", "confirm_finish"] and stamp != last_menu_revision:
 			last_menu_revision = stamp
 			menu.show_station(station)
+
+	sync_mouse_mode()
 
 func build_motion(station: Node3D, delta: float) -> Dictionary:
 	var item := held_item(station)
@@ -195,6 +208,11 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 			var reach := maxf(origin.y - grip_plane_y, 0.01) / maxf(-ray.y, 0.08)
 			var point := origin + ray * reach
 			target = Vector2(point.x, point.z)
+		# Keep the requested height at the support surface, not just the rendered item.
+		var current: Vector2 = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
+		var limited_target: Vector2 = target.clamp(-station.model.BOUNDS, station.model.BOUNDS)
+		var support: float = maxf(station.model.surface_at(current), station.model.surface_at(limited_target)) - station.model.BASE_Y
+		height = clampf(height, support, 1.1)
 		command.target = [target.x, target.y]
 		command.height = height
 		command.pan_tilt = [pan_tilt.x, pan_tilt.y]
@@ -204,7 +222,7 @@ func _physics_process(delta: float) -> void:
 	bind_training()
 	if session_paused and not session.online(): return
 	var move := Vector2.ZERO if input_blocked() else Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
-	player.advance(delta, move.limit_length())
+	if not awaiting_serving_confirmation(): player.advance(delta, move.limit_length())
 	var station := local_station()
 	if station != null and station.training.phase == "recording" and local_role >= 0: session.send_input(station, build_motion(station, delta))
 	if not session.is_guest(): service.advance(delta)

@@ -281,18 +281,18 @@ func quality() -> Dictionary:
 		if served >= 0:
 			for heat in potatoes[served].potato_heat:
 				if heat >= 0.999: faces += 1
-		return Quality.result([{"label": "Обжарено сторон: %d/6" % faces, "value": faces / 6.0}], served >= 0, ["Картофель · обжарить 6 сторон", "В работе: %d/6 сторон · всего 3 картошки" % cooked_faces()])
+		return Quality.with_components(Quality.result([{"label": "Обжарено сторон: %d/6" % faces, "value": faces / 6.0}], served >= 0, ["Картофель · обжарить 6 сторон", "В работе: %d/6 сторон · всего 3 картошки" % cooked_faces()]), [{"name": "Картофель", "role": 0, "served": served >= 0, "lines": ["Обжарено сторон: %d/6" % (faces if served >= 0 else cooked_faces())]}])
 	if dish == "sausage":
 		var served := -1
 		for i in range(3):
 			if sausages[i].sausage_state == "plate" and not (held == "sausage" and sausage_index == i): served = i; break
 		var coat := float(sausages[served].sausage_coating) if served >= 0 else 0.0
-		return Quality.result([{"label": "Соус: %d%% / нужно ≥90%%" % roundi(coat * 100), "value": minf(1, coat / 0.9)}], served >= 0, ["Сосиска · покрыть соусом ≥90%", "В работе: покрытие %d%%" % roundi(sausage_coating * 100)])
+		return Quality.with_components(Quality.result([{"label": "Соус: %d%% / нужно ≥90%%" % roundi(coat * 100), "value": minf(1, coat / 0.9)}], served >= 0, ["Сосиска · покрыть соусом ≥90%", "В работе: покрытие %d%%" % roundi(sausage_coating * 100)]), [{"name": "Сосиска", "role": 0, "served": served >= 0, "lines": ["Соус: %d%% / нужно ≥90%%" % roundi((coat if served >= 0 else sausage_coating) * 100)]}])
 	var on_tray := cup.distance_to(SERVE) < 0.4 and held != "cup" and absf(float(elevations.cup)) < 0.1 and filled > 0
 	var volume := filled if on_tray else 0.0
 	var amount_score := clampf(volume / 200.0, 0, 1) if volume <= 250 else clampf(1 - (volume - 250) / 50, 0, 1)
 	var waste := spilled() + soaked + lost
-	return Quality.result([{"label": "Вино: %d мл / 200–250 мл" % roundi(volume), "value": amount_score}, {"label": "Бережливость: %s · вне посуды %.0f мл" % ["✓" if waste <= 5 else "×", waste], "value": 1.0 if waste <= 5 else 0.0}], on_tray, ["Вино · 200–250 мл · кружка 300 мл", "Без потерь: верни пролитое в кувшин", "В кружке сейчас: %.0f мл" % filled])
+	return Quality.with_components(Quality.result([{"label": "Вино: %d мл / 200–250 мл" % roundi(volume), "value": amount_score}, {"label": "Бережливость: %s · вне посуды %.0f мл" % ["✓" if waste <= 5 else "×", waste], "value": 1.0 if waste <= 5 else 0.0}], on_tray, ["Вино · 200–250 мл · кружка 300 мл", "Без потерь: верни пролитое в кувшин", "В кружке сейчас: %.0f мл" % filled]), [{"name": "Вино", "role": 0, "served": on_tray, "lines": ["В кружке: %.0f мл / нужно 200–250 мл" % filled, "Бережливость: %s · вне посуды %.0f мл" % ["✓" if waste <= 5 else "×", waste]]}])
 
 func goal_text() -> String:
 	match dish:

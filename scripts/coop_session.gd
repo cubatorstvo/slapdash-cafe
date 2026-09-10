@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-5"
+const PROTOCOL := "slapdash-cafe-stations-6"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -205,6 +205,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 					return
 			if not run.start_pass(assignments): message_to(sender, "Назначь себя одной роли, а каждому напарнику — отдельную роль.")
 		"finish": run.finish_pass()
+		"confirm_finish":
+			if run.phase == "confirm_finish": run.finish_pass(true)
+		"resume": run.resume_pass()
 		"keep":
 			run.keep_pass()
 			game.save_cafe()

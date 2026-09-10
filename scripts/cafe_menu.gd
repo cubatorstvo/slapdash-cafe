@@ -132,6 +132,9 @@ func show_station(station: Node3D) -> void:
 		information.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		if run.lead != game.session.local_id():
 			_label(training_box, "Показом управляет другой игрок.")
+		elif run.phase == "confirm_finish":
+			_button(training_box, "Продолжить готовку · положить на подачу", func(): send("resume"))
+			_button(training_box, "Завершить проход как есть", func(): send("confirm_finish"))
 		elif run.phase == "review":
 			_label(training_box, "Проход: %.1f с. Рабочая запись пока сохранена." % (run.tick / 60.0))
 			_button(training_box, "Сохранить роли в черновик", func(): send("keep"))
@@ -161,7 +164,7 @@ func show_station(station: Node3D) -> void:
 			var old_time: float = station.recipes.get(run.dish, {}).get("duration", 0)
 			_label(training_box, "Рабочая запись: %.1f с. Черновик: %.1f с." % [old_time, (lengths.max() / 60.0) if not lengths.is_empty() else 0.0], 15)
 		if run.lead == game.session.local_id(): _button(training_box, "Закончить обучение · рабочий рецепт сохранится", func(): send("cancel"))
-	_button(training_box, "Закрыть меню · Esc", close)
+	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 

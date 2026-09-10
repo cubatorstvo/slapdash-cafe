@@ -78,7 +78,7 @@ func run() -> void:
 	kitchen.training.start_pass([1, 22])
 	check(kitchen.model.grab(0, "water"), "Simultaneously live roles share both zones")
 	kitchen.training.advance(DT)
-	kitchen.training.finish_pass()
+	kitchen.training.finish_pass(true)
 	kitchen.training.keep_pass()
 	check(kitchen.training.tracks[1].frames.back().owners.water == -1 and kitchen.training.tracks[0].frames.back().hand == "", "Joint finish releases cross-zone tools before capturing all zones")
 	check(kitchen.training.tracks[0].group == kitchen.training.tracks[1].group, "Cross-zone pass records linked roles")
