@@ -23,7 +23,12 @@ func setup() -> void:
 	started = Time.get_ticks_msec()
 func fail(message: String) -> void:
 	printerr("FAIL: ", role, " ", message)
+	if is_instance_valid(game): game.free(); game = null
 	quit(1)
+func succeed(message: String) -> void:
+	print(message)
+	if is_instance_valid(game): game.free(); game = null
+	quit(0)
 func act(action: String, station: int, extra := {}) -> void:
 	var value := {"action": action, "station": station}
 	value.merge(extra)
@@ -81,12 +86,12 @@ func host_tick() -> void:
 		quit_at = timer + 2
 	elif stage == 5 and timer > quit_at:
 		game.session.leave("")
+		if is_instance_valid(game): game.free(); game = null
 		quit(0)
 func guest_tick() -> void:
 	if stage == 6:
 		if game.service.revenue != 73 or game.service.stations.size() != 4: fail("Guest local cafe not restored")
-		print("PASS: guest independent lesson, mixed participants, cross-zone access and local backup")
-		quit(0)
+		succeed("PASS: guest independent lesson, mixed participants, cross-zone access and local backup")
 		return
 	if not game.session.synced: return
 	var first = game.service.by_id(1)
@@ -141,4 +146,5 @@ func observer_tick() -> void:
 	elif stage == 2 and kitchen.training.phase == "idle":
 		print("PASS: late observer sees station sessions and cancelled live take")
 		game.session.leave("")
+		if is_instance_valid(game): game.free(); game = null
 		quit(0)

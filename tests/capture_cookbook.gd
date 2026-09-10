@@ -50,15 +50,23 @@ func run() -> void:
 	await process_frame
 	await snap("book_meal_1280")
 	game.cookbook.close()
+	game.hud.hide()
+	game.service.hide()
 	var clone := preload("res://scripts/cook_avatar.gd").new()
 	game.add_child(clone)
-	clone.perform({"position": [0.0, 0.0, 0.0], "yaw": 0.0, "pitch": -0.3, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
+	clone.perform({"position": [6.2, 0.0, 3.4], "yaw": 0.55, "pitch": -0.3, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
 	var book_at: Vector3 = clone.book.global_position
-	var camera_at: Vector3 = book_at + clone.book.page_normal() * 0.92 + clone.global_transform.basis.x * 0.58 + Vector3(0, 0.08, 0)
-	look_at_point(game, camera_at, book_at + Vector3(0, 0.02, 0))
+	var right: Vector3 = clone.global_transform.basis.x
+	var forward: Vector3 = -clone.global_transform.basis.z
+	var camera_at: Vector3 = clone.global_position + Vector3(0, 1.42, 0) + right * 1.12 + forward * 0.62
+	look_at_point(game, camera_at, book_at + Vector3(0, -0.04, 0))
+	game.camera.fov = 58.0
 	await wait_frames(0.5)
 	await snap("clone_reading_1280")
 	clone.queue_free()
+	game.hud.show()
+	game.service.show()
+	game.camera.fov = 78.0
 	await set_view(Vector2i(1920, 1080))
 	game.player.global_position = Vector3(0, 0.02, 2.4)
 	game.player.rotation.y = 0
