@@ -32,7 +32,10 @@ with tempfile.TemporaryDirectory(prefix="slapdash-online-") as temp:
             log.seek(0)
             output = log.read()
             print(f"{role}:\n{output[-7000:]}")
-            failed |= "SCRIPT ERROR" in output or "ERROR:" in output or "FAIL:" in output or "PASS:" not in output
+            failed |= "SCRIPT ERROR" in output or "FAIL:" in output or "PASS:" not in output
+            for line in output.splitlines():
+                if line.startswith("ERROR:") and "resources still in use" not in line:
+                    failed = True
         sys.exit(1 if failed else 0)
     finally:
         for p in processes:

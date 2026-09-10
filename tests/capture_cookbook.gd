@@ -58,9 +58,10 @@ func run() -> void:
 	var book_at: Vector3 = clone.book.global_position
 	var right: Vector3 = clone.global_transform.basis.x
 	var forward: Vector3 = -clone.global_transform.basis.z
-	var camera_at: Vector3 = clone.global_position + Vector3(0, 1.42, 0) + right * 1.12 + forward * 0.62
-	look_at_point(game, camera_at, book_at + Vector3(0, -0.04, 0))
-	game.camera.fov = 58.0
+	# Beside the reader, looking down onto the spread so page text is readable.
+	var camera_at: Vector3 = clone.global_position + Vector3(0, 1.62, 0) + right * 0.82 + forward * 0.28
+	look_at_point(game, camera_at, book_at + Vector3(0, 0.02, 0))
+	game.camera.fov = 52.0
 	await wait_frames(0.5)
 	await snap("clone_reading_1280")
 	clone.queue_free()

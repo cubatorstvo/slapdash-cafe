@@ -20,13 +20,13 @@ func _ready() -> void:
 	P.box(self, Vector3(0.046, 0.007, 0.22), Vector3(0.12, 0.062, 0.30), Color("e0b15a"))
 	P.box(self, Vector3(0.08, 0.004, 0.08), Vector3(-0.42, 0.058, -0.28), Color("d7a45a"))
 	title = P.text(self, "", Vector3(-0.25, 0.056, -0.18), 26, Color("213b3c"))
-	title.rotation = Vector3(-PI / 2, PI, 0)
+	title.rotation = Vector3(-PI / 2, 0, 0)
 	title.pixel_size = 0.0025
 	title.outline_size = 0
 	title.modulate = Color("213b3c")
 	title.double_sided = false
 	notes = P.text(self, "", Vector3(0.25, 0.056, 0.10), 18, Color("35514c"))
-	notes.rotation = Vector3(-PI / 2, PI, 0)
+	notes.rotation = Vector3(-PI / 2, 0, 0)
 	notes.pixel_size = 0.0020
 	notes.outline_size = 0
 	notes.modulate = Color("35514c")
@@ -34,7 +34,7 @@ func _ready() -> void:
 	illustration = Sprite3D.new()
 	add_child(illustration)
 	illustration.position = Vector3(-0.25, 0.058, 0.14)
-	illustration.rotation = Vector3(-PI / 2, PI, 0)
+	illustration.rotation = Vector3(-PI / 2, 0, 0)
 	illustration.pixel_size = 0.0035
 	illustration.double_sided = false
 	for i in range(5): P.box(self, Vector3(0.34 - (i % 2) * 0.04, 0.002, 0.006), Vector3(-0.25, 0.057, -0.02 + i * 0.04), Color("c4b48d"))
