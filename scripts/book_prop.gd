@@ -3,6 +3,7 @@ const P = preload("res://scripts/props.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
 var page_sound: AudioStreamPlayer3D
 var title: Label3D
+var notes: Label3D
 var illustration: Sprite3D
 var current_page := ""
 var is_open := false
@@ -11,42 +12,79 @@ var page_mesh: Node3D
 
 func _ready() -> void:
 	for side in [-1, 1]:
-		P.box(self, Vector3(0.48, 0.035, 0.65), Vector3(side * 0.25, 0, 0), Color("934d42"))
-		P.box(self, Vector3(0.45, 0.028, 0.61), Vector3(side * 0.245, 0.035, 0), Color("eee1bf"))
-		for i in range(4): P.box(self, Vector3(0.45, 0.002, 0.60), Vector3(side * 0.245, 0.017 + i * 0.005, 0), Color("cbbd9b"))
-	P.box(self, Vector3(0.028, 0.052, 0.65), Vector3.ZERO, Color("704039"))
-	P.box(self, Vector3(0.038, 0.006, 0.2), Vector3(0.1, 0.057, 0.29), Color("bf6b57"))
-	title = P.text(self, "", Vector3(-0.24, 0.055, -0.15), 24, Color("354a45"))
-	title.rotation.x = -PI/2
-	title.pixel_size = 0.0013
+		P.box(self, Vector3(0.50, 0.038, 0.68), Vector3(side * 0.255, -0.004, 0), Color("7a3d38"))
+		P.box(self, Vector3(0.46, 0.030, 0.63), Vector3(side * 0.248, 0.034, 0), Color("f3e6c8") if side < 0 else Color("f8efd6"))
+		for i in range(5): P.box(self, Vector3(0.455, 0.002, 0.61), Vector3(side * 0.248, 0.012 + i * 0.004, 0), Color("d8c9a4"))
+	P.box(self, Vector3(0.032, 0.058, 0.68), Vector3.ZERO, Color("5e322f"))
+	P.box(self, Vector3(0.046, 0.007, 0.22), Vector3(0.12, 0.062, 0.30), Color("e0b15a"))
+	P.box(self, Vector3(0.08, 0.004, 0.08), Vector3(-0.42, 0.058, -0.28), Color("d7a45a"))
+	title = P.text(self, "", Vector3(-0.25, 0.056, -0.18), 22, Color("213b3c"))
+	title.rotation.x = -PI / 2
+	title.pixel_size = 0.00115
 	title.outline_size = 0
+	title.modulate = Color("213b3c")
+	notes = P.text(self, "", Vector3(0.25, 0.056, 0.16), 14, Color("35514c"))
+	notes.rotation.x = -PI / 2
+	notes.pixel_size = 0.00105
+	notes.outline_size = 0
+	notes.modulate = Color("35514c")
 	illustration = Sprite3D.new()
 	add_child(illustration)
-	illustration.position = Vector3(0.245, 0.057, 0)
-	illustration.rotation.x = -PI/2
-	illustration.pixel_size = 0.0028
-	for i in range(5): P.box(self, Vector3(0.31 - (i%2)*0.05, 0.002, 0.007), Vector3(-0.24, 0.056, -0.02+i*0.045), Color("b5a889"))
+	illustration.position = Vector3(-0.25, 0.058, 0.12)
+	illustration.rotation.x = -PI / 2
+	illustration.pixel_size = 0.0024
+	for i in range(5): P.box(self, Vector3(0.34 - (i % 2) * 0.04, 0.002, 0.006), Vector3(-0.25, 0.057, -0.02 + i * 0.04), Color("c4b48d"))
 	page_mesh = Node3D.new()
 	add_child(page_mesh)
-	P.box(page_mesh, Vector3(0.43, 0.004, 0.58), Vector3(0.22, 0.065, 0), Color("f6ebd1"))
+	P.box(page_mesh, Vector3(0.44, 0.004, 0.60), Vector3(0.22, 0.068, 0), Color("f7eed8"))
 	page_sound = AudioStreamPlayer3D.new()
 	add_child(page_sound)
 	page_sound.stream = preload("res://assets/audio/page.wav")
 	page_sound.max_distance = 6
+	page_sound.unit_size = 2
 	page_sound.volume_db = -12
 	hide()
 
+func pose_in_hands(first_person: bool) -> void:
+	if first_person:
+		position = Vector3(0.04, -0.26, -0.58)
+		rotation = Vector3(1.08, 0.06, 0.02)
+		scale = Vector3(0.92, 0.92, 0.92)
+	else:
+		position = Vector3(0, 1.04, -0.46)
+		rotation = Vector3(-0.52, 0, 0)
+		scale = Vector3.ONE
+
+func shown() -> bool:
+	if not is_inside_tree() or not visible: return false
+	var node: Node = self
+	while node != null:
+		if node is CanvasItem and not (node as CanvasItem).visible: return false
+		if node is Node3D and not (node as Node3D).visible: return false
+		node = node.get_parent()
+	return true
+
 func set_reading(open: bool, recipe := "index") -> void:
 	visible = open
-	if open != is_open or (open and current_page != recipe): if is_visible_in_tree(): page_sound.play()
-	if open and (not is_open or current_page != recipe): turn = 0.3
+	var page := Data.page(recipe) if open else current_page
+	var turned: bool = open != is_open or (open and current_page != page)
+	if turned and shown(): page_sound.play()
+	if open and turned: turn = 0.28
 	is_open = open
-	if current_page == recipe: return
-	current_page = recipe
-	title.text = "ПОВАРСКАЯ\nКНИГА" if recipe == "index" else Data.Definition.DISHES.get(recipe, "РЕЦЕПТ")
-	illustration.texture = Data.ICONS.get(recipe, Data.ICONS.meal)
+	if not open or current_page == page: return
+	current_page = page
+	title.text = "ПОВАРСКАЯ\nКНИГА" if page == "index" else Data.Definition.DISHES.get(page, "РЕЦЕПТ")
+	illustration.texture = Data.ICONS.get(page, Data.ICONS.meal)
+	illustration.visible = page != "index"
+	if page == "index":
+		notes.text = "Выбери блюдо.\nКнига говорит,\nчто должно\nполучиться."
+	else:
+		var lines := PackedStringArray()
+		for note in Data.NOTES.get(page, []):
+			lines.append("• " + str(note[0]))
+		notes.text = "\n".join(lines)
 
 func _process(delta: float) -> void:
-	turn = maxf(0, turn-delta)
-	page_mesh.visible = turn > 0
-	page_mesh.rotation.z = sin((1-turn/0.3)*PI)*2.7
+	turn = maxf(0, turn - delta)
+	page_mesh.visible = turn > 0 and visible
+	page_mesh.rotation.z = sin((1 - turn / 0.28) * PI) * 2.7

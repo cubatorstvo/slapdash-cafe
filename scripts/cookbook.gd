@@ -4,6 +4,7 @@ const Data = preload("res://scripts/cookbook_data.gd")
 signal changed
 var opened := false
 var recipe := "index"
+var overlay: ColorRect
 var book: PanelContainer
 var left: VBoxContainer
 var right: VBoxContainer
@@ -12,42 +13,66 @@ var game: Node3D
 
 func _ready() -> void:
 	layer = 12
+	overlay = ColorRect.new()
+	add_child(overlay)
+	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.color = Color(0.05, 0.09, 0.1, 0.35)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.hide()
 	book = PanelContainer.new()
 	add_child(book)
 	book.theme = CafeStyle.make(true)
-	book.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	book.offset_left = -490
-	book.offset_right = 490
-	book.offset_top = -285
-	book.offset_bottom = 265
-	var cover := CafeStyle.box(Color("924d42"), 18, 12)
-	cover.shadow_color = Color(0,0,0,0.45)
-	cover.shadow_size = 20
+	book.set_anchors_preset(Control.PRESET_CENTER)
+	book.anchor_left = 0.5
+	book.anchor_right = 0.5
+	book.anchor_top = 0.5
+	book.anchor_bottom = 0.5
+	_layout_book()
+	book.mouse_filter = Control.MOUSE_FILTER_STOP
+	var cover := CafeStyle.box(Color("7a3d38"), 18, 10)
+	cover.shadow_color = Color(0, 0, 0, 0.45)
+	cover.shadow_size = 18
+	cover.border_color = Color("d7a45a")
+	cover.set_border_width_all(2)
 	book.add_theme_stylebox_override("panel", cover)
 	var spread := HBoxContainer.new()
 	book.add_child(spread)
-	spread.add_theme_constant_override("separation", 3)
+	spread.add_theme_constant_override("separation", 4)
 	for side in range(2):
 		var paper := PanelContainer.new()
 		spread.add_child(paper)
-		paper.custom_minimum_size.x = 475
 		paper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		paper.add_theme_stylebox_override("panel", CafeStyle.box(Color("f1e5c9") if side == 0 else Color("f8efd9"), 8, 28))
+		paper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		paper.add_theme_stylebox_override("panel", CafeStyle.box(Color("f3e6c8") if side == 0 else Color("f8efd6"), 8, 22))
+		var scroll := ScrollContainer.new()
+		paper.add_child(scroll)
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		var col := VBoxContainer.new()
-		paper.add_child(col)
-		col.add_theme_constant_override("separation", 12)
+		scroll.add_child(col)
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 10)
 		if side == 0: left = col
 		else: right = col
 	book.hide()
+	get_viewport().size_changed.connect(_layout_book)
+
+func _layout_book() -> void:
+	var view := get_viewport().get_visible_rect().size
+	var width: float = clampf(view.x * 0.78, 720, 1040)
+	var height: float = clampf(view.y * 0.68, 430, 620)
+	book.offset_left = -width * 0.5
+	book.offset_right = width * 0.5
+	book.offset_top = -height * 0.5
+	book.offset_bottom = height * 0.5
 
 func attach(owner_game: Node3D) -> void:
 	game = owner_game
 	physical = preload("res://scripts/book_prop.gd").new()
 	game.camera.add_child(physical)
-	physical.position = Vector3(0, -0.48, -0.8)
-	physical.rotation.x = 0.18
-	for side in [-1,1]:
-		preload("res://scripts/props.gd").ball(physical, 0.07, Vector3(side*0.49, 0.01, 0.18), Color("e8b893"))
+	physical.pose_in_hands(true)
+	for side in [-1, 1]:
+		preload("res://scripts/props.gd").ball(physical, 0.055, Vector3(side * 0.46, 0.02, 0.16), Color("e8b893"))
 
 func toggle() -> void:
 	if opened: close(); return
@@ -57,6 +82,7 @@ func toggle() -> void:
 		game.session.send_input(station, {}, {"drop": true})
 	else: recipe = "index"
 	opened = true
+	overlay.show()
 	book.show()
 	rebuild()
 	physical.set_reading(true, recipe)
@@ -66,6 +92,7 @@ func toggle() -> void:
 func close() -> void:
 	if not opened: return
 	opened = false
+	overlay.hide()
 	book.hide()
 	physical.set_reading(false, recipe)
 	changed.emit()
@@ -83,6 +110,7 @@ func label(parent: Node, text: String, size := 18) -> Label:
 	node.add_theme_font_size_override("font_size", size)
 	node.add_theme_color_override("font_color", CafeStyle.INK)
 	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(node)
 	return node
 
@@ -94,19 +122,20 @@ func button(parent: Node, text: String, callback: Callable) -> Button:
 	return node
 
 func rebuild() -> void:
-	for col in [left,right]:
+	for col in [left, right]:
 		for child in col.get_children(): col.remove_child(child); child.queue_free()
-	label(left, "SLAPDASH  /  КУХОННЫЕ ЗАМЕТКИ", 14)
-	label(left, "Поварская\nкнига" if recipe == "index" else Data.Definition.DISHES[recipe], 32)
+	label(left, "SLAPDASH  /  КУХОННЫЕ ЗАМЕТКИ", 13)
+	label(left, "Поварская книга" if recipe == "index" else Data.Definition.DISHES[recipe], 30)
 	if recipe == "index":
-		label(left, "Хорошая еда.\nСомнительные методы.", 22)
-		label(left, "Выбери блюдо справа.\nСпособ приготовления — за тобой.", 18)
-		label(right, "Сегодня в меню", 26)
+		label(left, "Хорошая еда.\nСомнительные методы.", 20)
+		label(left, "Выбери блюдо справа. Способ приготовления — за тобой.", 17)
+		label(right, "Сегодня в меню", 24)
 		for key in Data.ICONS:
 			var entry := button(right, Data.Definition.DISHES[key], select.bind(key))
 			entry.icon = Data.ICONS[key]
 			entry.expand_icon = true
-			entry.add_theme_constant_override("icon_max_width", 44)
+			entry.add_theme_constant_override("icon_max_width", 48)
+			entry.custom_minimum_size.y = 52
 			entry.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	else:
 		var art := TextureRect.new()
@@ -114,17 +143,17 @@ func rebuild() -> void:
 		art.texture = Data.ICONS[recipe]
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art.custom_minimum_size = Vector2(200,180)
+		art.custom_minimum_size = Vector2(180, 160)
 		button(left, "← Все блюда", select.bind("index"))
-		label(right, "Что должно получиться", 25)
+		label(right, "Что должно получиться", 23)
 		for note in Data.NOTES[recipe]:
-			var line := label(right, "•  " + note[0], 18)
+			var line := label(right, "•  " + note[0], 17)
 			line.mouse_filter = Control.MOUSE_FILTER_STOP
 			line.tooltip_text = note[1]
-		label(right, "Наведи на требование, чтобы узнать подробности.", 14)
+		label(right, "Наведи на требование, чтобы узнать подробности.", 13)
 	var spacer := Control.new()
 	left.add_child(spacer)
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	button(left, "Закрыть книгу   ·   B / Esc", close)
-	var help := label(right, "B — книга · ЛКМ — взять / положить\nПКМ — действие · Колесо — высота\nShift + мышь — точное движение\nЗвонок на стойке — закончить показ", 15)
+	var help := label(right, "B — книга · ЛКМ — взять / положить\nПКМ — действие · Колесо — высота\nShift + мышь — точное движение\nЗвонок на стойке — закончить показ", 14)
 	help.tooltip_text = "Книга занимает обе руки. Во время показа чтение тоже запоминается бригадой."

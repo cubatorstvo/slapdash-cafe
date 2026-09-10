@@ -39,6 +39,8 @@ func _process(delta: float) -> bool:
 	if teaching != null and teaching.training.phase == "recording":
 		game.bind_training()
 		game.session.send_input(teaching, game.build_motion(teaching, delta))
+		if role == "guest" and game.session.synced:
+			game.session._presence.rpc_id(1, game.session.capture_player())
 	game.session.advance(delta)
 	game.service.refresh_views(delta)
 	if role == "host": host_tick()

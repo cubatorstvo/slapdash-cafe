@@ -43,8 +43,7 @@ func _ready() -> void:
 	notebook.hide()
 	book = preload("res://scripts/book_prop.gd").new()
 	add_child(book)
-	book.position = Vector3(0,1.0,-0.5)
-	book.rotation.x = -0.35
+	book.pose_in_hands(false)
 
 func walk_to(target: Vector3, delta: float) -> bool:
 	var offset := target - position
@@ -61,6 +60,7 @@ func walk_to(target: Vector3, delta: float) -> bool:
 func observe(target: Vector3, neighbor: Vector3, delta: float, index: int) -> void:
 	phase += delta
 	notebook.show()
+	book.set_reading(false)
 	var look := target
 	if fmod(phase + index * 1.7, 11) > 9: look = neighbor
 	var local := to_local(look)
@@ -72,15 +72,15 @@ func observe(target: Vector3, neighbor: Vector3, delta: float, index: int) -> vo
 
 func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 	notebook.hide()
-	var appearance: Dictionary = pose.get("presentation", {})
-	book.set_reading(appearance.get("book", false), appearance.get("page", "index"))
+	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
+	book.set_reading(appearance.get("book", false) == true, str(appearance.get("page", "index")))
 	position = Vector3(pose.position[0], pose.position[1], pose.position[2])
 	rotation.y = pose.yaw
 	head.rotation = Vector3(pose.pitch, 0, 0)
 	var hand := to_local(get_parent().to_global(target)) if holding else Vector3(0.35, 0.78, -0.2)
 	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), hand + Vector3(-0.18, 0, 0) if holding else Vector3(-0.35, 0.78, -0.2))
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), hand)
-
 	if book.visible:
-		P.align_line(arms[0], Vector3(-0.3,1.2,0),Vector3(-0.48,1.03,-0.35))
-		P.align_line(arms[1], Vector3(0.3,1.2,0),Vector3(0.48,1.03,-0.35))
+		head.rotation.x = minf(head.rotation.x, -0.18)
+		P.align_line(arms[0], Vector3(-0.3, 1.2, 0), Vector3(-0.42, 1.08, -0.38))
+		P.align_line(arms[1], Vector3(0.3, 1.2, 0), Vector3(0.42, 1.08, -0.38))

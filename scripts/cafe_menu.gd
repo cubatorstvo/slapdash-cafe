@@ -19,8 +19,13 @@ var port: SpinBox
 
 func _ready() -> void:
 	layer = 15
-	panel = _panel(730, 590)
-	training_box = _column(panel)
+	panel = _panel(760, 620)
+	var scroll := ScrollContainer.new()
+	panel.add_child(scroll)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	training_box = _column(scroll)
+	training_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.hide()
 	var box: VBoxContainer
 	net_panel = _panel(620, 650)
@@ -79,6 +84,8 @@ func _column(parent: Control) -> VBoxContainer:
 func _label(parent: Control, value: String, size := 17) -> Label:
 	var label := Label.new()
 	label.text = value
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", size)
 	parent.add_child(label)
 	return label
@@ -120,7 +127,7 @@ func show_station(station: Node3D) -> void:
 		for dish in station.dishes(): recipe_choice.add_item(station.Definition.DISHES[dish])
 		summary_text = _label(training_box, "")
 		summary_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		summary_text.custom_minimum_size.y = 140
+		summary_text.custom_minimum_size = Vector2(680, 90)
 		recipe_choice.item_selected.connect(func(_i): describe(station))
 		describe(station)
 		_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
@@ -149,7 +156,20 @@ func show_station(station: Node3D) -> void:
 			var groups: Array = station.remote_summary.get("groups", []) if game.session.is_guest() else run.summary().groups
 			for role in range(station.role_count()):
 				var seconds: float = lengths[role] / 60.0 if role < lengths.size() else 0
-				_label(training_box, "%s · %s" % [station.Definition.TYPES[station.type_id].roles[role], "запись %.1f с" % seconds if seconds > 0 else "ещё нет записи"], 16)
+				var row := HBoxContainer.new()
+				training_box.add_child(row)
+				row.add_theme_constant_override("separation", 10)
+				if seconds > 0:
+					var icon := TextureRect.new()
+					row.add_child(icon)
+					icon.texture = preload("res://assets/ui/record.svg")
+					icon.custom_minimum_size = Vector2(28, 28)
+					icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					icon.tooltip_text = "● — бригада уже знает эту роль. Рядом — длительность рабочего показа в секундах."
+				var role_label := _label(row, "%s · %s" % [station.Definition.TYPES[station.type_id].roles[role], "запись %.1f с" % seconds if seconds > 0 else "ещё нет записи"], 16)
+				role_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				if seconds > 0: role_label.tooltip_text = "Сохранённый дубль этой роли. Замена связанной роли очистит связанный черновик."
 				var selector := OptionButton.new()
 				training_box.add_child(selector)
 				selector.add_item("Повар повторяет / роль пока пустая", 0)
@@ -176,8 +196,11 @@ func show_station(station: Node3D) -> void:
 func describe(station: Node3D) -> void:
 	var dish: String = station.dishes()[recipe_choice.selected]
 	summary_text.text = station.Definition.REQUIREMENTS[dish]
-	if station.recipes.has(dish): summary_text.text += "\n\n●  %.1f с" % station.recipes[dish].duration
-	summary_text.tooltip_text = "● — бригада знает блюдо. Рядом указана длительность рабочего показа." if station.recipes.has(dish) else "Рецепт и подсказки — в поварской книге (B)."
+	if station.recipes.has(dish):
+		summary_text.text += "\n\n●  %.1f с" % station.recipes[dish].duration
+		summary_text.tooltip_text = "● — бригада знает блюдо. Рядом указана длительность рабочего показа."
+	else:
+		summary_text.tooltip_text = "Рецепт и подсказки — в поварской книге (B)."
 	if station.state == "cooking": summary_text.text += "\nОбучение начнётся после текущего заказа."
 
 func send(action: String) -> void:

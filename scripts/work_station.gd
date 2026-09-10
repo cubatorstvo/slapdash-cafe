@@ -96,9 +96,9 @@ func apply_single(command: Dictionary, delta: float) -> void:
 	var use_item: bool = command.get("use", false)
 	model.step(delta, use_item, not use_item, use_item)
 	if command.has("pose"):
-		var appearance: Dictionary = command.pose.get("presentation", {})
-		model.presentation.book = appearance.get("book", false)
-		model.presentation.page = appearance.get("page", "index")
+		var appearance: Dictionary = preload("res://scripts/cookbook_data.gd").presentation(command.pose.get("presentation", {}) if command.pose.get("presentation", {}) is Dictionary else {})
+		model.presentation.book = appearance.book
+		model.presentation.page = appearance.page
 		model.actor_position = Vector3(command.pose.position[0], command.pose.position[1], command.pose.position[2])
 		model.actor_yaw = command.pose.yaw
 		model.actor_pitch = command.pose.pitch
@@ -138,7 +138,6 @@ func refresh(local_peer: int, delta: float) -> void:
 	bell_flash = maxf(0, bell_flash-delta)
 	bell_cap.position.y = -sin(bell_flash*45)*bell_flash*0.08
 	if is_instance_valid(taster) and type_id == "counter": taster.react(model.customer_reaction)
-	view.update_view(model, age, state != "cooking")
 	var active: bool = training.active()
 	view.station_label.visible = not active
 	var local_role: int = training.role_for(local_peer)
@@ -153,7 +152,6 @@ func refresh(local_peer: int, delta: float) -> void:
 	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
-		view._update_worker(model, age, state != "cooking")
 		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active
 		view.name_label.text = crew[0].name + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 	else:
@@ -161,6 +159,8 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(role_count()):
 			view.actors[role].visible = not active or (performing and not role in training.live_roles)
 			view.actors[role].caption.text = crew[role].name + (" · дубль" if active else "")
+	view.update_view(model, age, state != "cooking")
+	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
 		var student: Node3D = students[role]
 		student.visible = active and (role in training.live_roles or training.phase == "ready")
@@ -192,7 +192,7 @@ func world_entry() -> Dictionary:
 func _build_bell() -> void:
 	bell = Node3D.new()
 	add_child(bell)
-	bell.position = Vector3(0.62 if type_id == "counter" else 0, 1.035, 0.95)
+		bell.position = Vector3(0.62, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
 	Props.cylinder(bell, 0.16, 0.035, Vector3.ZERO, Color("344c4c"))
 	bell_cap = Node3D.new()
 	bell.add_child(bell_cap)
@@ -213,9 +213,20 @@ func ring(role: int) -> void:
 	if type_id == "counter": model.presentation.bell += 1
 	else:
 		var appearance: Dictionary = model.poses[role].get("presentation", {"book": false, "page": "index", "bell": 0}).duplicate()
-		appearance.bell += 1
+		if not appearance is Dictionary: appearance = {"book": false, "page": "index", "bell": 0}
+		appearance.bell = int(appearance.get("bell", 0)) + 1
 		model.poses[role].presentation = appearance
 	bell_flash = 0.35
+	_stamp_bell(role)
+
+func _stamp_bell(role: int) -> void:
+	if training.phase != "recording" or role < 0 or training.pending_tracks.size() <= role: return
+	var track: Dictionary = training.pending_tracks[role]
+	if track.is_empty() or track.get("frames", []).is_empty(): return
+	if type_id == "counter":
+		track.frames.back()["presentation"] = model.presentation.duplicate(true)
+	elif track.frames.back() is Dictionary:
+		track.frames.back()["pose"] = model.poses[role].duplicate(true)
 
 func bell_count() -> int:
 	if type_id == "counter": return int(model.presentation.get("bell",0))

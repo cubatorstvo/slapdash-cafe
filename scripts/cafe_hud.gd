@@ -5,6 +5,7 @@ signal resume_requested
 var recipe_panel: PanelContainer
 var recipe_text: Label
 var recipe_content: VBoxContainer
+var recipe_scroll: ScrollContainer
 var recipe_stamp := ""
 var bottom: PanelContainer
 var goal: Label
@@ -50,21 +51,27 @@ func _ready() -> void:
 	progress.hide()
 	recipe_panel = _panel(root)
 	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	recipe_panel.position = Vector2(26,118)
-	recipe_panel.custom_minimum_size.x = 310
+	recipe_panel.position = Vector2(26, 110)
+	recipe_panel.custom_minimum_size = Vector2(320, 0)
+	recipe_scroll = ScrollContainer.new()
+	recipe_panel.add_child(recipe_scroll)
+	recipe_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	recipe_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	recipe_scroll.custom_minimum_size = Vector2(300, 0)
 	recipe_content = VBoxContainer.new()
-	recipe_panel.add_child(recipe_content)
-	recipe_content.add_theme_constant_override("separation",9)
+	recipe_scroll.add_child(recipe_content)
+	recipe_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recipe_content.add_theme_constant_override("separation", 8)
 	recipe_text = Label.new()
 	root.add_child(recipe_text)
 	recipe_text.hide()
 	recipe_panel.hide()
 	bottom = _panel(root)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_left = 170
-	bottom.offset_right = -170
-	bottom.offset_top = -82
-	bottom.offset_bottom = -20
+	bottom.offset_left = 120
+	bottom.offset_right = -120
+	bottom.offset_top = -90
+	bottom.offset_bottom = -16
 	var column := VBoxContainer.new()
 	bottom.add_child(column)
 	controls = _label(column,"",16)
@@ -137,9 +144,10 @@ func show_recipe(report: Dictionary, dish: String) -> void:
 		for line in component.lines:
 			var detail := _label(recipe_content,str(line),14,Color("c5d2c8"))
 			detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			detail.custom_minimum_size.x = 275
+			detail.custom_minimum_size.x = 268
 		_label(recipe_content,"",2)
 	_label(recipe_content,"B  ·  Рецепт и подсказки",13,CafeStyle.GOLD)
+	recipe_scroll.custom_minimum_size.y = mini(recipe_content.get_combined_minimum_size().y + 8, 360)
 
 func show_toast(message: String) -> void:
 	if toast_tween != null: toast_tween.kill()

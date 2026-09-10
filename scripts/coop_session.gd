@@ -90,6 +90,7 @@ func leave(message: String) -> void:
 	if game != null:
 		game.player.constrained = false
 		game.bound_revision = -1
+		if is_instance_valid(game.cookbook): game.cookbook.close()
 		game.menu.close()
 	if not message.is_empty(): _status(message)
 
@@ -284,7 +285,7 @@ func suspend_input() -> void:
 	var station: Node3D = game.local_station()
 	if station != null and station.training.role_for(local_id()) >= 0:
 		var pose: Dictionary = game.player.pose_in(station)
-		send_input(station, {"pose": {"position": [pose.position.x, pose.position.y, pose.position.z], "yaw": pose.yaw, "pitch": pose.pitch}, "use": false})
+		send_input(station, {"pose": {"position": [pose.position.x, pose.position.y, pose.position.z], "yaw": pose.yaw, "pitch": pose.pitch, "presentation": {"book": game.cookbook.opened, "page": game.cookbook.recipe}}, "use": false})
 
 func advance(delta: float) -> void:
 	_draw_players(delta)

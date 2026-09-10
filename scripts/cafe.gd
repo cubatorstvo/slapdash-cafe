@@ -76,6 +76,7 @@ func sync_mouse_mode() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if input_blocked() else Input.MOUSE_MODE_CAPTURED
 
 func toggle_pause() -> void:
+	if cookbook.opened: cookbook.close()
 	session_paused = not session_paused
 	hud.pause_panel.visible = session_paused
 	session.suspend_input()

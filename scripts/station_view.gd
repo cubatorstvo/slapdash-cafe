@@ -160,8 +160,8 @@ func _build_worker() -> void:
 	worker.rotation.y = PI
 	book = preload("res://scripts/book_prop.gd").new()
 	worker.add_child(book)
-	book.position = Vector3(0,1.0,0.5)
-	book.rotation.x = 0.35
+	book.position = Vector3(0, 1.04, 0.46)
+	book.rotation = Vector3(0.52, PI, 0)
 	name_label = Props.text(worker, "Клон", Vector3(0, 2.25, 0), 22, Color("a6efdb"))
 	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	for x in [-0.16, 0.16]:
