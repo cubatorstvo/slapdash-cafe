@@ -1,5 +1,6 @@
 extends Node3D
 const P = preload("res://scripts/props.gd")
+var book: Node3D
 var caption: Label3D
 var head: Node3D
 var notebook: Node3D
@@ -40,6 +41,10 @@ func _ready() -> void:
 	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	caption.pixel_size = 0.005
 	notebook.hide()
+	book = preload("res://scripts/book_prop.gd").new()
+	add_child(book)
+	book.position = Vector3(0,1.0,-0.5)
+	book.rotation.x = -0.35
 
 func walk_to(target: Vector3, delta: float) -> bool:
 	var offset := target - position
@@ -67,9 +72,15 @@ func observe(target: Vector3, neighbor: Vector3, delta: float, index: int) -> vo
 
 func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 	notebook.hide()
+	var appearance: Dictionary = pose.get("presentation", {})
+	book.set_reading(appearance.get("book", false), appearance.get("page", "index"))
 	position = Vector3(pose.position[0], pose.position[1], pose.position[2])
 	rotation.y = pose.yaw
 	head.rotation = Vector3(pose.pitch, 0, 0)
 	var hand := to_local(get_parent().to_global(target)) if holding else Vector3(0.35, 0.78, -0.2)
 	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), hand + Vector3(-0.18, 0, 0) if holding else Vector3(-0.35, 0.78, -0.2))
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), hand)
+
+	if book.visible:
+		P.align_line(arms[0], Vector3(-0.3,1.2,0),Vector3(-0.48,1.03,-0.35))
+		P.align_line(arms[1], Vector3(0.3,1.2,0),Vector3(0.48,1.03,-0.35))

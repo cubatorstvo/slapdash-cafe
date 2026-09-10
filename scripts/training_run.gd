@@ -65,7 +65,7 @@ func start_pass(assignments: Array) -> bool:
 	events.clear()
 	station.reset_taster()
 	revision += 1
-	info = "Красные зоны принадлежат другим дублям. Enter — закончить проход."
+	info = "Закончил? Позвони в звонок на стойке."
 	return true
 
 func queue_event(role: int, event: Dictionary) -> void:

@@ -113,7 +113,11 @@ func step(commands: Array, delta: float) -> void:
 	pouring = [false, false]
 	for role in range(2):
 		var command: Dictionary = commands[role] if role < commands.size() else {}
-		if command.has("pose"): poses[role] = command.pose.duplicate(true)
+		if command.has("pose"):
+			var bell_count: int = poses[role].get("presentation", {}).get("bell", 0)
+			poses[role] = command.pose.duplicate(true)
+			if not poses[role].has("presentation"): poses[role].presentation = {"book": false, "page": "index"}
+			poses[role].presentation.bell = bell_count
 		if command.get("drop", false): drop(role)
 		var item_to_grab: String = str(command.get("grab", ""))
 		if not item_to_grab.is_empty(): grab(role, item_to_grab)

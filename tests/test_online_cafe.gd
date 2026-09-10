@@ -35,6 +35,10 @@ func _process(delta: float) -> bool:
 		fail("Timeout at stage %d" % stage)
 		return false
 	if not game.session.is_guest(): game.service.advance(delta)
+	var teaching = game.local_station()
+	if teaching != null and teaching.training.phase == "recording":
+		game.bind_training()
+		game.session.send_input(teaching, game.build_motion(teaching, delta))
 	game.session.advance(delta)
 	game.service.refresh_views(delta)
 	if role == "host": host_tick()
@@ -97,16 +101,20 @@ func guest_tick() -> void:
 		stage = 2
 	elif stage == 2 and second.training.phase == "ready":
 		act("pass", 2, {"participants": [game.session.local_id()]})
+		game.cookbook.toggle()
 		stage = 3
 	elif stage == 3 and game.session.members.size() == 3 and second.training.phase == "recording":
+		if not second.model.presentation.book: return
+		game.cookbook.close()
 		saw_parallel = true
-		act("finish", 2)
+		act("ring", 2)
 		stage = 30
 	elif stage == 30 and second.training.phase == "confirm_finish":
 		act("resume", 2)
 		stage = 31
 	elif stage == 31 and second.training.phase == "recording":
-		print("CHECK: guest confirmation and resume replicated")
+		if second.bell_count() != 1: fail("Guest bell not replicated")
+		print("CHECK: guest book, bell, confirmation and resume replicated")
 		act("cancel", 2)
 		stage = 4
 	elif stage == 4 and kitchen.training.phase == "recording":

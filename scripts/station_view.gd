@@ -5,6 +5,7 @@ const Model = preload("res://scripts/cooking_model.gd")
 const TABLE_HEIGHT := Model.SURFACE_Y
 const WINE_COLOR := Color("ba4058")
 
+var book: Node3D
 var tomato: Node3D
 var jug: Node3D
 var jug_body: Node3D
@@ -157,6 +158,10 @@ func _build_worker() -> void:
 	add_child(worker)
 	worker.position = Vector3(0, 0, 1.8)
 	worker.rotation.y = PI
+	book = preload("res://scripts/book_prop.gd").new()
+	worker.add_child(book)
+	book.position = Vector3(0,1.0,0.5)
+	book.rotation.x = 0.35
 	name_label = Props.text(worker, "Клон", Vector3(0, 2.25, 0), 22, Color("a6efdb"))
 	name_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	for x in [-0.16, 0.16]:
@@ -239,6 +244,7 @@ func _update_worker(model, time: float, resting: bool) -> void:
 	worker.position = model.actor_position
 	worker.rotation.y = model.actor_yaw + PI
 	head.rotation.x = -model.actor_pitch
+	book.set_reading(model.presentation.book, model.presentation.page)
 	var target: Vector3 = worker.position + worker.basis * Vector3(0, 1.05, 0.4)
 	match model.held:
 		"jug": target = jug.position + Vector3(0, 0.35, 0)
@@ -249,8 +255,9 @@ func _update_worker(model, time: float, resting: bool) -> void:
 		"potato": target = kitchen.potato.position + Vector3(0, 0.14, 0)
 		"sausage": target = kitchen.sausage.position + Vector3(0, 0.1, 0)
 	if resting and model.held.is_empty(): target.y += sin(time * 2.0) * 0.02
-	left_hand.position = target + worker.basis * Vector3(-0.16, 0, 0)
-	right_hand.position = target + worker.basis * Vector3(0.16, 0, 0)
+	if book.visible: target = worker.position + worker.basis * Vector3(0,1.03,0.4)
+	left_hand.position = target + worker.basis * Vector3(-0.48 if book.visible else -0.16, 0, 0)
+	right_hand.position = target + worker.basis * Vector3(0.48 if book.visible else 0.16, 0, 0)
 	Props.align_line(left_arm, worker.position + worker.basis * Vector3(-0.32, 1.24, 0), left_hand.position)
 	Props.align_line(right_arm, worker.position + worker.basis * Vector3(0.32, 1.24, 0), right_hand.position)
 

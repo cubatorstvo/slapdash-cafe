@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-6"
+const PROTOCOL := "slapdash-cafe-stations-7"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -96,6 +96,7 @@ func leave(message: String) -> void:
 func _status(value: String) -> void:
 	game.menu.net_status.text = value
 	game.hud.notice.text = value
+	game.hud.show_toast(value)
 
 func _peer_left(id: int) -> void:
 	members.erase(id)
@@ -140,10 +141,11 @@ func _roster(value: Dictionary) -> void: members = value
 
 func capture_player() -> Dictionary:
 	var p: Vector3 = game.player.global_position
-	return {"position": [p.x, p.y, p.z], "yaw": game.player.rotation.y, "pitch": game.camera.rotation.x}
+	return {"position": [p.x, p.y, p.z], "yaw": game.player.rotation.y, "pitch": game.camera.rotation.x, "presentation": {"book": game.cookbook.opened, "page": game.cookbook.recipe}}
 
 func clean_pose(pose: Dictionary) -> Dictionary:
-	return {"position": [clampf(pose.position[0], -20, 20), clampf(pose.position[1], 0, 4), clampf(pose.position[2], -20, 20)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3)}
+	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
+	return {"position": [clampf(pose.position[0], -20, 20), clampf(pose.position[1], 0, 4), clampf(pose.position[2], -20, 20)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 3)
 func _presence(pose: Dictionary) -> void:
@@ -191,6 +193,12 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not near_peer(sender, station, 5.0): return
 		if game.service.request_training(station, str(value.get("dish", "")), sender):
 			message_to(sender, "Станция завершит заказ и начнёт показ." if station.pending_teacher > 0 else "Выбери роли для записи.")
+		return
+	if action == "ring":
+		var role: int = run.role_for(sender)
+		if role >= 0 and run.phase == "recording" and run.tick > 0 and int(value.get("revision",-1)) == run.revision and near_peer(sender,station.bell,3.3):
+			station.ring(role)
+			run.finish_pass()
 		return
 	if not run.active() or run.lead != sender or int(value.get("revision", -1)) != run.revision: return
 	match action:

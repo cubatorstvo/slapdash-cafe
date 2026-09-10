@@ -1,0 +1,45 @@
+extends SceneTree
+var failed := false
+func _initialize() -> void: run.call_deferred()
+func check(ok: bool, message: String) -> void:
+	if not ok: failed = true; printerr("FAIL: ",message)
+func run() -> void:
+	var game = preload("res://scenes/cafe.tscn").instantiate()
+	root.add_child(game)
+	await process_frame
+	game.set_physics_process(false)
+	game.cookbook.toggle()
+	check(game.cookbook.recipe == "index" and game.cookbook.physical.visible, "Free reading opens physical book and index")
+	game.cookbook.select("wine")
+	check(game.session.capture_player().presentation.page == "wine", "Reading page enters network presence")
+	game.cookbook.close()
+	var station = game.service.by_id(1)
+	game.service.request_training(station,"potato",1)
+	station.training.start_pass([1])
+	game.bind_training()
+	game.menu.close()
+	game.cookbook.toggle()
+	check(game.cookbook.recipe == "potato", "Lesson opens current recipe")
+	station.training.inputs[0] = game.build_motion(station,1.0/60)
+	station.training.advance(1.0/60)
+	var frame: Dictionary = station.training.pending_tracks[0].frames[0]
+	check(frame.presentation.book and frame.presentation.page == "potato", "Book recorded with cooking")
+	var replay = preload("res://scripts/cooking_model.gd").new()
+	replay.restore(frame)
+	check(replay.presentation.book,"Book restored for clone")
+	var old := frame.duplicate(true)
+	old.erase("presentation")
+	replay.restore(old)
+	check(not replay.presentation.book,"Old recording remains valid")
+	game.cookbook.close()
+	game.player.global_position = station.global_position + Vector3(0,0,1.8)
+	game.session.request_action({"action":"ring","station":1})
+	check(station.training.phase == "confirm_finish", "Bell asks before missing serving")
+	station.training.finish_pass(true)
+	check(station.training.pending_tracks[0].frames.back().presentation.bell == 1,"Bell stored in final frame")
+	var malformed := {"position":[0,0,0],"yaw":0.0,"pitch":0.0,"presentation":42}
+	check(not game.session.clean_pose(malformed).presentation.book,"Malformed appearance safely ignored")
+	game.queue_free()
+	await process_frame
+	print("PASS: cookbook, recording compatibility, presence and bell" if not failed else "FAILED")
+	quit(1 if failed else 0)

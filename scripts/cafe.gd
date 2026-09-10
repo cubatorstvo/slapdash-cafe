@@ -4,6 +4,8 @@ const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const SAVE_PATH := "user://station_cafe.save"
 const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var cookbook: CanvasLayer
+var feedback: Node
 var player: CharacterBody3D
 var camera: Camera3D
 var service: Node3D
@@ -53,11 +55,17 @@ func _ready() -> void:
 	add_child(steam)
 	menu.steam_requested.connect(func(action): steam.invite_friends() if action == "invite" else steam.create_lobby())
 	steam.setup(self)
+	cookbook = preload("res://scripts/cookbook.gd").new()
+	add_child(cookbook)
+	cookbook.attach(self)
+	feedback = preload("res://scripts/cafe_feedback.gd").new()
+	add_child(feedback)
+	feedback.game = self
 	load_cafe()
 	sync_mouse_mode()
 
 func input_blocked() -> bool:
-	return awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+	return (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
 
 func awaiting_serving_confirmation() -> bool:
 	if not is_instance_valid(service) or not is_instance_valid(session): return false
@@ -71,6 +79,8 @@ func toggle_pause() -> void:
 	session_paused = not session_paused
 	hud.pause_panel.visible = session_paused
 	session.suspend_input()
+	for loops in feedback.audio_nodes.values():
+		for voice in loops.values(): voice.stream_paused = session_paused and not session.online()
 	sync_mouse_mode()
 
 func local_station() -> Node3D: return service.training_for(session.local_id())
@@ -88,7 +98,13 @@ func nearest_station() -> Node3D:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.physical_keycode == KEY_B and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
+			cookbook.toggle()
+			return
 		if event.physical_keycode == KEY_ESCAPE:
+			if cookbook.opened:
+				cookbook.close()
+				return
 			if awaiting_serving_confirmation():
 				var current := local_station()
 				if current.training.lead == session.local_id():
@@ -107,10 +123,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E:
+				if recording and station.bell_hit(camera):
+					session.request_action({"action": "ring", "station": station.station_id})
+					return
 				var selected := station if station != null else nearest_station()
 				if selected != null: menu.show_station(selected)
-			KEY_ENTER, KEY_KP_ENTER:
-				if recording: session.request_action({"action": "finish", "station": station.station_id})
 			KEY_BACKSPACE:
 				if recording: session.request_action({"action": "retake", "station": station.station_id})
 			KEY_X:
@@ -133,6 +150,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if recording and event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_LEFT:
+				if station.bell_hit(camera):
+					session.request_action({"action": "ring", "station": station.station_id})
+					return
 				var item: String = held_item(station)
 				var command: Dictionary = {"drop": true} if not item.is_empty() else {"grab": station.view.pick_item(camera)}
 				session.send_input(station, {}, command)
@@ -197,7 +217,7 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 		anchor(station)
 		anchored_item = item
 	var pose: Dictionary = player.pose_in(station)
-	var command := {"pose": {"position": [pose.position.x, pose.position.y, pose.position.z], "yaw": pose.yaw, "pitch": pose.pitch}, "use": not input_blocked() and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)}
+	var command := {"pose": {"position": [pose.position.x, pose.position.y, pose.position.z], "yaw": pose.yaw, "pitch": pose.pitch, "presentation": {"book": cookbook.opened, "page": cookbook.recipe}}, "use": not input_blocked() and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)}
 	var aim: Vector3 = station.global_basis.inverse() * -camera.global_basis.z
 	command.aim = [aim.x, aim.y, aim.z]
 	if not item.is_empty():
@@ -220,6 +240,7 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 
 func _physics_process(delta: float) -> void:
 	bind_training()
+	if cookbook.opened and (menu.opened() or awaiting_serving_confirmation()): cookbook.close()
 	if session_paused and not session.online(): return
 	var move := Vector2.ZERO if input_blocked() else Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
 	if not awaiting_serving_confirmation(): player.advance(delta, move.limit_length())
@@ -229,11 +250,13 @@ func _physics_process(delta: float) -> void:
 	session.advance(delta)
 	service.refresh_views(delta)
 	refresh_hud()
+	feedback.update(delta)
+	if cookbook.opened or menu.opened(): hud.recipe_panel.hide()
 
 func refresh_hud() -> void:
 	hud.clone_status.text = "%d станций · обслужено %d · выручка %d" % [service.stations.size(), service.served, service.revenue]
-	hud.controls.text = "WASD — ходить · Space — прыгнуть · E — станция · F2 — друзья · G — гости"
-	hud.supplies.text = "Каждая станция обучается отдельно. Готовые бригады работают самостоятельно."
+	hud.controls.text = "B  Книга    ·    E  Станция    ·    F2  Друзья"
+	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "ГОСТИ: ПАУЗА"
 	hud.goal.text = "Подойди к рабочей станции · [E]"
 	hud.progress.value = 0
@@ -246,18 +269,21 @@ func refresh_hud() -> void:
 			hud.prompt.text = "[E] Станция %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title]
 			if station.state == "cooking":
 				hud.recipe_panel.show()
-				hud.recipe_text.text = preload("res://scripts/dish_quality.gd").text(station.model.quality())
+				hud.show_recipe(station.model.quality(), station.order_dish)
 				hud.goal.text = station.Definition.DISHES[station.order_dish]
 		return
 	hud.recipe_panel.show()
-	hud.recipe_text.text = preload("res://scripts/dish_quality.gd").text(station.model.quality())
-	hud.notice.text = station.training.info
+	hud.show_recipe(station.model.quality(), station.training.dish)
+	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	hud.progress.value = 100 if station.model.success() else 0
-	hud.supplies.text = station.model.goal_text() if station.type_id == "counter" else station.view.status.text.replace("\n", " · ")
-	hud.controls.text = "ЛКМ — взять/положить · ПКМ — использовать · Колесо / R,F — высота · Shift — точнее\nEnter — завершить проход · Backspace — повторить проход · X — закончить обучение"
+	hud.supplies.text = "Закончил? Позвони в звонок на стойке."
+	hud.controls.text = "ЛКМ  Взять    ·    ПКМ  Действие    ·    Колесо  Высота    ·    B  Книга"
 	if local_role >= 0 and station.training.phase == "recording":
+		if station.bell_hit(camera):
+			hud.prompt.text = "ЛКМ / E  ·  Подать и закончить показ"
+			return
 		var item := held_item(station)
 		if item.is_empty():
 			item = station.view.pick_item(camera)
