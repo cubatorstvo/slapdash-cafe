@@ -125,7 +125,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				var command: Dictionary = {"drop": true} if not item.is_empty() else {"grab": station.view.pick_item(camera)}
 				session.send_input(station, {}, command)
 			MOUSE_BUTTON_WHEEL_UP: height = minf(1.1, height + 0.08)
-			MOUSE_BUTTON_WHEEL_DOWN: height = maxf(0, height - 0.08)
+			MOUSE_BUTTON_WHEEL_DOWN: height = maxf(-1.0, height - 0.08)
 
 func held_item(station: Node3D) -> String:
 	if local_role < 0: return ""
@@ -136,7 +136,7 @@ func anchor(station: Node3D) -> void:
 	if item.is_empty(): return
 	target = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
 	height = station.model.elevations[item] if station.type_id == "counter" else station.model.heights[item]
-	var at := station.to_global(Vector3(target.x, 1.015, target.y))
+	var at := station.to_global(Vector3(target.x, 1.015 + height, target.y))
 	grip = camera.global_basis.inverse() * (at - camera.global_position).normalized()
 
 func bind_training() -> void:
@@ -185,11 +185,11 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 	var aim: Vector3 = station.global_basis.inverse() * -camera.global_basis.z
 	command.aim = [aim.x, aim.y, aim.z]
 	if not item.is_empty():
-		if not input_blocked(): height = clampf(height + (float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))) * delta * 0.55, 0, 1.1)
+		if not input_blocked(): height = clampf(height + (float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))) * delta * 0.55, -1.0, 1.1)
 		if not precise:
 			var origin: Vector3 = station.to_local(camera.global_position)
 			var ray: Vector3 = station.global_basis.inverse() * camera.global_basis * grip
-			var reach := maxf(origin.y - 1.015, 0.01) / maxf(-ray.y, 0.08)
+			var reach := maxf(origin.y - (1.015 + height), 0.01) / maxf(-ray.y, 0.08)
 			var point := origin + ray * reach
 			target = Vector2(point.x, point.z)
 		command.target = [target.x, target.y]
@@ -217,11 +217,19 @@ func refresh_hud() -> void:
 	hud.goal.text = "Подойди к рабочей станции · [E]"
 	hud.progress.value = 0
 	hud.prompt.text = ""
+	hud.recipe_panel.hide()
 	var station := local_station()
 	if station == null:
 		station = nearest_station()
-		if station != null: hud.prompt.text = "[E] Станция %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title]
+		if station != null:
+			hud.prompt.text = "[E] Станция %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title]
+			if station.state == "cooking":
+				hud.recipe_panel.show()
+				hud.recipe_text.text = preload("res://scripts/dish_quality.gd").text(station.model.quality())
+				hud.goal.text = station.Definition.DISHES[station.order_dish]
 		return
+	hud.recipe_panel.show()
+	hud.recipe_text.text = preload("res://scripts/dish_quality.gd").text(station.model.quality())
 	hud.notice.text = station.training.info
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
@@ -234,8 +242,8 @@ func refresh_hud() -> void:
 			item = station.view.pick_item(camera)
 			if item.is_empty(): return
 			var allowed: bool = station.type_id == "counter" or station.model.can_touch(local_role, item)
-			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + str(ITEM_NAMES.get(item, station.TeamModel.NAMES.get(item, "")))
-		else: hud.prompt.text = "[ПКМ] Использовать · " + str(ITEM_NAMES.get(item, station.TeamModel.NAMES.get(item, "")))
+			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
+		else: hud.prompt.text = "[ПКМ] Использовать · " + str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
 
 func save_cafe() -> bool:
 	if session.is_guest(): return false

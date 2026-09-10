@@ -2,16 +2,20 @@ extends RefCounted
 ## The bounded workstation's liquid rules. Positions use tabletop-local X/Z.
 ## This model is shared by live input and tests; replay uses recorded snapshots.
 
-const CUP_CAPACITY := 250.0
+const Pourable = preload("res://scripts/pourable.gd")
+const CUP_CAPACITY := 300.0
 const TARGET := 225.0
 const JUG_CAPACITY := 1000.0
 const RAG_CAPACITY := 300.0
 const CUP_RADIUS := 0.24
-const BOUNDS := Vector2(2.05, 0.85)
+const BOUNDS := Vector2(2.65, 2.65)
+const SERVE := Vector2(0.65, -0.65)
 const SURFACE_Y := 1.0
 const BASE_Y := 1.015
 const MAX_LIFT := 1.10
 
+var vessels := {"jug": Pourable.new(0.40, 0.78, 1050.0), "cup": Pourable.new(0.24, 0.50, 500.0)}
+var source := "jug"
 var jug := Vector2(-1.05, -0.1)
 var cup := Vector2(0.50, 0.18)
 var rag := Vector2(1.22, 0.40)
@@ -36,6 +40,9 @@ func reset() -> void:
 	cup = Vector2(0.50, 0.18)
 	rag = Vector2(1.22, 0.40)
 	tilt = 0.0
+	for vessel in vessels.values(): vessel.angle = 0.0
+	vessels.jug.pivot_height = 0.48
+	source = "jug"
 	wine = JUG_CAPACITY
 	filled = 0.0
 	soaked = 0.0
@@ -54,11 +61,12 @@ func reset() -> void:
 func pick_up(item: String) -> void:
 	put_down()
 	held = item
-	elevations[item] = 0.50 if item == "jug" else 0.04
+	elevations[item] = maxf(float(elevations[item]), surface_at(get(item)) - BASE_Y) + 0.12
 
 func put_down() -> void:
 	if held.is_empty(): return
-	elevations[held] = 0.0
+	elevations[held] = surface_at(get(held)) - BASE_Y
+	if held in vessels: vessels[held].angle = 0.0
 	held = ""
 	tilt = 0.0
 	flowing = false
@@ -66,23 +74,36 @@ func put_down() -> void:
 
 func lift_held(amount: float) -> void:
 	if held.is_empty(): return
-	var floor_limit := minimum_jug_lift() if held == "jug" else 0.0
+	var floor_limit := surface_at(get(held)) - BASE_Y
 	elevations[held] = clampf(float(elevations[held]) + amount, floor_limit, MAX_LIFT)
+
+static func surface_at(point: Vector2) -> float:
+	return BASE_Y if absf(point.x) <= 2.15 and absf(point.y) <= 1.125 else 0.015
+
+func vessel_base(item: String) -> Vector3:
+	var point: Vector2 = get(item)
+	return Vector3(point.x, BASE_Y + float(elevations[item]), point.y)
+
+func receiver_at(point: Vector2, height: float) -> String:
+	for item in ["cup", "jug"]:
+		if item == source and flowing: continue
+		if item == held: continue
+		var base := vessel_base(item)
+		if point.distance_to(get(item)) <= vessels[item].radius and height >= base.y + vessels[item].rim_height and vessels[item].angle < 15: return item
+	return ""
 
 func minimum_jug_lift() -> float:
 	var angle := deg_to_rad(tilt)
 	return maxf(0.0, 0.46 * sin(angle) + 0.40 * absf(cos(angle)) - 0.48)
 
 func spout_position() -> Vector3:
-	var angle := deg_to_rad(tilt)
-	return Vector3(jug.x + 0.40 * cos(angle) + 0.30 * sin(angle),
-		BASE_Y + float(elevations.jug) + 0.48 - 0.40 * sin(angle) + 0.30 * cos(angle), jug.y)
+	return vessels[source].mouth(vessel_base(source))
 
 func source_height() -> float:
 	return BASE_Y + float(elevations.rag) + 0.04 if held == "rag" else spout_position().y
 
 func can_fill_at(point: Vector2, height: float) -> bool:
-	return point.distance_to(cup) <= CUP_RADIUS and height >= BASE_Y + float(elevations.cup) + 0.50
+	return receiver_at(point, height) == "cup"
 
 func move_item(item: String, point: Vector2) -> void:
 	point = point.clamp(-BOUNDS, BOUNDS)
@@ -90,23 +111,22 @@ func move_item(item: String, point: Vector2) -> void:
 		"jug": jug = point
 		"cup": cup = point
 		"rag": rag = point
+	if item in elevations: elevations[item] = maxf(float(elevations[item]), surface_at(point) - BASE_Y)
 
 func spout_target() -> Vector2:
-	var mouth := spout_position()
-	return Vector2(mouth.x, mouth.z)
+	return vessels[source].landing(vessel_base(source), surface_at(get(source)))
 
-func step(delta: float, tip: bool, straighten: bool, squeeze: bool) -> void:
-	if tip:
-		tilt = minf(tilt + 45.0 * delta, 95.0)
-	elif straighten or held != "jug":
-		tilt = maxf(tilt - 95.0 * delta, 0.0)
-	elevations.jug = maxf(float(elevations.jug), minimum_jug_lift())
-	flowing = tilt > 28.0 and wine > 0.0
-	squeezing = held == "rag" and squeeze and soaked > 0.0
+func step(delta: float, tip: bool, _straighten: bool, squeeze: bool) -> void:
+	for item in vessels: vessels[item].advance(delta, tip and held == item)
+	if held in vessels: source = held
+	tilt = vessels.jug.angle
+	flowing = held in vessels and vessels[held].rate() > 0 and (wine if held == "jug" else filled) > 0
+	squeezing = held == "rag" and squeeze and soaked > 0
 	if flowing:
 		landing = spout_target()
-		var amount := minf(wine, (tilt - 28.0) * 2.2 * delta)
-		wine -= amount
+		var amount: float = vessels[held].take(wine if held == "jug" else filled, delta)
+		if held == "jug": wine -= amount
+		else: filled -= amount
 		_deliver(landing, amount, spout_position().y)
 	if held == "rag":
 		if squeezing:
@@ -115,21 +135,20 @@ func step(delta: float, tip: bool, straighten: bool, squeeze: bool) -> void:
 			soaked -= amount
 			squeezed_total += amount
 			_deliver(rag, amount, source_height())
-		elif float(elevations.rag) <= 0.10:
+		elif BASE_Y + float(elevations.rag) <= surface_at(rag) + 0.10:
 			_absorb(delta)
 
 func _deliver(point: Vector2, amount: float, height: float) -> void:
-	if can_fill_at(point, height):
-		var accepted := minf(amount, CUP_CAPACITY - filled)
-		filled += accepted
+	var receiver := receiver_at(point, height)
+	if not receiver.is_empty():
+		var accepted := Pourable.accepted(amount, filled if receiver == "cup" else wine, CUP_CAPACITY if receiver == "cup" else JUG_CAPACITY)
+		if receiver == "cup": filled += accepted
+		else: wine += accepted
 		amount -= accepted
-	if amount <= 0.0001:
-		return
-	if absf(point.x) > 2.0 or absf(point.y) > 1.03:
-		lost += amount
-		return
-	# A bounded grid merges spills, keeping recordings small and wiping local.
-	var cell := (point / 0.23).round() * 0.23
+	if amount <= 0.0001: return
+	# Floor spills remain recoverable; the station boundary retains every drop.
+	point = point.clamp(-BOUNDS, BOUNDS)
+	var cell := (point / 0.15).round() * 0.15
 	for puddle in puddles:
 		if Vector2(puddle[0], puddle[1]).distance_to(cell) < 0.05:
 			puddle[2] += amount
@@ -140,7 +159,7 @@ func _absorb(delta: float) -> void:
 	var budget := minf(160.0 * delta, RAG_CAPACITY - soaked)
 	for index in range(puddles.size() - 1, -1, -1):
 		var puddle: Array = puddles[index]
-		if rag.distance_to(Vector2(puddle[0], puddle[1])) > 0.42:
+		if rag.distance_to(Vector2(puddle[0], puddle[1])) > 0.42 or absf(surface_at(rag) - surface_at(Vector2(puddle[0], puddle[1]))) > 0.1:
 			continue
 		var amount := minf(float(puddle[2]), budget)
 		puddle[2] -= amount
@@ -150,7 +169,7 @@ func _absorb(delta: float) -> void:
 			puddles.remove_at(index)
 
 func success() -> bool:
-	return filled >= TARGET - 0.001
+	return filled >= 200 and filled <= 250 and spilled() + lost + soaked <= 5 and cup.distance_to(SERVE) < 0.4 and held != "cup"
 
 func spilled() -> float:
 	var total := 0.0
@@ -159,7 +178,7 @@ func spilled() -> float:
 	return total
 
 func snapshot() -> Dictionary:
-	return {"jug": [jug.x, jug.y], "cup": [cup.x, cup.y], "rag": [rag.x, rag.y],
+	return {"vessel_angles": {"jug": vessels.jug.angle, "cup": vessels.cup.angle}, "source": source, "jug": [jug.x, jug.y], "cup": [cup.x, cup.y], "rag": [rag.x, rag.y],
 		"tilt": tilt, "wine": wine, "filled": filled, "soaked": soaked,
 		"lost": lost, "squeezed_total": squeezed_total,
 		"puddles": puddles.duplicate(true), "held": held,
@@ -169,6 +188,8 @@ func snapshot() -> Dictionary:
 		"actor_yaw": actor_yaw, "actor_pitch": actor_pitch}
 
 func restore(data: Dictionary) -> void:
+	for item in vessels: vessels[item].angle = float(data.vessel_angles[item])
+	source = data.source
 	jug = Vector2(data.jug[0], data.jug[1])
 	cup = Vector2(data.cup[0], data.cup[1])
 	rag = Vector2(data.rag[0], data.rag[1])

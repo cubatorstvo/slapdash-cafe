@@ -27,8 +27,8 @@ func meat_role() -> void:
 
 func pasta_role() -> void:
 	step({"grab": "water"})
-	move(M.STOVE, 0.6)
-	step({"use": true}, 160)
+	move(M.STOVE - Vector2(0.3, 0), 0.6)
+	step({"use": true}, 190)
 	move(Vector2(2.3, 0.45), 0.5)
 	step({"drop": true})
 	step({"grab": "pasta_bag"})
@@ -44,8 +44,8 @@ func pasta_role() -> void:
 	step({"drop": true})
 	step({}, 720)
 	step({"grab": "pot"})
-	move(M.PASTA_PLATE, 0.5)
-	step({"use": true}, 60)
+	move(M.PASTA_PLATE - Vector2(0.2, 0), 0.5)
+	step({"use": true}, 260)
 	move(M.STOVE, 0.4)
 	step({"drop": true})
 	step({"grab": "pasta_salt_tool"})

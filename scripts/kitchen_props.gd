@@ -1,6 +1,12 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Model = preload("res://scripts/cooking_model.gd")
+var potato_nodes: Array = []
+var potato_bodies: Array = []
+var potato_patches: Array = []
+var sausage_nodes: Array = []
+var sausage_skins: Array = []
+var sausage_meshes: Array = []
 var potato_set: Node3D
 var sausage_set: Node3D
 var pan: Node3D
@@ -18,9 +24,25 @@ func _ready() -> void:
 	sausage_set = Node3D.new()
 	add_child(sausage_set)
 	_build_pan()
-	_build_potato()
-	_build_sausage()
-	for group in [potato_set, sausage_set]:
+	for i in range(3):
+		potato_sides = []
+		_build_potato()
+		potato_nodes.append(potato)
+		potato_bodies.append(potato_body)
+		potato_patches.append(potato_sides)
+		sausage_mesh = ArrayMesh.new()
+		tube_indices = PackedInt32Array()
+		_build_sausage()
+		sausage_nodes.append(sausage)
+		sausage_skins.append(sausage_skin)
+		sausage_meshes.append(sausage_mesh)
+	# Independent supply areas, all three physical ingredients are usable.
+	Props.box(self, Vector3(0.55, 0.12, 1.3), Vector3(-2.43, 0.13, 0.15), Color("9c744b"))
+	for x in [-2.7, -2.16]: Props.box(self, Vector3(0.045, 0.25, 1.3), Vector3(x, 0.22, 0.15), Color("ad8153"))
+	for z in [-0.5, 0.8]: Props.box(self, Vector3(0.55, 0.25, 0.045), Vector3(-2.43, 0.22, z), Color("ad8153"))
+	Props.box(self, Vector3(0.55, 0.06, 1.3), Vector3(2.43, 0.685, -0.1), Color("ba9769"))
+	for z in [-0.65, 0.45]: Props.box(self, Vector3(0.12, 0.67, 0.12), Vector3(2.43, 0.335, z), Color("446266"))
+	for group in [potato_set]:
 		var plate := Props.cylinder(group, 0.44, 0.035, point(Model.PLATE_CENTER, 0.025), Color("e7eee1"))
 		var rim := TorusMesh.new()
 		rim.inner_radius = 0.39
@@ -78,10 +100,11 @@ func _build_potato() -> void:
 		Props.ball(potato_body, 0.009, Vector3(cos(angle) * 0.19, sin(angle * 1.7) * 0.085, sin(angle) * 0.13), Color("947049"))
 
 func _build_sausage() -> void:
-	Props.cylinder(sausage_set, 0.36, 0.07, point(Model.SAUCE_CENTER, 0.04), Color("e2c39a"))
-	Props.cylinder(sausage_set, 0.325, 0.012, point(Model.SAUCE_CENTER, 0.082), Color("b63249"))
-	var label := Props.text(sausage_set, "СОУС", point(Model.SAUCE_CENTER + Vector2(0, -0.43), 0.01), 18, Color("b53c50"))
-	label.rotation.x = -PI / 2
+	if sausage_nodes.is_empty():
+		Props.cylinder(sausage_set, 0.36, 0.07, point(Model.SAUCE_CENTER, 0.04), Color("e2c39a"))
+		Props.cylinder(sausage_set, 0.325, 0.012, point(Model.SAUCE_CENTER, 0.082), Color("b63249"))
+		var label := Props.text(sausage_set, "СОУС", point(Model.SAUCE_CENTER + Vector2(0, -0.43), 0.01), 18, Color("b53c50"))
+		label.rotation.x = -PI / 2
 	sausage = Node3D.new()
 	sausage_set.add_child(sausage)
 	sausage_skin = Props.shape(sausage, sausage_mesh, Vector3.ZERO, Color("cd8869"))
@@ -115,27 +138,40 @@ func update_view(model) -> void:
 	potato_set.visible = true
 	sausage_set.visible = true
 	pan.rotation = Vector3(model.pan_tilt.y, 0, -model.pan_tilt.x)
-	potato.position = point(model.potato, model.elevations.potato)
-	potato_body.quaternion = model.potato_orientation
-	var orientation := Basis(model.potato_orientation)
-	potato_body.position.y = Vector3(orientation.x.y * 0.22, orientation.y.y * 0.14, orientation.z.y * 0.15).length()
-	for index in range(6):
-		potato_sides[index].material_override.albedo_color = Color("dcaf70").lerp(Color("875034"), float(model.potato_heat[index]))
-	sausage.position = point(model.sausage, model.elevations.sausage)
-	sausage.rotation.z = model.sausage_angle
-	sausage.position.y += absf(sin(model.sausage_angle)) * 0.30
-	var amplitude: float = 0.018 if model.held.is_empty() else 0.025 + model.sausage_slip * 0.05
-	_bend_sausage(model.sausage_phase, amplitude)
-	sausage_skin.material_override.albedo_color = Color("cd8869").lerp(Color("b8324a"), model.sausage_coating)
+	model._store_food("potato")
+	model._store_food("sausage")
+	for i in range(3):
+		var p: Dictionary = model.potatoes[i]
+		potato_nodes[i].position = point(p.potato, p.elevation)
+		potato_bodies[i].quaternion = p.potato_orientation
+		var orientation := Basis(p.potato_orientation)
+		potato_bodies[i].position.y = Vector3(orientation.x.y * 0.22, orientation.y.y * 0.14, orientation.z.y * 0.15).length()
+		for face in range(6): potato_patches[i][face].material_override.albedo_color = Color("dcaf70").lerp(Color("875034"), float(p.potato_heat[face]))
+		var f: Dictionary = model.sausages[i]
+		sausage_nodes[i].position = point(f.sausage, f.elevation)
+		sausage_nodes[i].rotation.z = f.sausage_angle
+		sausage_nodes[i].position.y += absf(sin(f.sausage_angle)) * 0.30
+		sausage_mesh = sausage_meshes[i]
+		_bend_sausage(f.sausage_phase, 0.018 + f.sausage_slip * 0.05)
+		sausage_skins[i].material_override.albedo_color = Color("cd8869").lerp(Color("b8324a"), f.sausage_coating)
+	potato = potato_nodes[model.potato_index]
+	sausage = sausage_nodes[model.sausage_index]
 
 func pick_item(camera: Camera3D, dish: String) -> String:
-	# Potato first allows retrieval through a hole, below the pan's broad hit box.
-	var entries := [["potato", potato, AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.46, 0.44))],
-		["pan", pan, AABB(Vector3(-0.80, -0.08, -0.65), Vector3(1.6, 0.25, 1.9))]] + [
-		["sausage", sausage, AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))]]
+	var entries: Array = []
+	for i in range(3):
+		entries.append(["potato_%d" % i, potato_nodes[i], AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.40, 0.44))])
+		entries.append(["sausage_%d" % i, sausage_nodes[i], AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))])
+	entries.append(["pan", pan, AABB(Vector3(-0.80, -0.08, -0.65), Vector3(1.6, 0.25, 1.9))])
+	var selected := ""
+	var nearest := 3.6
 	for entry in entries:
 		var node: Node3D = entry[1]
 		var bounds: AABB = entry[2]
 		var hit = bounds.intersects_ray(node.to_local(camera.global_position), node.global_basis.inverse() * -camera.global_basis.z)
-		if hit != null and camera.global_position.distance_to(node.to_global(hit)) < 3.6: return entry[0]
-	return ""
+		if hit == null: continue
+		var distance := camera.global_position.distance_to(node.to_global(hit))
+		if distance < nearest:
+			nearest = distance
+			selected = entry[0]
+	return selected

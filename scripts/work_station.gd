@@ -81,7 +81,7 @@ func reset_model() -> void:
 func apply_single(command: Dictionary, delta: float) -> void:
 	if command.get("drop", false): model.put_down()
 	var item: String = command.get("grab", "")
-	if item in ["jug", "cup", "rag", "pan", "potato", "sausage", "tomato"] and model.held.is_empty(): model.pick_up(item)
+	if item in ["jug", "cup", "rag", "pan", "potato", "sausage", "tomato", "potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] and model.held.is_empty(): model.pick_up(item)
 	item = model.held
 	if not item.is_empty():
 		if command.has("target") and item != "pan":

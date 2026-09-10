@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-4"
+const PROTOCOL := "slapdash-cafe-stations-5"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -259,15 +259,15 @@ func apply_input(sender: int, packet: Dictionary) -> void:
 	if motion is Dictionary and M.valid_pose(motion.get("pose")):
 		var clean := {"pose": clean_pose(motion.pose), "use": motion.get("use", false) == true}
 		if M.numbers(motion.get("aim"), 3): clean.aim = motion.aim
-		if M.numbers(motion.get("target"), 2): clean.target = [clampf(motion.target[0], -3, 3), clampf(motion.target[1], -1, 1)]
-		if M.finite(motion.get("height")): clean.height = clampf(motion.height, 0, 1.1)
+		if M.numbers(motion.get("target"), 2): clean.target = [clampf(motion.target[0], -3, 3), clampf(motion.target[1], -2.65, 2.65)]
+		if M.finite(motion.get("height")): clean.height = clampf(motion.height, -1.0, 1.1)
 		if M.numbers(motion.get("pan_tilt"), 2): clean.pan_tilt = motion.pan_tilt
 		run.inputs[role] = clean
 		motion_times[sender] = Time.get_ticks_msec()
 	var event = packet.get("event", {})
 	if event is Dictionary:
 		if event.get("drop", false) == true: run.queue_event(role, {"drop": true})
-		elif event.get("grab", "") in (game.ITEM_NAMES.keys() if station.type_id == "counter" else M.ITEMS): run.queue_event(role, {"grab": event.grab})
+		elif event.get("grab", "") in (game.ITEM_NAMES.keys() + ["potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] if station.type_id == "counter" else M.ITEMS): run.queue_event(role, {"grab": event.grab})
 
 func suspend_input() -> void:
 	var station: Node3D = game.local_station()

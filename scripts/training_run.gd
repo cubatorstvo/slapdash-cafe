@@ -124,13 +124,13 @@ func can_accept() -> bool:
 	for track in tracks:
 		if track.is_empty() or track.frames.is_empty(): return false
 	station.show_tracks(tracks, duration_ticks(tracks) - 1)
-	return station.model.success()
+	return station.model.quality().present
 
 func accept() -> bool:
 	if not can_accept():
-		info = "Нужны все роли и выполненные требования блюда. Можно перезаписать нужную роль."
+		info = "Запиши все роли и положи еду на подачу. Любое качество D–S можно сохранить."
 		return false
-	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0}
+	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
 	station.drafts.erase(dish)
 	station.finish_taster(true)
 	close()

@@ -87,6 +87,7 @@ func guest_tick() -> void:
 	var second = game.service.by_id(2)
 	var kitchen = game.service.by_id(4)
 	if game.service.by_id(27) == null: fail("Fifth station not replicated")
+	if first.model.potatoes.size() != 3 or first.model.sausages.size() != 3 or first.model.vessels.cup == null: fail("New stock and vessels not replicated")
 	if stage == 0 and first.training.phase == "recording":
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
 		stage = 1

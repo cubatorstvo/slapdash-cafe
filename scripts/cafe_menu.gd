@@ -121,6 +121,13 @@ func show_station(station: Node3D) -> void:
 		_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
 	else:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
+		var report: Dictionary = station.model.quality()
+		_label(training_box, "Качество блюда: %s · эффектность 0/3 · ×1.00" % report.grade, 17)
+		if run.phase == "review":
+			var details := PackedStringArray()
+			for criterion in report.criteria: details.append(criterion.label)
+			var criteria_label := _label(training_box, " · ".join(details), 15)
+			criteria_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		var information := _label(training_box, run.info, 16)
 		information.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		if run.lead != game.session.local_id():

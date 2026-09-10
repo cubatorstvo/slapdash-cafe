@@ -89,11 +89,13 @@ func run() -> void:
 	print("[4/7] Single recipe is station-owned, exact replay and customer service")
 	service.request_training(first, "wine", 1)
 	first.training.start_pass([1])
-	var wine: Array = [{"grab": "jug"}]
-	for i in range(60): wine.append({"target": [0.25, -0.65], "height": 0.5})
-	for i in range(600): wine.append({"use": true})
-	wine.append({"drop": true})
-	feed(first, 0, wine)
+	feed(first, 0, [{"grab": "jug"}])
+	for i in range(1800):
+		var mouth = first.model.spout_position()
+		var offset: float = first.model.spout_target().x - first.model.jug.x
+		feed(first, 0, [{"target": [first.model.cup.x - offset, first.model.cup.y], "height": 0.6, "use": first.model.tilt < 44}])
+		if first.model.filled >= 215: break
+	feed(first, 0, [{"drop": true}])
 	check(first.model.success(), "Wine prepared using the same input path")
 	first.training.finish_pass()
 	first.training.keep_pass()
@@ -119,7 +121,7 @@ func run() -> void:
 		if kitchen.state == "cooking": break
 	check(kitchen.state == "cooking", "Order started")
 	check(service.request_training(kitchen, "meal", 1) and kitchen.pending_teacher == 1, "Teaching waits for current order")
-	for i in range(2300): service.advance(DT)
+	for i in range(2700): service.advance(DT)
 	check(kitchen.training.active() and kitchen.pending_teacher == 0, "Pending lesson starts after order")
 	kitchen.training.close()
 

@@ -53,6 +53,9 @@ func build(production: bool) -> void:
 	Props.box(tomato, Vector3(0.12, 0.02, 0.04), Vector3(0, 0.24, 0), Color("6a9c56"))
 	_build_jug()
 	_build_cup()
+	Props.cylinder(self, 0.42, 0.01, item_point(Model.SERVE), Color("638f92"))
+	var serve_label := Props.text(self, "ПОДАЧА ВИНА", item_point(Model.SERVE + Vector2(0, -0.3)), 13, Color("29484b"))
+	serve_label.rotation.x = -PI / 2
 	rag = Node3D.new()
 	add_child(rag)
 	rag_surface = Props.box(rag, Vector3(0.43, 0.055, 0.30), Vector3(0, 0.045, 0), Color("eac26b"))
@@ -66,7 +69,7 @@ func build(production: bool) -> void:
 	target_ring = Props.shape(self, ring, Vector3.ZERO, Color("f3a963"))
 	target_ring.visible = false
 	_build_grip_marker()
-	fill_label = Props.text(self, "0 / 250 мл", Vector3(0, 2.2, 0), 20, Color("ffffff"))
+	fill_label = Props.text(self, "0 / 300 мл", Vector3(0, 2.2, 0), 20, Color("ffffff"))
 	fill_label.pixel_size = 0.004
 	fill_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	kitchen = preload("res://scripts/kitchen_props.gd").new()
@@ -100,7 +103,7 @@ func _update_grip_marker(model) -> void:
 	for dash in height_dashes: dash.visible = false
 	if not grip_marker.visible: return
 	var point: Vector2 = model.get(model.held)
-	grip_marker.position = Vector3(point.x, TABLE_HEIGHT + 0.025, point.y)
+	grip_marker.position = Vector3(point.x, Model.surface_at(point) + 0.025, point.y)
 	var radius_scale := 1.0 if model.held == "jug" else 0.85
 	grip_marker.scale = Vector3(radius_scale, 1, radius_scale)
 	var lift: float = model.elevations[model.held]
@@ -146,7 +149,8 @@ func _build_cup() -> void:
 	var mark := TorusMesh.new()
 	mark.inner_radius = 0.24
 	mark.outer_radius = 0.255
-	Props.shape(cup, mark, Vector3(0, 0.446, 0), Color("efb65b"))
+	for level in [200.0, 250.0]:
+		Props.shape(cup, mark, Vector3(0, 0.052 + level / 300.0 * 0.43, 0), Color("efb65b"))
 
 func _build_worker() -> void:
 	worker = Node3D.new()
@@ -182,19 +186,21 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 	jug.position = item_point(model.jug)
 	jug_body.rotation.z = -deg_to_rad(model.tilt)
 	cup.position = item_point(model.cup)
+	cup.rotation.z = -deg_to_rad(model.vessels.cup.angle)
 	rag.position = item_point(model.rag)
 	jug.position.y += model.elevations.jug
 	cup.position.y += model.elevations.cup
+	cup.position += Vector3.UP * 0.25 - cup.basis * Vector3.UP * 0.25
 	rag.position.y += model.elevations.rag
 	jug_liquid.visible = model.wine > 0.1
-	var height: float = maxf(0.003, model.filled / 250.0 * 0.43)
+	var height: float = maxf(0.003, model.filled / 300.0 * 0.43)
 	cup_liquid.visible = model.filled > 0.1
 	cup_liquid.scale.y = height
 	cup_liquid.position.y = 0.052 + height * 0.5
 	rag_surface.material_override.albedo_color = Color("eac26b").lerp(WINE_COLOR, model.soaked / 300.0)
 	rag.scale = Vector3(0.7, 1.2, 0.8) if model.squeezing else Vector3.ONE
 	fill_label.position = cup.position + Vector3(0, 0.65, 0)
-	fill_label.text = "%d / 250 мл" % roundi(model.filled)
+	fill_label.text = "%d / 300 мл" % roundi(model.filled)
 	fill_label.modulate = Color("8bf1b9") if model.success() else Color("ffffff")
 	_update_grip_marker(model)
 	for mesh in spill_meshes:
@@ -205,21 +211,26 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 		var data: Array = model.puddles[index]
 		var mesh := spill_meshes[index]
 		mesh.visible = true
-		mesh.position = Vector3(data[0], TABLE_HEIGHT + 0.008, data[1])
+		mesh.position = Vector3(data[0], Model.surface_at(Vector2(data[0], data[1])) + 0.008, data[1])
 		var radius := clampf(sqrt(float(data[2])) * 0.026, 0.025, 0.34)
 		mesh.scale = Vector3(radius, 1.0, radius * 0.8)
-	target_ring.visible = not is_production and model.held in ["jug", "rag"]
+	target_ring.visible = not is_production and model.held in ["jug", "cup", "rag"]
 	var aim: Vector2 = model.rag if model.held == "rag" else model.spout_target()
 	var aimed: bool = model.can_fill_at(aim, model.source_height())
-	target_ring.position = item_point(aim)
-	if aimed: target_ring.position.y += float(model.elevations.cup) + 0.50
+	target_ring.position = Vector3(aim.x, Model.surface_at(aim) + 0.01, aim.y)
+	var receiver: String = model.receiver_at(aim, model.source_height())
+	if not receiver.is_empty(): target_ring.position.y = model.vessel_base(receiver).y + model.vessels[receiver].rim_height
+	aimed = not receiver.is_empty()
 	target_ring.material_override.albedo_color = Color("6fd7ae") if aimed else Color("e9a164")
 	stream.visible = (model.flowing or model.squeezing)
 	if stream.visible:
 		var start: Vector3 = model.spout_position()
 		if model.squeezing: start = rag.position + Vector3(0, 0.04, 0)
-		var end: Vector3 = item_point(model.landing)
-		if model.can_fill_at(model.landing, start.y): end.y += float(model.elevations.cup) + 0.43
+		var end := Vector3(model.landing.x, Model.surface_at(model.landing) + 0.01, model.landing.y)
+		var receiving: String = model.receiver_at(model.landing, start.y)
+		if not receiving.is_empty(): end.y = model.vessel_base(receiving).y + model.vessels[receiving].rim_height
+		stream.mesh.top_radius = 0.015 + (model.vessels[model.source].rate() / 1050.0) * 0.045
+		stream.mesh.bottom_radius = stream.mesh.top_radius
 		Props.align_line(stream, start, end)
 	if is_production:
 		_update_worker(model, animation_time, resting)

@@ -1,6 +1,8 @@
 extends CanvasLayer
 ## FPS overlay and explicit teaching selection.
 signal resume_requested
+var recipe_panel: PanelContainer
+var recipe_text: Label
 var bottom: PanelContainer
 var goal: Label
 var clock: Label
@@ -52,6 +54,11 @@ func _ready() -> void:
 	row.add_child(timing)
 	clock = _label(timing, "", 21, Color("f2c578"))
 	_label(timing, "Время записанного исполнения", 14)
+	recipe_panel = _panel(root)
+	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	recipe_panel.position = Vector2(20, 118)
+	recipe_text = _label(recipe_panel, "", 16)
+	recipe_panel.hide()
 	bottom = _panel(root)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	bottom.offset_left = 20

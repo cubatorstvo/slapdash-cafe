@@ -18,8 +18,8 @@ func _ready() -> void:
 	rng.randomize()
 
 func initial_stations() -> void:
-	for index in range(3): add_station("counter", Vector3((index - 1) * 5.1, 0, -1.4))
-	add_station("kitchen", Vector3(11.2, 0, -1.4))
+	for index in range(3): add_station("counter", Vector3((index - 1) * 5.6, 0, -1.4))
+	add_station("kitchen", Vector3(11.8, 0, -1.4))
 
 func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
 	var station := Station.new()
@@ -149,7 +149,8 @@ func finish_customer(id: int, accepted: bool) -> void:
 		if not station.training.active(): station.state = "idle"
 		if accepted:
 			served += 1
-			revenue += 65 if customer.dish == "meal" else 25
+			var report: Dictionary = station.model.quality()
+			revenue += roundi((65 if customer.dish == "meal" else 25) * report.price_factor * report.style_multiplier)
 		return
 
 func refresh_views(delta := 0.016) -> void:
@@ -158,7 +159,7 @@ func refresh_views(delta := 0.016) -> void:
 func save_data() -> Dictionary:
 	var entries: Array = []
 	for station in stations: entries.append(station.save_entry())
-	return {"format": "station-cafe", "version": 1, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
+	return {"format": "station-cafe", "version": 2, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
 func clear_world() -> void:
 	for station in stations:
@@ -172,7 +173,7 @@ func clear_world() -> void:
 	next_station_id = 1
 
 func load_data(data: Dictionary) -> bool:
-	if data.get("format") != "station-cafe" or data.get("version") != 1 or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or data.get("version") != 2 or not data.get("stations") is Array: return false
 	var ids: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES or not entry.get("id") is int or entry.id <= 0 or entry.id in ids: return false

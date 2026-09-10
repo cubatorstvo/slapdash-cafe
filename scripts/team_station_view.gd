@@ -2,6 +2,7 @@ extends Node3D
 const M = preload("res://scripts/team_cooking_model.gd")
 const P = preload("res://scripts/props.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
+var spill_meshes: Array = []
 var items := {}
 var actors: Array = []
 var streams: Array = []
@@ -48,8 +49,8 @@ func build(production := false) -> void:
 			var noodle := P.cylinder(group, 0.017, 0.12, Vector3(sin(n * 2.3) * 0.23, 0.04 + (n % 3) * 0.025, cos(n * 3.1) * 0.2), Color("edcf74"))
 			noodle.rotation = Vector3(PI / 2, n * 0.7, 0.3)
 	P.cylinder(items.water, 0.19, 0.43, Vector3(0, 0.22, 0), Color("80b5c1"), 0.23)
-	P.box(items.water, Vector3(0.12, 0.06, 0.16), Vector3(0, 0.42, -0.22), Color("80b5c1"))
-	P.box(items.water, Vector3(0.09, 0.3, 0.13), Vector3(0.25, 0.23, 0), Color("80b5c1"))
+	P.box(items.water, Vector3(0.12, 0.06, 0.16), Vector3(0.22, 0.42, 0), Color("80b5c1"))
+	P.box(items.water, Vector3(0.09, 0.3, 0.13), Vector3(-0.25, 0.23, 0), Color("80b5c1"))
 	P.box(items.pasta_bag, Vector3(0.35, 0.48, 0.22), Vector3(0, 0.24, 0), Color("d7b168"))
 	P.text(items.pasta_bag, "PASTA", Vector3(0, 0.25, 0.12), 12).pixel_size = 0.003
 	for key in ["salt", "pasta_salt_tool"]:
@@ -90,9 +91,13 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 		marks[item].visible = model.owners[item] >= 0
 		var owner: int = model.owners[item]
 		if owner >= 0 and model.using[owner]:
-			if item in ["water", "pasta_bag", "pot"]: node.rotation.x = -0.8
+			if item == "pasta_bag": node.rotation.x = -0.8
 			elif item in ["salt", "pasta_salt_tool"]: node.rotation.z = PI + sin(model.elapsed * 22) * 0.25
 			elif item in ["spatula", "pasta_spatula"]: node.rotation.y = sin(model.elapsed * 8) * 0.7
+		if item in model.vessels:
+			node.rotation.z = -deg_to_rad(model.vessels[item].angle)
+			var pivot: float = model.vessels[item].pivot_height
+			node.position += Vector3.UP * pivot - node.basis * Vector3.UP * pivot
 	meat.material_override.albedo_color = Color("bc6355").lerp(Color("74513a"), model.meat_sides[1 - model.meat_face])
 	if model.flip_time > 0: items.steak.rotation.z = (model.flip_time / 0.35) * PI
 	liquid.visible = model.water > 0
@@ -107,7 +112,18 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 		streams[role].visible = model.pouring[role] and not item.is_empty()
 		if streams[role].visible:
 			streams[role].material_override.albedo_color = Color("a0d5e2") if item == "water" else (Color("fff5d8") if item in ["salt", "pasta_salt_tool"] else Color("edcf74"))
-			P.align_line(streams[role], target, Vector3(target.x, M.BASE_Y + 0.08, target.z))
+			if item in model.vessels:
+				var end: Vector2 = model.pour_target(item)
+				P.align_line(streams[role], model.mouth(item), Vector3(end.x, M.surface_at(end) + 0.08, end.y))
+			else: P.align_line(streams[role], target, Vector3(target.x, M.BASE_Y + 0.08, target.z))
+	for mesh in spill_meshes: mesh.hide()
+	for i in range(model.spills.size()):
+		if i == spill_meshes.size(): spill_meshes.append(P.cylinder(self, 1, 0.008, Vector3.ZERO, Color("8aa9a0")))
+		var entry: Array = model.spills[i]
+		spill_meshes[i].show()
+		spill_meshes[i].position = Vector3(entry[0], M.surface_at(Vector2(entry[0], entry[1])) + 0.008, entry[1])
+		var radius := clampf(sqrt(entry[2]) * 0.025, 0.025, 0.3)
+		spill_meshes[i].scale = Vector3(radius, 1, radius)
 	status.text = "МЯСО %d%% / %d%% · соль %s\nВОДА %d/500 мл · МАКАРОНЫ %d/100 г\nВарка %d%% · мешать %d%% · соль %s" % [model.meat_sides[0] * 100, model.meat_sides[1] * 100, "✓" if model.meat_salt >= 1 else "—", model.water, model.pasta + model.served_pasta, model.cooked * 100, model.stirred * 100, "✓" if model.pasta_salt >= 1 else "—"]
 
 func pick_item(camera: Camera3D) -> String:
