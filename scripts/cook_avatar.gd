@@ -81,6 +81,6 @@ func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), hand + Vector3(-0.18, 0, 0) if holding else Vector3(-0.35, 0.78, -0.2))
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), hand)
 	if book.visible:
-		head.rotation.x = minf(head.rotation.x, -0.22)
-		P.align_line(arms[0], Vector3(-0.3, 1.2, 0), Vector3(-0.30, 1.08, -0.32))
-		P.align_line(arms[1], Vector3(0.3, 1.2, 0), Vector3(0.30, 1.08, -0.32))
+		head.rotation.x = minf(head.rotation.x, -0.35)
+		P.align_line(arms[0], Vector3(-0.3, 1.2, 0), to_local(book.cover_grip(-1)))
+		P.align_line(arms[1], Vector3(0.3, 1.2, 0), to_local(book.cover_grip(1)))

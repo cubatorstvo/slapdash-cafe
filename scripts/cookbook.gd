@@ -6,6 +6,8 @@ var opened := false
 var recipe := "index"
 var overlay: ColorRect
 var book: PanelContainer
+var left_grip: Control
+var right_grip: Control
 var left: VBoxContainer
 var right: VBoxContainer
 var physical: Node3D
@@ -19,6 +21,8 @@ func _ready() -> void:
 	overlay.color = Color(0.05, 0.09, 0.1, 0.35)
 	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay.hide()
+	left_grip = _grip(false)
+	right_grip = _grip(true)
 	book = PanelContainer.new()
 	add_child(book)
 	book.theme = CafeStyle.make(true)
@@ -57,6 +61,45 @@ func _ready() -> void:
 	book.hide()
 	get_viewport().size_changed.connect(_layout_book)
 
+func _grip(flip: bool) -> Control:
+	var grip := Control.new()
+	add_child(grip)
+	grip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grip.set_anchors_preset(Control.PRESET_CENTER)
+	grip.z_index = 1
+	var palm := _shade(grip, Color("e8b893"), 26)
+	palm.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	palm.offset_left = 8
+	palm.offset_right = -6
+	palm.offset_top = 28
+	palm.offset_bottom = -4
+	for i in range(4):
+		var finger := _shade(grip, Color("e0ad86"), 10)
+		finger.anchor_left = 0.12 + i * 0.20
+		finger.anchor_right = 0.28 + i * 0.20
+		finger.anchor_top = 0.04
+		finger.anchor_bottom = 0.46
+		finger.offset_left = 0
+		finger.offset_right = 0
+		finger.offset_top = 0
+		finger.offset_bottom = 0
+	if flip: grip.scale = Vector2(-1, 1)
+	grip.hide()
+	return grip
+
+func _shade(parent: Control, color: Color, radius: int) -> Panel:
+	var panel := Panel.new()
+	parent.add_child(panel)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(color.r, color.g, color.b, 0.82)
+	style.set_corner_radius_all(radius)
+	style.shadow_color = Color(0.12, 0.06, 0.04, 0.28)
+	style.shadow_size = 5
+	style.shadow_offset = Vector2(0, 2)
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
+
 func _layout_book() -> void:
 	var view := get_viewport().get_visible_rect().size
 	var width: float = clampf(view.x * 0.78, 720, 1040)
@@ -65,14 +108,23 @@ func _layout_book() -> void:
 	book.offset_right = width * 0.5
 	book.offset_top = -height * 0.5
 	book.offset_bottom = height * 0.5
+	var hand_w: float = clampf(width * 0.11, 72, 110)
+	var hand_h: float = clampf(height * 0.18, 78, 120)
+	for grip in [left_grip, right_grip]:
+		if grip == null: continue
+		grip.offset_top = book.offset_bottom - hand_h * 0.45
+		grip.offset_bottom = grip.offset_top + hand_h
+		grip.pivot_offset = Vector2(hand_w * 0.5, hand_h * 0.5)
+	left_grip.offset_left = book.offset_left - hand_w * 0.55
+	left_grip.offset_right = left_grip.offset_left + hand_w
+	right_grip.offset_left = book.offset_right - hand_w * 0.45
+	right_grip.offset_right = right_grip.offset_left + hand_w
 
 func attach(owner_game: Node3D) -> void:
 	game = owner_game
 	physical = preload("res://scripts/book_prop.gd").new()
 	game.camera.add_child(physical)
 	physical.pose_in_hands(true)
-	for side in [-1, 1]:
-		preload("res://scripts/props.gd").ball(physical, 0.055, Vector3(side * 0.46, 0.02, 0.16), Color("e8b893"))
 
 func toggle() -> void:
 	if opened: close(); return
@@ -84,6 +136,9 @@ func toggle() -> void:
 	opened = true
 	overlay.show()
 	book.show()
+	left_grip.show()
+	right_grip.show()
+	_layout_book()
 	rebuild()
 	physical.set_reading(true, recipe)
 	changed.emit()
@@ -94,6 +149,8 @@ func close() -> void:
 	opened = false
 	overlay.hide()
 	book.hide()
+	left_grip.hide()
+	right_grip.hide()
 	physical.set_reading(false, recipe)
 	changed.emit()
 	game.sync_mouse_mode()

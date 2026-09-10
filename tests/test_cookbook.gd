@@ -3,15 +3,24 @@ var failed := false
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok: failed = true; printerr("FAIL: ",message)
+func check_reader_book(body: Node3D, book: Node3D, head: Node3D, who: String) -> void:
+	var toward_head: Vector3 = (head.global_position - book.global_position).normalized()
+	check(book.page_normal().dot(toward_head) > 0.25, "%s pages face the reader" % who)
+	var away := book.global_position - body.global_position
+	away.y = 0.0
+	check(away.length() > 0.05 and book.page_top().dot(away.normalized()) > 0.2, "%s book top points away from the reader" % who)
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
 	game.cookbook.toggle()
-	check(game.cookbook.recipe == "index" and game.cookbook.physical.visible, "Free reading opens physical book and index")
+	check(game.cookbook.recipe == "index" and game.cookbook.opened and not game.cookbook.physical.visible, "Readable overlay hides the local 3D book")
+	check(game.cookbook.physical.is_open, "Local reading still drives presence")
+	check(game.cookbook.left_grip.visible and game.cookbook.right_grip.visible, "UI hands hold the readable spread")
 	check(game.cookbook.overlay.visible, "Reading covers the screen so clicks stay in the book")
 	game.cookbook.select("wine")
+	check(game.cookbook.physical.page_sound.playing, "Page audio plays while the local mesh stays hidden")
 	check(game.session.capture_player().presentation.page == "wine", "Reading page enters network presence")
 	game.cookbook.close()
 	var station = game.service.by_id(1)
@@ -59,6 +68,21 @@ func run() -> void:
 	hidden.book.set_reading(true, "wine")
 	check(not hidden.book.shown() and not hidden.book.page_sound.playing, "Hidden avatar does not play page turns")
 	hidden.queue_free()
+	var reader := preload("res://scripts/cook_avatar.gd").new()
+	game.add_child(reader)
+	await process_frame
+	reader.perform({"position": [0.0, 0.0, 0.0], "yaw": 0.0, "pitch": -0.25, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
+	check(reader.book.visible, "Remote clone keeps a physical book")
+	check_reader_book(reader, reader.book, reader.head, "Clone")
+	var grip: Vector3 = reader.to_local(reader.book.cover_grip(-1))
+	check(grip.z < -0.15 and grip.y > 0.8, "Clone hands reach the lower cover edge")
+	reader.queue_free()
+	station.view.worker.show()
+	station.view.book.set_reading(true, "wine")
+	check_reader_book(station.view.worker, station.view.book, station.view.head, "Counter worker")
+	var worker_grip: Vector3 = station.view.worker.to_local(station.view.book.cover_grip(-1))
+	check(worker_grip.z > 0.15 and worker_grip.y > 0.8, "Worker hands reach the lower cover edge")
+	station.view.book.set_reading(false, "wine")
 	game.cookbook.toggle()
 	game.session.leave("test")
 	check(not game.cookbook.opened, "Disconnect hides the book")
