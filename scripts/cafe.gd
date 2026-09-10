@@ -253,6 +253,9 @@ func _physics_process(delta: float) -> void:
 	refresh_hud()
 	feedback.update(delta)
 	if cookbook.opened or menu.opened(): hud.recipe_panel.hide()
+	hud.bottom.visible = not cookbook.opened
+	hud.crosshair.visible = not cookbook.opened and not menu.opened()
+	if cookbook.opened: hud.prompt.text = ""
 
 func refresh_hud() -> void:
 	hud.clone_status.text = "%d станций · обслужено %d · выручка %d" % [service.stations.size(), service.served, service.revenue]

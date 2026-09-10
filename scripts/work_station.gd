@@ -96,7 +96,8 @@ func apply_single(command: Dictionary, delta: float) -> void:
 	var use_item: bool = command.get("use", false)
 	model.step(delta, use_item, not use_item, use_item)
 	if command.has("pose"):
-		var appearance: Dictionary = preload("res://scripts/cookbook_data.gd").presentation(command.pose.get("presentation", {}) if command.pose.get("presentation", {}) is Dictionary else {})
+		var raw = command.pose.get("presentation", {})
+		var appearance: Dictionary = preload("res://scripts/cookbook_data.gd").presentation(raw if raw is Dictionary else {})
 		model.presentation.book = appearance.book
 		model.presentation.page = appearance.page
 		model.actor_position = Vector3(command.pose.position[0], command.pose.position[1], command.pose.position[2])
@@ -192,7 +193,7 @@ func world_entry() -> Dictionary:
 func _build_bell() -> void:
 	bell = Node3D.new()
 	add_child(bell)
-		bell.position = Vector3(0.62, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
+	bell.position = Vector3(0.62, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
 	Props.cylinder(bell, 0.16, 0.035, Vector3.ZERO, Color("344c4c"))
 	bell_cap = Node3D.new()
 	bell.add_child(bell_cap)
@@ -212,8 +213,8 @@ func bell_hit(camera: Camera3D) -> bool:
 func ring(role: int) -> void:
 	if type_id == "counter": model.presentation.bell += 1
 	else:
-		var appearance: Dictionary = model.poses[role].get("presentation", {"book": false, "page": "index", "bell": 0}).duplicate()
-		if not appearance is Dictionary: appearance = {"book": false, "page": "index", "bell": 0}
+		var raw = model.poses[role].get("presentation", {"book": false, "page": "index", "bell": 0})
+		var appearance: Dictionary = raw.duplicate() if raw is Dictionary else {"book": false, "page": "index", "bell": 0}
 		appearance.bell = int(appearance.get("bell", 0)) + 1
 		model.poses[role].presentation = appearance
 	bell_flash = 0.35

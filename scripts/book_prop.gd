@@ -9,6 +9,7 @@ var current_page := ""
 var is_open := false
 var turn := 0.0
 var page_mesh: Node3D
+var first_person := false
 
 func _ready() -> void:
 	for side in [-1, 1]:
@@ -19,19 +20,19 @@ func _ready() -> void:
 	P.box(self, Vector3(0.046, 0.007, 0.22), Vector3(0.12, 0.062, 0.30), Color("e0b15a"))
 	P.box(self, Vector3(0.08, 0.004, 0.08), Vector3(-0.42, 0.058, -0.28), Color("d7a45a"))
 	title = P.text(self, "", Vector3(-0.25, 0.056, -0.18), 22, Color("213b3c"))
-	title.rotation.x = -PI / 2
+	title.rotation = Vector3(-PI / 2, PI, 0)
 	title.pixel_size = 0.00115
 	title.outline_size = 0
 	title.modulate = Color("213b3c")
 	notes = P.text(self, "", Vector3(0.25, 0.056, 0.16), 14, Color("35514c"))
-	notes.rotation.x = -PI / 2
+	notes.rotation = Vector3(-PI / 2, PI, 0)
 	notes.pixel_size = 0.00105
 	notes.outline_size = 0
 	notes.modulate = Color("35514c")
 	illustration = Sprite3D.new()
 	add_child(illustration)
 	illustration.position = Vector3(-0.25, 0.058, 0.12)
-	illustration.rotation.x = -PI / 2
+	illustration.rotation = Vector3(-PI / 2, PI, 0)
 	illustration.pixel_size = 0.0024
 	for i in range(5): P.box(self, Vector3(0.34 - (i % 2) * 0.04, 0.002, 0.006), Vector3(-0.25, 0.057, -0.02 + i * 0.04), Color("c4b48d"))
 	page_mesh = Node3D.new()
@@ -45,15 +46,18 @@ func _ready() -> void:
 	page_sound.volume_db = -12
 	hide()
 
-func pose_in_hands(first_person: bool) -> void:
+func pose_in_hands(first_person_held: bool) -> void:
+	first_person = first_person_held
 	if first_person:
-		position = Vector3(0.04, -0.26, -0.58)
-		rotation = Vector3(1.08, 0.06, 0.02)
-		scale = Vector3(0.92, 0.92, 0.92)
+		position = Vector3(0.0, -0.34, -0.70)
+		rotation = Vector3(1.12, 0.04, 0)
+		scale = Vector3(0.95, 0.95, 0.95)
 	else:
-		position = Vector3(0, 1.04, -0.46)
-		rotation = Vector3(-0.52, 0, 0)
-		scale = Vector3.ONE
+		position = Vector3(0, 1.08, -0.40)
+		rotation = Vector3(-0.58, 0, 0)
+		scale = Vector3(0.72, 0.72, 0.72)
+	title.visible = not first_person
+	notes.visible = not first_person
 
 func shown() -> bool:
 	if not is_inside_tree() or not visible: return false
@@ -74,8 +78,10 @@ func set_reading(open: bool, recipe := "index") -> void:
 	if not open or current_page == page: return
 	current_page = page
 	title.text = "ПОВАРСКАЯ\nКНИГА" if page == "index" else Data.Definition.DISHES.get(page, "РЕЦЕПТ")
+	title.visible = not first_person
 	illustration.texture = Data.ICONS.get(page, Data.ICONS.meal)
-	illustration.visible = page != "index"
+	illustration.visible = page != "index" and not first_person
+	notes.visible = not first_person
 	if page == "index":
 		notes.text = "Выбери блюдо.\nКнига говорит,\nчто должно\nполучиться."
 	else:
