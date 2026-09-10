@@ -51,6 +51,13 @@ func run() -> void:
 	station.refresh(1, 0.016)
 	check(station.zone_panels[0].visible and not station.zone_panels[1].visible, "Inactive zone visibly red")
 	check(station.walls[0].visible, "Training perimeter visible")
+	station.model.grab(1, "pot")
+	var initial: Dictionary = game.build_motion(station, 0)
+	for requested_height in [-1.0, 0.0, 0.5, 1.1]:
+		game.height = requested_height
+		var changed: Dictionary = game.build_motion(station, 0)
+		check(Vector2(changed.target[0], changed.target[1]).distance_to(Vector2(initial.target[0], initial.target[1])) < 0.00001, "Height change preserves horizontal position above floor and table")
+		check(changed.height == requested_height, "Height command still changes independently")
 	station.training.close()
 	game.bind_training()
 	check(not game.player.constrained, "Leaving lesson restores free movement")

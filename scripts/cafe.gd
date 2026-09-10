@@ -16,6 +16,8 @@ var bound_station := 0
 var bound_revision := -1
 var local_role := -1
 var grip := Vector3.FORWARD
+# The drag plane is anchored on pickup; lifting changes only item Y.
+var grip_plane_y := 1.015
 var height := 0.4
 var target := Vector2.ZERO
 var pan_tilt := Vector2.ZERO
@@ -136,7 +138,8 @@ func anchor(station: Node3D) -> void:
 	if item.is_empty(): return
 	target = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
 	height = station.model.elevations[item] if station.type_id == "counter" else station.model.heights[item]
-	var at := station.to_global(Vector3(target.x, 1.015 + height, target.y))
+	grip_plane_y = 1.015 + height
+	var at := station.to_global(Vector3(target.x, grip_plane_y, target.y))
 	grip = camera.global_basis.inverse() * (at - camera.global_position).normalized()
 
 func bind_training() -> void:
@@ -189,7 +192,7 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 		if not precise:
 			var origin: Vector3 = station.to_local(camera.global_position)
 			var ray: Vector3 = station.global_basis.inverse() * camera.global_basis * grip
-			var reach := maxf(origin.y - (1.015 + height), 0.01) / maxf(-ray.y, 0.08)
+			var reach := maxf(origin.y - grip_plane_y, 0.01) / maxf(-ray.y, 0.08)
 			var point := origin + ray * reach
 			target = Vector2(point.x, point.z)
 		command.target = [target.x, target.y]
