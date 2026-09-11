@@ -76,8 +76,8 @@ func run() -> void:
 	var origin: Vector3 = clone.global_position
 	var right: Vector3 = clone.global_transform.basis.x
 	var forward: Vector3 = -clone.global_transform.basis.z
-	look_at_point(game, origin - forward * 1.35 + right * 1.55 + Vector3(0, 1.58, 0), origin + Vector3(0, 1.12, 0) + forward * 0.15)
-	game.camera.fov = 48.0
+	look_at_point(game, origin - forward * 2.15 + right * 1.85 + Vector3(0, 1.52, 0), origin + Vector3(0, 1.05, 0) + forward * 0.12)
+	game.camera.fov = 50.0
 	await wait_frames(0.4)
 	await snap("clone_reading_1280")
 	clone.queue_free()

@@ -77,21 +77,29 @@ func _ready() -> void:
 
 func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 	first_person = first_person_held
-	for hand in hands: hand.visible = first_person
 	if first_person:
 		# Upright toward the camera with a slight reader tilt so the whole spread
 		# stays on screen at 1280x800 / 1920x1080 and the grip hands remain in frame.
 		position = Vector3(0, -0.10, -0.74)
 		rotation = Vector3(1.34, 0, 0)
 		scale = Vector3(0.82, 0.82, 0.82)
-		return
-	scale = Vector3.ONE
-	if look_negative_z:
+	elif look_negative_z:
+		scale = Vector3.ONE
 		position = Vector3(0, 1.18, -0.58)
 		rotation = Vector3(0.74, 0, 0)
 	else:
+		scale = Vector3.ONE
 		position = Vector3(0, 1.18, 0.58)
 		rotation = Vector3(0.74, PI, 0)
+	for i in range(hands.size()):
+		var side := -1.0 if i == 0 else 1.0
+		if first_person:
+			hands[i].position = Vector3(side * 0.58, 0.04, 0.06)
+			hands[i].rotation = Vector3(-0.15, -side * 0.45, side * 0.12)
+		else:
+			hands[i].position = Vector3(side * 0.64, 0.03, 0.38)
+			hands[i].rotation = Vector3(0.2, -side * 0.15, 0)
+		hands[i].visible = true
 
 func page_normal() -> Vector3:
 	return global_transform.basis.y.normalized()
@@ -131,7 +139,7 @@ func set_reading(open: bool, recipe := "index", model = null) -> void:
 	if open:
 		current_page = page
 		_paint()
-	for hand in hands: hand.visible = first_person and open
+	for hand in hands: hand.visible = open
 
 func _paint() -> void:
 	var model = live_model if current_page != "index" else null
