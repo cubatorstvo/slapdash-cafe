@@ -54,7 +54,7 @@ func _build_pan() -> void:
 	# Actual missing bottom tiles: the holes remain open in the rendered geometry.
 	for x in range(10):
 		for z in range(8):
-			var hole := (x in [2, 3] and z in [2, 3]) or (x in [6, 7] and z in [4, 5])
+			var hole := (x in [2, 3] and z in [4, 5]) or (x in [6, 7] and z in [2, 3])
 			if hole: continue
 			Props.box(pan, Vector3(0.151, 0.035, 0.151), Vector3(-0.675 + x * 0.15, -0.018, -0.525 + z * 0.15), Color("53656b"))
 	for x in [-0.77, 0.77]: Props.box(pan, Vector3(0.045, 0.07, 1.26), Vector3(x, 0.015, 0), Color("83928d"))
