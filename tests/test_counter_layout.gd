@@ -81,6 +81,16 @@ func run() -> void:
 		var center_distance: float = right.position.x - left.position.x
 		var physical_gap: float = center_distance - (left_width + right_width) / 2.0
 		assert(is_equal_approx(physical_gap, previous_physical_gap * 2.0), "physical table spacing should be doubled")
+	var legacy_save: Dictionary = game.service.save_data()
+	legacy_save.version = 2
+	legacy_save.served = 17
+	for entry in legacy_save.stations: entry.position = [0.0, 0.0, -1.4]
+	assert(game.service.load_data(legacy_save), "legacy v2 starter save should migrate")
+	assert(game.service.served == 17, "layout migration should preserve cafe progress")
+	var migrated_positions: Array = game.service.starter_layout_positions()
+	for index in range(game.service.stations.size()):
+		assert(game.service.stations[index].position.distance_to(migrated_positions[game.service.stations[index].station_id - 1]) < 0.0001, "legacy starter stations should move to current layout")
+	assert(game.service.save_data().version == 3, "migrated saves should write the current layout version")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()

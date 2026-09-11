@@ -2,6 +2,8 @@ extends Node3D
 const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Person = preload("res://scripts/customer_view.gd")
+const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
+const STARTER_ROW_CENTER_X := 3.0
 var stations: Array = []
 var customers: Array = []
 var next_station_id := 1
@@ -17,23 +19,27 @@ var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.randomize()
 
-func initial_stations() -> void:
-	const ROW_CENTER_X := 3.0
-	var types := ["counter", "counter", "counter", "kitchen"]
+func starter_layout_positions() -> Array:
 	var zone_widths: Array[float] = []
-	for type_id in types: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
+	for type_id in STARTER_TYPES: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
 	var zone_gaps: Array[float] = []
-	for index in range(types.size() - 1):
-		var left_width: float = Definition.TYPES[types[index]].width
-		var right_width: float = Definition.TYPES[types[index + 1]].width
+	for index in range(STARTER_TYPES.size() - 1):
+		var left_width: float = Definition.TYPES[STARTER_TYPES[index]].width
+		var right_width: float = Definition.TYPES[STARTER_TYPES[index + 1]].width
 		zone_gaps.append((left_width + right_width) / 2.0 * (Station.TRAINING_ZONE_SCALE - 1.0))
 	var row_width := 0.0
 	for width in zone_widths: row_width += width
 	for gap in zone_gaps: row_width += gap
-	var x := ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
-	for index in range(types.size()):
+	var positions: Array = []
+	var x := STARTER_ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
+	for index in range(STARTER_TYPES.size()):
 		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0 + zone_gaps[index - 1]
-		add_station(types[index], Vector3(x, 0, -1.4))
+		positions.append(Vector3(x, 0, -1.4))
+	return positions
+
+func initial_stations() -> void:
+	var positions := starter_layout_positions()
+	for index in range(STARTER_TYPES.size()): add_station(STARTER_TYPES[index], positions[index])
 
 func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
 	var station := Station.new()
@@ -178,7 +184,7 @@ func refresh_views(delta := 0.016) -> void:
 func save_data() -> Dictionary:
 	var entries: Array = []
 	for station in stations: entries.append(station.save_entry())
-	return {"format": "station-cafe", "version": 2, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
+	return {"format": "station-cafe", "version": 3, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
 func clear_world() -> void:
 	for station in stations:
@@ -191,8 +197,21 @@ func clear_world() -> void:
 	customers.clear()
 	next_station_id = 1
 
+func _legacy_starter_layout(entries: Array) -> bool:
+	if entries.size() != STARTER_TYPES.size(): return false
+	var types_by_id := {}
+	for entry in entries:
+		if not entry is Dictionary or not entry.get("id") is int: return false
+		types_by_id[entry.id] = entry.get("type", "")
+	for index in range(STARTER_TYPES.size()):
+		if types_by_id.get(index + 1, "") != STARTER_TYPES[index]: return false
+	return true
+
 func load_data(data: Dictionary) -> bool:
-	if data.get("format") != "station-cafe" or data.get("version") != 2 or not data.get("stations") is Array: return false
+	var version: int = int(data.get("version", 0))
+	if data.get("format") != "station-cafe" or not version in [2, 3] or not data.get("stations") is Array: return false
+	var migrate_starter_layout: bool = version == 2 and _legacy_starter_layout(data.stations)
+	var migrated_positions: Array = starter_layout_positions() if migrate_starter_layout else []
 	var ids: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES or not entry.get("id") is int or entry.id <= 0 or entry.id in ids: return false
@@ -214,7 +233,8 @@ func load_data(data: Dictionary) -> bool:
 						if track.is_empty() or track.frames.is_empty(): return false
 	clear_world()
 	for entry in data.stations:
-		var station := add_station(entry.type, Vector3(entry.position[0], entry.position[1], entry.position[2]), entry.id)
+		var point: Vector3 = migrated_positions[entry.id - 1] if migrate_starter_layout else Vector3(entry.position[0], entry.position[1], entry.position[2])
+		var station := add_station(entry.type, point, entry.id)
 		station.rotation.y = entry.yaw
 		station.crew = entry.crew.duplicate(true)
 		station.upgrades = entry.upgrades.duplicate(true)
