@@ -31,6 +31,7 @@ var flowing := false
 var squeezing := false
 var landing := Vector2.ZERO
 var elevations := {"jug": 0.0, "cup": 0.0, "rag": 0.0}
+var presentation := {"book": false, "page": "index", "bell": 0}
 var actor_position := Vector3(0, 0, 1.8)
 var actor_yaw := 0.0
 var actor_pitch := 0.0
@@ -54,6 +55,7 @@ func reset() -> void:
 	squeezing = false
 	landing = Vector2.ZERO
 	elevations = {"jug": 0.0, "cup": 0.0, "rag": 0.0}
+	presentation = {"book": false, "page": "index", "bell": 0}
 	actor_position = Vector3(0, 0, 1.8)
 	actor_yaw = 0.0
 	actor_pitch = 0.0
@@ -178,7 +180,7 @@ func spilled() -> float:
 	return total
 
 func snapshot() -> Dictionary:
-	return {"vessel_angles": {"jug": vessels.jug.angle, "cup": vessels.cup.angle}, "source": source, "jug": [jug.x, jug.y], "cup": [cup.x, cup.y], "rag": [rag.x, rag.y],
+	return {"presentation": presentation.duplicate(), "vessel_angles": {"jug": vessels.jug.angle, "cup": vessels.cup.angle}, "source": source, "jug": [jug.x, jug.y], "cup": [cup.x, cup.y], "rag": [rag.x, rag.y],
 		"tilt": tilt, "wine": wine, "filled": filled, "soaked": soaked,
 		"lost": lost, "squeezed_total": squeezed_total,
 		"puddles": puddles.duplicate(true), "held": held,
@@ -188,6 +190,7 @@ func snapshot() -> Dictionary:
 		"actor_yaw": actor_yaw, "actor_pitch": actor_pitch}
 
 func restore(data: Dictionary) -> void:
+	presentation = preload("res://scripts/cookbook_data.gd").presentation(data.get("presentation", {}))
 	for item in vessels: vessels[item].angle = float(data.vessel_angles[item])
 	source = data.source
 	jug = Vector2(data.jug[0], data.jug[1])

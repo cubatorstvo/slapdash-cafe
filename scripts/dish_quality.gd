@@ -30,5 +30,4 @@ static func text(report: Dictionary) -> String:
 		for line in component.lines: lines.append(str(line))
 		lines.append("")
 	lines.append("Качество блюда: " + report.grade)
-	lines.append("Эффектность: 0/3 · ×1.00")
 	return "\n".join(lines)

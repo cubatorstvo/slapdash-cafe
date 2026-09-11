@@ -1,8 +1,12 @@
 extends CanvasLayer
-## FPS overlay and explicit teaching selection.
+const CafeStyle = preload("res://scripts/cafe_theme.gd")
+const Data = preload("res://scripts/cookbook_data.gd")
 signal resume_requested
 var recipe_panel: PanelContainer
 var recipe_text: Label
+var recipe_content: VBoxContainer
+var recipe_scroll: ScrollContainer
+var recipe_stamp := ""
 var bottom: PanelContainer
 var goal: Label
 var clock: Label
@@ -14,119 +18,159 @@ var notice: Label
 var crosshair: Label
 var progress: ProgressBar
 var pause_panel: PanelContainer
+var toast: Label
+var toast_tween: Tween
 
 func _ready() -> void:
 	var root := Control.new()
 	add_child(root)
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var theme := Theme.new()
-	theme.default_font_size = 18
-	theme.set_color("font_color", "Label", Color("f5ead7"))
-	root.theme = theme
+	root.theme = CafeStyle.make()
 	var top := _panel(root)
 	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top.offset_left = 20
-	top.offset_right = -20
-	top.offset_top = 16
-	top.offset_bottom = 96
+	top.offset_left = 26
+	top.offset_right = -26
+	top.offset_top = 22
+	top.offset_bottom = 92
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 35)
 	top.add_child(row)
+	row.add_theme_constant_override("separation", 24)
 	var brand := VBoxContainer.new()
 	row.add_child(brand)
-	_label(brand, "SLAPDASH CAFE", 24, Color("f2c578"))
-	clone_status = _label(brand, "Клон ждёт показа", 16, Color("85cfb9"))
+	_label(brand,"SLAPDASH",22,CafeStyle.GOLD)
+	_label(brand,"C A F E",12,CafeStyle.MINT)
 	var order := VBoxContainer.new()
-	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(order)
-	goal = _label(order, "", 20)
+	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	goal = _label(order,"",20)
+	clone_status = _label(order,"",14,CafeStyle.MINT)
+	clock = _label(row,"",18,CafeStyle.GOLD)
 	progress = ProgressBar.new()
 	order.add_child(progress)
-	progress.max_value = 100
-	progress.show_percentage = false
-	progress.custom_minimum_size.y = 7
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = Color("ce6b78")
-	fill.set_corner_radius_all(4)
-	progress.add_theme_stylebox_override("fill", fill)
-	var timing := VBoxContainer.new()
-	row.add_child(timing)
-	clock = _label(timing, "", 21, Color("f2c578"))
-	_label(timing, "Время записанного исполнения", 14)
+	progress.hide()
 	recipe_panel = _panel(root)
 	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	recipe_panel.position = Vector2(20, 118)
-	recipe_text = _label(recipe_panel, "", 16)
+	recipe_panel.position = Vector2(26, 110)
+	recipe_panel.custom_minimum_size = Vector2(320, 0)
+	recipe_scroll = ScrollContainer.new()
+	recipe_panel.add_child(recipe_scroll)
+	recipe_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	recipe_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	recipe_scroll.custom_minimum_size = Vector2(300, 0)
+	recipe_content = VBoxContainer.new()
+	recipe_scroll.add_child(recipe_content)
+	recipe_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	recipe_content.add_theme_constant_override("separation", 8)
+	recipe_text = Label.new()
+	root.add_child(recipe_text)
+	recipe_text.hide()
 	recipe_panel.hide()
 	bottom = _panel(root)
 	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_left = 20
-	bottom.offset_right = -20
-	bottom.offset_top = -136
+	bottom.offset_left = 120
+	bottom.offset_right = -120
+	bottom.offset_top = -90
 	bottom.offset_bottom = -16
 	var column := VBoxContainer.new()
 	bottom.add_child(column)
-	column.add_theme_constant_override("separation", 6)
-	supplies = _label(column, "", 16)
-	controls = _label(column, "", 16)
-	notice = _label(column, "Подойди к рабочей станции и нажми E. Бригада уже на месте.", 16, Color("f2c578"))
-	notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	crosshair = _label(root, "·", 32, Color("ffffff"))
+	controls = _label(column,"",16)
+	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	supplies = _label(column,"",14,CafeStyle.MINT)
+	supplies.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	notice = _label(root,"",16,CafeStyle.GOLD)
+	notice.hide()
+	crosshair = _label(root,"·",32)
 	crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	crosshair.offset_left = -12
-	crosshair.offset_right = 12
+	crosshair.offset_left = -8
 	crosshair.offset_top = -22
-	crosshair.offset_bottom = 22
-	crosshair.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt = _label(root, "", 19, Color("ffe1a0"))
+	prompt = _label(root,"",17)
 	prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	prompt.offset_left = -430
-	prompt.offset_right = 430
-	prompt.offset_top = 34
-	prompt.offset_bottom = 94
+	prompt.offset_left = -410
+	prompt.offset_right = 410
+	prompt.offset_top = 42
+	prompt.offset_bottom = 80
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt.add_theme_constant_override("outline_size", 6)
-	prompt.add_theme_color_override("font_outline_color", Color("132b31"))
+	prompt.add_theme_constant_override("outline_size",5)
+	prompt.add_theme_color_override("font_outline_color",CafeStyle.INK)
+	toast = _label(root,"",24,CafeStyle.GOLD)
+	toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	toast.offset_left = -390
+	toast.offset_right = 390
+	toast.offset_top = -155
+	toast.offset_bottom = -112
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.add_theme_constant_override("outline_size",6)
+	toast.add_theme_color_override("font_outline_color",CafeStyle.INK)
+	toast.modulate.a = 0
 	pause_panel = _panel(root)
 	pause_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	pause_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	pause_panel.offset_left = -250
-	pause_panel.offset_right = 250
+	pause_panel.offset_left = -240
+	pause_panel.offset_right = 240
 	pause_panel.offset_top = -120
 	pause_panel.offset_bottom = 120
-	var pause_content := VBoxContainer.new()
-	pause_panel.add_child(pause_content)
-	pause_content.add_theme_constant_override("separation", 18)
-	_label(pause_content, "ПАУЗА", 28, Color("f2c578"))
-	_label(pause_content, "Кафе и обучение остановлены.\nEsc — вернуться в игру.", 18)
+	var pause := VBoxContainer.new()
+	pause_panel.add_child(pause)
+	pause.add_theme_constant_override("separation",20)
+	_label(pause,"Небольшой перерыв",26,CafeStyle.GOLD)
+	_label(pause,"Кофе подождёт.",18)
 	var resume := Button.new()
-	pause_content.add_child(resume)
-	resume.text = "Продолжить"
-	resume.custom_minimum_size.y = 45
+	pause.add_child(resume)
+	resume.text = "Вернуться в кафе"
 	resume.pressed.connect(func(): resume_requested.emit())
 	pause_panel.hide()
 
+func show_recipe(report: Dictionary, dish: String) -> void:
+	recipe_panel.show()
+	var stamp: String = JSON.stringify(report.components)+report.grade+dish
+	if stamp == recipe_stamp: return
+	recipe_stamp = stamp
+	for child in recipe_content.get_children(): recipe_content.remove_child(child); child.queue_free()
+	var heading := HBoxContainer.new()
+	recipe_content.add_child(heading)
+	var icon := TextureRect.new()
+	heading.add_child(icon)
+	icon.texture = Data.ICONS[dish]
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.custom_minimum_size = Vector2(42,42)
+	var name := _label(heading, Data.title(dish), 14, CafeStyle.GOLD)
+	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var grade := _label(heading, report.grade, 30, CafeStyle.MINT if report.grade in ["S","A"] else CafeStyle.GOLD)
+	grade.tooltip_text = "Качество поданной еды"
+	for component in report.components:
+		_label(recipe_content, ("✓  " if component.served else "○  ") + component.name, 18, CafeStyle.MINT if component.served else CafeStyle.CREAM)
+		for line in component.lines:
+			var detail := _label(recipe_content, str(line), 14, Color("c5d2c8"))
+			detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			detail.custom_minimum_size.x = 268
+		_label(recipe_content, "", 2)
+	recipe_scroll.custom_minimum_size.y = mini(recipe_content.get_combined_minimum_size().y + 8, 360)
+
+func show_toast(message: String) -> void:
+	if toast_tween != null: toast_tween.kill()
+	toast.text = message
+	toast.modulate.a = 1
+	toast_tween = create_tween()
+	toast_tween.tween_interval(1.5)
+	toast_tween.tween_property(toast,"modulate:a",0.0,0.5)
 
 func _panel(parent: Control) -> PanelContainer:
 	var panel := PanelContainer.new()
 	parent.add_child(panel)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.055, 0.12, 0.15, 0.93)
-	style.set_corner_radius_all(12)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	panel.add_theme_stylebox_override("panel", style)
+	var style := CafeStyle.box(Color(0.055,0.115,0.12,0.92),16,16)
+	style.border_color = Color(0.8,0.72,0.5,0.18)
+	style.set_border_width_all(1)
+	panel.add_theme_stylebox_override("panel",style)
 	return panel
 
-func _label(parent: Node, value: String, size: int, color := Color("e4e4d5")) -> Label:
+func _label(parent: Node, value: String, size: int, color := CafeStyle.CREAM) -> Label:
 	var label := Label.new()
 	label.text = value
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size",size)
+	label.add_theme_color_override("font_color",color)
 	parent.add_child(label)
 	return label

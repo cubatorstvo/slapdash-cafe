@@ -1,0 +1,41 @@
+=== ONLINE RUN 1 ===
+ONLINE_RUN_1 exit=0
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+PASS: late observer sees station sessions and cancelled live take
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-1
+ONLINE_RUN_1 exit=0
+
+=== ONLINE RUN 2 ===
+ONLINE_RUN_2 exit=0
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+PASS: late observer sees station sessions and cancelled live take
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-2
+ONLINE_RUN_2 exit=0
+
+=== ONLINE RUN 3 ===
+ONLINE_RUN_3 exit=0
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+PASS: late observer sees station sessions and cancelled live take
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-3
+ONLINE_RUN_3 exit=0
+
+=== ONLINE RUN 4 ===
+ONLINE_RUN_4 exit=0
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+PASS: late observer sees station sessions and cancelled live take
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-4
+ONLINE_RUN_4 exit=0
+
+=== ONLINE RUN 5 ===
+ONLINE_RUN_5 exit=0
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+PASS: late observer sees station sessions and cancelled live take
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-5
+ONLINE_RUN_5 exit=0
+
+ALL_ONLINE_OK=0

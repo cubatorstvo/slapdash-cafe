@@ -1,4 +1,5 @@
 extends CanvasLayer
+const CafeStyle = preload("res://scripts/cafe_theme.gd")
 signal command_requested(action: Dictionary)
 signal network_requested(action: String, address: String, port: int, player_name: String)
 signal steam_requested(action: String)
@@ -18,8 +19,13 @@ var port: SpinBox
 
 func _ready() -> void:
 	layer = 15
-	panel = _panel(730, 590)
-	training_box = _column(panel)
+	panel = _panel(760, 620)
+	var scroll := ScrollContainer.new()
+	panel.add_child(scroll)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	training_box = _column(scroll)
+	training_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.hide()
 	var box: VBoxContainer
 	net_panel = _panel(620, 650)
@@ -59,7 +65,8 @@ func _panel(width: float, height: float) -> PanelContainer:
 	result.offset_right = width / 2
 	result.offset_top = -height / 2
 	result.offset_bottom = height / 2
-	var style := StyleBoxFlat.new()
+	result.theme = CafeStyle.make()
+	var style := CafeStyle.box(Color("213b3c"), 20, 24)
 	style.bg_color = Color("203b43")
 	style.content_margin_left = 22
 	style.content_margin_right = 22
@@ -77,6 +84,8 @@ func _column(parent: Control) -> VBoxContainer:
 func _label(parent: Control, value: String, size := 17) -> Label:
 	var label := Label.new()
 	label.text = value
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.add_theme_font_size_override("font_size", size)
 	parent.add_child(label)
 	return label
@@ -84,7 +93,10 @@ func _label(parent: Control, value: String, size := 17) -> Label:
 func _button(parent: Control, value: String, callback: Callable) -> void:
 	var button := Button.new()
 	button.text = value
-	button.pressed.connect(callback)
+	button.custom_minimum_size.y = 42
+	button.pressed.connect(func():
+		if game != null and is_instance_valid(game.feedback): game.feedback.play_ui("click")
+		callback.call())
 	parent.add_child(button)
 
 func close() -> void:
@@ -115,14 +127,14 @@ func show_station(station: Node3D) -> void:
 		for dish in station.dishes(): recipe_choice.add_item(station.Definition.DISHES[dish])
 		summary_text = _label(training_box, "")
 		summary_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		summary_text.custom_minimum_size.y = 140
+		summary_text.custom_minimum_size = Vector2(680, 90)
 		recipe_choice.item_selected.connect(func(_i): describe(station))
 		describe(station)
 		_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
 	else:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()
-		_label(training_box, "Качество блюда: %s · эффектность 0/3 · ×1.00" % report.grade, 17)
+		_label(training_box, "Качество блюда: %s" % report.grade, 17)
 		if run.phase == "review":
 			var details := PackedStringArray()
 			for criterion in report.criteria: details.append(criterion.label)
@@ -134,20 +146,33 @@ func show_station(station: Node3D) -> void:
 			_label(training_box, "Показом управляет другой игрок.")
 		elif run.phase == "confirm_finish":
 			_button(training_box, "Продолжить готовку · положить на подачу", func(): send("resume"))
-			_button(training_box, "Завершить проход как есть", func(): send("confirm_finish"))
+			_button(training_box, "Подать как есть", func(): send("confirm_finish"))
 		elif run.phase == "review":
-			_label(training_box, "Проход: %.1f с. Рабочая запись пока сохранена." % (run.tick / 60.0))
-			_button(training_box, "Сохранить роли в черновик", func(): send("keep"))
-			_button(training_box, "Повторить этот проход", func(): send("retake"))
+			_label(training_box, "Показ: %.1f с." % (run.tick / 60.0))
+			_button(training_box, "Сохранить показ", func(): send("keep"))
+			_button(training_box, "Попробовать ещё раз", func(): send("retake"))
 		elif run.phase == "ready":
 			var lengths: Array = station.remote_summary.get("lengths", []) if game.session.is_guest() else run.summary().lengths
 			var groups: Array = station.remote_summary.get("groups", []) if game.session.is_guest() else run.summary().groups
 			for role in range(station.role_count()):
 				var seconds: float = lengths[role] / 60.0 if role < lengths.size() else 0
-				_label(training_box, "%s · %s" % [station.Definition.TYPES[station.type_id].roles[role], "запись %.1f с" % seconds if seconds > 0 else "ещё нет записи"], 16)
+				var row := HBoxContainer.new()
+				training_box.add_child(row)
+				row.add_theme_constant_override("separation", 10)
+				if seconds > 0:
+					var icon := TextureRect.new()
+					row.add_child(icon)
+					icon.texture = preload("res://assets/ui/record.svg")
+					icon.custom_minimum_size = Vector2(28, 28)
+					icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+					icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+					icon.tooltip_text = "● — бригада уже знает эту роль. Рядом — длительность рабочего показа в секундах."
+				var role_label := _label(row, "%s · %s" % [station.Definition.TYPES[station.type_id].roles[role], "запись %.1f с" % seconds if seconds > 0 else "ещё нет записи"], 16)
+				role_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				if seconds > 0: role_label.tooltip_text = "Сохранённый дубль этой роли. Замена связанной роли очистит связанный черновик."
 				var selector := OptionButton.new()
 				training_box.add_child(selector)
-				selector.add_item("Дубль / пустая зона", 0)
+				selector.add_item("Повар повторяет / роль пока пустая", 0)
 				selector.add_item("Я — записываю роль", game.session.local_id())
 				for id in game.session.members:
 					if id != game.session.local_id(): selector.add_item(str(game.session.members[id]), id)
@@ -159,19 +184,23 @@ func show_station(station: Node3D) -> void:
 			if groups.size() > 1 and groups[0] >= 0 and groups[0] == groups[1]:
 				var warning := _label(training_box, "Роли записаны вместе: замена одной очистит связанный черновик второй. Прежний рабочий рецепт останется до принятия нового.", 15)
 				warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			_button(training_box, "Записать выбранные роли", start_pass)
-			_button(training_box, "Принять всё блюдо и вернуться к заказам", func(): send("accept"))
+			_button(training_box, "Начать показ", start_pass)
+			_button(training_box, "Обучить бригаду · вернуться к заказам", func(): send("accept"))
 			var old_time: float = station.recipes.get(run.dish, {}).get("duration", 0)
 			_label(training_box, "Рабочая запись: %.1f с. Черновик: %.1f с." % [old_time, (lengths.max() / 60.0) if not lengths.is_empty() else 0.0], 15)
-		if run.lead == game.session.local_id(): _button(training_box, "Закончить обучение · рабочий рецепт сохранится", func(): send("cancel"))
+		if run.lead == game.session.local_id(): _button(training_box, "Закончить обучение", func(): send("cancel"))
 	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 func describe(station: Node3D) -> void:
 	var dish: String = station.dishes()[recipe_choice.selected]
-	summary_text.text = station.Definition.REQUIREMENTS[dish] + "\n\nВесь комплект станции доступен. Способ придумай сам."
-	if station.recipes.has(dish): summary_text.text += "\nЕсть рабочая запись: %.1f с." % station.recipes[dish].duration
+	summary_text.text = preload("res://scripts/cookbook_data.gd").summary(dish)
+	if station.recipes.has(dish):
+		summary_text.text += "\n\n●  %.1f с" % station.recipes[dish].duration
+		summary_text.tooltip_text = "● — бригада знает блюдо. Рядом указана длительность рабочего показа."
+	else:
+		summary_text.tooltip_text = "Рецепт и подсказки — в поварской книге (B)."
 	if station.state == "cooking": summary_text.text += "\nОбучение начнётся после текущего заказа."
 
 func send(action: String) -> void:

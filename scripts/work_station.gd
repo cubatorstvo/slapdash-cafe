@@ -6,6 +6,9 @@ const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const Props = preload("res://scripts/props.gd")
+var bell: Node3D
+var bell_cap: Node3D
+var bell_flash := 0.0
 var station_id := 1
 var type_id := "counter"
 var crew: Array = []
@@ -46,6 +49,7 @@ func _ready() -> void:
 	view.station_label.position = Vector3(0, 1.32, -1.1)
 	view.station_label.pixel_size = 0.005
 	view.station_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_build_bell()
 	training.setup(self)
 	for role in range(role_count()):
 		var student := Avatar.new()
@@ -92,6 +96,10 @@ func apply_single(command: Dictionary, delta: float) -> void:
 	var use_item: bool = command.get("use", false)
 	model.step(delta, use_item, not use_item, use_item)
 	if command.has("pose"):
+		var raw = command.pose.get("presentation", {})
+		var appearance: Dictionary = preload("res://scripts/cookbook_data.gd").presentation(raw if raw is Dictionary else {})
+		model.presentation.book = appearance.book
+		model.presentation.page = appearance.page
 		model.actor_position = Vector3(command.pose.position[0], command.pose.position[1], command.pose.position[2])
 		model.actor_yaw = command.pose.yaw
 		model.actor_pitch = command.pose.pitch
@@ -128,8 +136,9 @@ func finish_taster(accepted: bool) -> void:
 
 func refresh(local_peer: int, delta: float) -> void:
 	age += delta
+	bell_flash = maxf(0, bell_flash-delta)
+	bell_cap.position.y = -sin(bell_flash*45)*bell_flash*0.08
 	if is_instance_valid(taster) and type_id == "counter": taster.react(model.customer_reaction)
-	view.update_view(model, age, state != "cooking")
 	var active: bool = training.active()
 	view.station_label.visible = not active
 	var local_role: int = training.role_for(local_peer)
@@ -144,7 +153,6 @@ func refresh(local_peer: int, delta: float) -> void:
 	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
-		view._update_worker(model, age, state != "cooking")
 		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active
 		view.name_label.text = crew[0].name + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 	else:
@@ -152,6 +160,8 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(role_count()):
 			view.actors[role].visible = not active or (performing and not role in training.live_roles)
 			view.actors[role].caption.text = crew[role].name + (" · дубль" if active else "")
+	view.update_view(model, age, state != "cooking")
+	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
 		var student: Node3D = students[role]
 		student.visible = active and (role in training.live_roles or training.phase == "ready")
@@ -179,3 +189,61 @@ func world_entry() -> Dictionary:
 	data.model = model.snapshot()
 	data.training = training.summary()
 	return data
+
+func _build_bell() -> void:
+	bell = Node3D.new()
+	add_child(bell)
+	bell.position = Vector3(0.62, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
+	Props.cylinder(bell, 0.16, 0.035, Vector3.ZERO, Color("344c4c"))
+	bell_cap = Node3D.new()
+	bell.add_child(bell_cap)
+	var dome := Props.ball(bell_cap, 0.135, Vector3(0,0.055,0), Color("ddb77a"))
+	dome.scale.y = 0.65
+	dome.material_override.metallic = 0.8
+	dome.material_override.roughness = 0.25
+	Props.cylinder(bell_cap, 0.024, 0.05, Vector3(0,0.15,0), Color("f1d29a"))
+	Props.cylinder(bell_cap, 0.06, 0.015, Vector3(0,0.18,0), Color("e5c58c"))
+
+func bell_hit(camera: Camera3D) -> bool:
+	var origin := bell.to_local(camera.global_position)
+	var ray := bell.global_basis.inverse() * -camera.global_basis.z
+	var hit = AABB(Vector3(-0.2,-0.02,-0.2),Vector3(0.4,0.25,0.4)).intersects_ray(origin,ray)
+	return hit != null and origin.distance_to(hit) < 3.2
+
+func ring(role: int) -> void:
+	if type_id == "counter": model.presentation.bell += 1
+	else:
+		var raw = model.poses[role].get("presentation", {"book": false, "page": "index", "bell": 0})
+		var appearance: Dictionary = raw.duplicate() if raw is Dictionary else {"book": false, "page": "index", "bell": 0}
+		appearance.bell = int(appearance.get("bell", 0)) + 1
+		model.poses[role].presentation = appearance
+	bell_flash = 0.35
+	_stamp_bell(role)
+
+func _stamp_bell(role: int) -> void:
+	if training.phase != "recording" or role < 0 or training.pending_tracks.size() <= role: return
+	var track: Dictionary = training.pending_tracks[role]
+	if track.is_empty() or track.get("frames", []).is_empty(): return
+	if type_id == "counter":
+		track.frames.back()["presentation"] = model.presentation.duplicate(true)
+	elif track.frames.back() is Dictionary:
+		track.frames.back()["pose"] = model.poses[role].duplicate(true)
+
+func bell_count() -> int:
+	if type_id == "counter": return int(model.presentation.get("bell",0))
+	var count := 0
+	for pose in model.poses: count += int(pose.get("presentation",{}).get("bell",0))
+	return count
+
+func pulse_at(point: Vector3) -> void:
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = 0.16
+	mesh.outer_radius = 0.19
+	var pulse := Props.shape(self, mesh, point, Color("f5d48e"))
+	pulse.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	pulse.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(pulse,"scale",Vector3(2.8,1,2.8),0.55)
+	tween.tween_property(pulse,"position:y",point.y+0.15,0.55)
+	tween.tween_property(pulse.material_override,"albedo_color:a",0.0,0.55)
+	tween.chain().tween_callback(pulse.queue_free)

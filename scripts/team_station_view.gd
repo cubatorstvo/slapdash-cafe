@@ -109,6 +109,8 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 		var item: String = model.hands[role]
 		var target: Vector3 = Vector3.ZERO if item.is_empty() else items[item].position + Vector3(0, 0.12, 0)
 		actors[role].perform(model.poses[role], target, not item.is_empty())
+		var appearance: Dictionary = model.poses[role].get("presentation", {}) if model.poses[role].get("presentation", {}) is Dictionary else {}
+		actors[role].book.set_live(model if appearance.get("book", false) and str(appearance.get("page", "")) == "meal" else null)
 		streams[role].visible = model.pouring[role] and not item.is_empty()
 		if streams[role].visible:
 			streams[role].material_override.albedo_color = Color("a0d5e2") if item == "water" else (Color("fff5d8") if item in ["salt", "pasta_salt_tool"] else Color("edcf74"))

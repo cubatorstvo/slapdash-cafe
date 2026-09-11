@@ -1,0 +1,43 @@
+host exit=0:
+[S_API] SteamAPI_Init(): SteamAPI_IsSteamRunning() did not locate a running instance of Steam.
+dlopen failed trying to load:
+/home/ubuntu/.steam/sdk64/steamclient.so
+with error:
+/home/ubuntu/.steam/sdk64/steamclient.so: cannot open shared object file: No such file or directory
+[S_API] SteamAPI_Init(): Failed to load module '/home/ubuntu/.steam/sdk64/steamclient.so'
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+READY: late join
+ACK: kitchen-live from 1105431615
+CHECK: both live roles share zones
+CHECK: host held kitchen until observer ack
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
+
+guest exit=0:
+[S_API] SteamAPI_Init(): SteamAPI_IsSteamRunning() did not locate a running instance of Steam.
+dlopen failed trying to load:
+/home/ubuntu/.steam/sdk64/steamclient.so
+with error:
+/home/ubuntu/.steam/sdk64/steamclient.so: cannot open shared object file: No such file or directory
+[S_API] SteamAPI_Init(): Failed to load module '/home/ubuntu/.steam/sdk64/steamclient.so'
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+CHECK: guest book, bell, confirmation and resume replicated
+ACK: kitchen-live from 1105431615
+PASS: guest independent lesson, mixed participants, cross-zone access and local backup
+
+observer exit=0:
+[S_API] SteamAPI_Init(): SteamAPI_IsSteamRunning() did not locate a running instance of Steam.
+dlopen failed trying to load:
+/home/ubuntu/.steam/sdk64/steamclient.so
+with error:
+/home/ubuntu/.steam/sdk64/steamclient.so: cannot open shared object file: No such file or directory
+[S_API] SteamAPI_Init(): Failed to load module '/home/ubuntu/.steam/sdk64/steamclient.so'
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+CHECK: observer replicated kitchen recording with both roles
+ACK: kitchen-live from 1105431615
+PASS: late observer sees station sessions and cancelled live take
+
+CODES: host=0 guest=0 observer=0 logdir=/cursor/stores/bc-e9fe381d-b645-4c58-9d35-c67f64f6116b/artifacts/logs/online-run-4
+ONLINE_RUN_4 exit=0

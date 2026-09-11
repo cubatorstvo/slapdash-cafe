@@ -233,6 +233,7 @@ func matches_schema(value: Variant, schema: Variant) -> bool:
 	if schema is Dictionary:
 		if not value is Dictionary: return false
 		for key in schema:
+			if key == "presentation" and not value.has(key): continue
 			if not value.has(key) or not matches_schema(value[key], schema[key]): return false
 	elif schema is Array:
 		if not value is Array: return false

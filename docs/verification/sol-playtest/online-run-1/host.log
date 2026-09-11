@@ -1,0 +1,13 @@
+[S_API] SteamAPI_Init(): SteamAPI_IsSteamRunning() did not locate a running instance of Steam.
+dlopen failed trying to load:
+/home/ubuntu/.steam/sdk64/steamclient.so
+with error:
+/home/ubuntu/.steam/sdk64/steamclient.so: cannot open shared object file: No such file or directory
+[S_API] SteamAPI_Init(): Failed to load module '/home/ubuntu/.steam/sdk64/steamclient.so'
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+READY: late join
+CHECK: both live roles share zones
+ACK: kitchen-live from 1002805479
+CHECK: host held kitchen until observer ack
+PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup
