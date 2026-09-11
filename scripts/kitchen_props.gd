@@ -2,6 +2,10 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Model = preload("res://scripts/cooking_model.gd")
 var pick_distance := 3.6
+# Interaction bounds follow the visible pan: a close rectangular body plus a
+# separate narrow handle. The old single AABB covered empty space around both.
+const PAN_BODY_BOUNDS := AABB(Vector3(-0.80, -0.04, -0.65), Vector3(1.60, 0.10, 1.30))
+const PAN_HANDLE_BOUNDS := AABB(Vector3(-0.08, -0.02, 0.60), Vector3(0.16, 0.09, 0.44))
 var potato_nodes: Array = []
 var potato_bodies: Array = []
 var potato_patches: Array = []
@@ -147,19 +151,21 @@ func update_view(model) -> void:
 func pick_item(camera: Camera3D, dish: String) -> String:
 	var entries: Array = []
 	for i in range(3):
-		entries.append(["potato_%d" % i, potato_nodes[i], AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.40, 0.44))])
-		entries.append(["sausage_%d" % i, sausage_nodes[i], AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))])
-	entries.append(["pan", pan, AABB(Vector3(-0.80, -0.08, -0.65), Vector3(1.6, 0.25, 1.9))])
+		entries.append(["potato_%d" % i, potato_nodes[i], [AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.40, 0.44))]])
+		entries.append(["sausage_%d" % i, sausage_nodes[i], [AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))]])
+	entries.append(["pan", pan, [PAN_BODY_BOUNDS, PAN_HANDLE_BOUNDS]])
 	var selected := ""
 	var nearest := 3.6
 	for entry in entries:
 		var node: Node3D = entry[1]
-		var bounds: AABB = entry[2]
-		var hit = bounds.intersects_ray(node.to_local(camera.global_position), node.global_basis.inverse() * -camera.global_basis.z)
-		if hit == null: continue
-		var distance := camera.global_position.distance_to(node.to_global(hit))
-		if distance < nearest:
-			nearest = distance
-			selected = entry[0]
+		var origin := node.to_local(camera.global_position)
+		var direction := node.global_basis.inverse() * -camera.global_basis.z
+		for bounds in entry[2]:
+			var hit = bounds.intersects_ray(origin, direction)
+			if hit == null: continue
+			var distance := camera.global_position.distance_to(node.to_global(hit))
+			if distance < nearest:
+				nearest = distance
+				selected = entry[0]
 	pick_distance = nearest
 	return selected
