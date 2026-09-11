@@ -183,8 +183,12 @@ func world_entry() -> Dictionary:
 	data.erase("recipes")
 	data.erase("drafts")
 	data.known = recipes.keys()
+	data.order_dish = order_dish
 	data.recipe_times = {}
-	for key in recipes: data.recipe_times[key] = recipes[key].duration
+	data.recipe_quality = {}
+	for key in recipes:
+		data.recipe_times[key] = recipes[key].duration
+		data.recipe_quality[key] = recipes[key].get("quality", {})
 	data.state = state
 	data.model = model.snapshot()
 	data.training = training.summary()
