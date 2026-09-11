@@ -189,6 +189,16 @@ func run() -> void:
 	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
 	check(live_meal[1].lines[2] == "Перемешать [✓]", "Finished stirring uses the check mark")
 	kitchen.training.close()
+	game.service.request_training(kitchen, "meal", 1)
+	kitchen.training.start_pass([1, 2])
+	game.bind_training()
+	kitchen.model.pasta = 40
+	kitchen.model.pasta_salt = 1.2
+	kitchen.training.advance(1.0 / 60.0)
+	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
+	check(live_meal[1].lines[3] == "Порция — 100 г [40/100 г]", "Dual-role kitchen keeps pasta mass through a tick")
+	check(live_meal[1].lines[1] == "Соль [✓]", "Dual-role kitchen keeps pasta salt through a tick")
+	kitchen.training.close()
 	var wine_station = game.service.by_id(2)
 	game.service.request_training(wine_station, "wine", 1)
 	wine_station.training.start_pass([1])
