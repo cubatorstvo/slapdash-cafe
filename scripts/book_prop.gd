@@ -3,7 +3,7 @@ const P = preload("res://scripts/props.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
 const Page = preload("res://scripts/recipe_page.gd")
 const PAGE := Vector2(0.54, 0.76)
-const VIEW := Vector2i(560, 790)
+const VIEW := Vector2i(640, 900)
 signal chosen(page)
 var page_sound: AudioStreamPlayer3D
 var pages: Array = []
@@ -23,7 +23,6 @@ func _ready() -> void:
 		P.box(self, Vector3(0.60, 0.044, 0.84), Vector3(side * 0.31, -0.006, 0), Color("7a3d38"))
 		P.box(self, Vector3(0.56, 0.016, 0.78), Vector3(side * 0.305, 0.028, 0), Color("f3e6c8") if side < 0 else Color("f8efd6"))
 	P.box(self, Vector3(0.038, 0.07, 0.84), Vector3.ZERO, Color("5e322f"))
-	P.box(self, Vector3(0.05, 0.008, 0.24), Vector3(0.14, 0.068, 0.34), Color("e0b15a"))
 	for side in [-1, 1]:
 		var view := SubViewport.new()
 		add_child(view)
@@ -52,17 +51,18 @@ func _ready() -> void:
 		mat.albedo_texture = view.get_texture()
 		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
 		mat.cull_mode = BaseMaterial3D.CULL_BACK
+		mat.render_priority = 1
 		mesh.material_override = mat
 		pages.append(sheet)
 		views.append(view)
 		surfaces.append(mesh)
 		var hand := Node3D.new()
 		add_child(hand)
-		hand.position = Vector3(side * 0.64, 0.01, 0.38)
-		hand.rotation.y = -side * 0.18
-		P.box(hand, Vector3(0.13, 0.05, 0.16), Vector3(0, 0, 0), Color("e8b893"))
+		hand.position = Vector3(side * 0.62, 0.04, 0.08)
+		hand.rotation = Vector3(-0.2, -side * 0.55, side * 0.18)
+		P.box(hand, Vector3(0.11, 0.045, 0.14), Vector3(0, 0, 0), Color("e8b893"))
 		for i in range(4):
-			P.box(hand, Vector3(0.028, 0.028, 0.09), Vector3(side * (-0.04 + i * 0.03), 0.02, -0.11), Color("e0ad86"))
+			P.box(hand, Vector3(0.026, 0.026, 0.08), Vector3(side * (-0.035 + i * 0.028), 0.018, -0.10), Color("e0ad86"))
 		hands.append(hand)
 	page_mesh = Node3D.new()
 	add_child(page_mesh)
@@ -79,16 +79,18 @@ func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 	first_person = first_person_held
 	for hand in hands: hand.visible = first_person
 	if first_person:
-		position = Vector3(0, -0.34, -0.92)
-		rotation = Vector3(0.98, 0, 0)
+		# Upright toward the camera with a slight reader tilt so the whole spread
+		# stays on screen at 1280x800 / 1920x1080 and the grip hands remain in frame.
+		position = Vector3(0, -0.10, -0.74)
+		rotation = Vector3(1.34, 0, 0)
 		scale = Vector3(0.82, 0.82, 0.82)
 		return
 	scale = Vector3.ONE
 	if look_negative_z:
-		position = Vector3(0, 1.06, -0.58)
+		position = Vector3(0, 1.18, -0.58)
 		rotation = Vector3(0.74, 0, 0)
 	else:
-		position = Vector3(0, 1.06, 0.58)
+		position = Vector3(0, 1.18, 0.58)
 		rotation = Vector3(0.74, PI, 0)
 
 func page_normal() -> Vector3:

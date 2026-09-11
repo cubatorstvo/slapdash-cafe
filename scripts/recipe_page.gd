@@ -35,7 +35,7 @@ func _ready() -> void:
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.add_theme_font_size_override("font_size", 15)
 	note.add_theme_color_override("font_color", Color("5a6b62"))
-	note.custom_minimum_size.x = 460
+	note.custom_minimum_size.x = 520
 
 func show_page(page: String, model = null) -> void:
 	var key := "%s:%s" % [page, JSON.stringify(Data.components(page, model)) if page != "index" else "index"]
@@ -49,10 +49,10 @@ func show_page(page: String, model = null) -> void:
 func _left(page: String, _model) -> void:
 	_label("SLAPDASH / КУХОННЫЕ ЗАМЕТКИ", 13, Color("6d7f78"))
 	if page == "index":
-		_label("Поварская книга", 32)
+		_label("Поварская книга", 36)
 		_button("Закрыть", closed.emit)
 	else:
-		_label(Data.title(page), 28)
+		_label(Data.title(page), 32)
 		var art := TextureRect.new()
 		column.add_child(art)
 		art.texture = Data.ICONS[page]
@@ -88,7 +88,7 @@ func _right(page: String, model) -> void:
 			title.add_theme_font_size_override("font_size", 20)
 			title.add_theme_color_override("font_color", CafeStyle.INK)
 			for i in range(component.lines.size()):
-				var row := _label(component.lines[i], 17)
+				var row := _label(component.lines[i], 19)
 				row.mouse_filter = Control.MOUSE_FILTER_STOP
 				row.mouse_entered.connect(func(): note.text = component.details[i])
 				row.mouse_exited.connect(func(): if note.text == component.details[i]: note.text = "")
@@ -97,7 +97,7 @@ func _label(text: String, size := 18, color := CafeStyle.INK) -> Label:
 	var node := Label.new()
 	node.text = text
 	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	node.custom_minimum_size.x = 460
+	node.custom_minimum_size.x = 520
 	node.add_theme_font_size_override("font_size", size)
 	node.add_theme_color_override("font_color", color)
 	column.add_child(node)

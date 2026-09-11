@@ -59,13 +59,12 @@ func run() -> void:
 	kitchen.model.cooked = 0.0
 	kitchen.model.pasta = 40
 	game.cookbook.toggle()
-	await wait_frames(0.2)
+	await wait_frames(0.3)
 	await snap("book_live_meal_1280")
 	game.cookbook.close()
-	game.player.global_position = kitchen.to_global(Vector3(0.15, 0.02, 1.35))
-	game.player.rotation.y = kitchen.global_rotation.y
-	game.camera.rotation.x = -0.28
-	await wait_frames(0.15)
+	var bell_at: Vector3 = kitchen.bell.global_position
+	look_at_point(game, game.player.global_position + Vector3(0, 1.70, 0), bell_at)
+	await wait_frames(0.2)
 	await snap("bell_aim_1280")
 	kitchen.training.close()
 	game.bind_training()
@@ -73,12 +72,12 @@ func run() -> void:
 	game.service.hide()
 	var clone := preload("res://scripts/cook_avatar.gd").new()
 	game.add_child(clone)
-	clone.perform({"position": [6.4, 0.0, 3.6], "yaw": 0.4, "pitch": -0.28, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
+	clone.perform({"position": [6.4, 0.0, 3.6], "yaw": 0.2, "pitch": -0.28, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
 	var origin: Vector3 = clone.global_position
 	var right: Vector3 = clone.global_transform.basis.x
 	var forward: Vector3 = -clone.global_transform.basis.z
-	look_at_point(game, origin + Vector3(0, 1.55, 0) + right * 1.55 + forward * 1.35, origin + Vector3(0, 1.15, 0) + forward * 0.2)
-	game.camera.fov = 62.0
+	look_at_point(game, origin - forward * 1.35 + right * 1.55 + Vector3(0, 1.58, 0), origin + Vector3(0, 1.12, 0) + forward * 0.15)
+	game.camera.fov = 48.0
 	await wait_frames(0.4)
 	await snap("clone_reading_1280")
 	clone.queue_free()
