@@ -72,12 +72,15 @@ func run() -> void:
 	for index in range(game.service.stations.size() - 1):
 		var left = game.service.stations[index]
 		var right = game.service.stations[index + 1]
+		var left_width: float = game.service.Definition.TYPES[left.type_id].width
+		var right_width: float = game.service.Definition.TYPES[right.type_id].width
+		var previous_physical_gap: float = (left_width + right_width) / 2.0 * (left.TRAINING_ZONE_SCALE - 1.0)
 		var left_edge: float = left.position.x + left.training_zone_max().x
 		var right_edge: float = right.position.x + right.training_zone_min().x
-		assert(absf(left_edge - right_edge) < 0.0001, "adjacent station zones should meet without overlap")
+		assert(is_equal_approx(right_edge - left_edge, previous_physical_gap), "adjacent station zones should have a visible floor gap")
 		var center_distance: float = right.position.x - left.position.x
-		var minimum_physical_width: float = maxf(game.service.Definition.TYPES[left.type_id].width, game.service.Definition.TYPES[right.type_id].width)
-		assert(center_distance >= minimum_physical_width, "station centers should be separated by at least the wider station")
+		var physical_gap: float = center_distance - (left_width + right_width) / 2.0
+		assert(is_equal_approx(physical_gap, previous_physical_gap * 2.0), "physical table spacing should be doubled")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()

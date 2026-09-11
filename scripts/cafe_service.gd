@@ -22,11 +22,17 @@ func initial_stations() -> void:
 	var types := ["counter", "counter", "counter", "kitchen"]
 	var zone_widths: Array[float] = []
 	for type_id in types: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
+	var zone_gaps: Array[float] = []
+	for index in range(types.size() - 1):
+		var left_width: float = Definition.TYPES[types[index]].width
+		var right_width: float = Definition.TYPES[types[index + 1]].width
+		zone_gaps.append((left_width + right_width) / 2.0 * (Station.TRAINING_ZONE_SCALE - 1.0))
 	var row_width := 0.0
 	for width in zone_widths: row_width += width
+	for gap in zone_gaps: row_width += gap
 	var x := ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
 	for index in range(types.size()):
-		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0
+		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0 + zone_gaps[index - 1]
 		add_station(types[index], Vector3(x, 0, -1.4))
 
 func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
@@ -137,7 +143,7 @@ func spawn_customer(recipe := "") -> bool:
 	var person := Person.new()
 	person.color = [Color("ae7381"), Color("839fbb"), Color("c6a66b"), Color("91aa78")][next_customer_id % 4]
 	add_child(person)
-	person.position = Vector3(-9.4, 0, 1.65)
+	person.position = Vector3(-11.4, 0, 1.65)
 	person.caption.text = Definition.DISHES[recipe]
 	var destination: Vector3 = station.to_global(Vector3(0, 0, -1.85))
 	customers.append({"id": next_customer_id, "view": person, "station": station.station_id, "dish": recipe, "state": "walking", "wait": 0.0, "path": [destination]})
@@ -151,7 +157,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 		if customer.id != id or customer.state == "leaving": continue
 		customer.state = "leaving"
 		customer.view.caption.text = "Спасибо!" if accepted else "Загляну позже"
-		customer.path = [Vector3(15.4, 0, 1.65)]
+		customer.path = [Vector3(17.4, 0, 1.65)]
 		var station: Node3D = by_id(customer.station)
 		station.customer_id = -1
 		if not station.training.active(): station.state = "idle"

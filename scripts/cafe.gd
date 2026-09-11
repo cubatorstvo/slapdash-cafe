@@ -358,14 +358,14 @@ func _build_room() -> void:
 	sun.light_color = Color("fff4e2")
 	sun.light_energy = 0.75
 	sun.shadow_enabled = true
-	for x in range(-10, 16):
+	for x in range(-12, 18):
 		for z in range(-8, 11):
 			var color := Color("6c7c73") if (x + z) % 2 == 0 else Color("79887b")
 			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
-	Props.collision_box(self, Vector3(26, 0.2, 19), Vector3(3, -0.10, 1.5))
-	Props.solid_box(self, Vector3(26, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
-	Props.solid_box(self, Vector3(26, 4.7, 0.18), Vector3(3, 2.3, 10.6), Color("244c50"))
-	for x in [-9.8, 15.8]:
+	Props.collision_box(self, Vector3(30, 0.2, 19), Vector3(3, -0.10, 1.5))
+	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
+	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, 10.6), Color("244c50"))
+	for x in [-11.8, 17.8]:
 		Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
 	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
 	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
@@ -381,7 +381,7 @@ func _build_room() -> void:
 			leaf.scale = Vector3(0.8, 1.7, 0.8)
 	Props.box(self, Vector3(2.0, 0.018, 0.65), Vector3(0, 0.006, 7.1), Color("c09b63"))
 
-	for x in [-9.2, 15.2]:
+	for x in [-11.2, 17.2]:
 		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
