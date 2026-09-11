@@ -3,12 +3,13 @@ var failed := false
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok: failed = true; printerr("FAIL: ",message)
-func check_reader_book(body: Node3D, book: Node3D, head: Node3D, who: String) -> void:
-	var toward_head: Vector3 = (head.global_position - book.global_position).normalized()
-	check(book.page_normal().dot(toward_head) > 0.25, "%s pages face the reader" % who)
-	var away := book.global_position - body.global_position
-	away.y = 0.0
-	check(away.length() > 0.05 and book.page_top().dot(away.normalized()) > 0.2, "%s book top points away from the reader" % who)
+func check_reader_book(body: Node3D, book: Node3D, head: Node3D, look_negative_z: bool, who: String) -> void:
+	var local_forward := Vector3.FORWARD if look_negative_z else Vector3.BACK
+	var gaze: Vector3 = (body.global_basis * (head.basis * local_forward)).normalized()
+	var from_head: Vector3 = (book.global_position - head.global_position).normalized()
+	check(from_head.dot(gaze) > 0.98, "%s book center stays on the recorded gaze ray" % who)
+	check(book.page_normal().dot(-gaze) > 0.98, "%s pages stay perpendicular to and face the gaze ray" % who)
+	check(is_equal_approx(book.scale.x, book.THIRD_PERSON_SCALE), "%s uses the 1.2x third-person book scale" % who)
 func click_page(game, side: int, uv: Vector2) -> void:
 	var screen: Vector2 = game.cookbook.physical.page_to_screen(game.camera, side, uv)
 	var hit: Dictionary = game.cookbook.physical.hit_from_screen(game.camera, screen)
@@ -47,10 +48,16 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.camera.rotation.x = 0.52
+	var opening_gaze: Vector3 = -game.camera.global_basis.z
 	game.cookbook.toggle()
 	await process_frame
 	await process_frame
 	check(game.cookbook.recipe == "index" and game.cookbook.opened and game.cookbook.physical.visible, "Local reader sees the physical book")
+	var book_ray: Vector3 = (game.cookbook.physical.global_position - game.camera.global_position).normalized()
+	check(book_ray.dot(opening_gaze) > 0.999, "First-person book opens directly on the current gaze ray")
+	check(game.cookbook.physical.page_normal().dot(-opening_gaze) > 0.999, "First-person pages are perpendicular to and face the gaze ray")
+	check(is_equal_approx(game.cookbook.physical.scale.x, 0.82 * 1.2), "First-person book is exactly 1.2x larger")
 	check(game.cookbook.physical.is_open, "Local reading still drives presence")
 	check(game.cookbook.physical.hands[0].visible, "3D hands hold the cover edges")
 	check_plane_uv(game.cookbook.physical)
@@ -154,16 +161,22 @@ func run() -> void:
 	await process_frame
 	reader.perform({"position": [0.0, 0.0, 0.0], "yaw": 0.0, "pitch": -0.25, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
 	check(reader.book.visible, "Remote clone keeps a physical book")
-	check_reader_book(reader, reader.book, reader.head, "Clone")
+	check(is_equal_approx(reader.head.rotation.x, -0.25), "Clone keeps the recorded head pitch while reading")
+	check_reader_book(reader, reader.book, reader.head, true, "Clone")
 	var grip: Vector3 = reader.to_local(reader.book.cover_grip(-1))
 	check(grip.z < -0.15 and grip.y > 0.8, "Clone hands reach the lower cover edge")
 	reader.free()
 	station.view.worker.show()
-	station.view.book.set_reading(true, "wine")
-	check_reader_book(station.view.worker, station.view.book, station.view.head, "Counter worker")
+	station.model.actor_pitch = -0.48
+	station.model.presentation.book = true
+	station.model.presentation.page = "wine"
+	station.view._update_worker(station.model, 0.0, false)
+	check_reader_book(station.view.worker, station.view.book, station.view.head, false, "Counter worker")
+	check(is_equal_approx(station.view.head.rotation.x, 0.48), "Counter worker keeps the recorded head pitch while reading")
 	var worker_grip: Vector3 = station.view.worker.to_local(station.view.book.cover_grip(-1))
-	check(worker_grip.z > 0.15 and worker_grip.y > 0.8, "Worker hands reach the lower cover edge")
-	station.view.book.set_reading(false, "wine")
+	check(worker_grip.y > 0.7, "Worker hands reach the gaze-aligned lower cover edge")
+	station.model.presentation.book = false
+	station.view._update_worker(station.model, 0.0, false)
 	game.cookbook.toggle()
 	game.session.leave("test")
 	check(not game.cookbook.opened, "Disconnect hides the book")

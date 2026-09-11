@@ -4,6 +4,12 @@ const Data = preload("res://scripts/cookbook_data.gd")
 const Page = preload("res://scripts/recipe_page.gd")
 const PAGE := Vector2(0.54, 0.76)
 const VIEW := Vector2i(640, 900)
+const SIZE_MULTIPLIER := 1.2
+const FIRST_PERSON_SCALE := 0.82 * SIZE_MULTIPLIER
+const THIRD_PERSON_SCALE := SIZE_MULTIPLIER
+const FIRST_PERSON_DISTANCE := 0.74
+const THIRD_PERSON_DISTANCE := 0.68
+const READER_EYE_HEIGHT := 1.55
 signal chosen(page)
 var page_sound: AudioStreamPlayer3D
 var pages: Array = []
@@ -79,20 +85,7 @@ func _ready() -> void:
 
 func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 	first_person = first_person_held
-	if first_person:
-		# Upright toward the camera with a slight reader tilt so the whole spread
-		# stays on screen at 1280x800 / 1920x1080 and the grip hands remain in frame.
-		position = Vector3(0, -0.10, -0.74)
-		rotation = Vector3(1.34, 0, 0)
-		scale = Vector3(0.82, 0.82, 0.82)
-	elif look_negative_z:
-		scale = Vector3.ONE
-		position = Vector3(0, 1.18, -0.58)
-		rotation = Vector3(0.74, 0, 0)
-	else:
-		scale = Vector3.ONE
-		position = Vector3(0, 1.18, 0.58)
-		rotation = Vector3(0.74, PI, 0)
+	pose_for_gaze(0.0, look_negative_z)
 	for i in range(hands.size()):
 		var side := -1.0 if i == 0 else 1.0
 		if first_person:
@@ -102,6 +95,24 @@ func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 			hands[i].position = Vector3(side * 0.64, 0.03, 0.38)
 			hands[i].rotation = Vector3(0.2, -side * 0.15, 0)
 		hands[i].visible = true
+
+func pose_for_gaze(pitch: float, look_negative_z := true, eye_height := READER_EYE_HEIGHT) -> void:
+	# Pages face the reader and the spread is centered directly on the gaze ray.
+	# First-person pitch/yaw already live on the Camera3D parent, while avatars
+	# pass their recorded local head pitch here.
+	var forward_zero := Vector3.FORWARD if look_negative_z else Vector3.BACK
+	var gaze_basis := Basis(Vector3.RIGHT, pitch)
+	var forward := (gaze_basis * forward_zero).normalized()
+	var reader_up := (gaze_basis * Vector3.UP).normalized()
+	var page_normal := -forward
+	var page_z := -reader_up
+	var page_x := page_normal.cross(page_z).normalized()
+	var origin := Vector3.ZERO if first_person else Vector3(0, eye_height, 0)
+	var distance := FIRST_PERSON_DISTANCE if first_person else THIRD_PERSON_DISTANCE
+	position = origin + forward * distance
+	basis = Basis(page_x, page_normal, page_z)
+	var held_scale := FIRST_PERSON_SCALE if first_person else THIRD_PERSON_SCALE
+	scale = Vector3.ONE * held_scale
 
 func page_normal() -> Vector3:
 	return global_transform.basis.y.normalized()

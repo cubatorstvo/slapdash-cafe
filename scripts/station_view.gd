@@ -248,6 +248,7 @@ func _update_worker(model, time: float, resting: bool) -> void:
 	worker.position = model.actor_position
 	worker.rotation.y = model.actor_yaw + PI
 	head.rotation.x = -model.actor_pitch
+	book.pose_for_gaze(head.rotation.x, false, head.position.y)
 	book.set_reading(model.presentation.book, model.presentation.page)
 	book.set_live(model if model.presentation.book and model.presentation.page == model.dish else null)
 	var target: Vector3 = worker.position + worker.basis * Vector3(0, 1.05, 0.4)
@@ -262,7 +263,6 @@ func _update_worker(model, time: float, resting: bool) -> void:
 		"sausage": target = kitchen.sausage.position + Vector3(0, 0.1, 0)
 	if resting and model.held.is_empty(): target.y += sin(time * 2.0) * 0.02
 	if book.visible:
-		head.rotation.x = minf(head.rotation.x, -0.35)
 		left_hand.global_position = book.cover_grip(-1)
 		right_hand.global_position = book.cover_grip(1)
 	else:
