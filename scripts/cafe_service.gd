@@ -19,14 +19,15 @@ func _ready() -> void:
 
 func initial_stations() -> void:
 	const ROW_CENTER_X := 3.0
+	const STATION_GAP := 0.45
 	var types := ["counter", "counter", "counter", "kitchen"]
-	var zone_widths: Array[float] = []
-	for type_id in types: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
-	var row_width := 0.0
-	for width in zone_widths: row_width += width
-	var x := ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
+	var layout_widths: Array[float] = []
+	for type_id in types: layout_widths.append(float(Definition.TYPES[type_id].width))
+	var row_width := STATION_GAP * float(types.size() - 1)
+	for width in layout_widths: row_width += width
+	var x := ROW_CENTER_X - row_width / 2.0 + layout_widths[0] / 2.0
 	for index in range(types.size()):
-		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0
+		if index > 0: x += (layout_widths[index - 1] + layout_widths[index]) / 2.0 + STATION_GAP
 		add_station(types[index], Vector3(x, 0, -1.4))
 
 func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:

@@ -60,17 +60,18 @@ func run() -> void:
 	for i in range(5): await process_frame
 	var station = game.service.by_id(1)
 	var zone_size: Vector2 = station.training_zone_max() - station.training_zone_min()
-	assert(is_equal_approx(zone_size.x, station.Definition.TYPES.counter.width * 1.2), "training zone width should be 1.2x")
-	assert(is_equal_approx(zone_size.y, 5.2 * 1.2), "training zone depth should be 1.2x")
+	assert(is_equal_approx(zone_size.x, station.Definition.TYPES.counter.width * 1.1), "training zone width should be 1.1x")
+	assert(is_equal_approx(zone_size.y, 5.2 * 1.1), "training zone depth should be 1.1x")
 	assert(station.model.BOUNDS == Vector2(3.35, 2.65), "counter object movement bounds should remain unchanged")
 	var shelf = station.view.get_node("ProductShelf")
 	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
 	for index in range(game.service.stations.size() - 1):
 		var left = game.service.stations[index]
 		var right = game.service.stations[index + 1]
-		var left_edge: float = left.position.x + left.training_zone_max().x
-		var right_edge: float = right.position.x + right.training_zone_min().x
-		assert(absf(left_edge - right_edge) < 0.0001, "adjacent station zones should touch without overlap")
+		var visual_width_left: float = game.service.Definition.TYPES[left.type_id].width
+		var visual_width_right: float = game.service.Definition.TYPES[right.type_id].width
+		var gap: float = (right.position.x - left.position.x) - (visual_width_left + visual_width_right) / 2.0
+		assert(gap >= 0.4, "adjacent stations should leave a small readable visual gap")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()

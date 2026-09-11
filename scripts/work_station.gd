@@ -6,7 +6,7 @@ const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const Props = preload("res://scripts/props.gd")
-const TRAINING_ZONE_SCALE := 1.2
+const TRAINING_ZONE_SCALE := 1.1
 const TRAINING_ZONE_CENTER_Z := 0.30
 const TRAINING_ZONE_BASE_HALF_DEPTH := 2.60
 var bell: Node3D
