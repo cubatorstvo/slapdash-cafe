@@ -85,9 +85,11 @@ func build(production: bool) -> void:
 
 
 func _emit_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	# Godot front faces use clockwise winding; the perimeter below is counterclockwise.
+	st.set_smooth_group(-1)
 	st.add_vertex(a)
-	st.add_vertex(b)
 	st.add_vertex(c)
+	st.add_vertex(b)
 
 func _collision_prism(top_points: Array) -> void:
 	var points := PackedVector3Array()
@@ -431,4 +433,3 @@ func _build_storage_and_tray() -> void:
 	tray_liquid = Props.box(self, Vector3(layout.TRAY_HALF.x * 1.85, 0.008, layout.TRAY_HALF.y * 1.85), center + Vector3.UP * 0.008, WINE_COLOR)
 	var label := Props.text(self, "ПОДАЧА", center + Vector3(0, 0.012, layout.TRAY_HALF.y + 0.16), 16, Color("25464a"))
 	label.rotation.x = -PI / 2
-
