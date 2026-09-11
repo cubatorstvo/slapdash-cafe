@@ -60,8 +60,8 @@ func run() -> void:
 	for i in range(5): await process_frame
 	var station = game.service.by_id(1)
 	var zone_size: Vector2 = station.training_zone_max() - station.training_zone_min()
-	assert(is_equal_approx(zone_size.x, station.Definition.TYPES.counter.width * 1.1), "training zone width should be 1.1x")
-	assert(is_equal_approx(zone_size.y, 5.2 * 1.1), "training zone depth should be 1.1x")
+	assert(is_equal_approx(zone_size.x, station.SLOT_WIDTH), "every station should use the fixed slot width")
+	assert(is_equal_approx(zone_size.y, station.SLOT_DEPTH), "every station should use the fixed slot depth")
 	assert(station.model.BOUNDS == Vector2(3.35, 2.65), "counter object movement bounds should remain unchanged")
 	var shelf = station.view.get_node("ProductShelf")
 	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
@@ -69,28 +69,38 @@ func run() -> void:
 		assert(station.get_node_or_null(edge_name) != null, "training zone should show a visible floor outline on every side")
 	assert(is_equal_approx(station.get_node("ZoneEdgeLeft").position.x, station.training_zone_min().x), "left outline should match the logical station boundary")
 	assert(is_equal_approx(station.get_node("ZoneEdgeRight").position.x, station.training_zone_max().x), "right outline should match the logical station boundary")
+	for index in range(game.service.stations.size()):
+		var current = game.service.stations[index]
+		assert(current.slot_index == index, "starter station should occupy its fixed slot")
+		assert(current.station_id == index + 1, "runtime station id should be derived from the slot")
+		assert(current.position.distance_to(game.service.slot_position(index)) < 0.0001, "station position should be derived from its slot")
+		assert(is_equal_approx((current.training_zone_max() - current.training_zone_min()).x, station.SLOT_WIDTH), "all station types should use the same slot width")
 	for index in range(game.service.stations.size() - 1):
 		var left = game.service.stations[index]
 		var right = game.service.stations[index + 1]
-		var left_width: float = game.service.Definition.TYPES[left.type_id].width
-		var right_width: float = game.service.Definition.TYPES[right.type_id].width
-		var previous_physical_gap: float = (left_width + right_width) / 2.0 * (left.TRAINING_ZONE_SCALE - 1.0)
 		var left_edge: float = left.position.x + left.training_zone_max().x
 		var right_edge: float = right.position.x + right.training_zone_min().x
-		assert(is_equal_approx(right_edge - left_edge, previous_physical_gap), "adjacent station zones should have a visible floor gap")
-		var center_distance: float = right.position.x - left.position.x
-		var physical_gap: float = center_distance - (left_width + right_width) / 2.0
-		assert(is_equal_approx(physical_gap, previous_physical_gap * 2.0), "physical table spacing should be doubled")
-	var legacy_save: Dictionary = game.service.save_data()
-	legacy_save.version = 2
-	legacy_save.served = 17
-	for entry in legacy_save.stations: entry.position = [0.0, 0.0, -1.4]
-	assert(game.service.load_data(legacy_save), "legacy v2 starter save should migrate")
-	assert(game.service.served == 17, "layout migration should preserve cafe progress")
-	var migrated_positions: Array = game.service.starter_layout_positions()
+		assert(is_equal_approx(right_edge - left_edge, game.service.SLOT_GAP), "fixed station slots should keep the configured floor gap")
+		assert(is_equal_approx(right.position.x - left.position.x, station.SLOT_WIDTH + game.service.SLOT_GAP), "slot centers should be equally spaced")
+	var saved: Dictionary = game.service.save_data()
+	assert(saved.version == 4, "slot-based saves should use format v4")
+	for index in range(saved.stations.size()):
+		var entry: Dictionary = saved.stations[index]
+		assert(entry.slot == index, "save should identify station contents by slot")
+		assert(not entry.has("position") and not entry.has("yaw") and not entry.has("id"), "save should not persist station transforms or runtime ids")
+	var legacy: Dictionary = saved.duplicate(true)
+	legacy.version = 3
+	legacy.served = 17
+	for index in range(legacy.stations.size()):
+		legacy.stations[index].id = index + 1
+		legacy.stations[index].position = [100.0 + index, 0.0, 100.0]
+		legacy.stations[index].yaw = 0.0
+		legacy.stations[index].erase("slot")
+	assert(game.service.load_data(legacy), "legacy transform-based save should migrate into fixed slots")
+	assert(game.service.served == 17, "slot migration should preserve cafe progress")
 	for index in range(game.service.stations.size()):
-		assert(game.service.stations[index].position.distance_to(migrated_positions[game.service.stations[index].station_id - 1]) < 0.0001, "legacy starter stations should move to current layout")
-	assert(game.service.save_data().version == 3, "migrated saves should write the current layout version")
+		assert(game.service.stations[index].position.distance_to(game.service.slot_position(index)) < 0.0001, "legacy saved transforms should be ignored")
+	assert(game.service.save_data().version == 4, "migrated saves should write slot format v4")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()

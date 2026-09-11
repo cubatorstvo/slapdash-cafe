@@ -125,16 +125,17 @@ func run() -> void:
 	check(kitchen.training.active() and kitchen.pending_teacher == 0, "Pending lesson starts after order")
 	kitchen.training.close()
 
-	print("[6/7] Dynamic station IDs, save/load drafts and malformed data rejection")
-	var extra: Node3D = service.add_station("counter", Vector3(0, 0, 5), 17)
-	extra.recipes.wine = first_record.duplicate(true)
+	print("[6/7] Fixed station slots, save/load drafts and malformed data rejection")
 	var saved: Dictionary = bytes_to_var(var_to_bytes(service.save_data()))
+	check(saved.version == 4, "Station save uses slot format")
+	for entry in saved.stations:
+		check(entry.has("slot") and not entry.has("position") and not entry.has("yaw") and not entry.has("id"), "Slot save omits transforms and runtime IDs")
 	check(service.load_data(saved), "Station save loads")
-	check(service.stations.size() == 5 and service.by_id(17).recipes.wine == first_record, "ID not array index; independent recordings survive")
+	check(service.stations.size() == 4 and service.by_id(1).recipes.wine == first_record, "Independent recordings survive slot save")
 	check(service.by_id(4).drafts.has("meal"), "Confirmed partial role drafts survive save")
 	var damaged := saved.duplicate(true)
-	damaged.stations[1].id = damaged.stations[0].id
-	check(not service.load_data(damaged) and service.by_id(17) != null, "Reject duplicate ID without replacing world")
+	damaged.stations[1].slot = damaged.stations[0].slot
+	check(not service.load_data(damaged) and service.by_id(1) != null, "Reject duplicate slot without replacing world")
 	check(game.save_cafe(), "Atomic save to disk")
 
 	print("[7/7] UI ownership and restart revision")

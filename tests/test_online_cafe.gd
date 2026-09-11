@@ -20,7 +20,6 @@ func setup() -> void:
 	game.service.clear_world()
 	game.service.initial_stations()
 	game.service.revenue = 73 if role == "guest" else 0
-	if role == "host": game.service.add_station("counter", Vector3(0, 0, 5), 27)
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
 	game.session.add_child(barrier)
@@ -118,7 +117,7 @@ func host_tick() -> void:
 		stage = 5
 	elif stage == 5 and kitchen.training.phase == "idle" and game.session.members.size() < 3:
 		if not saw_parallel: fail("No concurrent sessions")
-		print("PASS: host simultaneous lessons, dynamic station, late join, shared live zones, disconnect cleanup")
+		print("PASS: host simultaneous lessons, fixed slots, late join, shared live zones, disconnect cleanup")
 		stage = 6
 		quit_at = timer + 2
 	elif stage == 6 and timer > quit_at:
@@ -137,7 +136,6 @@ func guest_tick() -> void:
 	var first = game.service.by_id(1)
 	var second = game.service.by_id(2)
 	var kitchen = game.service.by_id(4)
-	if game.service.by_id(27) == null: fail("Fifth station not replicated")
 	if first.model.potatoes.size() != 3 or first.model.sausages.size() != 3 or first.model.vessels.cup == null: fail("New stock and vessels not replicated")
 	if stage == 0 and first.training.phase == "recording":
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
@@ -179,7 +177,7 @@ func observer_tick() -> void:
 	if not game.session.synced: return
 	var kitchen = game.service.by_id(4)
 	if stage == 0:
-		if game.service.stations.size() != 5: fail("Late observer did not receive dynamic stations")
+		if game.service.stations.size() != 4: fail("Late observer did not receive all fixed station slots")
 		stage = 1
 	elif stage == 1 and kitchen.training.phase == "recording":
 		if kitchen.training.dish != "meal": fail("Observer kitchen dish %s" % kitchen.training.dish)

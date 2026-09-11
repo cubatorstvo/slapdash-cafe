@@ -6,14 +6,15 @@ const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const Props = preload("res://scripts/props.gd")
-const TRAINING_ZONE_SCALE := 1.1
+const SLOT_WIDTH := 6.6
+const SLOT_DEPTH := 5.72
 const TRAINING_ZONE_CENTER_Z := 0.30
-const TRAINING_ZONE_BASE_HALF_DEPTH := 2.60
 const TRAINING_ZONE_OUTLINE_THICKNESS := 0.04
 var bell: Node3D
 var bell_cap: Node3D
 var bell_flash := 0.0
 var station_id := 1
+var slot_index := 0
 var type_id := "counter"
 var crew: Array = []
 var upgrades: Array = []
@@ -45,12 +46,10 @@ func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
 
 func training_zone_min() -> Vector2:
-	var half_width: float = Definition.TYPES[type_id].width / 2.0 * TRAINING_ZONE_SCALE
-	return Vector2(-half_width, TRAINING_ZONE_CENTER_Z - TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
+	return Vector2(-SLOT_WIDTH / 2.0, TRAINING_ZONE_CENTER_Z - SLOT_DEPTH / 2.0)
 
 func training_zone_max() -> Vector2:
-	var half_width: float = Definition.TYPES[type_id].width / 2.0 * TRAINING_ZONE_SCALE
-	return Vector2(half_width, TRAINING_ZONE_CENTER_Z + TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
+	return Vector2(SLOT_WIDTH / 2.0, TRAINING_ZONE_CENTER_Z + SLOT_DEPTH / 2.0)
 
 func _ready() -> void:
 	if crew.is_empty(): crew = Definition.crew(type_id, station_id)
@@ -243,10 +242,11 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"id": station_id, "type": type_id, "crew": crew, "upgrades": upgrades, "position": [position.x, position.y, position.z], "yaw": rotation.y, "recipes": recipes, "drafts": drafts}
+	return {"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
+	data.id = station_id
 	data.erase("recipes")
 	data.erase("drafts")
 	data.known = recipes.keys()

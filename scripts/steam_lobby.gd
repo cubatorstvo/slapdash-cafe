@@ -2,7 +2,7 @@ extends Node
 ## Steam owns lobby membership and invitations; Session owns the shared cafe.
 const APP_ID := 480
 const GAME_KEY := "slapdash-cafe"
-const PROTOCOL := "slapdash-cafe-stations-8"
+const PROTOCOL := "slapdash-cafe-stations-9"
 const MAX_PLAYERS := 4
 var game: Node3D
 var api: Object

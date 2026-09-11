@@ -3,10 +3,12 @@ const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
-const STARTER_ROW_CENTER_X := 3.0
+const SLOT_COUNT := 4
+const SLOT_GAP := 0.6
+const SLOT_ROW_CENTER_X := 3.0
+const SLOT_Z := -1.4
 var stations: Array = []
 var customers: Array = []
-var next_station_id := 1
 var next_customer_id := 1
 var served := 0
 var missed := 0
@@ -19,34 +21,25 @@ var rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	rng.randomize()
 
+func slot_position(slot_index: int) -> Vector3:
+	var row_width := Station.SLOT_WIDTH * SLOT_COUNT + SLOT_GAP * (SLOT_COUNT - 1)
+	var first_center := SLOT_ROW_CENTER_X - row_width / 2.0 + Station.SLOT_WIDTH / 2.0
+	return Vector3(first_center + slot_index * (Station.SLOT_WIDTH + SLOT_GAP), 0, SLOT_Z)
+
 func starter_layout_positions() -> Array:
-	var zone_widths: Array[float] = []
-	for type_id in STARTER_TYPES: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
-	var zone_gaps: Array[float] = []
-	for index in range(STARTER_TYPES.size() - 1):
-		var left_width: float = Definition.TYPES[STARTER_TYPES[index]].width
-		var right_width: float = Definition.TYPES[STARTER_TYPES[index + 1]].width
-		zone_gaps.append((left_width + right_width) / 2.0 * (Station.TRAINING_ZONE_SCALE - 1.0))
-	var row_width := 0.0
-	for width in zone_widths: row_width += width
-	for gap in zone_gaps: row_width += gap
 	var positions: Array = []
-	var x := STARTER_ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
-	for index in range(STARTER_TYPES.size()):
-		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0 + zone_gaps[index - 1]
-		positions.append(Vector3(x, 0, -1.4))
+	for slot_index in range(SLOT_COUNT): positions.append(slot_position(slot_index))
 	return positions
 
 func initial_stations() -> void:
-	var positions := starter_layout_positions()
-	for index in range(STARTER_TYPES.size()): add_station(STARTER_TYPES[index], positions[index])
+	for slot_index in range(STARTER_TYPES.size()): add_station(STARTER_TYPES[slot_index], slot_index)
 
-func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
+func add_station(type_id: String, slot_index: int) -> Node3D:
 	var station := Station.new()
-	station.station_id = next_station_id if id == 0 else id
-	next_station_id = maxi(next_station_id, station.station_id + 1)
+	station.slot_index = slot_index
+	station.station_id = slot_index + 1
 	station.type_id = type_id
-	station.position = point
+	station.position = slot_position(slot_index)
 	station.rotation.y = PI
 	add_child(station)
 	stations.append(station)
@@ -184,7 +177,7 @@ func refresh_views(delta := 0.016) -> void:
 func save_data() -> Dictionary:
 	var entries: Array = []
 	for station in stations: entries.append(station.save_entry())
-	return {"format": "station-cafe", "version": 3, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
+	return {"format": "station-cafe", "version": 4, "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
 func clear_world() -> void:
 	for station in stations:
@@ -195,28 +188,20 @@ func clear_world() -> void:
 		customer.view.queue_free()
 	stations.clear()
 	customers.clear()
-	next_station_id = 1
 
-func _legacy_starter_layout(entries: Array) -> bool:
-	if entries.size() != STARTER_TYPES.size(): return false
-	var types_by_id := {}
-	for entry in entries:
-		if not entry is Dictionary or not entry.get("id") is int: return false
-		types_by_id[entry.id] = entry.get("type", "")
-	for index in range(STARTER_TYPES.size()):
-		if types_by_id.get(index + 1, "") != STARTER_TYPES[index]: return false
-	return true
+func _saved_slot(entry: Dictionary, version: int) -> int:
+	if version >= 4: return int(entry.get("slot", -1))
+	return int(entry.get("id", 0)) - 1
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3] or not data.get("stations") is Array: return false
-	var migrate_starter_layout: bool = version == 2 and _legacy_starter_layout(data.stations)
-	var migrated_positions: Array = starter_layout_positions() if migrate_starter_layout else []
-	var ids: Array = []
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4] or not data.get("stations") is Array: return false
+	var slots: Array = []
 	for entry in data.stations:
-		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES or not entry.get("id") is int or entry.id <= 0 or entry.id in ids: return false
-		ids.append(entry.id)
-		if not Station.TeamModel.numbers(entry.get("position"), 3) or not Station.TeamModel.finite(entry.get("yaw")): return false
+		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
+		var slot_index := _saved_slot(entry, version)
+		if slot_index < 0 or slot_index >= SLOT_COUNT or slot_index in slots: return false
+		slots.append(slot_index)
 		if not entry.get("crew") is Array or entry.crew.size() != Definition.TYPES[entry.type].roles.size(): return false
 		for member in entry.crew:
 			if not member is Dictionary or not member.get("name") is String: return false
@@ -233,9 +218,8 @@ func load_data(data: Dictionary) -> bool:
 						if track.is_empty() or track.frames.is_empty(): return false
 	clear_world()
 	for entry in data.stations:
-		var point: Vector3 = migrated_positions[entry.id - 1] if migrate_starter_layout else Vector3(entry.position[0], entry.position[1], entry.position[2])
-		var station := add_station(entry.type, point, entry.id)
-		station.rotation.y = entry.yaw
+		var slot_index := _saved_slot(entry, version)
+		var station := add_station(entry.type, slot_index)
 		station.crew = entry.crew.duplicate(true)
 		station.upgrades = entry.upgrades.duplicate(true)
 		station.recipes = entry.recipes.duplicate(true)

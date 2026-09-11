@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-8"
+const PROTOCOL := "slapdash-cafe-stations-9"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -341,8 +341,7 @@ func _world(packet: PackedByteArray) -> void:
 	for entry in data.stations:
 		ids.append(entry.id)
 		var station: Node3D = game.service.by_id(entry.id)
-		if station == null: station = game.service.add_station(entry.type, Vector3(entry.position[0], entry.position[1], entry.position[2]), entry.id)
-		station.rotation.y = entry.yaw
+		if station == null: station = game.service.add_station(entry.type, int(entry.slot))
 		station.crew = entry.crew
 		station.state = entry.state
 		station.order_dish = str(entry.get("order_dish", ""))
