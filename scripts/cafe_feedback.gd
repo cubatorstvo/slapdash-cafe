@@ -10,7 +10,7 @@ func play_ui(sound: String) -> void:
 	add_child(voice)
 	voice.stream = SOUNDS[sound]
 	voice.volume_db = -6
-	voice.finished.connect(voice.queue_free)
+	voice.finished.connect(func(): if is_instance_valid(voice): voice.stream = null; voice.queue_free())
 	voice.play()
 
 func voice_at(station: Node3D, sound: String) -> AudioStreamPlayer3D:
@@ -25,8 +25,25 @@ func voice_at(station: Node3D, sound: String) -> AudioStreamPlayer3D:
 
 func one_shot(station: Node3D, sound: String) -> void:
 	var voice := voice_at(station, sound)
-	voice.finished.connect(voice.queue_free)
+	voice.finished.connect(func(): if is_instance_valid(voice): voice.stream = null; voice.queue_free())
 	voice.play()
+
+func shutdown() -> void:
+	for loops in audio_nodes.values():
+		for voice in loops.values():
+			if not is_instance_valid(voice): continue
+			voice.stop()
+			voice.stream = null
+			voice.free()
+	audio_nodes.clear()
+	for child in get_children():
+		if child is AudioStreamPlayer or child is AudioStreamPlayer3D:
+			child.stop()
+			child.stream = null
+			child.free()
+
+func _exit_tree() -> void:
+	shutdown()
 
 func announce(station: Node3D, message: String, point: Vector3) -> void:
 	one_shot(station, "ready")

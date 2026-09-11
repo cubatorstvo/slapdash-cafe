@@ -1,46 +1,72 @@
 extends Node3D
 const P = preload("res://scripts/props.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
+const Page = preload("res://scripts/recipe_page.gd")
+const PAGE := Vector2(0.54, 0.76)
+const VIEW := Vector2i(560, 790)
+signal chosen(page)
 var page_sound: AudioStreamPlayer3D
-var title: Label3D
-var notes: Label3D
-var illustration: Sprite3D
-var current_page := ""
+var pages: Array = []
+var views: Array = []
+var surfaces: Array = []
+var hands: Array = []
+var current_page := "index"
 var is_open := false
 var turn := 0.0
 var page_mesh: Node3D
 var first_person := false
+var live_model = null
+var last_pointer := Vector2(-1, -1)
 
 func _ready() -> void:
 	for side in [-1, 1]:
-		P.box(self, Vector3(0.50, 0.038, 0.68), Vector3(side * 0.255, -0.004, 0), Color("7a3d38"))
-		P.box(self, Vector3(0.46, 0.030, 0.63), Vector3(side * 0.248, 0.034, 0), Color("f3e6c8") if side < 0 else Color("f8efd6"))
-		for i in range(5): P.box(self, Vector3(0.455, 0.002, 0.61), Vector3(side * 0.248, 0.012 + i * 0.004, 0), Color("d8c9a4"))
-	P.box(self, Vector3(0.032, 0.058, 0.68), Vector3.ZERO, Color("5e322f"))
-	P.box(self, Vector3(0.046, 0.007, 0.22), Vector3(0.12, 0.062, 0.30), Color("e0b15a"))
-	P.box(self, Vector3(0.08, 0.004, 0.08), Vector3(-0.42, 0.058, -0.28), Color("d7a45a"))
-	title = P.text(self, "", Vector3(-0.25, 0.056, -0.18), 26, Color("213b3c"))
-	title.rotation = Vector3(-PI / 2, 0, 0)
-	title.pixel_size = 0.0025
-	title.outline_size = 0
-	title.modulate = Color("213b3c")
-	title.double_sided = false
-	notes = P.text(self, "", Vector3(0.25, 0.056, 0.10), 18, Color("35514c"))
-	notes.rotation = Vector3(-PI / 2, 0, 0)
-	notes.pixel_size = 0.0020
-	notes.outline_size = 0
-	notes.modulate = Color("35514c")
-	notes.double_sided = false
-	illustration = Sprite3D.new()
-	add_child(illustration)
-	illustration.position = Vector3(-0.25, 0.058, 0.14)
-	illustration.rotation = Vector3(-PI / 2, 0, 0)
-	illustration.pixel_size = 0.0035
-	illustration.double_sided = false
-	for i in range(5): P.box(self, Vector3(0.34 - (i % 2) * 0.04, 0.002, 0.006), Vector3(-0.25, 0.057, -0.02 + i * 0.04), Color("c4b48d"))
+		P.box(self, Vector3(0.60, 0.044, 0.84), Vector3(side * 0.31, -0.006, 0), Color("7a3d38"))
+		P.box(self, Vector3(0.56, 0.016, 0.78), Vector3(side * 0.305, 0.028, 0), Color("f3e6c8") if side < 0 else Color("f8efd6"))
+	P.box(self, Vector3(0.038, 0.07, 0.84), Vector3.ZERO, Color("5e322f"))
+	P.box(self, Vector3(0.05, 0.008, 0.24), Vector3(0.14, 0.068, 0.34), Color("e0b15a"))
+	for side in [-1, 1]:
+		var view := SubViewport.new()
+		add_child(view)
+		view.size = VIEW
+		view.disable_3d = true
+		view.transparent_bg = false
+		view.handle_input_locally = true
+		view.gui_disable_input = false
+		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		var sheet := Page.new()
+		view.add_child(sheet)
+		sheet.name = "L" if side < 0 else "R"
+		sheet.anchor_right = 1
+		sheet.anchor_bottom = 1
+		sheet.chosen.connect(func(page): chosen.emit(page))
+		sheet.closed.connect(func(): chosen.emit("close"))
+		var mesh := MeshInstance3D.new()
+		add_child(mesh)
+		var plane := PlaneMesh.new()
+		plane.size = PAGE
+		plane.orientation = PlaneMesh.FACE_Y
+		mesh.mesh = plane
+		mesh.position = Vector3(side * 0.305, 0.046, 0)
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_texture = view.get_texture()
+		mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+		mat.cull_mode = BaseMaterial3D.CULL_BACK
+		mesh.material_override = mat
+		pages.append(sheet)
+		views.append(view)
+		surfaces.append(mesh)
+		var hand := Node3D.new()
+		add_child(hand)
+		hand.position = Vector3(side * 0.64, 0.01, 0.38)
+		hand.rotation.y = -side * 0.18
+		P.box(hand, Vector3(0.13, 0.05, 0.16), Vector3(0, 0, 0), Color("e8b893"))
+		for i in range(4):
+			P.box(hand, Vector3(0.028, 0.028, 0.09), Vector3(side * (-0.04 + i * 0.03), 0.02, -0.11), Color("e0ad86"))
+		hands.append(hand)
 	page_mesh = Node3D.new()
 	add_child(page_mesh)
-	P.box(page_mesh, Vector3(0.44, 0.004, 0.60), Vector3(0.22, 0.068, 0), Color("f7eed8"))
+	P.box(page_mesh, Vector3(0.52, 0.004, 0.72), Vector3(0.26, 0.08, 0), Color("f7eed8"))
 	page_sound = AudioStreamPlayer3D.new()
 	add_child(page_sound)
 	page_sound.stream = preload("res://assets/audio/page.wav")
@@ -51,19 +77,19 @@ func _ready() -> void:
 
 func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 	first_person = first_person_held
+	for hand in hands: hand.visible = first_person
 	if first_person:
-		position = Vector3.ZERO
-		rotation = Vector3.ZERO
-		scale = Vector3.ONE
+		position = Vector3(0, -0.34, -0.92)
+		rotation = Vector3(0.98, 0, 0)
+		scale = Vector3(0.82, 0.82, 0.82)
 		return
-	# Open spread in front of the reader: page face toward the face, top away from the chest.
-	scale = Vector3(0.70, 0.70, 0.70)
+	scale = Vector3.ONE
 	if look_negative_z:
-		position = Vector3(0, 1.12, -0.42)
-		rotation = Vector3(0.72, 0, 0)
+		position = Vector3(0, 1.06, -0.58)
+		rotation = Vector3(0.74, 0, 0)
 	else:
-		position = Vector3(0, 1.12, 0.42)
-		rotation = Vector3(0.72, PI, 0)
+		position = Vector3(0, 1.06, 0.58)
+		rotation = Vector3(0.74, PI, 0)
 
 func page_normal() -> Vector3:
 	return global_transform.basis.y.normalized()
@@ -72,7 +98,7 @@ func page_top() -> Vector3:
 	return (-global_transform.basis.z).normalized()
 
 func cover_grip(side: float) -> Vector3:
-	return to_global(Vector3(side * 0.50, 0.02, 0.32))
+	return to_global(Vector3(side * 0.64, 0.02, 0.40))
 
 func ancestors_shown() -> bool:
 	if not is_inside_tree(): return false
@@ -86,27 +112,85 @@ func ancestors_shown() -> bool:
 func shown() -> bool:
 	return visible and ancestors_shown()
 
-func set_reading(open: bool, recipe := "index") -> void:
+func set_live(model) -> void:
+	live_model = model
+	if is_open: _paint()
+
+func set_reading(open: bool, recipe := "index", model = null) -> void:
 	var page := Data.page(recipe) if open else current_page
 	var turned: bool = open != is_open or (open and current_page != page)
 	is_open = open
-	visible = open and not first_person
-	if turned and ancestors_shown(): page_sound.play()
-	if open and turned: turn = 0.28
-	if not open or current_page == page: return
-	current_page = page
-	title.text = "ПОВАРСКАЯ\nКНИГА" if page == "index" else Data.Definition.DISHES.get(page, "РЕЦЕПТ")
-	illustration.texture = Data.ICONS.get(page, Data.ICONS.meal)
-	illustration.visible = page != "index"
-	if page == "index":
-		notes.text = "Выбери блюдо.\nКнига говорит,\nчто должно\nполучиться."
-	else:
-		var lines := PackedStringArray()
-		for note in Data.NOTES.get(page, []):
-			lines.append("• " + str(note[0]))
-		notes.text = "\n".join(lines)
+	visible = open
+	if model != null or not open: live_model = model
+	for view in views:
+		view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if open else SubViewport.UPDATE_DISABLED
+	if turned and open and ancestors_shown(): page_sound.play()
+	if open and turned: turn = 0.22
+	if open:
+		current_page = page
+		_paint()
+	for hand in hands: hand.visible = first_person and open
+
+func _paint() -> void:
+	var model = live_model if current_page != "index" else null
+	pages[0].show_page(current_page, model)
+	pages[1].show_page(current_page, model)
+
+func page_to_world(side: int, uv: Vector2) -> Vector3:
+	var local := Vector3((uv.x - 0.5) * PAGE.x, 0, (0.5 - uv.y) * PAGE.y)
+	return surfaces[side].to_global(local)
+
+func page_to_screen(camera: Camera3D, side: int, uv: Vector2) -> Vector2:
+	return camera.unproject_position(page_to_world(side, uv))
+
+func hit_from_screen(camera: Camera3D, screen: Vector2) -> Dictionary:
+	if not visible: return {}
+	var origin := camera.project_ray_origin(screen)
+	var ray := camera.project_ray_normal(screen)
+	var best := {}
+	var nearest := 8.0
+	for i in range(surfaces.size()):
+		var mesh: MeshInstance3D = surfaces[i]
+		var n: Vector3 = mesh.global_transform.basis.y.normalized()
+		var denom := n.dot(ray)
+		if absf(denom) < 0.02: continue
+		var point: Vector3 = mesh.global_position
+		var t: float = (point - origin).dot(n) / denom
+		if t < 0.04 or t > nearest: continue
+		var hit: Vector3 = origin + ray * t
+		var local: Vector3 = mesh.global_transform.affine_inverse() * hit
+		var uv := Vector2(local.x / PAGE.x + 0.5, 0.5 - local.z / PAGE.y)
+		if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0: continue
+		nearest = t
+		best = {"side": i, "uv": uv, "viewport": Vector2(uv.x * VIEW.x, uv.y * VIEW.y)}
+	return best
+
+func feed_pointer(event: InputEvent, hit: Dictionary) -> void:
+	if hit.is_empty(): return
+	var local := event.duplicate()
+	if local is InputEventMouse:
+		local.position = hit.viewport
+		if local is InputEventMouseButton: local.global_position = local.position
+	views[hit.side].push_input(local, true)
+	last_pointer = hit.viewport
 
 func _process(delta: float) -> void:
 	turn = maxf(0, turn - delta)
 	page_mesh.visible = turn > 0 and visible
-	page_mesh.rotation.z = sin((1 - turn / 0.28) * PI) * 2.7
+	page_mesh.rotation.z = sin((1 - turn / 0.22) * PI) * 2.4
+
+func shutdown() -> void:
+	if page_sound:
+		page_sound.stop()
+		page_sound.stream = null
+	for i in range(surfaces.size()):
+		var mesh: MeshInstance3D = surfaces[i]
+		if is_instance_valid(mesh) and mesh.material_override:
+			mesh.material_override.albedo_texture = null
+	for view in views:
+		if not is_instance_valid(view): continue
+		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		view.size = Vector2i(2, 2)
+
+func _exit_tree() -> void:
+	shutdown()

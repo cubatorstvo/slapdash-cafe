@@ -9,19 +9,40 @@ func check_reader_book(body: Node3D, book: Node3D, head: Node3D, who: String) ->
 	var away := book.global_position - body.global_position
 	away.y = 0.0
 	check(away.length() > 0.05 and book.page_top().dot(away.normalized()) > 0.2, "%s book top points away from the reader" % who)
+func click_page(game, side: int, uv: Vector2) -> void:
+	var screen: Vector2 = game.cookbook.physical.page_to_screen(game.camera, side, uv)
+	var down := InputEventMouseButton.new()
+	down.pressed = true
+	down.button_index = MOUSE_BUTTON_LEFT
+	down.position = screen
+	game.cookbook._input(down)
+	var up := down.duplicate()
+	up.pressed = false
+	game.cookbook._input(up)
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
 	game.cookbook.toggle()
-	check(game.cookbook.recipe == "index" and game.cookbook.opened and not game.cookbook.physical.visible, "Readable overlay hides the local 3D book")
+	await process_frame
+	await process_frame
+	check(game.cookbook.recipe == "index" and game.cookbook.opened and game.cookbook.physical.visible, "Local reader sees the physical book")
 	check(game.cookbook.physical.is_open, "Local reading still drives presence")
-	check(game.cookbook.left_grip.visible and game.cookbook.right_grip.visible, "UI hands hold the readable spread")
-	check(game.cookbook.overlay.visible, "Reading covers the screen so clicks stay in the book")
-	game.cookbook.select("wine")
-	check(game.cookbook.physical.page_sound.playing, "Page audio plays while the local mesh stays hidden")
+	check(game.cookbook.physical.hands[0].visible, "3D hands hold the cover edges")
+	var wine: Control = null
+	for child in game.cookbook.physical.pages[1].column.get_children():
+		if child is Button and str(child.text).contains("вина"): wine = child; break
+	check(wine != null, "Index lists recipes as one-click links")
+	if wine:
+		var uv: Vector2 = wine.get_global_rect().get_center() / Vector2(game.cookbook.physical.VIEW)
+		click_page(game, 1, uv)
+		await process_frame
+	check(game.cookbook.recipe == "wine", "Screen-space ray opens a recipe on the page")
+	check(game.cookbook.physical.page_sound.playing, "Page audio plays on the held book")
 	check(game.session.capture_player().presentation.page == "wine", "Reading page enters network presence")
+	var meal_lines: Array = preload("res://scripts/cookbook_data.gd").components("meal")
+	check(meal_lines.size() == 2 and meal_lines[0].lines[0] == "Обжарить с 2 сторон" and meal_lines[1].lines[3] == "Порция — 100 г", "Static recipe labels match the live card")
 	game.cookbook.close()
 	var station = game.service.by_id(1)
 	game.service.request_training(station,"potato",1)
@@ -67,7 +88,7 @@ func run() -> void:
 	hidden.hide()
 	hidden.book.set_reading(true, "wine")
 	check(not hidden.book.shown() and not hidden.book.page_sound.playing, "Hidden avatar does not play page turns")
-	hidden.queue_free()
+	hidden.free()
 	var reader := preload("res://scripts/cook_avatar.gd").new()
 	game.add_child(reader)
 	await process_frame
@@ -76,7 +97,7 @@ func run() -> void:
 	check_reader_book(reader, reader.book, reader.head, "Clone")
 	var grip: Vector3 = reader.to_local(reader.book.cover_grip(-1))
 	check(grip.z < -0.15 and grip.y > 0.8, "Clone hands reach the lower cover edge")
-	reader.queue_free()
+	reader.free()
 	station.view.worker.show()
 	station.view.book.set_reading(true, "wine")
 	check_reader_book(station.view.worker, station.view.book, station.view.head, "Counter worker")
@@ -98,6 +119,9 @@ func run() -> void:
 	kitchen.model.meat_sides = [0.999, 0.2]
 	game.feedback.update(0)
 	check(game.feedback.latches[kitchen.station_id].sides == 1, "Near-threshold steak sides do not chime again")
+	var live_meal: Array = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
+	check(live_meal[0].lines[0].contains("100%") and live_meal[0].lines[0].contains("0%"), "Live steak sides use the same labels")
+	check(live_meal[1].lines[0].begins_with("Сварить"), "Live pasta cooking keeps the static label")
 	kitchen.training.close()
 	var wine_station = game.service.by_id(2)
 	game.service.request_training(wine_station, "wine", 1)
@@ -116,7 +140,6 @@ func run() -> void:
 	wine_station.model.filled = 180
 	game.feedback.update(0)
 	check(not game.feedback.latches[2].wine, "Leaving the wine window allows a later announcement")
-	game.queue_free()
-	await process_frame
+	game.free()
 	print("PASS: cookbook, recording compatibility, presence and bell" if not failed else "FAILED")
 	quit(1 if failed else 0)

@@ -21,14 +21,20 @@ func setup() -> void:
 	if role == "host": game.service.add_station("counter", Vector3(0, 0, 5), 27)
 	game.session.configure("host" if role == "host" else "join", "127.0.0.1", 27843, role)
 	started = Time.get_ticks_msec()
-func fail(message: String) -> void:
-	printerr("FAIL: ", role, " ", message)
-	if is_instance_valid(game): game.free(); game = null
-	quit(1)
 func succeed(message: String) -> void:
 	print(message)
-	if is_instance_valid(game): game.free(); game = null
+	if is_instance_valid(game):
+		game._shutdown_tree(game)
+		game.free()
+		game = null
 	quit(0)
+func fail(message: String) -> void:
+	printerr("FAIL: ", role, " ", message)
+	if is_instance_valid(game):
+		game._shutdown_tree(game)
+		game.free()
+		game = null
+	quit(1)
 func act(action: String, station: int, extra := {}) -> void:
 	var value := {"action": action, "station": station}
 	value.merge(extra)
@@ -86,7 +92,10 @@ func host_tick() -> void:
 		quit_at = timer + 2
 	elif stage == 5 and timer > quit_at:
 		game.session.leave("")
-		if is_instance_valid(game): game.free(); game = null
+		if is_instance_valid(game):
+			game._shutdown_tree(game)
+			game.free()
+			game = null
 		quit(0)
 func guest_tick() -> void:
 	if stage == 6:
@@ -146,5 +155,8 @@ func observer_tick() -> void:
 	elif stage == 2 and kitchen.training.phase == "idle":
 		print("PASS: late observer sees station sessions and cancelled live take")
 		game.session.leave("")
-		if is_instance_valid(game): game.free(); game = null
+		if is_instance_valid(game):
+			game._shutdown_tree(game)
+			game.free()
+			game = null
 		quit(0)

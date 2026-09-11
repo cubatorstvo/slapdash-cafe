@@ -183,10 +183,7 @@ func quality() -> Dictionary:
 		{"label": "Порция сварена: %.0f%%" % (served_cooked * 100), "value": served_cooked if pasta_on else 0},
 		{"label": "Порция перемешана: %.0f%%" % (served_stirred * 100), "value": served_stirred if pasta_on else 0},
 		{"label": "Соль макарон ≥1 г: " + ("✓" if pasta_on and served_salt >= 1 else "×"), "value": minf(1, served_salt) if pasta_on else 0}
-	], meat_on or pasta_on, ["Стейк: 2 стороны 100% · соль ≥1 г", "Макароны: ≥100 г · сварить · перемешать", "Варить в ≥500 мл воды · соль ≥1 г", "В работе мясо: %.0f%% / %.0f%%" % [float(meat_sides[0]) * 100, float(meat_sides[1]) * 100], "Кастрюля: %.0f мл · %.0f г · варка %.0f%%" % [water, pasta, cooked * 100]]), [
-		{"name": "Стейк", "role": 0, "served": meat_on, "lines": ["Обжарка: %.0f%% / %.0f%% · нужно 100%% с двух сторон" % [float(meat_sides[0]) * 100, float(meat_sides[1]) * 100], "Соль ≥1 г: " + ("✓" if meat_salt >= 1 else "×")]},
-		{"name": "Макароны", "role": 1, "served": pasta_on, "lines": ["Порция: %.0f / 100 г" % (served_pasta if pasta_on else pasta), "Готовность: %.0f%% · перемешано %.0f%%" % [(served_cooked if pasta_on else cooked) * 100, (served_stirred if pasta_on else stirred) * 100], "Соль ≥1 г: " + ("✓" if (served_salt if pasta_on else pasta_salt) >= 1 else "×"), "Вода для варки: %.0f / 500 мл" % water]}
-	])
+	], meat_on or pasta_on, []), preload("res://scripts/cookbook_data.gd").components("meal", self))
 
 static func surface_at(point: Vector2) -> float:
 	return BASE_Y if absf(point.x) <= 3.05 and absf(point.y) <= 1.125 else 0.015

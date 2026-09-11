@@ -76,8 +76,11 @@ func leave(message: String) -> void:
 	synced = false
 	transport = "offline"
 	connection_deadline = 0
-	for actor in player_avatars.values(): actor.queue_free()
-	for actor in remote_customers.values(): actor.queue_free()
+	for actor in player_avatars.values():
+		if is_instance_valid(actor) and actor.book: actor.book.shutdown()
+		if is_instance_valid(actor): actor.free()
+	for actor in remote_customers.values():
+		if is_instance_valid(actor): actor.free()
 	player_avatars.clear()
 	remote_customers.clear()
 	player_poses.clear()
@@ -88,6 +91,7 @@ func leave(message: String) -> void:
 	if was_guest and not local_backup.is_empty(): game.service.load_data(local_backup)
 	local_backup.clear()
 	if game != null:
+		if is_instance_valid(game.feedback): game.feedback.shutdown()
 		game.player.constrained = false
 		game.bound_revision = -1
 		if is_instance_valid(game.cookbook): game.cookbook.close()
@@ -394,3 +398,7 @@ func _draw_players(delta: float) -> void:
 					target = station.to_global(Vector3(point.x, 1.14 + height, point.y))
 		avatar.perform(pose, target, held)
 		avatar.caption.text = str(members[id])
+		if station != null and avatar.book.current_page == station.training.dish:
+			avatar.book.set_live(station.model)
+		else:
+			avatar.book.set_live(null)

@@ -42,27 +42,44 @@ func run() -> void:
 	game.service.open_for_business = false
 	game.player.global_position = Vector3(0, 0.02, 2.4)
 	game.player.rotation.y = 0
-	game.camera.rotation.x = -0.15
+	game.camera.rotation.x = -0.12
 	game.cookbook.toggle()
-	await process_frame
+	await wait_frames(0.25)
 	await snap("book_index_1280")
 	game.cookbook.select("meal")
-	await process_frame
+	await wait_frames(0.2)
 	await snap("book_meal_1280")
 	game.cookbook.close()
+	var kitchen = game.service.by_id(4)
+	game.service.request_training(kitchen, "meal", 1)
+	kitchen.training.start_pass([1, 0])
+	game.bind_training()
+	game.menu.close()
+	kitchen.model.meat_sides = [1.0, 0.15]
+	kitchen.model.cooked = 0.0
+	kitchen.model.pasta = 40
+	game.cookbook.toggle()
+	await wait_frames(0.2)
+	await snap("book_live_meal_1280")
+	game.cookbook.close()
+	game.player.global_position = kitchen.to_global(Vector3(0.15, 0.02, 1.35))
+	game.player.rotation.y = kitchen.global_rotation.y
+	game.camera.rotation.x = -0.28
+	await wait_frames(0.15)
+	await snap("bell_aim_1280")
+	kitchen.training.close()
+	game.bind_training()
 	game.hud.hide()
 	game.service.hide()
 	var clone := preload("res://scripts/cook_avatar.gd").new()
 	game.add_child(clone)
-	clone.perform({"position": [6.2, 0.0, 3.4], "yaw": 0.55, "pitch": -0.3, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
-	var book_at: Vector3 = clone.book.global_position
+	clone.perform({"position": [6.4, 0.0, 3.6], "yaw": 0.4, "pitch": -0.28, "presentation": {"book": true, "page": "potato"}}, Vector3.ZERO, false)
+	var origin: Vector3 = clone.global_position
 	var right: Vector3 = clone.global_transform.basis.x
 	var forward: Vector3 = -clone.global_transform.basis.z
-	# Beside the reader, looking down onto the spread so page text is readable.
-	var camera_at: Vector3 = clone.global_position + Vector3(0, 1.62, 0) + right * 0.82 + forward * 0.28
-	look_at_point(game, camera_at, book_at + Vector3(0, 0.02, 0))
-	game.camera.fov = 52.0
-	await wait_frames(0.5)
+	look_at_point(game, origin + Vector3(0, 1.55, 0) + right * 1.55 + forward * 1.35, origin + Vector3(0, 1.15, 0) + forward * 0.2)
+	game.camera.fov = 62.0
+	await wait_frames(0.4)
 	await snap("clone_reading_1280")
 	clone.queue_free()
 	game.hud.show()
@@ -71,12 +88,12 @@ func run() -> void:
 	await set_view(Vector2i(1920, 1080))
 	game.player.global_position = Vector3(0, 0.02, 2.4)
 	game.player.rotation.y = 0
-	game.camera.rotation.x = -0.15
+	game.camera.rotation.x = -0.12
 	game.cookbook.toggle()
-	await process_frame
+	await wait_frames(0.2)
 	await snap("book_index_1920")
 	game.cookbook.select("meal")
-	await process_frame
+	await wait_frames(0.2)
 	await snap("book_meal_1920")
 	print("PASS: cookbook captures")
 	quit(0)

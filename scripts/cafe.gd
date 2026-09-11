@@ -4,7 +4,7 @@ const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const SAVE_PATH := "user://station_cafe.save"
 const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
-var cookbook: CanvasLayer
+var cookbook: Node
 var feedback: Node
 var player: CharacterBody3D
 var camera: Camera3D
@@ -26,6 +26,7 @@ var pan_tilt := Vector2.ZERO
 var anchored_item := ""
 var precise := false
 var last_menu_revision := ""
+var taught := {"book": false, "grab": false, "use": false, "height": false}
 
 func _ready() -> void:
 	_build_room()
@@ -156,9 +157,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 				var item: String = held_item(station)
 				var command: Dictionary = {"drop": true} if not item.is_empty() else {"grab": station.view.pick_item(camera)}
+				if command.has("grab") and not str(command.grab).is_empty(): taught.grab = true
 				session.send_input(station, {}, command)
-			MOUSE_BUTTON_WHEEL_UP: height = minf(1.1, height + 0.08)
-			MOUSE_BUTTON_WHEEL_DOWN: height = maxf(-1.0, height - 0.08)
+			MOUSE_BUTTON_RIGHT:
+				if not held_item(station).is_empty(): taught.use = true
+			MOUSE_BUTTON_WHEEL_UP:
+				taught.height = true
+				height = minf(1.1, height + 0.08)
+			MOUSE_BUTTON_WHEEL_DOWN:
+				taught.height = true
+				height = maxf(-1.0, height - 0.08)
 
 func held_item(station: Node3D) -> String:
 	if local_role < 0: return ""
@@ -252,25 +260,26 @@ func _physics_process(delta: float) -> void:
 	service.refresh_views(delta)
 	refresh_hud()
 	feedback.update(delta)
-	if cookbook.opened or menu.opened(): hud.recipe_panel.hide()
-	hud.bottom.visible = not cookbook.opened
+	if menu.opened(): hud.recipe_panel.hide()
+	hud.bottom.visible = false
 	hud.crosshair.visible = not cookbook.opened and not menu.opened()
-	if cookbook.opened: hud.prompt.text = ""
+	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
 func refresh_hud() -> void:
 	hud.clone_status.text = "%d станций · обслужено %d · выручка %d" % [service.stations.size(), service.served, service.revenue]
-	hud.controls.text = "B  Книга    ·    E  Станция    ·    F2  Друзья"
+	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "ГОСТИ: ПАУЗА"
 	hud.goal.text = "Подойди к рабочей станции · [E]"
 	hud.progress.value = 0
 	hud.prompt.text = ""
 	hud.recipe_panel.hide()
+	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
 		station = nearest_station()
 		if station != null:
-			hud.prompt.text = "[E] Станция %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title]
+			if hud.prompt.text.is_empty(): hud.prompt.text = "[E] %s" % station.Definition.TYPES[station.type_id].title
 			if station.state == "cooking":
 				hud.recipe_panel.show()
 				hud.show_recipe(station.model.quality(), station.order_dish)
@@ -282,19 +291,24 @@ func refresh_hud() -> void:
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	hud.progress.value = 100 if station.model.success() else 0
-	hud.supplies.text = "Закончил? Позвони в звонок на стойке."
-	hud.controls.text = "ЛКМ  Взять    ·    ПКМ  Действие    ·    Колесо  Высота    ·    B  Книга"
 	if local_role >= 0 and station.training.phase == "recording":
 		if station.bell_hit(camera):
-			hud.prompt.text = "ЛКМ / E  ·  Подать и закончить показ"
+			hud.prompt.text = "(E) Завершить показ"
 			return
 		var item := held_item(station)
 		if item.is_empty():
 			item = station.view.pick_item(camera)
-			if item.is_empty(): return
+			if item.is_empty():
+				if not taught.grab: hud.prompt.text = "ЛКМ · Взять"
+				return
 			var allowed: bool = station.type_id == "counter" or station.model.can_touch(local_role, item)
-			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
-		else: hud.prompt.text = "[ПКМ] Использовать · " + str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
+			var name := str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
+			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + name
+		else:
+			var name := str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
+			if not taught.use: hud.prompt.text = "ПКМ · %s" % name
+			elif not taught.height: hud.prompt.text = "Колесо · Высота"
+			else: hud.prompt.text = name
 
 func save_cafe() -> bool:
 	if session.is_guest(): return false
@@ -316,6 +330,16 @@ func load_cafe() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(session): save_cafe()
+	elif what == NOTIFICATION_PREDELETE:
+		_shutdown_tree(self)
+
+func _shutdown_tree(node: Node) -> void:
+	if node.has_method("shutdown"): node.shutdown()
+	for child in node.get_children():
+		_shutdown_tree(child)
+	if node is AudioStreamPlayer or node is AudioStreamPlayer3D:
+		node.stop()
+		node.stream = null
 func _build_room() -> void:
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()

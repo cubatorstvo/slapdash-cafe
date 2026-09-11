@@ -244,6 +244,7 @@ func _update_worker(model, time: float, resting: bool) -> void:
 	worker.rotation.y = model.actor_yaw + PI
 	head.rotation.x = -model.actor_pitch
 	book.set_reading(model.presentation.book, model.presentation.page)
+	book.set_live(model if model.presentation.book and model.presentation.page == model.dish else null)
 	var target: Vector3 = worker.position + worker.basis * Vector3(0, 1.05, 0.4)
 	match model.held:
 		"jug": target = jug.position + Vector3(0, 0.35, 0)

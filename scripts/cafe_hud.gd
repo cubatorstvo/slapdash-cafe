@@ -135,18 +135,17 @@ func show_recipe(report: Dictionary, dish: String) -> void:
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.custom_minimum_size = Vector2(42,42)
-	var name := _label(heading,"ТВОЙ ЗАКАЗ",14,CafeStyle.GOLD)
+	var name := _label(heading, Data.title(dish), 14, CafeStyle.GOLD)
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var grade := _label(heading,report.grade,30,CafeStyle.MINT if report.grade in ["S","A"] else CafeStyle.GOLD)
+	var grade := _label(heading, report.grade, 30, CafeStyle.MINT if report.grade in ["S","A"] else CafeStyle.GOLD)
 	grade.tooltip_text = "Качество поданной еды"
 	for component in report.components:
-		_label(recipe_content,("✓  " if component.served else "○  ")+component.name,18,CafeStyle.MINT if component.served else CafeStyle.CREAM)
+		_label(recipe_content, ("✓  " if component.served else "○  ") + component.name, 18, CafeStyle.MINT if component.served else CafeStyle.CREAM)
 		for line in component.lines:
-			var detail := _label(recipe_content,str(line),14,Color("c5d2c8"))
+			var detail := _label(recipe_content, str(line), 14, Color("c5d2c8"))
 			detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			detail.custom_minimum_size.x = 268
-		_label(recipe_content,"",2)
-	_label(recipe_content,"B  ·  Рецепт и подсказки",13,CafeStyle.GOLD)
+		_label(recipe_content, "", 2)
 	recipe_scroll.custom_minimum_size.y = mini(recipe_content.get_combined_minimum_size().y + 8, 360)
 
 func show_toast(message: String) -> void:

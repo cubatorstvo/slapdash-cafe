@@ -195,7 +195,7 @@ func show_station(station: Node3D) -> void:
 
 func describe(station: Node3D) -> void:
 	var dish: String = station.dishes()[recipe_choice.selected]
-	summary_text.text = station.Definition.REQUIREMENTS[dish]
+	summary_text.text = preload("res://scripts/cookbook_data.gd").summary(dish)
 	if station.recipes.has(dish):
 		summary_text.text += "\n\n●  %.1f с" % station.recipes[dish].duration
 		summary_text.tooltip_text = "● — бригада знает блюдо. Рядом указана длительность рабочего показа."
