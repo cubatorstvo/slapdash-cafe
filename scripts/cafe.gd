@@ -18,8 +18,9 @@ var bound_station := 0
 var bound_revision := -1
 var local_role := -1
 var grip := Vector3.FORWARD
-# The drag plane is anchored on pickup; lifting changes only item Y.
-var grip_plane_y := 1.015
+# Camera-relative reach is stable even when looking above the horizon.
+var grip_distance := 1.5
+var previous_grip_y := 1.015
 var height := 0.4
 var target := Vector2.ZERO
 var pan_tilt := Vector2.ZERO
@@ -160,10 +161,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not held_item(station).is_empty(): taught.use = true
 			MOUSE_BUTTON_WHEEL_UP:
 				taught.height = true
-				height = minf(1.1, height + 0.08)
+				if Input.is_physical_key_pressed(KEY_ALT): grip_distance = minf(3.6, grip_distance + 0.10)
+				else: height = minf(1.1, height + 0.08)
 			MOUSE_BUTTON_WHEEL_DOWN:
 				taught.height = true
-				height = maxf(-1.0, height - 0.08)
+				if Input.is_physical_key_pressed(KEY_ALT): grip_distance = maxf(0.5, grip_distance - 0.10)
+				else: height = maxf(-1.0, height - 0.08)
 
 func held_item(station: Node3D) -> String:
 	if local_role < 0: return ""
@@ -174,9 +177,11 @@ func anchor(station: Node3D) -> void:
 	if item.is_empty(): return
 	target = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
 	height = station.model.elevations[item] if station.type_id == "counter" else station.model.heights[item]
-	grip_plane_y = 1.015 + height
-	var at := station.to_global(Vector3(target.x, grip_plane_y, target.y))
-	grip = camera.global_basis.inverse() * (at - camera.global_position).normalized()
+	var at := station.to_global(Vector3(target.x, station.model.BASE_Y + height, target.y))
+	var offset := at - camera.global_position
+	grip_distance = clampf(offset.length(), 0.5, 3.6)
+	grip = camera.global_basis.inverse() * offset.normalized()
+	previous_grip_y = station.to_local(camera.global_position + camera.global_basis * grip * grip_distance).y
 
 func bind_training() -> void:
 	var station := local_station()
@@ -228,11 +233,10 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 	if not item.is_empty():
 		if not input_blocked(): height = clampf(height + (float(Input.is_physical_key_pressed(KEY_R)) - float(Input.is_physical_key_pressed(KEY_F))) * delta * 0.55, -1.0, 1.1)
 		if not precise:
-			var origin: Vector3 = station.to_local(camera.global_position)
-			var ray: Vector3 = station.global_basis.inverse() * camera.global_basis * grip
-			var reach := maxf(origin.y - grip_plane_y, 0.01) / maxf(-ray.y, 0.08)
-			var point := origin + ray * reach
+			var point: Vector3 = station.to_local(camera.global_position + camera.global_basis * grip * grip_distance)
 			target = Vector2(point.x, point.z)
+			height += point.y - previous_grip_y
+			previous_grip_y = point.y
 		# Keep the requested height at the support surface, not just the rendered item.
 		var current: Vector2 = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
 		var limited_target: Vector2 = target.clamp(-station.model.BOUNDS, station.model.BOUNDS)
@@ -303,7 +307,7 @@ func refresh_hud() -> void:
 		else:
 			var name := str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.TeamModel.NAMES.get(item, "")))
 			if not taught.use: hud.prompt.text = "ПКМ · %s" % name
-			elif not taught.height: hud.prompt.text = "Колесо · Высота"
+			elif not taught.height: hud.prompt.text = "Колесо · Высота   Alt + колесо · Расстояние   Shift · Точно"
 			else: hud.prompt.text = name
 
 func save_cafe() -> bool:
@@ -381,4 +385,5 @@ func _build_room() -> void:
 	for x in [-11.2, 17.2]:
 		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+
 

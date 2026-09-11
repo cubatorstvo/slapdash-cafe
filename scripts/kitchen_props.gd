@@ -47,11 +47,24 @@ func point(at: Vector2, height := 0.0) -> Vector3:
 
 func _build_pan() -> void:
 	for x in [-0.65, 0.65]:
-		for z in [-0.52, 0.52]: Props.box(potato_set, Vector3(0.12, 0.16, 0.12), point(Model.PAN_CENTER + Vector2(x, z), 0.08), Color("293d44"))
+		for z in [-0.52, 0.52]:
+			var foot: Vector2 = Model.PAN_CENTER + Vector2(x, z)
+			var ground: float = Model.Layout.table_height(foot)
+			var top: float = Model.BASE_Y + Model.PAN_LIFT - 0.035
+			Props.box(potato_set, Vector3(0.12, top - ground, 0.12), Vector3(foot.x, (ground + top) * 0.5, foot.y), Color("293d44"))
+	for z in [-0.52, 0.52]:
+		Props.box(potato_set, Vector3(1.42, 0.05, 0.10), point(Model.PAN_CENTER + Vector2(0, z), Model.PAN_LIFT - 0.06), Color("293d44"))
+	for x in [-0.65, 0.65]:
+		Props.box(potato_set, Vector3(0.10, 0.05, 1.04), point(Model.PAN_CENTER + Vector2(x, 0), Model.PAN_LIFT - 0.06), Color("293d44"))
 	var burner := TorusMesh.new()
 	burner.inner_radius = 0.42
 	burner.outer_radius = 0.47
-	Props.shape(potato_set, burner, point(Model.PAN_CENTER, 0.06), Color("ec9459"))
+	Props.shape(potato_set, burner, point(Model.PAN_CENTER, 0.09), Color("ec9459"))
+	# Small brackets visibly support the burner ring above the damaged surface.
+	for x in [-0.43, 0.43]:
+		var ground: float = Model.Layout.table_height(Model.PAN_CENTER + Vector2(x, 0))
+		var top: float = Model.BASE_Y + 0.075
+		Props.box(potato_set, Vector3(0.09, top - ground, 0.09), Vector3(Model.PAN_CENTER.x + x, (ground + top) * 0.5, Model.PAN_CENTER.y), Color("293d44"))
 	pan = Node3D.new()
 	potato_set.add_child(pan)
 	pan.position = point(Model.PAN_CENTER, Model.PAN_LIFT)
@@ -169,3 +182,4 @@ func pick_item(camera: Camera3D, dish: String) -> String:
 				selected = entry[0]
 	pick_distance = nearest
 	return selected
+

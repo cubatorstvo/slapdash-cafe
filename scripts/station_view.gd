@@ -2,7 +2,7 @@ extends Node3D
 
 const Props = preload("res://scripts/props.gd")
 const Model = preload("res://scripts/cooking_model.gd")
-const TABLE_HEIGHT := Model.SURFACE_Y
+const TABLE_HEIGHT := Model.Layout.TABLE_Y
 const WINE_COLOR := Color("ba4058")
 
 var plates: Array = []
@@ -40,8 +40,14 @@ func build(production: bool) -> void:
 	_build_countertop_structure(Color("eddbb6"), Color("a76f4e"), Color("79513f"))
 	for x in [-1.85, 1.85]:
 		for z in [-0.85, 0.85]:
-			var leg_height := 0.43 if x < 0.0 and z > 0.0 else 0.83
+			var leg_height: float = Model.Layout.table_height(Vector2(x, z)) - 0.18
 			Props.box(self, Vector3(0.13, leg_height, 0.13), Vector3(x, leg_height * 0.5, z), Color("244047"))
+	# Rear stretcher and side rails connect the legs to the sloped tabletop.
+	Props.box(self, Vector3(3.83, 0.12, 0.09), Vector3(0, TABLE_HEIGHT - 0.23, -0.85), Color("244047"))
+	for x in [-1.85, 1.85]:
+		var a := Vector3(x, Model.Layout.table_height(Vector2(x, -0.85)) - 0.23, -0.85)
+		var b := Vector3(x, Model.Layout.table_height(Vector2(x, 0.85)) - 0.23, 0.85)
+		Props.line(self, a, b, 0.055, Color("244047"))
 	_build_front_accent(accent)
 	station_label = Props.text(self, "КЛОН" if production else "ПОКАЖИ КАК", Vector3(0, 0.76, 1.20), 25, Color("19353b"))
 	# Markings follow the actual surface, including the broken corner.
@@ -58,9 +64,9 @@ func build(production: bool) -> void:
 	_build_storage_and_tray()
 	rag = Node3D.new()
 	add_child(rag)
-	rag_surface = Props.box(rag, Vector3(0.43, 0.055, 0.30), Vector3(0, 0.045, 0), Color("eac26b"))
+	rag_surface = Props.box(rag, Vector3(0.43, 0.045, 0.30), Vector3(0, 0.025, 0), Color("eac26b"))
 	for i in range(4):
-		Props.box(rag, Vector3(0.025, 0.008, 0.29), Vector3(-0.15 + i * 0.10, 0.076, 0), Color("bc924e"))
+		Props.box(rag, Vector3(0.025, 0.008, 0.29), Vector3(-0.15 + i * 0.10, 0.052, 0), Color("bc924e"))
 	stream = Props.line(self, Vector3.ZERO, Vector3.UP, 0.026, WINE_COLOR)
 	stream.visible = false
 	var ring := TorusMesh.new()
@@ -185,17 +191,18 @@ func _update_grip_marker(model) -> void:
 	for dash in height_dashes: dash.visible = false
 	if not grip_marker.visible: return
 	var point: Vector2 = model.get(model.held)
-	grip_marker.position = Vector3(point.x, Model.surface_at(point) + 0.025, point.y)
+	var support: float = model.support_at(point, Model.BASE_Y + float(model.elevations[model.held]))
+	grip_marker.position = Vector3(point.x, support + 0.012, point.y)
 	var radius_scale := 1.0 if model.held == "jug" else 0.85
 	grip_marker.scale = Vector3(radius_scale, 1, radius_scale)
-	var lift: float = model.elevations[model.held]
+	var lift: float = Model.BASE_Y + float(model.elevations[model.held]) - support
 	for index in range(height_dashes.size()):
 		var bottom := 0.025 + index * 0.09
 		var top := minf(bottom + 0.045, lift)
 		if top <= bottom: break
 		var dash := height_dashes[index]
 		dash.visible = true
-		Props.align_line(dash, item_point(point) + Vector3.UP * bottom, item_point(point) + Vector3.UP * top)
+		Props.align_line(dash, Vector3(point.x, support + bottom, point.y), Vector3(point.x, support + top, point.y))
 
 func _build_jug() -> void:
 	jug = Node3D.new()
@@ -410,6 +417,12 @@ func _build_storage_and_tray() -> void:
 		rim.outer_radius = 0.39
 		Props.shape(plate, rim, Vector3(0, 0.025, 0), Color("83b9ac"))
 		plates.append(plate)
+	# A small open drip holder gives the cloth a dedicated visible home.
+	var rag_home := Vector3(layout.RAG_HOME.x, layout.RAG_Y, layout.RAG_HOME.y)
+	Props.box(self, Vector3(0.50, 0.025, 0.38), rag_home - Vector3.UP * 0.0125, Color("638f92"))
+	for side in [-1, 1]:
+		Props.box(self, Vector3(0.02, 0.025, 0.38), rag_home + Vector3(side * 0.25, 0.0125, 0), Color("abc3ba"))
+	Props.box(self, Vector3(0.50, 0.025, 0.02), rag_home + Vector3(0, 0.0125, -0.19), Color("abc3ba"))
 	var center := Vector3(layout.TRAY.x, layout.TRAY_Y, layout.TRAY.y)
 	Props.box(self, Vector3(layout.TRAY_HALF.x * 2, 0.03, layout.TRAY_HALF.y * 2), center - Vector3.UP * 0.015, Color("778e91"))
 	for side in [-1, 1]:
@@ -418,3 +431,4 @@ func _build_storage_and_tray() -> void:
 	tray_liquid = Props.box(self, Vector3(layout.TRAY_HALF.x * 1.85, 0.008, layout.TRAY_HALF.y * 1.85), center + Vector3.UP * 0.008, WINE_COLOR)
 	var label := Props.text(self, "ПОДАЧА", center + Vector3(0, 0.012, layout.TRAY_HALF.y + 0.16), 16, Color("25464a"))
 	label.rotation.x = -PI / 2
+

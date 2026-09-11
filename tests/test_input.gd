@@ -8,7 +8,7 @@ func check(ok: bool, message: String) -> void:
 		failed = true
 		printerr("FAIL: ", message)
 func run() -> void:
-	print("[1/3] Full-kit wine/rag interaction and predictable controls")
+	print("[1/4] Full-kit wine/rag interaction and predictable controls")
 	var model := M.new()
 	model.reset("potato")
 	model.pick_up("jug")
@@ -24,7 +24,7 @@ func run() -> void:
 	model.lift_held(0.6)
 	for i in range(180): model.step(1.0 / 60, true, false, true)
 	check(model.filled >= 224.99, "RMB squeezing still fills glass")
-	print("[2/3] Tomato trajectory, customer reaction and exact replay")
+	print("[2/4] Tomato trajectory, customer reaction and exact replay")
 	model.reset("wine")
 	model.pick_up("tomato")
 	model.move_item("tomato", Vector2(0, -0.8))
@@ -36,7 +36,7 @@ func run() -> void:
 	var replay := M.new()
 	replay.restore(bytes_to_var(var_to_bytes(saved)))
 	check(replay.snapshot() == saved, "Prank is included in food recording")
-	print("[3/3] FPS at the real station, protected zones and menu role assignment")
+	print("[3/4] FPS at the real station, protected zones and menu role assignment")
 	var game = Scene.instantiate()
 	root.add_child(game)
 	await process_frame
@@ -85,6 +85,35 @@ func run() -> void:
 	station.training.close()
 	game.bind_training()
 	check(not game.player.constrained, "Leaving lesson restores free movement")
+	print("[4/4] High shelf pickup and horizon crossing")
+	station = game.service.by_id(1)
+	game.service.request_training(station, "wine", 1)
+	station.training.start_pass([1])
+	game.bind_training()
+	var shelf: Vector2 = station.model.jug
+	game.player.global_position = station.to_global(Vector3(shelf.x, 0, shelf.y + 1.5))
+	game.camera.look_at(station.to_global(Vector3(shelf.x, 2.05, shelf.y)))
+	station.model.pick_up("jug")
+	game.anchored_item = ""
+	var pickup: Dictionary = game.build_motion(station, 0)
+	check(Vector2(pickup.target[0], pickup.target[1]).distance_to(shelf) < 0.001, "High pickup preserves the item's position")
+	for pitch in [0.5, 0.001, -0.001, -0.5]:
+		game.camera.rotation.x = pitch
+		var motion: Dictionary = game.build_motion(station, 0)
+		var target_point := Vector2(motion.target[0], motion.target[1])
+		var origin: Vector3 = station.to_local(game.camera.global_position)
+		check(target_point.is_finite() and target_point.distance_to(Vector2(origin.x, origin.z)) <= 3.61, "All viewing angles preserve bounded reach")
+		var before_target := target_point
+		game.height += 0.08
+		motion = game.build_motion(station, 0)
+		check(before_target.distance_to(Vector2(motion.target[0], motion.target[1])) < 0.00001, "Wheel lifts vertically at every angle")
+	game.camera.rotation.x = 0.001
+	var above: Dictionary = game.build_motion(station, 0)
+	game.camera.rotation.x = -0.001
+	var below: Dictionary = game.build_motion(station, 0)
+	check(Vector2(above.target[0], above.target[1]).distance_to(Vector2(below.target[0], below.target[1])) < 0.02, "Crossing the horizon is continuous")
+	game._shutdown_tree(game)
 	game.free()
 	print("PASS: item input, prank replay and FPS zones" if not failed else "FAILED")
 	quit(1 if failed else 0)
+

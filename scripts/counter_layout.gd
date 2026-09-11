@@ -12,10 +12,13 @@ const SHELF_YAW := PI / 4.0
 const LEVELS := [0.35, 0.85, 1.40]
 const TRAY := Vector2(1.35, -0.15)
 const TRAY_HALF := Vector2(0.58, 0.77)
-const TRAY_Y := 1.055
+const TRAY_Y := 1.045
 const CROCKERY_Y := 0.40
 const CROCKERY_Z := 1.38
 const TABLE_Y := 1.015
+const RAG_HOME := Vector2(1.88, 0.86)
+const RAG_HALF := Vector2(0.25, 0.19)
+const RAG_Y := TABLE_Y + 0.025
 
 static func on_tray(point: Vector2, margin := 0.0) -> bool:
 	var d := (point - TRAY).abs()
@@ -91,6 +94,8 @@ static func support(point: Vector2, height := 100.0) -> float:
 		return level
 	if point.x >= 0.85 and point.x <= 2.15 and point.y > 1.125 and point.y <= 1.68:
 		return CROCKERY_Y
+	if (point - RAG_HOME).abs().x <= RAG_HALF.x and (point - RAG_HOME).abs().y <= RAG_HALF.y: return RAG_Y
 	if on_tray(point): return TRAY_Y
 	if table_contains(point): return table_height(point)
 	return 0.015
+

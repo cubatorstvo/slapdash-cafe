@@ -57,7 +57,7 @@ func reset(recipe := "") -> void:
 	super.reset()
 	jug = Layout.shelf_point(Vector2(-0.1, 0.0))
 	cup = Vector2(1.93, Layout.CROCKERY_Z)
-	rag = Vector2(0.7, 0.87)
+	rag = Layout.RAG_HOME
 	tomato = Layout.shelf_point(Vector2(0.33, 0.10))
 	tomato_velocity = Vector3.ZERO
 	tomato_flying = false
@@ -83,6 +83,7 @@ func reset(recipe := "") -> void:
 	sausage_velocity = Vector2.ZERO
 	previous_sausage = sausage
 	elevations.merge({"pan": PAN_LIFT, "potato": PAN_LIFT, "sausage": 0.0, "tomato": 0.0})
+	elevations.rag = Layout.RAG_Y - BASE_Y
 	elevations.jug = Layout.LEVELS[2] - BASE_Y
 	elevations.tomato = Layout.LEVELS[2] - BASE_Y
 	elevations.cup = Layout.CROCKERY_Y - BASE_Y
@@ -92,7 +93,7 @@ func reset(recipe := "") -> void:
 	sausage_plate_offset = Vector2.ZERO
 	for i in range(3):
 		plates.append({"point": Vector2(1.30, Layout.CROCKERY_Z), "tilt": 0.0})
-		elevations["plate_%d" % i] = Layout.CROCKERY_Y + i * 0.055 - BASE_Y
+		elevations["plate_%d" % i] = Layout.CROCKERY_Y + i * 0.045 - BASE_Y
 	potato_index = 0
 	sausage_index = 0
 	potatoes.clear()
@@ -269,6 +270,8 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			potato_orientation = (Quaternion(axis, travel.length() / 0.14) * potato_orientation).normalized()
 		if Layout.table_contains(potato):
 			elevations.potato = Layout.table_height(potato) - BASE_Y
+		elif Layout.shelf_contains(potato):
+			elevations.potato = support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y
 		else:
 			potato_state = "falling"
 			fall_speed = 0.0
@@ -563,3 +566,4 @@ func _utensil_grade(report: Dictionary) -> Dictionary:
 		report.grade = grades[maxi(0, grades.find(report.grade) - 1)]
 		report.price_factor = Quality.PRICE_FACTORS[report.grade]
 	return report
+
