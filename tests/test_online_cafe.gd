@@ -18,8 +18,12 @@ func setup() -> void:
 	game.set_physics_process(false)
 	game.service.open_for_business = false
 	game.service.clear_world()
-	game.service.initial_stations()
+	game.service.initial_stations(true)
 	game.service.revenue = 73 if role == "guest" else 0
+	if role == "host":
+		game.service.progress.cash = 200
+		game.service.purchase("decor", "sign")
+		game.service.purchase("upgrade", "", 3)
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
 	game.session.add_child(barrier)
@@ -72,6 +76,10 @@ func _process(delta: float) -> bool:
 	if Time.get_ticks_msec() - started > 30000:
 		fail(timeout_message())
 		return false
+	if game.session.is_guest() and game.session.synced and stage < 6:
+		if game.service.progress.popularity != 10 or not "sign" in game.service.progress.decorations or not is_instance_valid(game.service.by_id(3).upgrade_view):
+			fail("Shared cafe progression missing")
+			return false
 	if not game.session.is_guest(): game.service.advance(delta)
 	var teaching = game.local_station()
 	if teaching != null and teaching.training.phase == "recording":
@@ -90,6 +98,7 @@ func host_tick() -> void:
 	var second = game.service.by_id(2)
 	var kitchen = game.service.by_id(4)
 	if stage == 0 and game.session.members.size() >= 2:
+		if game.service.progress.popularity != 10: fail("Host decoration purchase missing"); return
 		game.player.global_position = first.to_global(Vector3(0, 0.02, 1.8))
 		act("open", 1, {"dish": "wine"})
 		act("pass", 1, {"participants": [1]})

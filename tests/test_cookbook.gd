@@ -48,6 +48,8 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	game.camera.rotation.x = 0.52
 	var opening_gaze: Vector3 = -game.camera.global_basis.z
 	game.cookbook.toggle()

@@ -21,6 +21,8 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	game.service.open_for_business = false
 	var station = game.service.by_id(1)
 	game.service.request_training(station, "wine", 1)

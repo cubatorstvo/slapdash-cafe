@@ -25,6 +25,8 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	game.service.open_for_business = false
 	var service = game.service
 	print("[1/7] Station identity, complete kit, attached crew and local training")
@@ -89,7 +91,10 @@ func run() -> void:
 	print("[4/7] Single recipe is station-owned, exact replay and customer service")
 	service.request_training(first, "wine", 1)
 	first.training.start_pass([1])
-	feed(first, 0, [{"grab": "jug"}])
+	feed(first, 0, [{"grab": "cup"}])
+	for i in range(90): feed(first, 0, [{"target": [first.model.Layout.TRAY.x, first.model.Layout.TRAY.y], "height": 0.15}])
+	feed(first, 0, [{"drop": true}, {"grab": "jug"}])
+	for i in range(90): feed(first, 0, [{"target": [first.model.cup.x - 0.40, first.model.cup.y], "height": 0.6}])
 	for i in range(1800):
 		var mouth = first.model.spout_position()
 		var offset: float = first.model.spout_target().x - first.model.jug.x
@@ -116,7 +121,7 @@ func run() -> void:
 	first.training.close()
 	second.training.close()
 	service.spawn_customer("meal")
-	for i in range(900):
+	for i in range(1800):
 		service.advance(DT)
 		if kitchen.state == "cooking": break
 	check(kitchen.state == "cooking", "Order started")
@@ -127,7 +132,7 @@ func run() -> void:
 
 	print("[6/7] Fixed station slots, save/load drafts and malformed data rejection")
 	var saved: Dictionary = bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version == 4, "Station save uses slot format")
+	check(saved.version == 5, "Station save uses slot format")
 	for entry in saved.stations:
 		check(entry.has("slot") and not entry.has("position") and not entry.has("yaw") and not entry.has("id"), "Slot save omits transforms and runtime IDs")
 	check(service.load_data(saved), "Station save loads")

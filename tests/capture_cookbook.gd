@@ -92,6 +92,8 @@ func run() -> void:
 	game.bind_training()
 	game.menu.close()
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	apply_partial_meal(kitchen)
 	if kitchen.view.station_label: kitchen.view.station_label.visible = false
 	reset_reader(game)

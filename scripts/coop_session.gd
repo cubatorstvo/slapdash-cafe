@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-9"
+const PROTOCOL := "slapdash-cafe-first-star-10"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -96,6 +96,7 @@ func leave(message: String) -> void:
 		game.bound_revision = -1
 		if is_instance_valid(game.cookbook): game.cookbook.close()
 		game.menu.close()
+		if is_instance_valid(game.office): game.office.close()
 	if not message.is_empty(): _status(message)
 
 func _status(value: String) -> void:
@@ -188,12 +189,36 @@ func _action(value: Dictionary) -> void:
 
 func execute_action(sender: int, value: Dictionary) -> void:
 	var action: String = value.get("action", "")
-	if action == "business":
-		game.service.open_for_business = not game.service.open_for_business
+	if action in ["buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
+		if sender != 1:
+			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
+			return
+		var error := ""
+		match action:
+			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)))
+			"banquet": error = game.service.start_banquet(sender)
+			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
+			"save":
+				message_to(sender, "Кафе сохранено." if game.save_cafe() else "Не удалось записать сохранение.")
+				return
+			"new_cafe":
+				if not game.service.any_training() and not game.service.progress.busy(): game.new_cafe()
+				return
+			"business":
+				if game.service.progress.busy(): return
+				game.service.open_for_business = not game.service.open_for_business
+		if not error.is_empty(): message_to(sender, error)
+		else:
+			game.service.progress.revision += 1
+			game.save_cafe()
 		return
 	var station: Node3D = game.service.by_id(int(value.get("station", -1)))
 	if station == null: return
 	var run = station.training
+	if game.service.is_showcase(station) and action in ["keep", "accept"]: return
+	if game.service.is_showcase(station) and action == "cancel":
+		if sender == run.lead: game.service.finish_banquet(false, "Личный показ прерван.")
+		return
 	if action == "open":
 		if not near_peer(sender, station, 5.0): return
 		if game.service.request_training(station, str(value.get("dish", "")), sender):
@@ -242,7 +267,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 
 func message_to(id: int, value: String) -> void:
 	if id == 1: _status(value)
-	else: _message.rpc_id(id, value)
+	elif connected and members.has(id): _message.rpc_id(id, value)
 
 @rpc("authority", "call_remote", "reliable", 0)
 func _message(value: String) -> void: _status(value)
@@ -323,8 +348,8 @@ func advance(delta: float) -> void:
 		if is_instance_valid(station.taster) and not station.taster_real:
 			customers.append({"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
-		customers.append({"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business}
+		customers.append({"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
+	var data := {"protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -343,6 +368,8 @@ func _world(packet: PackedByteArray) -> void:
 		var station: Node3D = game.service.by_id(entry.id)
 		if station == null: station = game.service.add_station(entry.type, int(entry.slot))
 		station.crew = entry.crew
+		station.upgrades = entry.upgrades
+		station.apply_upgrades()
 		station.state = entry.state
 		station.order_dish = str(entry.get("order_dish", ""))
 		station.recipes = {}
@@ -361,6 +388,7 @@ func _world(packet: PackedByteArray) -> void:
 			station.queue_free()
 	for key in ["served", "revenue", "missed"]: game.service.set(key, data[key])
 	game.service.open_for_business = data.open
+	game.service.progress.restore(data.progression, true)
 	ids.clear()
 	for entry in data.customers:
 		ids.append(entry.id)

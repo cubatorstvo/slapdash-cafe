@@ -41,6 +41,8 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	var station = game.service.by_id(4)
 	game.service.request_training(station, "meal", 1)
 	game.menu.show_station(station)

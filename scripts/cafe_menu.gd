@@ -117,6 +117,7 @@ func show_station(station: Node3D) -> void:
 	selected_station = station.station_id
 	rebuild()
 	var run = station.training
+	var showcase: bool = game.service.is_showcase(station)
 	_label(training_box, "СТАНЦИЯ %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title], 23)
 	var names := PackedStringArray()
 	for member in station.crew: names.append(member.name)
@@ -185,10 +186,11 @@ func show_station(station: Node3D) -> void:
 				var warning := _label(training_box, "Роли записаны вместе: замена одной очистит связанный черновик второй. Прежний рабочий рецепт останется до принятия нового.", 15)
 				warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_button(training_box, "Начать показ", start_pass)
-			_button(training_box, "Обучить бригаду · вернуться к заказам", func(): send("accept"))
+			if not showcase: _button(training_box, "Обучить бригаду · вернуться к заказам", func(): send("accept"))
+			else: _label(training_box, "Личный показ инспектору. Звонок подаёт блюдо; рабочая запись бригады сохранится.")
 			var old_time: float = station.recipes.get(run.dish, {}).get("duration", 0)
 			_label(training_box, "Рабочая запись: %.1f с. Черновик: %.1f с." % [old_time, (lengths.max() / 60.0) if not lengths.is_empty() else 0.0], 15)
-		if run.lead == game.session.local_id(): _button(training_box, "Закончить обучение", func(): send("cancel"))
+		if run.lead == game.session.local_id(): _button(training_box, "Прервать проверку" if showcase else "Закончить обучение", func(): send("cancel"))
 	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

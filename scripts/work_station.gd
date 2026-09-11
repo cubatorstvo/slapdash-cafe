@@ -41,6 +41,7 @@ var observing := false
 var student_paths: Array = []
 var walls: Array = []
 var was_resting := true
+var upgrade_view: Node3D
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
@@ -319,3 +320,33 @@ func pulse_at(point: Vector3) -> void:
 	tween.tween_property(pulse.material_override,"albedo_color:a",0.0,0.55)
 	tween.chain().tween_callback(pulse.queue_free)
 
+
+func apply_upgrades() -> void:
+	if type_id != "counter": return
+	model.sauce_ramp = "sauce_ramp" in upgrades
+	if not model.sauce_ramp:
+		if is_instance_valid(upgrade_view):
+			remove_child(upgrade_view)
+			upgrade_view.queue_free()
+			upgrade_view = null
+		return
+	if is_instance_valid(upgrade_view): return
+	upgrade_view = Node3D.new()
+	upgrade_view.name = "SauceRamp"
+	add_child(upgrade_view)
+	var length := Model.RAMP_END - Model.RAMP_START
+	var slope := atan2(0.65, length)
+	var chute := Node3D.new()
+	upgrade_view.add_child(chute)
+	chute.position = Vector3(Model.RAMP_X, 0.975, (Model.RAMP_START + Model.RAMP_END) / 2)
+	chute.rotation.x = slope
+	var size := sqrt(length * length + 0.65 * 0.65)
+	Props.box(chute, Vector3(0.56, 0.07, size + 0.1), Vector3(0,-0.045,0), Color("b7c7bb"))
+	Props.box(chute, Vector3(0.45, 0.015, size), Vector3.ZERO, Color("c45b47"))
+	for x in [-0.27, 0.27]: Props.box(chute, Vector3(0.035, 0.16, size + 0.1), Vector3(x,0.04,0), Color("d5cbb2"))
+	for z in [Model.RAMP_START, Model.RAMP_END]:
+		var height := Model.ramp_height(z) - 0.10
+		Props.box(upgrade_view, Vector3(0.08,height,0.08), Vector3(Model.RAMP_X,height/2,z), Color("728779"))
+	var label := Props.text(upgrade_view, "СОУСНЫЙ ЖЁЛОБ", Vector3(Model.RAMP_X,1.60,Model.RAMP_START), 18, Color("efcc8e"))
+	label.pixel_size = 0.003
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED

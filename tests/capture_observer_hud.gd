@@ -34,6 +34,8 @@ func run() -> void:
 	await process_frame
 	game.service.open_for_business = false
 	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.initial_stations(true)
 	var station = game.service.by_id(1)
 	game.service.request_training(station, "wine", 1)
 	station.training.start_pass([1])

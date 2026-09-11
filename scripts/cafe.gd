@@ -2,8 +2,12 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
-const SAVE_PATH := "user://station_cafe.save"
+const SAVE_PATH := "user://first_star_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var office: CanvasLayer
+var development: Node3D
+var development_stamp := ""
+var event_phase_seen := "none"
 var cookbook: Node
 var feedback: Node
 var player: CharacterBody3D
@@ -33,7 +37,7 @@ func _ready() -> void:
 	_build_room()
 	player = Player.new()
 	add_child(player)
-	player.position = Vector3(0, 0.02, 6)
+	player.position = Vector3(-6.0, 0.02, 5.0)
 	camera = player.camera
 	camera.rotation.x = -0.2
 	hud = preload("res://scripts/cafe_hud.gd").new()
@@ -63,11 +67,20 @@ func _ready() -> void:
 	feedback = preload("res://scripts/cafe_feedback.gd").new()
 	add_child(feedback)
 	feedback.game = self
+	office = preload("res://scripts/cafe_office.gd").new()
+	office.game = self
+	add_child(office)
+	development = preload("res://scripts/cafe_development_view.gd").new()
+	add_child(development)
+	development.build(self)
 	load_cafe()
+	event_phase_seen = service.progress.phase
+	development.refresh()
+	hud.office_requested.connect(func(): office.open())
 	sync_mouse_mode()
 
 func input_blocked() -> bool:
-	return (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+	return (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
 
 func awaiting_serving_confirmation() -> bool:
 	if not is_instance_valid(service) or not is_instance_valid(session): return false
@@ -101,10 +114,16 @@ func nearest_station() -> Node3D:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == KEY_B and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
+		if event.physical_keycode == KEY_M and not session_paused and not awaiting_serving_confirmation():
+			office.close() if office.opened() else office.open()
+			return
+		if event.physical_keycode == KEY_B and not office.opened() and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
 			cookbook.toggle()
 			return
 		if event.physical_keycode == KEY_ESCAPE:
+			if office.opened():
+				office.close()
+				return
 			if cookbook.opened:
 				cookbook.close()
 				return
@@ -117,6 +136,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			else: toggle_pause()
 			return
 		if event.physical_keycode == KEY_F2:
+			office.close()
 			menu.net_panel.visible = not menu.net_panel.visible
 			sync_mouse_mode()
 			return
@@ -126,6 +146,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E:
+				if not recording and development.board_hit(camera):
+					office.open()
+					return
 				if recording and station.bell_hit(camera):
 					session.request_action({"action": "ring", "station": station.station_id})
 					return
@@ -209,13 +232,14 @@ func bind_training() -> void:
 			precise = false
 			pan_tilt = Vector2.ZERO
 			menu.close()
+			office.close()
 			bound_station = station.station_id
 			bound_revision = run.revision
 		player.constrained = true
 	else:
 		player.constrained = run.phase == "confirm_finish"
 		var stamp := "%d:%d:%s" % [station.station_id, run.revision, run.phase]
-		if run.lead == session.local_id() and run.phase in ["ready", "review", "confirm_finish"] and stamp != last_menu_revision:
+		if run.lead == session.local_id() and not office.opened() and run.phase in ["ready", "review", "confirm_finish"] and stamp != last_menu_revision:
 			last_menu_revision = stamp
 			menu.show_station(station)
 
@@ -260,24 +284,36 @@ func _physics_process(delta: float) -> void:
 	session.advance(delta)
 	service.refresh_views(delta)
 	refresh_hud()
+	if event_phase_seen != service.progress.phase:
+		event_phase_seen = service.progress.phase
+		if event_phase_seen in ["won", "lost"]:
+			if event_phase_seen == "won": feedback.play_ui("ready")
+			menu.close()
+			office.open("star")
+	var display_stamp := "%d:%d" % [service.progress.revision, service.stations.size()]
+	if display_stamp != development_stamp:
+		development_stamp = display_stamp
+		development.refresh()
 	feedback.update(delta)
-	if menu.opened() or cookbook.opened: hud.recipe_panel.hide()
+	if menu.opened() or cookbook.opened or office.opened(): hud.recipe_panel.hide()
 	hud.bottom.visible = false
-	hud.crosshair.visible = not cookbook.opened and not menu.opened()
+	hud.crosshair.visible = not cookbook.opened and not menu.opened() and not office.opened()
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
 func refresh_hud() -> void:
-	hud.clone_status.text = "%d станций · обслужено %d · выручка %d" % [service.stations.size(), service.served, service.revenue]
+	hud.clone_status.text = "%d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
 	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "ГОСТИ: ПАУЗА"
-	hud.goal.text = "Подойди к рабочей станции · [E]"
+	hud.goal.text = service.progress.objective(service.stations, service.served, service.open_for_business)
 	hud.progress.value = 0
 	hud.prompt.text = ""
 	hud.recipe_panel.hide()
 	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
+		if service.progress.phase in ["showcase", "service"]: hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
+		if development.board_hit(camera): hud.prompt.text = "(E) Моё кафе"
 		station = nearest_station()
 		if station != null:
 			if hud.prompt.text.is_empty(): hud.prompt.text = "[E] %s" % station.Definition.TYPES[station.type_id].title
@@ -285,15 +321,18 @@ func refresh_hud() -> void:
 				var record: Dictionary = station.recipes.get(station.order_dish, {})
 				if record.has("quality"):
 					hud.show_production_recipe(record.quality, station.order_dish, float(record.duration))
-					hud.goal.text = station.Definition.DISHES[station.order_dish]
+					if not service.progress.busy(): hud.goal.text = station.Definition.DISHES[station.order_dish]
 		return
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
+	if service.progress.phase == "showcase":
+		hud.goal.text = "Инспектор · картофель на B или лучше"
+		hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 	hud.progress.value = 100 if station.model.success() else 0
 	if local_role >= 0 and station.training.phase == "recording":
 		if station.bell_hit(camera):
-			hud.prompt.text = "(E) Завершить показ"
+			hud.prompt.text = "(E) Подать инспектору" if service.is_showcase(station) else "(E) Завершить показ"
 			return
 		var item := held_item(station)
 		if item.is_empty():
@@ -311,7 +350,7 @@ func refresh_hud() -> void:
 			else: hud.prompt.text = name
 
 func save_cafe() -> bool:
-	if session.is_guest(): return false
+	if session.is_guest() or "--fresh-cafe" in OS.get_cmdline_user_args(): return false
 	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
 	if file == null: return false
 	file.store_buffer(var_to_bytes(service.save_data()).compress(FileAccess.COMPRESSION_DEFLATE))
@@ -321,6 +360,7 @@ func save_cafe() -> bool:
 	return DirAccess.rename_absolute(SAVE_PATH + ".tmp", SAVE_PATH) == OK
 
 func load_cafe() -> void:
+	if "--fresh-cafe" in OS.get_cmdline_user_args(): return
 	if not FileAccess.file_exists(SAVE_PATH): return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file == null or file.get_length() > 134217728: return
@@ -387,3 +427,20 @@ func _build_room() -> void:
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 
 
+
+func new_cafe() -> void:
+	service.clear_world()
+	service.progress = service.Progression.new()
+	service.served = 0
+	service.missed = 0
+	service.revenue = 0
+	service.open_for_business = false
+	service.initial_stations()
+	service.spawn_clock = 3.0
+	bound_revision = -1
+	last_menu_revision = ""
+	development_stamp = ""
+	player.position = Vector3(-6.0, 0.02, 5.0)
+	player.velocity = Vector3.ZERO
+	development.refresh()
+	save_cafe()

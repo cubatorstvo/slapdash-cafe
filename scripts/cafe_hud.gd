@@ -1,6 +1,7 @@
 extends CanvasLayer
 const CafeStyle = preload("res://scripts/cafe_theme.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
+signal office_requested
 signal resume_requested
 var recipe_panel: PanelContainer
 var recipe_text: Label
@@ -46,6 +47,10 @@ func _ready() -> void:
 	goal = _label(order,"",20)
 	clone_status = _label(order,"",14,CafeStyle.MINT)
 	clock = _label(row,"",18,CafeStyle.GOLD)
+	var office_button := Button.new()
+	row.add_child(office_button)
+	office_button.text = "Кафе · M"
+	office_button.pressed.connect(func(): office_requested.emit())
 	progress = ProgressBar.new()
 	order.add_child(progress)
 	progress.hide()

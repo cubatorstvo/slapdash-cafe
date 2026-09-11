@@ -113,6 +113,9 @@ func finish_pass(confirmed := false) -> void:
 		station.model.put_down() if station.type_id == "counter" else station.model.drop(role)
 	for role in live_roles:
 		pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
+	if station.get_parent().is_showcase(station):
+		station.get_parent().finish_showcase(station.model.quality())
+		return
 	phase = "review"
 	info = "Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний."
 
@@ -122,6 +125,7 @@ func resume_pass() -> void:
 	info = "Показ продолжается. Положи нужные компоненты на подачу."
 
 func keep_pass() -> void:
+	if station.get_parent().is_showcase(station): return
 	if phase != "review": return
 	tracks = pending_tracks.duplicate(true)
 	station.drafts[dish] = tracks.duplicate(true)
@@ -139,11 +143,13 @@ func can_accept() -> bool:
 	return true
 
 func accept() -> bool:
+	if station.get_parent().is_showcase(station): return false
 	if not can_accept():
 		info = "Запиши все роли. Подтверждённый неполный результат тоже можно сохранить."
 		return false
 	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
 	station.drafts.erase(dish)
+	station.get_parent().progress.revision += 1
 	station.finish_taster(true)
 	close()
 	return true

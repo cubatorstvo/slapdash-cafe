@@ -12,6 +12,10 @@ const FACE_NAMES := ["правый", "левый", "верх", "низ", "пер
 const SAUCE_CENTER := Vector2(0.30, -0.70)
 const PLATE_CENTER := Layout.TRAY
 
+const RAMP_X := 2.65
+const RAMP_START := -0.65
+const RAMP_END := 0.85
+var sauce_ramp := false
 var plates: Array = []
 var tray_wine := 0.0
 const PLATE_RADIUS := 0.39
@@ -168,6 +172,13 @@ func put_down() -> void:
 			potato_state = _food_rest("potato", potato)
 			elevations.potato = _food_height(potato_state, potato, "potato") - BASE_Y
 	elif held == "sausage":
+		if sauce_ramp and absf(sausage.x - RAMP_X) < 0.24 and sausage.y >= RAMP_START - 0.1 and sausage.y < RAMP_END and BASE_Y + float(elevations.sausage) >= ramp_height(sausage.y) - 0.12:
+			sausage_state = "ramp"
+			sausage.x = RAMP_X
+			elevations.sausage = ramp_height(sausage.y) - BASE_Y
+			held = ""
+			_store_food("sausage")
+			return
 		sausage_state = _food_rest("sausage", sausage)
 		elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 		sausage_angle = 0
@@ -295,7 +306,24 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			sausage_velocity = motion * 0.45 + Vector2(cos(sausage_phase), sin(sausage_phase)) * 0.65
 			sausage_fall_speed = -0.5
 			falls += 1
+	elif sausage_state == "ramp" and sauce_ramp:
+		sausage.y = minf(RAMP_END, sausage.y + delta * 0.48)
+		sausage.x = RAMP_X
+		elevations.sausage = ramp_height(sausage.y) - BASE_Y
+		sausage_coating = minf(1, sausage_coating + delta * 0.60)
+		if sausage.y >= RAMP_END:
+			sausage_state = "falling"
+			sausage_fall_speed = 0.0
+			sausage_velocity = Vector2(0, 0.15)
 	elif sausage_state == "falling":
+		for i in range(plates.size()):
+			if sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
+				sausage_state = "plate_%d" % i
+				sausage_plate_offset = sausage - plates[i].point
+				elevations.sausage = float(elevations[sausage_state]) + 0.035
+				sausage_velocity = Vector2.ZERO
+				previous_sausage = sausage
+				return
 		sausage_fall_speed += delta * 4
 		elevations.sausage = clampf(float(elevations.sausage) - sausage_fall_speed * delta, support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y, MAX_LIFT)
 		sausage = (sausage + sausage_velocity * delta).clamp(-BOUNDS, BOUNDS)
@@ -567,3 +595,6 @@ func _utensil_grade(report: Dictionary) -> Dictionary:
 		report.price_factor = Quality.PRICE_FACTORS[report.grade]
 	return report
 
+
+static func ramp_height(z: float) -> float:
+	return lerpf(1.30, 0.65, clampf((z - RAMP_START) / (RAMP_END - RAMP_START), 0, 1))
