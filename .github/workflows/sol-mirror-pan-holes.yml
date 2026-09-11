@@ -1,0 +1,34 @@
+name: Sol mirror pan holes
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tmp/mirror-pan-holes.trigger'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Mirror logical holes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/cooking_model.gd')
+          s = p.read_text()
+          old = 'const HOLES := [Vector2(-0.30, -0.15), Vector2(0.30, 0.15)]'
+          new = 'const HOLES := [Vector2(-0.30, 0.15), Vector2(0.30, -0.15)]'
+          assert old in s
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit to main
+        run: |
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/cooking_model.gd
+          git commit -m "Mirror frying pan holes vertically"
+          git push origin HEAD:main
