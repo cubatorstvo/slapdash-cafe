@@ -37,20 +37,18 @@ var kitchen: Node3D
 func build(production: bool) -> void:
 	is_production = production
 	var accent := Color("72c1b0") if production else Color("efb65b")
-	Props.box(self, Vector3(4.3, 0.18, 2.25), Vector3(0, 0.86, 0), Color("a76f4e"))
-	_build_broken_countertop(Color("eddbb6"), Color("79513f"))
-	Props.collision_box(self, Vector3(4.3, 1.0, 2.25), Vector3(0, 0.5, 0))
+	_build_countertop_structure(Color("eddbb6"), Color("a76f4e"), Color("79513f"))
 	for x in [-1.85, 1.85]:
 		for z in [-0.85, 0.85]:
-			var leg_height := 0.60 if x < 0.0 and z > 0.0 else 0.83
+			var leg_height := 0.43 if x < 0.0 and z > 0.0 else 0.83
 			Props.box(self, Vector3(0.13, leg_height, 0.13), Vector3(x, leg_height * 0.5, z), Color("244047"))
-	Props.box(self, Vector3(4.3, 0.22, 0.08), Vector3(0, 0.78, 1.14), accent)
+	_build_front_accent(accent)
 	station_label = Props.text(self, "КЛОН" if production else "ПОКАЖИ КАК", Vector3(0, 0.76, 1.20), 25, Color("19353b"))
-	# Work boundary markings also make the recording's spatial limits legible.
+	# Markings follow the actual surface, including the broken corner.
 	for z in [-0.96, 0.96]:
-		Props.box(self, Vector3(3.9, 0.007, 0.018), Vector3(0, TABLE_HEIGHT + 0.004, z), accent.darkened(0.25))
+		_surface_marker(Vector2(-1.95, z), Vector2(1.95, z), accent.darkened(0.25))
 	for x in [-1.95, 1.95]:
-		Props.box(self, Vector3(0.018, 0.007, 1.94), Vector3(x, TABLE_HEIGHT + 0.004, 0), accent.darkened(0.25))
+		_surface_marker(Vector2(x, -0.96), Vector2(x, 0.96), accent.darkened(0.25))
 	tomato = Node3D.new()
 	add_child(tomato)
 	Props.ball(tomato, 0.12, Vector3(0, 0.12, 0), Color("d9483b"))
@@ -85,35 +83,81 @@ func _emit_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void
 	st.add_vertex(b)
 	st.add_vertex(c)
 
-func _extruded_polygon(points: Array, thickness: float, color: Color) -> MeshInstance3D:
-	var bottom: Array = []
-	for point in points:
-		bottom.append(point - Vector3.UP * thickness)
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for index in range(1, points.size() - 1):
-		_emit_triangle(st, points[0], points[index], points[index + 1])
-	for index in range(1, bottom.size() - 1):
-		_emit_triangle(st, bottom[0], bottom[index + 1], bottom[index])
-	for index in range(points.size()):
-		var next := (index + 1) % points.size()
-		_emit_triangle(st, points[index], bottom[index], bottom[next])
-		_emit_triangle(st, points[index], bottom[next], points[next])
-	st.generate_normals()
-	return Props.shape(self, st.commit(), Vector3.ZERO, color)
+func _collision_prism(top_points: Array) -> void:
+	var points := PackedVector3Array()
+	for point in top_points:
+		points.append(point)
+		points.append(Vector3(point.x, 0.0, point.z))
+	var body := StaticBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 2
+	add_child(body)
+	var collider := CollisionShape3D.new()
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = points
+	collider.shape = shape
+	body.add_child(collider)
 
-func _build_broken_countertop(top_color: Color, seam_color: Color) -> void:
+func _build_countertop_structure(top_color: Color, side_color: Color, seam_color: Color) -> void:
 	var layout = Model.Layout
-	var top_y := TABLE_HEIGHT
-	var thickness := 0.06
-	var far_left := Vector3(layout.TABLE_FAR_LEFT.x, top_y, layout.TABLE_FAR_LEFT.y)
-	var far_right := Vector3(layout.TABLE_FAR_RIGHT.x, top_y, layout.TABLE_FAR_RIGHT.y)
-	var near_right := Vector3(layout.TABLE_NEAR_RIGHT.x, top_y, layout.TABLE_NEAR_RIGHT.y)
-	var break_near := Vector3(layout.TABLE_BREAK_NEAR.x, top_y, layout.TABLE_BREAK_NEAR.y)
-	var near_left_low := Vector3(layout.TABLE_NEAR_LEFT.x, top_y - layout.TABLE_BREAK_DROP, layout.TABLE_NEAR_LEFT.y)
-	_extruded_polygon([far_left, far_right, near_right, break_near], thickness, top_color)
-	_extruded_polygon([far_left, near_left_low, break_near], thickness, top_color)
-	Props.line(self, far_left + Vector3.UP * 0.003, break_near + Vector3.UP * 0.003, 0.012, seam_color)
+	var far_left := Vector3(layout.TABLE_FAR_LEFT.x, TABLE_HEIGHT, layout.TABLE_FAR_LEFT.y)
+	var near_left := Vector3(layout.TABLE_NEAR_LEFT.x, TABLE_HEIGHT - layout.TABLE_BREAK_DROP, layout.TABLE_NEAR_LEFT.y)
+	var break_near := Vector3(layout.TABLE_BREAK_NEAR.x, TABLE_HEIGHT, layout.TABLE_BREAK_NEAR.y)
+	var near_right := Vector3(layout.TABLE_NEAR_RIGHT.x, TABLE_HEIGHT, layout.TABLE_NEAR_RIGHT.y)
+	var far_right := Vector3(layout.TABLE_FAR_RIGHT.x, TABLE_HEIGHT, layout.TABLE_FAR_RIGHT.y)
+	var top_st := SurfaceTool.new()
+	top_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_emit_triangle(top_st, far_left, near_left, break_near)
+	_emit_triangle(top_st, far_left, break_near, near_right)
+	_emit_triangle(top_st, far_left, near_right, far_right)
+	top_st.generate_normals()
+	var mesh := ArrayMesh.new()
+	top_st.commit(mesh)
+	var thickness := 0.18
+	var perimeter := [far_left, near_left, break_near, near_right, far_right]
+	var bottom: Array = []
+	for point in perimeter:
+		bottom.append(point - Vector3.UP * thickness)
+	var side_st := SurfaceTool.new()
+	side_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_emit_triangle(side_st, bottom[0], bottom[2], bottom[1])
+	_emit_triangle(side_st, bottom[0], bottom[3], bottom[2])
+	_emit_triangle(side_st, bottom[0], bottom[4], bottom[3])
+	for index in range(perimeter.size()):
+		var next := (index + 1) % perimeter.size()
+		_emit_triangle(side_st, perimeter[index], bottom[index], bottom[next])
+		_emit_triangle(side_st, perimeter[index], bottom[next], perimeter[next])
+	side_st.generate_normals()
+	side_st.commit(mesh)
+	var countertop := MeshInstance3D.new()
+	countertop.name = "Countertop"
+	countertop.mesh = mesh
+	add_child(countertop)
+	countertop.set_surface_override_material(0, Props.material(top_color))
+	countertop.set_surface_override_material(1, Props.material(side_color))
+	_collision_prism([far_left, break_near, near_right, far_right])
+	_collision_prism([far_left, near_left, break_near])
+	Props.line(self, far_left + Vector3.UP * 0.012, break_near + Vector3.UP * 0.012, 0.016, seam_color)
+
+func _build_front_accent(color: Color) -> void:
+	var layout = Model.Layout
+	var main_left: float = layout.TABLE_BREAK_NEAR.x
+	var main_right: float = layout.TABLE_NEAR_RIGHT.x
+	Props.box(self, Vector3(main_right - main_left, 0.22, 0.08), Vector3((main_left + main_right) * 0.5, 0.78, 1.14), color)
+	var low := Vector3(layout.TABLE_NEAR_LEFT.x, 0.78 - layout.TABLE_BREAK_DROP, 1.14)
+	var high := Vector3(layout.TABLE_BREAK_NEAR.x, 0.78, 1.14)
+	var bar := Props.box(self, Vector3(low.distance_to(high), 0.22, 0.08), (low + high) * 0.5, color)
+	bar.rotation.z = atan2(high.y - low.y, high.x - low.x)
+
+func _surface_marker(start: Vector2, end: Vector2, color: Color) -> void:
+	var layout = Model.Layout
+	const SEGMENTS := 16
+	for index in range(SEGMENTS):
+		var a2 := start.lerp(end, float(index) / SEGMENTS)
+		var b2 := start.lerp(end, float(index + 1) / SEGMENTS)
+		var a := Vector3(a2.x, layout.table_height(a2) + 0.008, a2.y)
+		var b := Vector3(b2.x, layout.table_height(b2) + 0.008, b2.y)
+		Props.line(self, a, b, 0.009, color)
 
 func _build_grip_marker() -> void:
 	grip_marker = Node3D.new()

@@ -6,7 +6,7 @@ const TABLE_FAR_RIGHT := Vector2(TABLE_HALF.x, -TABLE_HALF.y)
 const TABLE_NEAR_LEFT := Vector2(-TABLE_HALF.x, TABLE_HALF.y)
 const TABLE_NEAR_RIGHT := Vector2(TABLE_HALF.x, TABLE_HALF.y)
 const TABLE_BREAK_NEAR := Vector2(-0.75, TABLE_HALF.y)
-const TABLE_BREAK_DROP := 0.24
+const TABLE_BREAK_DROP := 0.40
 const SHELF_HALF := Vector2(0.55, 0.275)
 const SHELF_YAW := PI / 4.0
 const LEVELS := [0.35, 0.85, 1.40]
@@ -43,11 +43,20 @@ static func broken_corner_height(point: Vector2) -> float:
 	var weights := broken_corner_weights(point)
 	return TABLE_Y - TABLE_BREAK_DROP * weights.y
 
+static func broken_corner_run() -> float:
+	var seam := TABLE_BREAK_NEAR - TABLE_FAR_LEFT
+	var t := clampf((TABLE_NEAR_LEFT - TABLE_FAR_LEFT).dot(seam) / maxf(seam.length_squared(), 0.000001), 0.0, 1.0)
+	return TABLE_NEAR_LEFT.distance_to(TABLE_FAR_LEFT.lerp(TABLE_BREAK_NEAR, t))
+
 static func broken_corner_downhill() -> Vector2:
 	var seam := TABLE_BREAK_NEAR - TABLE_FAR_LEFT
 	var t := clampf((TABLE_NEAR_LEFT - TABLE_FAR_LEFT).dot(seam) / maxf(seam.length_squared(), 0.000001), 0.0, 1.0)
 	var closest := TABLE_FAR_LEFT.lerp(TABLE_BREAK_NEAR, t)
 	return (TABLE_NEAR_LEFT - closest).normalized()
+
+static func broken_corner_roll_acceleration() -> Vector2:
+	var slope_angle := atan2(TABLE_BREAK_DROP, maxf(broken_corner_run(), 0.000001))
+	return broken_corner_downhill() * 9.81 * sin(slope_angle)
 
 static func shelf_offset(local_point: Vector2) -> Vector2:
 	var c := cos(SHELF_YAW)

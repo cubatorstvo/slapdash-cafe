@@ -242,7 +242,7 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			if absf(offset.x - hole.x) < 0.11 and absf(offset.y - hole.y) < 0.11:
 				potato_state = "falling"
 				fall_speed = 0
-				potato_velocity = Vector2(0, 0.9)
+				potato_velocity *= 0.92
 				falls += 1
 		if potato_state == "pan":
 			var bottom := potato_orientation.inverse() * Vector3.DOWN
@@ -258,25 +258,22 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			potato_state = "table"
 	elif potato_state == "table":
 		if Layout.broken_corner_contains(potato):
-			potato_velocity += Layout.broken_corner_downhill() * 2.8 * delta
-			potato_velocity *= exp(-0.9 * delta)
-			var travel := potato_velocity * delta
-			potato += travel
-			if travel.length() > 0.00001:
-				var axis := Vector3(travel.y, 0, -travel.x).normalized()
-				potato_orientation = (Quaternion(axis, travel.length() / 0.14) * potato_orientation).normalized()
-			if Layout.table_contains(potato):
-				elevations.potato = Layout.table_height(potato) - BASE_Y
-			else:
-				potato_state = "falling"
-				fall_speed = 0.0
-		elif Layout.table_contains(potato) and potato_velocity.length() > 0:
-			var before := potato.y
-			potato.y = minf(0.78, potato.y + potato_velocity.y * delta)
-			potato_orientation = (Quaternion(Vector3.RIGHT, (potato.y - before) / 0.14) * potato_orientation).normalized()
-			if potato.y >= 0.78: potato_velocity = Vector2.ZERO
+			potato_velocity += Layout.broken_corner_roll_acceleration() * delta
+			potato_velocity *= exp(-0.75 * delta)
 		else:
-			potato_velocity = potato_velocity.move_toward(Vector2.ZERO, delta * 1.8)
+			potato_velocity *= exp(-2.8 * delta)
+		var travel := potato_velocity * delta
+		potato += travel
+		if travel.length() > 0.00001:
+			var axis := Vector3(travel.y, 0, -travel.x).normalized()
+			potato_orientation = (Quaternion(axis, travel.length() / 0.14) * potato_orientation).normalized()
+		if Layout.table_contains(potato):
+			elevations.potato = Layout.table_height(potato) - BASE_Y
+		else:
+			potato_state = "falling"
+			fall_speed = 0.0
+		if potato_velocity.length() < 0.015:
+			potato_velocity = Vector2.ZERO
 
 func _step_sausage(delta: float, use_item: bool) -> void:
 	var motion := (sausage - previous_sausage) / maxf(delta, 0.001)
