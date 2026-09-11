@@ -260,7 +260,7 @@ func _physics_process(delta: float) -> void:
 	service.refresh_views(delta)
 	refresh_hud()
 	feedback.update(delta)
-	if menu.opened(): hud.recipe_panel.hide()
+	if menu.opened() or cookbook.opened: hud.recipe_panel.hide()
 	hud.bottom.visible = false
 	hud.crosshair.visible = not cookbook.opened and not menu.opened()
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
