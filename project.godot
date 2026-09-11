@@ -23,6 +23,10 @@ window/size/window_width_override=1280
 window/size/window_height_override=800
 window/stretch/mode="canvas_items"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/steam_export/plugin.cfg")
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
@@ -31,10 +35,6 @@ anti_aliasing/quality/msaa_3d=2
 environment/defaults/default_clear_color=Color(0.055, 0.09, 0.11, 1)
 
 [steam]
+
 initialization/app_data/app_id=480
 initialization/processes/initialize_on_startup=true
-initialization/processes/embed_callbacks=false
-multiplayer_peer/max_channels=4
-
-[editor_plugins]
-enabled=PackedStringArray("res://addons/steam_export/plugin.cfg")
