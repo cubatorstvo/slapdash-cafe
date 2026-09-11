@@ -50,8 +50,11 @@ func _ready() -> void:
 	order.add_child(progress)
 	progress.hide()
 	recipe_panel = _panel(root)
-	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	recipe_panel.position = Vector2(26, 110)
+	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	recipe_panel.offset_left = -346
+	recipe_panel.offset_right = -26
+	recipe_panel.offset_top = 110
+	recipe_panel.offset_bottom = 110
 	recipe_panel.custom_minimum_size = Vector2(320, 0)
 	recipe_scroll = ScrollContainer.new()
 	recipe_panel.add_child(recipe_scroll)
@@ -122,8 +125,11 @@ func _ready() -> void:
 	pause_panel.hide()
 
 func show_recipe(report: Dictionary, dish: String) -> void:
+	show_production_recipe(report, dish, 0.0)
+
+func show_production_recipe(report: Dictionary, dish: String, duration: float) -> void:
 	recipe_panel.show()
-	var stamp: String = JSON.stringify(report.components)+report.grade+dish
+	var stamp := "%s:%s:%.3f" % [dish, JSON.stringify(report), duration]
 	if stamp == recipe_stamp: return
 	recipe_stamp = stamp
 	for child in recipe_content.get_children(): recipe_content.remove_child(child); child.queue_free()
@@ -137,9 +143,11 @@ func show_recipe(report: Dictionary, dish: String) -> void:
 	icon.custom_minimum_size = Vector2(42,42)
 	var name := _label(heading, Data.title(dish), 14, CafeStyle.GOLD)
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var grade := _label(heading, report.grade, 30, CafeStyle.MINT if report.grade in ["S","A"] else CafeStyle.GOLD)
-	grade.tooltip_text = "Качество поданной еды"
-	for component in report.components:
+	var grade := _label(heading, str(report.get("grade", "")), 30, CafeStyle.MINT if str(report.get("grade", "")) in ["S","A"] else CafeStyle.GOLD)
+	grade.tooltip_text = "Итоговая оценка записанного блюда"
+	grade.mouse_filter = Control.MOUSE_FILTER_STOP
+	_label(recipe_content, "Запись клона · %.1f с" % duration, 14, CafeStyle.GOLD)
+	for component in report.get("components", []):
 		_label(recipe_content, ("✓  " if component.served else "○  ") + component.name, 18, CafeStyle.MINT if component.served else CafeStyle.CREAM)
 		for line in component.lines:
 			var detail := _label(recipe_content, str(line), 14, Color("c5d2c8"))
@@ -147,6 +155,15 @@ func show_recipe(report: Dictionary, dish: String) -> void:
 			detail.custom_minimum_size.x = 268
 		_label(recipe_content, "", 2)
 	recipe_scroll.custom_minimum_size.y = mini(recipe_content.get_combined_minimum_size().y + 8, 360)
+
+func recipe_panel_text() -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for child in recipe_content.get_children():
+		if child is Label: parts.append(child.text)
+		elif child is HBoxContainer:
+			for nested in child.get_children():
+				if nested is Label: parts.append(nested.text)
+	return " ".join(parts)
 
 func show_toast(message: String) -> void:
 	if toast_tween != null: toast_tween.kill()

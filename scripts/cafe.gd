@@ -281,12 +281,11 @@ func refresh_hud() -> void:
 		if station != null:
 			if hud.prompt.text.is_empty(): hud.prompt.text = "[E] %s" % station.Definition.TYPES[station.type_id].title
 			if station.state == "cooking":
-				hud.recipe_panel.show()
-				hud.show_recipe(station.model.quality(), station.order_dish)
-				hud.goal.text = station.Definition.DISHES[station.order_dish]
+				var record: Dictionary = station.recipes.get(station.order_dish, {})
+				if record.has("quality"):
+					hud.show_production_recipe(record.quality, station.order_dish, float(record.duration))
+					hud.goal.text = station.Definition.DISHES[station.order_dish]
 		return
-	hud.recipe_panel.show()
-	hud.show_recipe(station.model.quality(), station.training.dish)
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)

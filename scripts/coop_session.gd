@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-stations-7"
+const PROTOCOL := "slapdash-cafe-stations-8"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -343,8 +343,11 @@ func _world(packet: PackedByteArray) -> void:
 		station.rotation.y = entry.yaw
 		station.crew = entry.crew
 		station.state = entry.state
+		station.order_dish = str(entry.get("order_dish", ""))
 		station.recipes = {}
-		for key in entry.known: station.recipes[key] = {"duration": entry.recipe_times[key]}
+		var qualities: Dictionary = entry.get("recipe_quality", {})
+		for key in entry.known:
+			station.recipes[key] = {"duration": entry.recipe_times[key], "quality": qualities.get(key, {})}
 		station.model.restore(entry.model)
 		station.training.apply_summary(entry.training)
 		station.remote_summary = entry.training
