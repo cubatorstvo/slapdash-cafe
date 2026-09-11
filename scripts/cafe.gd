@@ -152,9 +152,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if recording and event is InputEventMouseButton and event.pressed:
 		match event.button_index:
 			MOUSE_BUTTON_LEFT:
-				if station.bell_hit(camera):
-					session.request_action({"action": "ring", "station": station.station_id})
-					return
 				var item: String = held_item(station)
 				var command: Dictionary = {"drop": true} if not item.is_empty() else {"grab": station.view.pick_item(camera)}
 				if command.has("grab") and not str(command.grab).is_empty(): taught.grab = true

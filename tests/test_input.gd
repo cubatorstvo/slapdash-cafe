@@ -68,6 +68,20 @@ func run() -> void:
 	game.target = Vector2(1.4, 2.0)
 	check(game.build_motion(station, 0).height == 0.0, "Returning over floor retains table height")
 	game.precise = false
+	station.model.drop(1)
+	station.training.tick = 1
+	game.camera.look_at(station.bell.global_position)
+	check(station.bell_hit(game.camera), "Bell is under the crosshair for the input regression")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	game._unhandled_input(click)
+	check(station.training.phase == "recording" and station.bell_count() == 0, "LMB over the bell never finishes the take")
+	var finish := InputEventKey.new()
+	finish.physical_keycode = KEY_E
+	finish.pressed = true
+	game._unhandled_input(finish)
+	check(station.training.phase == "confirm_finish" and station.bell_count() == 1, "E over the bell finishes the take")
 	station.training.close()
 	game.bind_training()
 	check(not game.player.constrained, "Leaving lesson restores free movement")
