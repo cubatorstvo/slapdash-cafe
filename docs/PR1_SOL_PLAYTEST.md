@@ -42,15 +42,17 @@ tests/test_cookbook.gd с verbose, tests/test_quality.gd, tests/test_input.gd. �
 
 Причина — **расписание теста**, не игровая репликация. Наблюдатель ждал `kitchen.training.phase == recording`. Хост и гость могли закрыть проход (гость выходит → хост отменяет запись участника) до того, как наблюдатель увидит короткое окно.
 
-Исправление только в тестовом сценарии:
+Исправление только в тестовом сценарии. Handshake двухфазный:
 
-1. Хост открывает кухню `meal` с двумя живыми ролями и **держит** `recording`, пока не придёт ack.
-2. Наблюдатель после синка проверяет блюдо, фазу, `live_roles` и участников, затем шлёт RPC `kitchen-live`.
-3. Гость не выходит, пока нет ack наблюдателя.
-4. Хост после ack позволяет завершение (уход гостя закрывает проход).
-5. Наблюдатель проверяет `idle`.
+1. Хост открывает кухню `meal` с двумя живыми ролями и **держит** `recording`.
+2. Наблюдатель проверяет блюдо, фазу, `live_roles` и участников, затем шлёт `kitchen-live`.
+3. Хост, всё ещё в `recording`, отвечает `kitchen-release`.
+4. Гость выходит только после `kitchen-release` от peer `1`.
+5. Наблюдатель сначала видит host release, затем `idle`.
 6. Таймаут: `role=… stage=… expected=… kitchen=… station1/2=… acks=… members=…`.
 7. Обёртка по-прежнему валит прогон на `SCRIPT ERROR` / `ERROR:` / `FAIL:` / отсутствие `PASS:` / ненулевой код любого процесса.
+
+Последовательность: `observer kitchen-live ACK → host kitchen-release → guest leaves → observer sees idle`.
 
 Барьер: `tests/online_barrier.gd` (дочерний узел `Session/OnlineBarrier`, одинаковый путь у всех пиров).
 
@@ -58,7 +60,7 @@ tests/test_cookbook.gd с verbose, tests/test_quality.gd, tests/test_input.gd. �
 
 | Сбой | Причина | Исправление |
 |---|---|---|
-| Observer `Timeout at stage 1` (флейк) | Тест ждал фазу, которую могли закрыть раньше | Явный ack `kitchen-live` |
+| Observer `Timeout at stage 1` (флейк) | Тест ждал фазу, которую могли закрыть раньше | Явный ack `kitchen-live`, затем host `kitchen-release` |
 | Живой прогресс макарон `0%` / `0/100 г` / соль `×` на скрине | `start_pass([1, 0])` оставляет зону макарон неактивной; `_restore_inactive` обнуляет её каждый тик | Для кадра и регрессии обе роли живые `[1, 2]`; `test_cookbook.gd` проверяет `40/100 г` и `Соль [✓]` после тика |
 | На живом кадре книги поверх страницы `[E] Тарелка стойка` | Physics выключен для заморозки прогресса, HUD не чистился | Capture гасит prompt и label стойки |
 
@@ -69,7 +71,7 @@ tests/test_cookbook.gd с verbose, tests/test_quality.gd, tests/test_input.gd. �
 | Файл | Назначение |
 |---|---|
 | `tests/online_barrier.gd` | Тестовый RPC-барьер подтверждений этапа |
-| `tests/test_online_cafe.gd` | Сценарий host/guest/observer с ack и подробным таймаутом |
+| `tests/test_online_cafe.gd` | Сценарий host/guest/observer: `kitchen-live` → `kitchen-release` → idle |
 | `tests/run_online_cafe_test.py` | Каталог логов и строка `CODES: host=… guest=… observer=…` |
 | `tests/test_cookbook.gd` | Регрессия: две живые роли кухни сохраняют массу и соль макарон |
 | `tests/capture_cookbook.gd` | Скриншоты и кадры последовательности для Sol/владельца |
@@ -86,6 +88,7 @@ Godot: `/tmp/godot/godot` → `4.7.stable.official.5b4e0cb0f`.
 | `godot --headless --path . --script tests/test_quality.gd` | **0** | `PASS: live grading, partial recipes, independent stock and conserved pouring` |
 | `godot --headless --path . --script tests/test_input.gd` | **0** | `PASS: item input, prank replay and FPS zones` |
 | `python3 tests/run_online_cafe_test.py /tmp/godot/godot <dir>` ×5 | **0,0,0,0,0** | Каждый прогон `CODES: host=0 guest=0 observer=0`, все три `PASS:` |
+| `python3 tests/run_online_cafe_test.py /tmp/godot/godot …/online-release-1` | **0** | Двухфазный handshake: host получает observer ACK до `kitchen-release`; guest и observer получают host release до leave/`idle`. `CODES: host=0 guest=0 observer=0` |
 
 Полные логи:
 
@@ -94,6 +97,7 @@ Godot: `/tmp/godot/godot` → `4.7.stable.official.5b4e0cb0f`.
 - [test_input.log](https://github.com/cubatorstvo/slapdash-cafe/blob/cursor/finish-cookbook-bell-and-cooking-polish-fee5/docs/verification/sol-playtest/test_input.log)
 - [online_five_summary.txt](https://github.com/cubatorstvo/slapdash-cafe/blob/cursor/finish-cookbook-bell-and-cooking-polish-fee5/docs/verification/sol-playtest/online_five_summary.txt)
 - [online-run-1](https://github.com/cubatorstvo/slapdash-cafe/tree/cursor/finish-cookbook-bell-and-cooking-polish-fee5/docs/verification/sol-playtest/online-run-1) … [online-run-5](https://github.com/cubatorstvo/slapdash-cafe/tree/cursor/finish-cookbook-bell-and-cooking-polish-fee5/docs/verification/sol-playtest/online-run-5)
+- [online-release-1](https://github.com/cubatorstvo/slapdash-cafe/tree/cursor/finish-cookbook-bell-and-cooking-polish-fee5/docs/verification/sol-playtest/online-release-1) — двухфазный `kitchen-live` / `kitchen-release`
 
 Cookbook по-прежнему проверяет UV меша (`UV.y = local.z/PAGE.y+0.5`), клик верхней кнопки оглавления и нижней «Закрыть»/«Содержание», сброс hover-подсказки, совместимость старых кадров без `presentation`, остановку аудио перед `free()`.
 
