@@ -93,14 +93,18 @@ func run() -> void:
 	game.menu.close()
 	game.set_physics_process(false)
 	apply_partial_meal(kitchen)
+	if kitchen.view.station_label: kitchen.view.station_label.visible = false
 	reset_reader(game)
 	game.player.global_position = kitchen.to_global(Vector3(-1.2, 0.02, 1.7))
 	game.player.rotation.y = kitchen.global_rotation.y
 	game.camera.rotation.x = -0.12
 	game.cookbook.toggle()
+	game.hud.prompt.text = ""
+	game.hud.recipe_panel.hide()
 	await wait_frames(0.35)
 	apply_partial_meal(kitchen)
 	game.cookbook.physical.set_live(kitchen.model)
+	game.hud.prompt.text = ""
 	await wait_frames(0.05)
 	print("LIVE: ", str(preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)))
 	await snap("playtest_live_meal_1280")

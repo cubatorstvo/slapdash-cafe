@@ -1,0 +1,117 @@
+WorkerThreadPool: 4 threads, 1 max low-priority.
+[S_API] SteamAPI_Init(): SteamAPI_IsSteamRunning() did not locate a running instance of Steam.
+dlopen failed trying to load:
+/home/ubuntu/.steam/sdk64/steamclient.so
+with error:
+/home/ubuntu/.steam/sdk64/steamclient.so: cannot open shared object file: No such file or directory
+[S_API] SteamAPI_Init(): Failed to load module '/home/ubuntu/.steam/sdk64/steamclient.so'
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+TextServer: Added interface "Dummy"
+TextServer: Added interface "ICU / HarfBuzz / Graphite (Built-in)"
+SDL: Init OK!
+Using "default" pen tablet driver...
+
+TextServer: Primary interface set to: "ICU / HarfBuzz / Graphite (Built-in)".
+CORE API HASH: 3472268009
+EDITOR API HASH: 2212757246
+Loading resource: res://tests/test_cookbook.gd remapped: res://tests/test_cookbook.gd
+Loading resource: res://scenes/cafe.tscn remapped: res://scenes/cafe.tscn
+Loading resource: res://scripts/cafe.gd remapped: res://scripts/cafe.gd
+Loading resource: res://assets/ui/wine.svg remapped: res://assets/ui/wine.svg
+Loading resource: res://.godot/imported/wine.svg-7721b366ff94d015a8f93cc61f9e13bd.ctex remapped: res://.godot/imported/wine.svg-7721b366ff94d015a8f93cc61f9e13bd.ctex
+Completed load for: 'res://assets/ui/wine.svg' remapped 'res://assets/ui/wine.svg' at thread -1
+Loading resource: res://assets/ui/potato.svg remapped: res://assets/ui/potato.svg
+Loading resource: res://.godot/imported/potato.svg-fa573cb764ba3f715b27d665f8c6c3b9.ctex remapped: res://.godot/imported/potato.svg-fa573cb764ba3f715b27d665f8c6c3b9.ctex
+Completed load for: 'res://assets/ui/potato.svg' remapped 'res://assets/ui/potato.svg' at thread -1
+Loading resource: res://assets/ui/sausage.svg remapped: res://assets/ui/sausage.svg
+Loading resource: res://.godot/imported/sausage.svg-bc6fa1fb584594c2668662ecab95a386.ctex remapped: res://.godot/imported/sausage.svg-bc6fa1fb584594c2668662ecab95a386.ctex
+Completed load for: 'res://assets/ui/sausage.svg' remapped 'res://assets/ui/sausage.svg' at thread -1
+Loading resource: res://assets/ui/meal.svg remapped: res://assets/ui/meal.svg
+Loading resource: res://.godot/imported/meal.svg-e58373b856762d87d1015313c001ba55.ctex remapped: res://.godot/imported/meal.svg-e58373b856762d87d1015313c001ba55.ctex
+Completed load for: 'res://assets/ui/meal.svg' remapped 'res://assets/ui/meal.svg' at thread -1
+Loading resource: res://assets/audio/page.wav remapped: res://assets/audio/page.wav
+Loading resource: res://.godot/imported/page.wav-b0d274802eb760ac058485c7ed98c6c3.sample remapped: res://.godot/imported/page.wav-b0d274802eb760ac058485c7ed98c6c3.sample
+Completed load for: 'res://assets/audio/page.wav' remapped 'res://assets/audio/page.wav' at thread -1
+Loading resource: res://assets/ui/record.svg remapped: res://assets/ui/record.svg
+Loading resource: res://.godot/imported/record.svg-86f4c42c97abc332de6682d69d1ae3c7.ctex remapped: res://.godot/imported/record.svg-86f4c42c97abc332de6682d69d1ae3c7.ctex
+Completed load for: 'res://assets/ui/record.svg' remapped 'res://assets/ui/record.svg' at thread -1
+Loading resource: res://assets/audio/bell.wav remapped: res://assets/audio/bell.wav
+Loading resource: res://.godot/imported/bell.wav-c9e8b15c72938ff0cc4247d900f73a2f.sample remapped: res://.godot/imported/bell.wav-c9e8b15c72938ff0cc4247d900f73a2f.sample
+Completed load for: 'res://assets/audio/bell.wav' remapped 'res://assets/audio/bell.wav' at thread -1
+Loading resource: res://assets/audio/ready.wav remapped: res://assets/audio/ready.wav
+Loading resource: res://.godot/imported/ready.wav-b90efe24faa05372f3b25ab2e0f1b3d9.sample remapped: res://.godot/imported/ready.wav-b90efe24faa05372f3b25ab2e0f1b3d9.sample
+Completed load for: 'res://assets/audio/ready.wav' remapped 'res://assets/audio/ready.wav' at thread -1
+Loading resource: res://assets/audio/place.wav remapped: res://assets/audio/place.wav
+Loading resource: res://.godot/imported/place.wav-1edabb5558d5fd30aa083ae98cd39bf2.sample remapped: res://.godot/imported/place.wav-1edabb5558d5fd30aa083ae98cd39bf2.sample
+Completed load for: 'res://assets/audio/place.wav' remapped 'res://assets/audio/place.wav' at thread -1
+Loading resource: res://assets/audio/click.wav remapped: res://assets/audio/click.wav
+Loading resource: res://.godot/imported/click.wav-726094e36c7052fadb6392aaf7409595.sample remapped: res://.godot/imported/click.wav-726094e36c7052fadb6392aaf7409595.sample
+Completed load for: 'res://assets/audio/click.wav' remapped 'res://assets/audio/click.wav' at thread -1
+Loading resource: res://assets/audio/pour.wav remapped: res://assets/audio/pour.wav
+Loading resource: res://.godot/imported/pour.wav-7fc33eaa0f3ad85bdcfcfd01fc35520b.sample remapped: res://.godot/imported/pour.wav-7fc33eaa0f3ad85bdcfcfd01fc35520b.sample
+Completed load for: 'res://assets/audio/pour.wav' remapped 'res://assets/audio/pour.wav' at thread -1
+Loading resource: res://assets/audio/fry.wav remapped: res://assets/audio/fry.wav
+Loading resource: res://.godot/imported/fry.wav-4bda4d37c1e5a693aa10c18432b934b3.sample remapped: res://.godot/imported/fry.wav-4bda4d37c1e5a693aa10c18432b934b3.sample
+Completed load for: 'res://assets/audio/fry.wav' remapped 'res://assets/audio/fry.wav' at thread -1
+Loading resource: res://assets/audio/salt.wav remapped: res://assets/audio/salt.wav
+Loading resource: res://.godot/imported/salt.wav-e19bcce76e1f32dd1c519a730d43b34d.sample remapped: res://.godot/imported/salt.wav-e19bcce76e1f32dd1c519a730d43b34d.sample
+Completed load for: 'res://assets/audio/salt.wav' remapped 'res://assets/audio/salt.wav' at thread -1
+Completed load for: 'res://scripts/cafe.gd' remapped 'res://scripts/cafe.gd' at thread -1
+Completed load for: 'res://scenes/cafe.tscn' remapped 'res://scenes/cafe.tscn' at thread -1
+Completed load for: 'res://tests/test_cookbook.gd' remapped 'res://tests/test_cookbook.gd' at thread -1
+SceneTreeFTI: traversal method DEFAULT
+Loaded system CA certificates
+PASS: cookbook, recording compatibility, presence and bell
+XR: Clearing primary interface
+XR: Removed interface "Native mobile"
+XR: Removed interface "OpenXR"
+Orphan StringName: RenderingDevice (static: 0, total: 2)
+Orphan StringName: Mesh (static: 0, total: 2)
+Orphan StringName: Tween (static: 0, total: 2)
+Orphan StringName: Shader (static: 0, total: 2)
+Orphan StringName: MainLoop (static: 0, total: 2)
+Orphan StringName: TriangleMesh (static: 0, total: 2)
+Orphan StringName: InputEvent (static: 0, total: 2)
+Orphan StringName: SteamMultiplayerPeer (static: 0, total: 2)
+Orphan StringName: WorkerThreadPool (static: 0, total: 2)
+Orphan StringName: Shape3D (static: 0, total: 2)
+Orphan StringName: Steam (static: 0, total: 2)
+Orphan StringName: MultiplayerPeer (static: 0, total: 2)
+Orphan StringName: ScriptLanguage (static: 0, total: 2)
+Orphan StringName: Font (static: 0, total: 2)
+Orphan StringName: RenderingServer (static: 0, total: 2)
+Orphan StringName: Image (static: 0, total: 2)
+Orphan StringName: Resource (static: 0, total: 2)
+Orphan StringName: OS (static: 0, total: 2)
+Orphan StringName: Viewport (static: 0, total: 2)
+Orphan StringName: MultiplayerAPI (static: 0, total: 2)
+Orphan StringName: DisplayServer (static: 0, total: 2)
+Orphan StringName: PacketPeer (static: 0, total: 2)
+Orphan StringName: FileAccess (static: 0, total: 2)
+Orphan StringName: ConcavePolygonShape3D (static: 0, total: 2)
+Orphan StringName: PacketPeerExtension (static: 0, total: 2)
+Orphan StringName: CanvasItem (static: 0, total: 2)
+Orphan StringName: SceneTree (static: 0, total: 2)
+Orphan StringName: Texture (static: 0, total: 2)
+Orphan StringName: CanvasLayer (static: 0, total: 2)
+Orphan StringName: World2D (static: 0, total: 2)
+Orphan StringName: Material (static: 0, total: 2)
+Orphan StringName: Node (static: 0, total: 2)
+Orphan StringName: ProjectSettings (static: 0, total: 2)
+Orphan StringName: TextServer (static: 0, total: 2)
+Orphan StringName: RefCounted (static: 0, total: 2)
+Orphan StringName: Engine (static: 0, total: 2)
+Orphan StringName: Object (static: 1, total: 3)
+Orphan StringName: Theme (static: 0, total: 2)
+Orphan StringName: MultiplayerPeerExtension (static: 0, total: 2)
+Orphan StringName: SteamPacketPeer (static: 0, total: 2)
+Orphan StringName: RDPipelineSpecializationConstant (static: 0, total: 2)
+Orphan StringName: ConvexPolygonShape3D (static: 0, total: 2)
+Orphan StringName: MultiMesh (static: 0, total: 2)
+Orphan StringName: XMLParser (static: 0, total: 2)
+Orphan StringName: Texture2D (static: 0, total: 2)
+Orphan StringName: Window (static: 0, total: 2)
+Orphan StringName: StyleBox (static: 0, total: 2)
+Orphan StringName: ClassDB (static: 0, total: 2)
+StringName: 48 unclaimed string names at exit.
+EXIT test_cookbook=0
