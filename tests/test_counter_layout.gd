@@ -4,9 +4,9 @@ func _initialize() -> void: run.call_deferred()
 func run() -> void:
 	var m = Model.new()
 	m.reset("sausage")
-	var expected_shelf_center: Vector2 = m.Layout.SHELF_HOME + m.Layout.shelf_forward() * (m.Layout.SHELF_HALF.y * 0.5)
-	assert(m.Layout.shelf_center().distance_to(expected_shelf_center) < 0.0001, "product shelf should be pulled forward by one quarter depth")
-	assert(is_equal_approx(m.Layout.SHELF_YAW, PI / 4.0), "product shelf should face the cook at 45 degrees")
+	var shelf_right_near: Vector2 = m.Layout.shelf_point(Vector2(m.Layout.SHELF_HALF.x, m.Layout.SHELF_HALF.y))
+	assert(shelf_right_near.distance_to(m.Layout.TABLE_NEAR_LEFT) < 0.0001, "product shelf right-near corner should meet the table left-near corner")
+	assert(is_equal_approx(m.Layout.SHELF_YAW, PI / 4.0), "product shelf should meet the table at 45 degrees")
 	for point in [m.jug, m.tomato, m.potatoes[0].potato, m.potatoes[1].potato, m.potatoes[2].potato, m.sausages[0].sausage, m.sausages[1].sausage, m.sausages[2].sausage]:
 		assert(m.Layout.shelf_contains(point), "initial stock should remain on the rotated shelf")
 	m.pick_up("plate_2")
