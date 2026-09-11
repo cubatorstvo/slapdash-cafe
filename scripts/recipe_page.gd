@@ -19,23 +19,23 @@ func _ready() -> void:
 	var margin := MarginContainer.new()
 	add_child(margin)
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_top", 26)
-	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_bottom", 16)
 	var hold := VBoxContainer.new()
 	margin.add_child(hold)
-	hold.add_theme_constant_override("separation", 10)
+	hold.add_theme_constant_override("separation", 8)
 	column = VBoxContainer.new()
 	hold.add_child(column)
 	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation", 6)
 	note = Label.new()
 	hold.add_child(note)
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.add_theme_font_size_override("font_size", 15)
+	note.add_theme_font_size_override("font_size", 26)
 	note.add_theme_color_override("font_color", Color("5a6b62"))
-	note.custom_minimum_size.x = 520
+	note.custom_minimum_size = Vector2(560, 72)
 
 func show_page(page: String, model = null) -> void:
 	var key := "%s:%s" % [page, JSON.stringify(Data.components(page, model)) if page != "index" else "index"]
@@ -46,66 +46,78 @@ func show_page(page: String, model = null) -> void:
 	if name.ends_with("L"): _left(page, model)
 	else: _right(page, model)
 
+func find_button(text: String) -> Button:
+	for child in column.get_children():
+		if child is Button and str(child.text) == text: return child
+	for child in column.get_children():
+		if child is Button and str(child.text).contains(text): return child
+	return null
+
 func _left(page: String, _model) -> void:
-	_label("SLAPDASH / КУХОННЫЕ ЗАМЕТКИ", 13, Color("6d7f78"))
+	_label("SLAPDASH / КУХОННЫЕ ЗАМЕТКИ", 16, Color("6d7f78"))
 	if page == "index":
-		_label("Поварская книга", 36)
-		_button("Закрыть", closed.emit)
+		_label("Поварская книга", 44)
+		_button("Закрыть", closed.emit, 30, 64)
 	else:
-		_label(Data.title(page), 32)
+		_label(Data.title(page), 44)
 		var art := TextureRect.new()
 		column.add_child(art)
 		art.texture = Data.ICONS[page]
 		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art.custom_minimum_size = Vector2(200, 168)
-		_button("Содержание", chosen.emit.bind("index"))
-		_button("Закрыть", closed.emit)
+		art.custom_minimum_size = Vector2(180, 110)
+		_button("Содержание", chosen.emit.bind("index"), 30, 64)
+		_button("Закрыть", closed.emit, 30, 64)
 
 func _right(page: String, model) -> void:
 	if page == "index":
-		_label("Сегодня в меню", 24)
+		_label("Сегодня в меню", 28)
 		for key in Data.ORDER:
-			var entry := _button(Data.title(key), chosen.emit.bind(key))
+			var entry := _button(Data.title(key), chosen.emit.bind(key), 34, 76)
 			entry.icon = Data.ICONS[key]
 			entry.expand_icon = true
-			entry.add_theme_constant_override("icon_max_width", 42)
+			entry.add_theme_constant_override("icon_max_width", 48)
 			entry.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			entry.custom_minimum_size.y = 56
 	else:
-		_label("Что должно получиться", 22)
+		_label("Что должно получиться", 28)
 		for component in Data.components(page, model):
 			var head := HBoxContainer.new()
 			column.add_child(head)
+			head.add_theme_constant_override("separation", 10)
+			head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			var mark := Label.new()
 			head.add_child(mark)
 			mark.text = "✓" if component.served else "○"
-			mark.add_theme_font_size_override("font_size", 18)
+			mark.add_theme_font_size_override("font_size", 42)
 			mark.add_theme_color_override("font_color", Color("3d8f74") if component.served else Color("8a9690"))
 			var title := Label.new()
 			head.add_child(title)
 			title.text = component.name
-			title.add_theme_font_size_override("font_size", 20)
+			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			title.add_theme_font_size_override("font_size", 42)
 			title.add_theme_color_override("font_color", CafeStyle.INK)
 			for i in range(component.lines.size()):
-				var row := _label(component.lines[i], 19)
+				var row := _label(component.lines[i], 38)
 				row.mouse_filter = Control.MOUSE_FILTER_STOP
 				row.mouse_entered.connect(func(): note.text = component.details[i])
 				row.mouse_exited.connect(func(): if note.text == component.details[i]: note.text = "")
 
-func _label(text: String, size := 18, color := CafeStyle.INK) -> Label:
+func _label(text: String, size := 38, color := CafeStyle.INK) -> Label:
 	var node := Label.new()
 	node.text = text
 	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	node.custom_minimum_size.x = 520
+	node.custom_minimum_size.x = 560
 	node.add_theme_font_size_override("font_size", size)
 	node.add_theme_color_override("font_color", color)
 	column.add_child(node)
 	return node
 
-func _button(text: String, callback: Callable) -> Button:
+func _button(text: String, callback: Callable, font := 30, height := 64) -> Button:
 	var node := Button.new()
 	node.text = text
 	node.pressed.connect(callback)
+	node.add_theme_font_size_override("font_size", font)
+	node.custom_minimum_size.y = height
+	node.clip_text = true
 	column.add_child(node)
 	return node

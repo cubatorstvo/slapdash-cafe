@@ -55,10 +55,8 @@ func _input(event: InputEvent) -> void:
 	if not opened or not is_instance_valid(physical): return
 	if event is InputEventMouse:
 		var hit: Dictionary = physical.hit_from_screen(game.camera, event.position)
-		if not hit.is_empty():
-			physical.feed_pointer(event, hit)
-			get_viewport().set_input_as_handled()
-		elif event is InputEventMouseButton and event.pressed:
+		physical.feed_pointer(event, hit)
+		if not hit.is_empty() or event is InputEventMouseButton:
 			get_viewport().set_input_as_handled()
 
 func shutdown() -> void:

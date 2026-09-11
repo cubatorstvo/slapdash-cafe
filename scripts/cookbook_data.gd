@@ -34,7 +34,7 @@ const RECIPES := {
 				"id": "sausage", "name": "Сосиска", "role": 0,
 				"lines": [
 					{"id": "coating", "label": "Покрытие ≥90%", "detail": "Покрытие видно по цвету сосиски и в карточке блюда."},
-					{"id": "portion", "label": "Порция", "detail": "Способ доставки выбираешь сам. Главное — результат на подаче."}
+					{"id": "portion", "label": "Порция", "detail": "На заказ нужна одна сосиска на тарелке."}
 				]
 			}
 		]
@@ -147,6 +147,6 @@ static func _live(dish: String, line_id: String, model, served: bool) -> String:
 			if line_id == "meat_salt": return mark(model.meat_salt >= 1)
 			if line_id == "cooked": return pct(model.served_cooked if served else model.cooked)
 			if line_id == "pasta_salt": return mark((model.served_salt if served else model.pasta_salt) >= 1)
-			if line_id == "stirred": return pct(model.served_stirred if served else model.stirred)
+			if line_id == "stirred": return mark((model.served_stirred if served else model.stirred) >= 0.999)
 			if line_id == "portion": return "%d/100 г" % roundi(model.served_pasta if served else model.pasta)
 	return ""

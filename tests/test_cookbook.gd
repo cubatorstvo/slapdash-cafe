@@ -11,6 +11,8 @@ func check_reader_book(body: Node3D, book: Node3D, head: Node3D, who: String) ->
 	check(away.length() > 0.05 and book.page_top().dot(away.normalized()) > 0.2, "%s book top points away from the reader" % who)
 func click_page(game, side: int, uv: Vector2) -> void:
 	var screen: Vector2 = game.cookbook.physical.page_to_screen(game.camera, side, uv)
+	var hit: Dictionary = game.cookbook.physical.hit_from_screen(game.camera, screen)
+	check(not hit.is_empty() and absf(hit.uv.x - uv.x) < 0.08 and absf(hit.uv.y - uv.y) < 0.08, "Screen ray lands on the same page UV")
 	var down := InputEventMouseButton.new()
 	down.pressed = true
 	down.button_index = MOUSE_BUTTON_LEFT
@@ -19,6 +21,27 @@ func click_page(game, side: int, uv: Vector2) -> void:
 	var up := down.duplicate()
 	up.pressed = false
 	game.cookbook._input(up)
+func click_control(game, side: int, control: Control) -> void:
+	check(control != null, "Page control exists to click")
+	if control == null: return
+	click_page(game, side, game.cookbook.physical.control_uv(side, control))
+func check_plane_uv(book: Node3D) -> void:
+	var mesh: PlaneMesh = book.surfaces[0].mesh
+	var arrays: Array = mesh.get_mesh_arrays()
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	check(verts.size() > 0 and verts.size() == uvs.size(), "Page mesh exposes vertex UVs")
+	var saw_plus := false
+	var saw_minus := false
+	for i in verts.size():
+		check(uvs[i].distance_to(book.uv_from_local(verts[i])) < 0.03, "Hit UV.y follows PlaneMesh local z")
+		if verts[i].z > 0.3:
+			check(absf(uvs[i].y - 1.0) < 0.05, "local +z is UV.y=1")
+			saw_plus = true
+		if verts[i].z < -0.3:
+			check(absf(uvs[i].y) < 0.05, "local -z is UV.y=0")
+			saw_minus = true
+	check(saw_plus and saw_minus, "PlaneMesh samples both page poles")
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game)
@@ -30,19 +53,56 @@ func run() -> void:
 	check(game.cookbook.recipe == "index" and game.cookbook.opened and game.cookbook.physical.visible, "Local reader sees the physical book")
 	check(game.cookbook.physical.is_open, "Local reading still drives presence")
 	check(game.cookbook.physical.hands[0].visible, "3D hands hold the cover edges")
-	var wine: Control = null
-	for child in game.cookbook.physical.pages[1].column.get_children():
-		if child is Button and str(child.text).contains("вина"): wine = child; break
+	check_plane_uv(game.cookbook.physical)
+	var wine: Button = game.cookbook.physical.pages[1].find_button("вина")
 	check(wine != null, "Index lists recipes as one-click links")
 	if wine:
-		var uv: Vector2 = wine.get_global_rect().get_center() / Vector2(game.cookbook.physical.VIEW)
-		click_page(game, 1, uv)
+		click_control(game, 1, wine)
 		await process_frame
-	check(game.cookbook.recipe == "wine", "Screen-space ray opens a recipe on the page")
+		await process_frame
+	check(game.cookbook.recipe == "wine", "Upper index entry opens from the visible page UV")
 	check(game.cookbook.physical.page_sound.playing, "Page audio plays on the held book")
+	var close_recipe: Button = game.cookbook.physical.pages[0].find_button("Закрыть")
+	click_control(game, 0, close_recipe)
+	await process_frame
+	check(not game.cookbook.opened, "Lower close control closes the book")
+	game.cookbook.toggle()
+	await process_frame
+	await process_frame
+	wine = game.cookbook.physical.pages[1].find_button("вина")
+	click_control(game, 1, wine)
+	await process_frame
+	await process_frame
+	var contents: Button = game.cookbook.physical.pages[0].find_button("Содержание")
+	click_control(game, 0, contents)
+	await process_frame
+	await process_frame
+	check(game.cookbook.recipe == "index", "Contents tab returns to the index")
+	game.cookbook.select("meal")
+	await process_frame
+	await process_frame
+	var row: Label = null
+	for child in game.cookbook.physical.pages[1].column.get_children():
+		if child is Label and str(child.text).contains("Обжарить"):
+			row = child
+			break
+	check(row != null, "Recipe body lines are hover targets")
+	if row:
+		var hover := InputEventMouseMotion.new()
+		hover.position = game.cookbook.physical.page_to_screen(game.camera, 1, game.cookbook.physical.control_uv(1, row))
+		game.cookbook._input(hover)
+		await process_frame
+		check(game.cookbook.physical.pages[1].note.text != "", "Hover note appears on the physical page")
+		var away := InputEventMouseMotion.new()
+		away.position = Vector2(12, 8)
+		game.cookbook._input(away)
+		await process_frame
+		check(game.cookbook.physical.pages[1].note.text == "", "Leaving the page clears the hover note")
+	game.cookbook.select("wine")
 	check(game.session.capture_player().presentation.page == "wine", "Reading page enters network presence")
 	var meal_lines: Array = preload("res://scripts/cookbook_data.gd").components("meal")
 	check(meal_lines.size() == 2 and meal_lines[0].lines[0] == "Обжарить с 2 сторон" and meal_lines[1].lines[3] == "Порция — 100 г", "Static recipe labels match the live card")
+	check(preload("res://scripts/cookbook_data.gd").RECIPES.sausage.components[0].lines[1].detail.contains("одна сосиска"), "Sausage portion detail is the plated requirement")
 	game.cookbook.close()
 	var station = game.service.by_id(1)
 	game.service.request_training(station,"potato",1)
@@ -122,6 +182,12 @@ func run() -> void:
 	var live_meal: Array = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
 	check(live_meal[0].lines[0].contains("100%") and live_meal[0].lines[0].contains("0%"), "Live steak sides use the same labels")
 	check(live_meal[1].lines[0].begins_with("Сварить"), "Live pasta cooking keeps the static label")
+	kitchen.model.stirred = 0.4
+	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
+	check(live_meal[1].lines[2] == "Перемешать [×]", "Unfinished stirring is a mark, not a percent")
+	kitchen.model.stirred = 1.0
+	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
+	check(live_meal[1].lines[2] == "Перемешать [✓]", "Finished stirring uses the check mark")
 	kitchen.training.close()
 	var wine_station = game.service.by_id(2)
 	game.service.request_training(wine_station, "wine", 1)
@@ -140,6 +206,12 @@ func run() -> void:
 	wine_station.model.filled = 180
 	game.feedback.update(0)
 	check(not game.feedback.latches[2].wine, "Leaving the wine window allows a later announcement")
+	game.hush_audio()
+	for _i in range(8):
+		await process_frame
 	game.free()
+	game = null
+	for _i in range(6):
+		await process_frame
 	print("PASS: cookbook, recording compatibility, presence and bell" if not failed else "FAILED")
 	quit(1 if failed else 0)

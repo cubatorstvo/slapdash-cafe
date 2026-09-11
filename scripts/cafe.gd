@@ -333,6 +333,9 @@ func _notification(what: int) -> void:
 	elif what == NOTIFICATION_PREDELETE:
 		_shutdown_tree(self)
 
+func hush_audio() -> void:
+	_shutdown_tree(self)
+
 func _shutdown_tree(node: Node) -> void:
 	if node.has_method("shutdown"): node.shutdown()
 	for child in node.get_children():
@@ -340,6 +343,7 @@ func _shutdown_tree(node: Node) -> void:
 	if node is AudioStreamPlayer or node is AudioStreamPlayer3D:
 		node.stop()
 		node.stream = null
+
 func _build_room() -> void:
 	var environment := WorldEnvironment.new()
 	environment.environment = Environment.new()

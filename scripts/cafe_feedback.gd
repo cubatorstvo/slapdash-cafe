@@ -34,13 +34,11 @@ func shutdown() -> void:
 			if not is_instance_valid(voice): continue
 			voice.stop()
 			voice.stream = null
-			voice.free()
 	audio_nodes.clear()
 	for child in get_children():
 		if child is AudioStreamPlayer or child is AudioStreamPlayer3D:
 			child.stop()
 			child.stream = null
-			child.free()
 
 func _exit_tree() -> void:
 	shutdown()

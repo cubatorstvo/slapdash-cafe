@@ -17,6 +17,8 @@ var page_mesh: Node3D
 var first_person := false
 var live_model = null
 var last_pointer := Vector2(-1, -1)
+var last_side := -1
+var pointer_down := false
 
 func _ready() -> void:
 	for side in [-1, 1]:
@@ -134,6 +136,9 @@ func set_reading(open: bool, recipe := "index", model = null) -> void:
 	if model != null or not open: live_model = model
 	for view in views:
 		view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if open else SubViewport.UPDATE_DISABLED
+	if not open:
+		_leave_side(last_side)
+		if page_sound: page_sound.stop()
 	if turned and open and ancestors_shown(): page_sound.play()
 	if open and turned: turn = 0.22
 	if open:
@@ -146,12 +151,20 @@ func _paint() -> void:
 	pages[0].show_page(current_page, model)
 	pages[1].show_page(current_page, model)
 
+func uv_from_local(local: Vector3) -> Vector2:
+	return Vector2(local.x / PAGE.x + 0.5, local.z / PAGE.y + 0.5)
+
+func local_from_uv(uv: Vector2) -> Vector3:
+	return Vector3((uv.x - 0.5) * PAGE.x, 0, (uv.y - 0.5) * PAGE.y)
+
 func page_to_world(side: int, uv: Vector2) -> Vector3:
-	var local := Vector3((uv.x - 0.5) * PAGE.x, 0, (0.5 - uv.y) * PAGE.y)
-	return surfaces[side].to_global(local)
+	return surfaces[side].to_global(local_from_uv(uv))
 
 func page_to_screen(camera: Camera3D, side: int, uv: Vector2) -> Vector2:
 	return camera.unproject_position(page_to_world(side, uv))
+
+func control_uv(side: int, control: Control) -> Vector2:
+	return control.get_global_rect().get_center() / Vector2(VIEW)
 
 func hit_from_screen(camera: Camera3D, screen: Vector2) -> Dictionary:
 	if not visible: return {}
@@ -169,20 +182,46 @@ func hit_from_screen(camera: Camera3D, screen: Vector2) -> Dictionary:
 		if t < 0.04 or t > nearest: continue
 		var hit: Vector3 = origin + ray * t
 		var local: Vector3 = mesh.global_transform.affine_inverse() * hit
-		var uv := Vector2(local.x / PAGE.x + 0.5, 0.5 - local.z / PAGE.y)
+		var uv := uv_from_local(local)
 		if uv.x < 0.0 or uv.x > 1.0 or uv.y < 0.0 or uv.y > 1.0: continue
 		nearest = t
 		best = {"side": i, "uv": uv, "viewport": Vector2(uv.x * VIEW.x, uv.y * VIEW.y)}
 	return best
 
+func _leave_side(side: int) -> void:
+	if side < 0 or side >= views.size():
+		last_side = -1
+		pointer_down = false
+		return
+	var leave := InputEventMouseMotion.new()
+	leave.position = Vector2(-64, -1)
+	views[side].push_input(leave, true)
+	if pointer_down:
+		var up := InputEventMouseButton.new()
+		up.button_index = MOUSE_BUTTON_LEFT
+		up.pressed = false
+		up.position = Vector2(-64, -1)
+		up.global_position = up.position
+		views[side].push_input(up, true)
+	last_side = -1
+	pointer_down = false
+	last_pointer = Vector2(-1, -1)
+
 func feed_pointer(event: InputEvent, hit: Dictionary) -> void:
-	if hit.is_empty(): return
+	var side := int(hit.get("side", -1)) if not hit.is_empty() else -1
+	if last_side >= 0 and side != last_side:
+		_leave_side(last_side)
+	if hit.is_empty():
+		return
 	var local := event.duplicate()
 	if local is InputEventMouse:
 		local.position = hit.viewport
-		if local is InputEventMouseButton: local.global_position = local.position
+		if local is InputEventMouseButton:
+			local.global_position = local.position
+			pointer_down = local.pressed and local.button_index == MOUSE_BUTTON_LEFT
 	views[hit.side].push_input(local, true)
 	last_pointer = hit.viewport
+	last_side = hit.side
 
 func _process(delta: float) -> void:
 	turn = maxf(0, turn - delta)
@@ -190,7 +229,9 @@ func _process(delta: float) -> void:
 	page_mesh.rotation.z = sin((1 - turn / 0.22) * PI) * 2.4
 
 func shutdown() -> void:
-	if page_sound:
+	_leave_side(last_side)
+	is_open = false
+	if page_sound and is_instance_valid(page_sound):
 		page_sound.stop()
 		page_sound.stream = null
 	for i in range(surfaces.size()):
