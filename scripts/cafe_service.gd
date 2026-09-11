@@ -155,6 +155,11 @@ func finish_customer(id: int, accepted: bool) -> void:
 
 func refresh_views(delta := 0.016) -> void:
 	for station in stations: station.refresh(game.session.local_id(), delta)
+	for customer in customers:
+		customer.view.watching = customer.state in ["waiting", "cooking", "training"]
+		if customer.view.watching:
+			var station: Node3D = by_id(customer.station)
+			if is_instance_valid(station): station.direct_attention(customer.view)
 
 func save_data() -> Dictionary:
 	var entries: Array = []

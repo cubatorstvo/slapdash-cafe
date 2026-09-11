@@ -319,9 +319,9 @@ func advance(delta: float) -> void:
 	for station in game.service.stations:
 		entries.append(station.world_entry())
 		if is_instance_valid(station.taster) and not station.taster_real:
-			customers.append({"id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
+			customers.append({"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
-		customers.append({"id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
+		customers.append({"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
 	var data := {"protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
@@ -372,6 +372,10 @@ func _world(packet: PackedByteArray) -> void:
 		person.rotation.y = entry.yaw
 		person.caption.text = entry.text
 		person.react(entry.get("reaction", 0.0))
+		person.watching = entry.get("watching", false)
+		person.food_target = entry.get("food_target", Vector3.ZERO)
+		person.cook_target = entry.get("cook_target", Vector3.ZERO)
+		person.following_food = entry.get("following_food", false)
 	for id in remote_customers.keys():
 		if not id in ids:
 			remote_customers[id].queue_free()
@@ -405,3 +409,4 @@ func _draw_players(delta: float) -> void:
 			avatar.book.set_live(station.model)
 		else:
 			avatar.book.set_live(null)
+

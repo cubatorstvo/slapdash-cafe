@@ -84,3 +84,35 @@ func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 		head.rotation.x = minf(head.rotation.x, -0.35)
 		P.align_line(arms[0], Vector3(-0.3, 1.2, 0), to_local(book.cover_grip(-1)))
 		P.align_line(arms[1], Vector3(0.3, 1.2, 0), to_local(book.cover_grip(1)))
+
+# Ambient poses never modify the recorded cooking model.
+func idle(home: Vector3, delta: float, clock: float, identity: int, aisle: float) -> void:
+	notebook.hide()
+	book.set_reading(false)
+	var beat := fposmod(clock + identity * 3.73, 23.0)
+	var destination := home
+	if beat > 8.0 and beat < 14.0:
+		destination.x += 0.42 if identity % 2 == 0 else -0.42
+		destination.z += 0.16
+	if position.z < 1.4:
+		var side := -1.0 if position.x < 0.0 else 1.0
+		destination = Vector3(side * aisle, 0, position.z) if absf(position.x) < aisle - 0.08 else Vector3(side * aisle, 0, home.z)
+	var walking := not walk_to(destination, delta)
+	if not walking: rotation.y = lerp_angle(rotation.y, 0.0, 1.0 - exp(-delta * 4.0))
+	var glance := sin(clock * 0.65 + identity) * 0.38
+	head.rotation.y = lerp_angle(head.rotation.y, glance, 1.0 - exp(-delta * 3.0))
+	head.rotation.x = lerp_angle(head.rotation.x, 0.24 if beat > 15.0 and beat < 19.0 else 0.02, 1.0 - exp(-delta * 3.0))
+	var left := Vector3(-0.35, 0.78, -0.12)
+	var right := Vector3(0.35, 0.78, -0.12)
+	if walking:
+		left.z += sin(phase) * 0.13
+		right.z -= sin(phase) * 0.13
+	elif beat > 3.0 and beat < 6.0:
+		var gesture := sin((beat - 3.0) / 3.0 * PI)
+		right = right.lerp(Vector3(0.23, 1.83, -0.04), gesture)
+	elif beat > 15.0 and beat < 19.0:
+		var gesture := sin((beat - 15.0) / 4.0 * PI)
+		left = left.lerp(Vector3(-0.16, 1.08, -0.35), gesture)
+		right = right.lerp(Vector3(0.16, 1.08, -0.35), gesture)
+	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), left)
+	P.align_line(arms[1], Vector3(0.3, 1.2, 0), right)

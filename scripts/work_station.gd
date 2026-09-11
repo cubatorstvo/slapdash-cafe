@@ -35,6 +35,7 @@ var age := 0.0
 var observing := false
 var student_paths: Array = []
 var walls: Array = []
+var was_resting := true
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
@@ -140,6 +141,8 @@ func refresh(local_peer: int, delta: float) -> void:
 	bell_cap.position.y = -sin(bell_flash*45)*bell_flash*0.08
 	if is_instance_valid(taster) and type_id == "counter": taster.react(model.customer_reaction)
 	var active: bool = training.active()
+	var resting: bool = not active and state != "cooking"
+	var just_finished_training: bool = observing and not active
 	view.station_label.visible = not active
 	var local_role: int = training.role_for(local_peer)
 	for wall in walls: wall.visible = active and local_role >= 0 and training.phase in ["recording", "confirm_finish"]
@@ -153,19 +156,35 @@ func refresh(local_peer: int, delta: float) -> void:
 	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
-		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active
+		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active and not resting
 		view.name_label.text = crew[0].name + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 	else:
 		view.status.visible = state == "cooking"
 		for role in range(role_count()):
-			view.actors[role].visible = not active or (performing and not role in training.live_roles)
+			view.actors[role].visible = (not active and not resting) or (performing and not role in training.live_roles)
 			view.actors[role].caption.text = crew[role].name + (" · дубль" if active else "")
 	view.update_view(model, age, state != "cooking")
 	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
 		var student: Node3D = students[role]
-		student.visible = active and (role in training.live_roles or training.phase == "ready")
-		if student.visible:
+		var home := Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0.0, 0, 1.85)
+		if resting:
+			if not was_resting and not just_finished_training:
+				if type_id == "counter":
+					student.position = model.actor_position
+					student.rotation.y = model.actor_yaw
+				else:
+					var pose: Dictionary = model.poses[role]
+					student.position = Vector3(pose.position[0], pose.position[1], pose.position[2])
+					student.rotation.y = pose.yaw
+			elif age <= delta * 1.5: student.position = home
+			student.show()
+			student.caption.text = crew[role].name + ("\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
+			student.idle(home, delta, age, station_id * 3 + role, float(Definition.TYPES[type_id].width) / 2.0 + 0.35)
+		else:
+			student.visible = active and (role in training.live_roles or training.phase == "ready")
+			student.caption.text = crew[role].name
+		if student.visible and active:
 			var target := Vector3(-1.4 + role * 2.8 if role_count() == 2 else 1.5, 0, -1.5)
 			if not student_paths[role].is_empty():
 				if student.walk_to(student_paths[role][0], delta): student_paths[role].pop_front()
@@ -174,6 +193,30 @@ func refresh(local_peer: int, delta: float) -> void:
 		zone_panels[role].visible = active and local_role >= 0 and not role in training.live_roles
 		if local_role >= 0 and not performing: zone_panels[role].hide()
 		zone_labels[role].visible = zone_panels[role].visible
+
+	was_resting = resting
+	if is_instance_valid(taster): direct_attention(taster)
+
+func direct_attention(person: Node3D) -> void:
+	person.watching = true
+	var role := int(age / 5.0) % role_count()
+	person.cook_target = to_global(Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0.0, 1.55, 1.85))
+	var target := Vector3(0, 1.1, 0)
+	person.following_food = false
+	if type_id == "counter":
+		person.cook_target = to_global(model.actor_position + Vector3(0, 1.5, 0)) if state == "cooking" or training.active() else students[0].global_position + Vector3.UP * 1.5
+		var item: String = model.held
+		person.following_food = not item.is_empty()
+		if item.is_empty(): item = "potato" if model.dish == "potato" else "sausage" if model.dish == "sausage" else "cup"
+		var point: Vector2 = model.get(item)
+		target = Vector3(point.x, Model.BASE_Y + float(model.elevations.get(item, 0.0)) + 0.1, point.y)
+	else:
+		var item: String = model.hands[role]
+		if item.is_empty(): item = model.hands[1 - role]
+		person.following_food = not item.is_empty()
+		if item.is_empty(): item = "steak" if role == 0 else "pot"
+		if view.items.has(item): target = view.items[item].position + Vector3.UP * 0.1
+	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
 	return {"id": station_id, "type": type_id, "crew": crew, "upgrades": upgrades, "position": [position.x, position.y, position.z], "yaw": rotation.y, "recipes": recipes, "drafts": drafts}
@@ -251,3 +294,4 @@ func pulse_at(point: Vector3) -> void:
 	tween.tween_property(pulse,"position:y",point.y+0.15,0.55)
 	tween.tween_property(pulse.material_override,"albedo_color:a",0.0,0.55)
 	tween.chain().tween_callback(pulse.queue_free)
+
