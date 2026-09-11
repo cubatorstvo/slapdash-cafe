@@ -65,6 +65,11 @@ func run() -> void:
 	assert(station.model.BOUNDS == Vector2(3.35, 2.65), "counter object movement bounds should remain unchanged")
 	var shelf = station.view.get_node("ProductShelf")
 	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
+	assert(m.Layout.broken_corner_contains(Vector2(-1.7, 0.65)), "broken table wedge should include the left-near corner region")
+	assert(not m.Layout.broken_corner_contains(Vector2(0.0, 0.0)), "broken table wedge should stay local to the left side")
+	assert(is_equal_approx(m.Layout.table_height(m.Layout.TABLE_FAR_LEFT), m.Layout.TABLE_Y), "broken wedge seam should stay flush with the main table")
+	assert(is_equal_approx(m.Layout.table_height(m.Layout.TABLE_NEAR_LEFT), m.Layout.TABLE_Y - m.Layout.TABLE_BREAK_DROP), "near-left corner should sink below the rest of the table")
+	assert(m.Layout.broken_corner_downhill().dot(Vector2(-1, 1).normalized()) > 0.9, "broken wedge should slope toward the near-left corner")
 	for edge_name in ["ZoneEdgeFront", "ZoneEdgeBack", "ZoneEdgeLeft", "ZoneEdgeRight"]:
 		assert(station.get_node_or_null(edge_name) != null, "training zone should show a visible floor outline on every side")
 	assert(is_equal_approx(station.get_node("ZoneEdgeLeft").position.x, station.training_zone_min().x), "left outline should match the logical station boundary")

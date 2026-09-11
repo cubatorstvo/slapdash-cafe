@@ -38,11 +38,12 @@ func build(production: bool) -> void:
 	is_production = production
 	var accent := Color("72c1b0") if production else Color("efb65b")
 	Props.box(self, Vector3(4.3, 0.18, 2.25), Vector3(0, 0.86, 0), Color("a76f4e"))
-	Props.box(self, Vector3(4.16, 0.06, 2.10), Vector3(0, 0.97, 0), Color("eddbb6"))
+	_build_broken_countertop(Color("eddbb6"), Color("79513f"))
 	Props.collision_box(self, Vector3(4.3, 1.0, 2.25), Vector3(0, 0.5, 0))
 	for x in [-1.85, 1.85]:
 		for z in [-0.85, 0.85]:
-			Props.box(self, Vector3(0.13, 0.83, 0.13), Vector3(x, 0.415, z), Color("244047"))
+			var leg_height := 0.60 if x < 0.0 and z > 0.0 else 0.83
+			Props.box(self, Vector3(0.13, leg_height, 0.13), Vector3(x, leg_height * 0.5, z), Color("244047"))
 	Props.box(self, Vector3(4.3, 0.22, 0.08), Vector3(0, 0.78, 1.14), accent)
 	station_label = Props.text(self, "КЛОН" if production else "ПОКАЖИ КАК", Vector3(0, 0.76, 1.20), 25, Color("19353b"))
 	# Work boundary markings also make the recording's spatial limits legible.
@@ -77,6 +78,42 @@ func build(production: bool) -> void:
 	add_child(kitchen)
 	if production:
 		_build_worker()
+
+
+func _emit_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	st.add_vertex(a)
+	st.add_vertex(b)
+	st.add_vertex(c)
+
+func _extruded_polygon(points: Array, thickness: float, color: Color) -> MeshInstance3D:
+	var bottom: Array = []
+	for point in points:
+		bottom.append(point - Vector3.UP * thickness)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for index in range(1, points.size() - 1):
+		_emit_triangle(st, points[0], points[index], points[index + 1])
+	for index in range(1, bottom.size() - 1):
+		_emit_triangle(st, bottom[0], bottom[index + 1], bottom[index])
+	for index in range(points.size()):
+		var next := (index + 1) % points.size()
+		_emit_triangle(st, points[index], bottom[index], bottom[next])
+		_emit_triangle(st, points[index], bottom[next], points[next])
+	st.generate_normals()
+	return Props.shape(self, st.commit(), Vector3.ZERO, color)
+
+func _build_broken_countertop(top_color: Color, seam_color: Color) -> void:
+	var layout = Model.Layout
+	var top_y := TABLE_HEIGHT
+	var thickness := 0.06
+	var far_left := Vector3(layout.TABLE_FAR_LEFT.x, top_y, layout.TABLE_FAR_LEFT.y)
+	var far_right := Vector3(layout.TABLE_FAR_RIGHT.x, top_y, layout.TABLE_FAR_RIGHT.y)
+	var near_right := Vector3(layout.TABLE_NEAR_RIGHT.x, top_y, layout.TABLE_NEAR_RIGHT.y)
+	var break_near := Vector3(layout.TABLE_BREAK_NEAR.x, top_y, layout.TABLE_BREAK_NEAR.y)
+	var near_left_low := Vector3(layout.TABLE_NEAR_LEFT.x, top_y - layout.TABLE_BREAK_DROP, layout.TABLE_NEAR_LEFT.y)
+	_extruded_polygon([far_left, far_right, near_right, break_near], thickness, top_color)
+	_extruded_polygon([far_left, near_left_low, break_near], thickness, top_color)
+	Props.line(self, far_left + Vector3.UP * 0.003, break_near + Vector3.UP * 0.003, 0.012, seam_color)
 
 func _build_grip_marker() -> void:
 	grip_marker = Node3D.new()

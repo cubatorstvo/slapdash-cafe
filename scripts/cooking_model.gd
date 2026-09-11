@@ -252,13 +252,31 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			potato_heat[face] = minf(1.0, float(potato_heat[face]) + delta * 0.55)
 	elif potato_state == "falling":
 		fall_speed += 3.5 * delta
-		elevations.potato = maxf(support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y, float(elevations.potato) - fall_speed * delta)
-		if elevations.potato <= support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y: potato_state = "table"
-	elif potato_state == "table" and potato_velocity.length() > 0:
-		var before := potato.y
-		potato.y = minf(0.78, potato.y + potato_velocity.y * delta)
-		potato_orientation = (Quaternion(Vector3.RIGHT, (potato.y - before) / 0.14) * potato_orientation).normalized()
-		if potato.y >= 0.78: potato_velocity = Vector2.ZERO
+		var resting_support := support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y
+		elevations.potato = maxf(resting_support, float(elevations.potato) - fall_speed * delta)
+		if elevations.potato <= resting_support:
+			potato_state = "table"
+	elif potato_state == "table":
+		if Layout.broken_corner_contains(potato):
+			potato_velocity += Layout.broken_corner_downhill() * 2.8 * delta
+			potato_velocity *= exp(-0.9 * delta)
+			var travel := potato_velocity * delta
+			potato += travel
+			if travel.length() > 0.00001:
+				var axis := Vector3(travel.y, 0, -travel.x).normalized()
+				potato_orientation = (Quaternion(axis, travel.length() / 0.14) * potato_orientation).normalized()
+			if Layout.table_contains(potato):
+				elevations.potato = Layout.table_height(potato) - BASE_Y
+			else:
+				potato_state = "falling"
+				fall_speed = 0.0
+		elif Layout.table_contains(potato) and potato_velocity.length() > 0:
+			var before := potato.y
+			potato.y = minf(0.78, potato.y + potato_velocity.y * delta)
+			potato_orientation = (Quaternion(Vector3.RIGHT, (potato.y - before) / 0.14) * potato_orientation).normalized()
+			if potato.y >= 0.78: potato_velocity = Vector2.ZERO
+		else:
+			potato_velocity = potato_velocity.move_toward(Vector2.ZERO, delta * 1.8)
 
 func _step_sausage(delta: float, use_item: bool) -> void:
 	var motion := (sausage - previous_sausage) / maxf(delta, 0.001)
