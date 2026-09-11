@@ -65,6 +65,8 @@ func run() -> void:
 	assert(station.model.BOUNDS == Vector2(3.35, 2.65), "counter object movement bounds should remain unchanged")
 	var shelf = station.view.get_node("ProductShelf")
 	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
+	for edge_name in ["ZoneEdgeFront", "ZoneEdgeBack", "ZoneEdgeLeft", "ZoneEdgeRight"]:
+		assert(station.get_node_or_null(edge_name) != null, "training zone should show a visible floor outline on every side")
 	for index in range(game.service.stations.size() - 1):
 		var left = game.service.stations[index]
 		var right = game.service.stations[index + 1]

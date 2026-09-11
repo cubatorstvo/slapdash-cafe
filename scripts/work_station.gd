@@ -9,6 +9,7 @@ const Props = preload("res://scripts/props.gd")
 const TRAINING_ZONE_SCALE := 1.1
 const TRAINING_ZONE_CENTER_Z := 0.30
 const TRAINING_ZONE_BASE_HALF_DEPTH := 2.60
+const TRAINING_ZONE_OUTLINE_THICKNESS := 0.04
 var bell: Node3D
 var bell_cap: Node3D
 var bell_flash := 0.0
@@ -85,7 +86,16 @@ func _ready() -> void:
 	var zone_max := training_zone_max()
 	var extent: float = (Definition.TYPES[type_id].width / 2.0 + 0.6) * TRAINING_ZONE_SCALE
 	var zone_depth: float = zone_max.y - zone_min.y
-	for z in [zone_min.y + 0.2 * TRAINING_ZONE_SCALE, zone_max.y - 0.1 * TRAINING_ZONE_SCALE]: Props.box(self, Vector3(extent * 2, 0.01, 0.035), Vector3(0, 0.01, z), Color("cbad72"))
+	var outline_color := Color("cbad72")
+	var outline_thickness := TRAINING_ZONE_OUTLINE_THICKNESS
+	var front := Props.box(self, Vector3(extent * 2 + outline_thickness, 0.01, outline_thickness), Vector3(0, 0.01, zone_min.y), outline_color)
+	front.name = "ZoneEdgeFront"
+	var back := Props.box(self, Vector3(extent * 2 + outline_thickness, 0.01, outline_thickness), Vector3(0, 0.01, zone_max.y), outline_color)
+	back.name = "ZoneEdgeBack"
+	var left_edge := Props.box(self, Vector3(outline_thickness, 0.01, zone_depth + outline_thickness), Vector3(-extent, 0.01, TRAINING_ZONE_CENTER_Z), outline_color)
+	left_edge.name = "ZoneEdgeLeft"
+	var right_edge := Props.box(self, Vector3(outline_thickness, 0.01, zone_depth + outline_thickness), Vector3(extent, 0.01, TRAINING_ZONE_CENTER_Z), outline_color)
+	right_edge.name = "ZoneEdgeRight"
 	for spec in [[Vector3(0.02, 2.5, zone_depth), Vector3(-extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(0.02, 2.5, zone_depth), Vector3(extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_min.y)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_max.y)]]:
 		var wall := Props.box(self, spec[0], spec[1], Color("86d7c2"))
 		wall.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
