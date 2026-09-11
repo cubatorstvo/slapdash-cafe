@@ -1,6 +1,7 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Model = preload("res://scripts/cooking_model.gd")
+var pick_distance := 3.6
 var potato_nodes: Array = []
 var potato_bodies: Array = []
 var potato_patches: Array = []
@@ -36,20 +37,6 @@ func _ready() -> void:
 		sausage_nodes.append(sausage)
 		sausage_skins.append(sausage_skin)
 		sausage_meshes.append(sausage_mesh)
-	# Independent supply areas, all three physical ingredients are usable.
-	Props.box(self, Vector3(0.55, 0.12, 1.3), Vector3(-2.43, 0.13, 0.15), Color("9c744b"))
-	for x in [-2.7, -2.16]: Props.box(self, Vector3(0.045, 0.25, 1.3), Vector3(x, 0.22, 0.15), Color("ad8153"))
-	for z in [-0.5, 0.8]: Props.box(self, Vector3(0.55, 0.25, 0.045), Vector3(-2.43, 0.22, z), Color("ad8153"))
-	Props.box(self, Vector3(0.55, 0.06, 1.3), Vector3(2.43, 0.685, -0.1), Color("ba9769"))
-	for z in [-0.65, 0.45]: Props.box(self, Vector3(0.12, 0.67, 0.12), Vector3(2.43, 0.335, z), Color("446266"))
-	for group in [potato_set]:
-		var plate := Props.cylinder(group, 0.44, 0.035, point(Model.PLATE_CENTER, 0.025), Color("e7eee1"))
-		var rim := TorusMesh.new()
-		rim.inner_radius = 0.39
-		rim.outer_radius = 0.44
-		Props.shape(group, rim, plate.position + Vector3(0, 0.02, 0), Color("83b9ac"))
-		var label := Props.text(group, "ПОДАЧА", point(Model.PLATE_CENTER + Vector2(0, 0.49), 0.012), 15, Color("25464a"))
-		label.rotation.x = -PI / 2
 
 func point(at: Vector2, height := 0.0) -> Vector3:
 	return Vector3(at.x, Model.BASE_Y + height, at.y)
@@ -174,4 +161,5 @@ func pick_item(camera: Camera3D, dish: String) -> String:
 		if distance < nearest:
 			nearest = distance
 			selected = entry[0]
+	pick_distance = nearest
 	return selected

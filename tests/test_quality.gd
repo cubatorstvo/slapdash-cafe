@@ -7,12 +7,15 @@ var errors := 0
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool, message: String) -> void:
 	if not ok: errors += 1; printerr("FAIL: ", message)
-func total(m) -> float: return m.wine + m.filled + m.soaked + m.spilled() + m.lost
+func total(m) -> float: return m.wine + m.filled + m.tray_wine + m.soaked + m.spilled() + m.lost
 func run() -> void:
 	check(M.Quality.style_multiplier(1) == 1.2 and M.Quality.style_multiplier(2) == 1.5 and M.Quality.style_multiplier(10) == 2, "Independent style multiplier is capped at x2")
 	var m := M.new()
 	m.reset("potato")
 	check(m.potatoes.size() == 3 and m.sausages.size() == 3, "Three distinct items of each kind")
+	m.pick_up("plate_2")
+	m.move_item("plate_2", M.PLATE_CENTER)
+	m.put_down()
 	m.pick_up("potato_1")
 	m.potato_heat = [1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
 	check(m.quality().grade == "D", "Food in hand never contributes to plated quality")
@@ -29,12 +32,17 @@ func run() -> void:
 	replay.restore(JSON.parse_string(JSON.stringify(snap)))
 	check(JSON.stringify(replay.snapshot()) == JSON.stringify(snap), "All six independent foods replay exactly")
 	m.reset("wine")
+	m.pick_up("cup")
+	m.move_item("cup", M.SERVE)
+	m.put_down()
 	m.filled = 225
 	m.wine = 775
 	check(m.quality().grade == "S", "Correct serving without waste gives S")
 	m.filled = 300
 	m.wine = 700
 	check(m.quality().grade == "B", "Overfilling loses volume criterion")
+	m.jug = Vector2(-0.5, 0)
+	m.elevations.jug = 0.0
 	m.pick_up("cup")
 	m.elevations.cup = 1.0
 	for i in range(120):

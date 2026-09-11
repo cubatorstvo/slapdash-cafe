@@ -86,7 +86,7 @@ func reset_model() -> void:
 func apply_single(command: Dictionary, delta: float) -> void:
 	if command.get("drop", false): model.put_down()
 	var item: String = command.get("grab", "")
-	if item in ["jug", "cup", "rag", "pan", "potato", "sausage", "tomato", "potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] and model.held.is_empty(): model.pick_up(item)
+	if item in ["jug", "cup", "rag", "pan", "potato", "sausage", "tomato", "potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2", "plate_0", "plate_1", "plate_2"] and model.held.is_empty(): model.pick_up(item)
 	item = model.held
 	if not item.is_empty():
 		if command.has("target") and item != "pan":
@@ -240,7 +240,7 @@ func world_entry() -> Dictionary:
 func _build_bell() -> void:
 	bell = Node3D.new()
 	add_child(bell)
-	bell.position = Vector3(0.62, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
+	bell.position = Vector3(0.70, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
 	Props.cylinder(bell, 0.16, 0.035, Vector3.ZERO, Color("344c4c"))
 	bell_cap = Node3D.new()
 	bell.add_child(bell_cap)

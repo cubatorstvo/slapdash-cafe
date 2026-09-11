@@ -2,14 +2,15 @@ extends RefCounted
 ## The bounded workstation's liquid rules. Positions use tabletop-local X/Z.
 ## This model is shared by live input and tests; replay uses recorded snapshots.
 
+const Layout = preload("res://scripts/counter_layout.gd")
 const Pourable = preload("res://scripts/pourable.gd")
 const CUP_CAPACITY := 300.0
 const TARGET := 225.0
 const JUG_CAPACITY := 1000.0
 const RAG_CAPACITY := 300.0
 const CUP_RADIUS := 0.24
-const BOUNDS := Vector2(2.65, 2.65)
-const SERVE := Vector2(0.65, -0.65)
+const BOUNDS := Vector2(3.35, 2.65)
+const SERVE := Layout.TRAY
 const SURFACE_Y := 1.0
 const BASE_Y := 1.015
 const MAX_LIFT := 1.10
@@ -63,11 +64,11 @@ func reset() -> void:
 func pick_up(item: String) -> void:
 	put_down()
 	held = item
-	elevations[item] = maxf(float(elevations[item]), surface_at(get(item)) - BASE_Y) + 0.12
+	elevations[item] = maxf(float(elevations[item]), support_at(get(item), BASE_Y + float(elevations[item])) - BASE_Y) + 0.12
 
 func put_down() -> void:
 	if held.is_empty(): return
-	elevations[held] = surface_at(get(held)) - BASE_Y
+	elevations[held] = support_at(get(held), BASE_Y + float(elevations[held])) - BASE_Y
 	if held in vessels: vessels[held].angle = 0.0
 	held = ""
 	tilt = 0.0
@@ -76,11 +77,14 @@ func put_down() -> void:
 
 func lift_held(amount: float) -> void:
 	if held.is_empty(): return
-	var floor_limit := surface_at(get(held)) - BASE_Y
+	var floor_limit := support_at(get(held), BASE_Y + float(elevations[held])) - BASE_Y
 	elevations[held] = clampf(float(elevations[held]) + amount, floor_limit, MAX_LIFT)
 
 static func surface_at(point: Vector2) -> float:
-	return BASE_Y if absf(point.x) <= 2.15 and absf(point.y) <= 1.125 else 0.015
+	return Layout.support(point)
+
+static func support_at(point: Vector2, height: float) -> float:
+	return Layout.support(point, height)
 
 func vessel_base(item: String) -> Vector3:
 	var point: Vector2 = get(item)
@@ -113,10 +117,10 @@ func move_item(item: String, point: Vector2) -> void:
 		"jug": jug = point
 		"cup": cup = point
 		"rag": rag = point
-	if item in elevations: elevations[item] = maxf(float(elevations[item]), surface_at(point) - BASE_Y)
+	if item in elevations: elevations[item] = maxf(float(elevations[item]), support_at(point, BASE_Y + float(elevations[item])) - BASE_Y)
 
 func spout_target() -> Vector2:
-	return vessels[source].landing(vessel_base(source), surface_at(get(source)))
+	return vessels[source].landing(vessel_base(source), support_at(get(source), spout_position().y))
 
 func step(delta: float, tip: bool, _straighten: bool, squeeze: bool) -> void:
 	for item in vessels: vessels[item].advance(delta, tip and held == item)
@@ -137,7 +141,7 @@ func step(delta: float, tip: bool, _straighten: bool, squeeze: bool) -> void:
 			soaked -= amount
 			squeezed_total += amount
 			_deliver(rag, amount, source_height())
-		elif BASE_Y + float(elevations.rag) <= surface_at(rag) + 0.10:
+		elif BASE_Y + float(elevations.rag) <= support_at(rag, BASE_Y + float(elevations.rag)) + 0.10:
 			_absorb(delta)
 
 func _deliver(point: Vector2, amount: float, height: float) -> void:

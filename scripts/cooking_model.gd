@@ -3,21 +3,26 @@ extends "res://scripts/station_model.gd"
 
 const Quality = preload("res://scripts/dish_quality.gd")
 const DISHES := {"wine": "Вино тяп-ляп", "potato": "Картошка на дырявой сковороде", "sausage": "Непослушная сосиска"}
-const PAN_CENTER := Vector2(-0.55, 0)
+const PAN_CENTER := Vector2(-1.05, -0.10)
 const PAN_LIFT := 0.20
 const PAN_HALF := Vector2(0.75, 0.60)
 const HOLES := [Vector2(-0.30, -0.15), Vector2(0.30, 0.15)]
 const FACES := [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD]
 const FACE_NAMES := ["правый", "левый", "верх", "низ", "перед", "зад"]
-const SAUCE_CENTER := Vector2(1.45, -0.50)
-const PLATE_CENTER := Vector2(1.35, 0.40)
+const SAUCE_CENTER := Vector2(0.30, -0.70)
+const PLATE_CENTER := Layout.TRAY
 
+var plates: Array = []
+var tray_wine := 0.0
+const PLATE_RADIUS := 0.39
 var potato_index := 0
 var sausage_index := 0
+var potato_plate_offset := Vector2.ZERO
+var sausage_plate_offset := Vector2.ZERO
 var potatoes: Array = []
 var sausages: Array = []
-const POTATO_FIELDS := ["potato", "potato_velocity", "potato_orientation", "potato_heat", "potato_state", "fall_speed"]
-const SAUSAGE_FIELDS := ["sausage", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip", "sausage_state", "sausage_velocity", "previous_sausage", "sausage_fall_speed"]
+const POTATO_FIELDS := ["potato_plate_offset","potato", "potato_velocity", "potato_orientation", "potato_heat", "potato_state", "fall_speed"]
+const SAUSAGE_FIELDS := ["sausage_plate_offset","sausage", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip", "sausage_state", "sausage_velocity", "previous_sausage", "sausage_fall_speed"]
 var tomato := Vector2(1.85, -0.1)
 var tomato_velocity := Vector3.ZERO
 var tomato_flying := false
@@ -50,10 +55,10 @@ func _init() -> void:
 func reset(recipe := "") -> void:
 	if not recipe.is_empty(): dish = recipe
 	super.reset()
-	jug = Vector2(-1.65, -0.65)
-	cup = Vector2(0.65, -0.65)
-	rag = Vector2(1.85, 0.65)
-	tomato = Vector2(1.85, -0.1)
+	jug = Vector2(Layout.SHELF_X - 0.1, Layout.SHELF_Z)
+	cup = Vector2(1.93, Layout.CROCKERY_Z)
+	rag = Vector2(0.7, 0.87)
+	tomato = Vector2(Layout.SHELF_X + 0.33, Layout.SHELF_Z + 0.25)
 	tomato_velocity = Vector3.ZERO
 	tomato_flying = false
 	tomato_hit = false
@@ -78,18 +83,28 @@ func reset(recipe := "") -> void:
 	sausage_velocity = Vector2.ZERO
 	previous_sausage = sausage
 	elevations.merge({"pan": PAN_LIFT, "potato": PAN_LIFT, "sausage": 0.0, "tomato": 0.0})
+	elevations.jug = Layout.LEVELS[2] - BASE_Y
+	elevations.tomato = Layout.LEVELS[2] - BASE_Y
+	elevations.cup = Layout.CROCKERY_Y - BASE_Y
+	plates.clear()
+	tray_wine = 0.0
+	potato_plate_offset = Vector2.ZERO
+	sausage_plate_offset = Vector2.ZERO
+	for i in range(3):
+		plates.append({"point": Vector2(1.30, Layout.CROCKERY_Z), "tilt": 0.0})
+		elevations["plate_%d" % i] = Layout.CROCKERY_Y + i * 0.055 - BASE_Y
 	potato_index = 0
 	sausage_index = 0
 	potatoes.clear()
 	sausages.clear()
 	for i in range(3):
-		potato = Vector2(-2.43, -0.25 + i * 0.38)
+		potato = Vector2(Layout.SHELF_X - 0.30 + i * 0.30, Layout.SHELF_Z + 0.20)
 		potato_state = "table"
-		elevations.potato = -0.82
+		elevations.potato = Layout.LEVELS[0] - BASE_Y
 		potatoes.append(_capture_food("potato"))
-		sausage = Vector2(2.43, -0.45 + i * 0.34)
+		sausage = Vector2(Layout.SHELF_X, Layout.SHELF_Z - 0.27 + i * 0.27)
 		previous_sausage = sausage
-		elevations.sausage = -0.30
+		elevations.sausage = Layout.LEVELS[1] - BASE_Y
 		sausages.append(_capture_food("sausage"))
 	_load_food("potato", 0)
 	_load_food("sausage", 0)
@@ -102,10 +117,14 @@ func pick_up(item: String) -> void:
 		_store_food(kind)
 		_load_food(kind, clampi(int(item.get_slice("_", 1)), 0, 2))
 		item = kind
+	if item.begins_with("plate_"):
+		super.pick_up(item)
+		_sync_carried_food()
+		return
 	if item == "tomato":
 		put_down()
 		held = item
-		elevations.tomato = 0.4
+		elevations.tomato += 0.12
 		tomato_flying = false
 		tomato_hit = false
 		return
@@ -127,6 +146,11 @@ func pick_up(item: String) -> void:
 		sausage_slip = 0
 
 func put_down() -> void:
+	if held.begins_with("plate_"):
+		plates[int(held.get_slice("_", 1))].tilt = 0.0
+		super.put_down()
+		_sync_carried_food()
+		return
 	if held == "tomato":
 		elevations.tomato = surface_at(tomato) - BASE_Y
 		held = ""
@@ -140,11 +164,11 @@ func put_down() -> void:
 			potato_state = "pan"
 			elevations.potato = PAN_LIFT
 		else:
-			potato_state = "plate" if potato.distance_to(PLATE_CENTER) < 0.40 else "table"
-			elevations.potato = 0.045 if potato_state == "plate" else food_surface("potato", potato) - BASE_Y
+			potato_state = _food_rest("potato", potato)
+			elevations.potato = _food_height(potato_state, potato, "potato") - BASE_Y
 	elif held == "sausage":
-		sausage_state = "plate" if sausage.distance_to(PLATE_CENTER) < 0.40 else "table"
-		elevations.sausage = 0.045 if sausage_state == "plate" else food_surface("sausage", sausage) - BASE_Y
+		sausage_state = _food_rest("sausage", sausage)
+		elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 		sausage_angle = 0
 		sausage_slip = 0
 	_store_food("potato")
@@ -155,15 +179,17 @@ func put_down() -> void:
 func lift_held(amount: float) -> void:
 	if held == "pan": return
 	super.lift_held(amount)
+	if held.begins_with("plate_"): _sync_carried_food()
 
 func move_item(item: String, point: Vector2) -> void:
 	if item == "pan": return
 	point = point.clamp(-BOUNDS, BOUNDS)
-	if item == "tomato": tomato = point
+	if item.begins_with("plate_"): plates[int(item.get_slice("_", 1))].point = point
+	elif item == "tomato": tomato = point
 	elif item == "potato": potato = point
 	elif item == "sausage": sausage = point
 	else: super.move_item(item, point)
-	if item in elevations: elevations[item] = maxf(float(elevations[item]), surface_at(point) - BASE_Y)
+	if item in elevations: elevations[item] = maxf(float(elevations[item]), support_at(point, BASE_Y + float(elevations[item])) - BASE_Y)
 
 func tilt_pan(motion: Vector2) -> void:
 	pan_tilt = (pan_tilt + motion * 0.003).limit_length(0.18)
@@ -188,6 +214,9 @@ func step(delta: float, use_item: bool, straighten: bool, squeeze: bool) -> void
 	_load_food("potato", pi)
 	_load_food("sausage", si)
 	_step_tomato(delta, use_item)
+	for i in range(plates.size()):
+		plates[i].tilt = move_toward(float(plates[i].tilt), 0.95 if held == "plate_%d" % i and use_item else 0.0, delta * 1.8)
+	_sync_carried_food()
 
 func _step_potato(delta: float, use_item: bool) -> void:
 	if held != "pan" or not use_item: pan_tilt = pan_tilt.move_toward(Vector2.ZERO, 1.5 * delta)
@@ -223,8 +252,8 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			potato_heat[face] = minf(1.0, float(potato_heat[face]) + delta * 0.55)
 	elif potato_state == "falling":
 		fall_speed += 3.5 * delta
-		elevations.potato = maxf(surface_at(potato) - BASE_Y, float(elevations.potato) - fall_speed * delta)
-		if elevations.potato <= surface_at(potato) - BASE_Y: potato_state = "table"
+		elevations.potato = maxf(support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y, float(elevations.potato) - fall_speed * delta)
+		if elevations.potato <= support_at(potato, BASE_Y + float(elevations.potato)) - BASE_Y: potato_state = "table"
 	elif potato_state == "table" and potato_velocity.length() > 0:
 		var before := potato.y
 		potato.y = minf(0.78, potato.y + potato_velocity.y * delta)
@@ -250,12 +279,13 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			falls += 1
 	elif sausage_state == "falling":
 		sausage_fall_speed += delta * 4
-		elevations.sausage = clampf(float(elevations.sausage) - sausage_fall_speed * delta, surface_at(sausage) - BASE_Y, MAX_LIFT)
+		elevations.sausage = clampf(float(elevations.sausage) - sausage_fall_speed * delta, support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y, MAX_LIFT)
 		sausage = (sausage + sausage_velocity * delta).clamp(-BOUNDS, BOUNDS)
 		sausage_velocity *= exp(-2 * delta)
 		sausage_angle = move_toward(sausage_angle, 0, delta * 3)
-		if elevations.sausage <= surface_at(sausage) - BASE_Y:
-			sausage_state = "plate" if sausage.distance_to(PLATE_CENTER) < 0.4 else "table"
+		if elevations.sausage <= support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y:
+			sausage_state = _food_rest("sausage", sausage)
+			elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 			sausage_slip = 0
 	if sausage.distance_to(SAUCE_CENTER) < 0.34 and float(elevations.sausage) <= 0.13:
 		sausage_coating = minf(1, sausage_coating + delta * 1.4)
@@ -277,23 +307,23 @@ func quality() -> Dictionary:
 	if dish == "potato":
 		var served := -1
 		for i in range(3):
-			if potatoes[i].potato_state == "plate" and not (held == "potato" and potato_index == i): served = i; break
+			if food_is_served("potato", i): served = i; break
 		var faces := 0
 		if served >= 0:
 			for heat in potatoes[served].potato_heat:
 				if heat >= 0.999: faces += 1
-		return Quality.with_components(Quality.result([{"label": "Обжарено сторон: %d/6" % faces, "value": faces / 6.0}], served >= 0, []), Book.components(dish, self))
+		return _utensil_grade(Quality.with_components(Quality.result([{"label": "Обжарено сторон: %d/6" % faces, "value": faces / 6.0}], served >= 0, []), Book.components(dish, self)))
 	if dish == "sausage":
 		var served := -1
 		for i in range(3):
-			if sausages[i].sausage_state == "plate" and not (held == "sausage" and sausage_index == i): served = i; break
+			if food_is_served("sausage", i): served = i; break
 		var coat := float(sausages[served].sausage_coating) if served >= 0 else 0.0
-		return Quality.with_components(Quality.result([{"label": "Соус: %d%% / нужно ≥90%%" % roundi(coat * 100), "value": minf(1, coat / 0.9)}], served >= 0, []), Book.components(dish, self))
-	var on_tray := cup.distance_to(SERVE) < 0.4 and held != "cup" and absf(float(elevations.cup)) < 0.1 and filled > 0
-	var volume := filled if on_tray else 0.0
+		return _utensil_grade(Quality.with_components(Quality.result([{"label": "Соус: %d%% / нужно ≥90%%" % roundi(coat * 100), "value": minf(1, coat / 0.9)}], served >= 0, []), Book.components(dish, self)))
+	var on_tray := served_wine() > 0
+	var volume := served_wine()
 	var amount_score := clampf(volume / 200.0, 0, 1) if volume <= 250 else clampf(1 - (volume - 250) / 50, 0, 1)
 	var waste := spilled() + soaked + lost
-	return Quality.with_components(Quality.result([{"label": "Вино: %d мл / 200–250 мл" % roundi(volume), "value": amount_score}, {"label": "Бережливость: %s · вне посуды %.0f мл" % ["✓" if waste <= 5 else "×", waste], "value": 1.0 if waste <= 5 else 0.0}], on_tray, []), Book.components(dish, self))
+	return _utensil_grade(Quality.with_components(Quality.result([{"label": "Вино: %d мл / 200–250 мл" % roundi(volume), "value": amount_score}, {"label": "Бережливость: %s · вне посуды и подноса %.0f мл" % ["✓" if waste <= 5 else "×", waste], "value": 1.0 if waste <= 5 else 0.0}], on_tray, []), Book.components(dish, self)))
 
 func goal_text() -> String:
 	match dish:
@@ -312,6 +342,8 @@ func progress_value() -> float:
 func snapshot() -> Dictionary:
 	var data := super.snapshot()
 	data.dish = dish
+	data.plates = plates.map(func(p): return {"point": [p.point.x, p.point.y], "tilt": p.tilt})
+	data.tray_wine = tray_wine
 	data.tomato = {"position": [tomato.x, tomato.y], "velocity": [tomato_velocity.x, tomato_velocity.y, tomato_velocity.z], "flying": tomato_flying, "hit": tomato_hit, "reaction": customer_reaction}
 	_store_food("potato")
 	_store_food("sausage")
@@ -327,6 +359,9 @@ func snapshot() -> Dictionary:
 func restore(data: Dictionary) -> void:
 	super.restore(data)
 	dish = str(data.get("dish", "wine"))
+	tray_wine = float(data.get("tray_wine", 0.0))
+	if data.has("plates"):
+		plates = data.plates.map(func(p): return {"point": Vector2(p.point[0], p.point[1]), "tilt": float(p.tilt)})
 	tomato = Vector2(data.tomato.position[0], data.tomato.position[1])
 	tomato_velocity = Vector3(data.tomato.velocity[0], data.tomato.velocity[1], data.tomato.velocity[2])
 	tomato_flying = data.tomato.flying
@@ -354,6 +389,8 @@ func restore(data: Dictionary) -> void:
 	sausages = decode_stock(data.stock.sausages)
 	potato_index = int(data.stock.potato_index)
 	sausage_index = int(data.stock.sausage_index)
+	_load_food("potato", potato_index)
+	_load_food("sausage", sausage_index)
 
 func _step_tomato(delta: float, use_item: bool) -> void:
 	customer_reaction = maxf(0, customer_reaction - delta)
@@ -398,9 +435,89 @@ func _load_food(kind: String, index: int) -> void:
 		else: set(key, stock[index][key].duplicate(true) if stock[index][key] is Array else stock[index][key])
 
 static func food_surface(kind: String, point: Vector2) -> float:
-	if kind == "sausage" and point.x > 2.15 and point.y >= -0.7 and point.y <= 0.5: return BASE_Y - 0.30
-	if kind == "potato" and point.x < -2.15 and point.y >= -0.5 and point.y <= 0.8: return BASE_Y - 0.82
+	if Layout.shelf_contains(point): return Layout.LEVELS[0] if kind == "potato" else Layout.LEVELS[1]
 	return surface_at(point)
+
+func _get(property: StringName):
+	if str(property).begins_with("plate_"):
+		var index := int(str(property).get_slice("_", 1))
+		if index >= 0 and index < plates.size(): return plates[index].point
+	return null
+
+func _food_rest(kind: String, point: Vector2) -> String:
+	for i in range(plates.size()):
+		var key := "plate_%d" % i
+		if point.distance_to(plates[i].point) <= PLATE_RADIUS - 0.10 and float(elevations[kind]) >= float(elevations[key]) - 0.06:
+			set(kind + "_plate_offset", point - plates[i].point)
+			return key
+	return "tray" if Layout.on_tray(point, 0.1) else "table"
+
+func _food_height(state: String, point: Vector2, kind: String) -> float:
+	if state.begins_with("plate_"): return BASE_Y + float(elevations[state]) + 0.035
+	return support_at(point, BASE_Y + float(elevations[kind]))
+
+func _sync_carried_food() -> void:
+	_store_food("potato")
+	_store_food("sausage")
+	for kind in ["potato", "sausage"]:
+		for food in potatoes if kind == "potato" else sausages:
+			var state: String = food[kind + "_state"]
+			if not state.begins_with("plate_"): continue
+			var carrier: Dictionary = plates[int(state.get_slice("_", 1))]
+			food[kind] = carrier.point + food.get(kind + "_plate_offset", Vector2.ZERO)
+			food.elevation = float(elevations[state]) + 0.035
+			if kind == "sausage": food.previous_sausage = food[kind]
+			if float(carrier.tilt) > 0.60:
+				food[kind] += Vector2(0.46, 0)
+				food[kind + "_state"] = "falling"
+				food["fall_speed" if kind == "potato" else "sausage_fall_speed"] = 0.0
+	_load_food("potato", potato_index)
+	_load_food("sausage", sausage_index)
+
+func food_is_served(kind: String, index: int) -> bool:
+	var food: Dictionary = (potatoes if kind == "potato" else sausages)[index]
+	if held == kind and index == (potato_index if kind == "potato" else sausage_index): return false
+	var state: String = food[kind + "_state"]
+	if state.begins_with("plate_") and held == state: return false
+	if not Layout.on_tray(food[kind], 0.08) or absf(BASE_Y + float(food.elevation) - Layout.TRAY_Y) >= 0.12: return false
+	return state in ["tray", "table"] or state.begins_with("plate_")
+
+func served_index(kind: String) -> int:
+	for i in range(3):
+		if food_is_served(kind, i): return i
+	return -1
+
+func served_in_dish(kind: String) -> bool:
+	if kind == "wine": return cup_on_tray() and filled > 0 and tray_wine <= 0.01
+	var index := served_index(kind)
+	return index >= 0 and str((potatoes if kind == "potato" else sausages)[index][kind + "_state"]).begins_with("plate_")
+
+func cup_on_tray() -> bool:
+	return Layout.on_tray(cup, 0.24) and held != "cup" and absf(BASE_Y + float(elevations.cup) - Layout.TRAY_Y) < 0.08
+
+func served_wine() -> float:
+	return tray_wine + (filled if cup_on_tray() else 0.0)
+
+func _deliver(point: Vector2, amount: float, height: float) -> void:
+	var receiver := receiver_at(point, height)
+	if not receiver.is_empty():
+		var accepted := Pourable.accepted(amount, filled if receiver == "cup" else wine, CUP_CAPACITY if receiver == "cup" else JUG_CAPACITY)
+		if receiver == "cup": filled += accepted
+		else: wine += accepted
+		amount -= accepted
+	if amount <= 0.0001: return
+	if Layout.on_tray(point) and height >= Layout.TRAY_Y:
+		var accepted := minf(amount, maxf(0, 350.0 - tray_wine))
+		tray_wine += accepted
+		if amount > accepted: super._deliver(Layout.TRAY + Vector2(Layout.TRAY_HALF.x + 0.15, 0), amount - accepted, height)
+	else: super._deliver(point, amount, height)
+
+func _absorb(delta: float) -> void:
+	super._absorb(delta)
+	if Layout.on_tray(rag) and tray_wine > 0:
+		var amount := minf(tray_wine, minf(160 * delta, RAG_CAPACITY - soaked))
+		tray_wine -= amount
+		soaked += amount
 
 static func encode_stock(stock: Array) -> Array:
 	var result: Array = []
@@ -422,3 +539,12 @@ static func decode_stock(stock: Array) -> Array:
 			if value is Array and value.size() == 2: data[key] = Vector2(value[0], value[1])
 			elif key == "potato_orientation": data[key] = Quaternion(value[0], value[1], value[2], value[3])
 	return result
+
+func _utensil_grade(report: Dictionary) -> Dictionary:
+	var correct := served_in_dish(dish)
+	report.criteria.append({"label": "Подходящая посуда: " + ("✓" if correct else "×"), "value": 1.0 if correct else 0.0})
+	if report.present and not correct:
+		var grades := ["D", "C", "B", "A", "S"]
+		report.grade = grades[maxi(0, grades.find(report.grade) - 1)]
+		report.price_factor = Quality.PRICE_FACTORS[report.grade]
+	return report

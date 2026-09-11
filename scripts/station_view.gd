@@ -5,6 +5,8 @@ const Model = preload("res://scripts/cooking_model.gd")
 const TABLE_HEIGHT := Model.SURFACE_Y
 const WINE_COLOR := Color("ba4058")
 
+var plates: Array = []
+var tray_liquid: MeshInstance3D
 var book: Node3D
 var tomato: Node3D
 var jug: Node3D
@@ -54,9 +56,7 @@ func build(production: bool) -> void:
 	Props.box(tomato, Vector3(0.12, 0.02, 0.04), Vector3(0, 0.24, 0), Color("6a9c56"))
 	_build_jug()
 	_build_cup()
-	Props.cylinder(self, 0.42, 0.01, item_point(Model.SERVE), Color("638f92"))
-	var serve_label := Props.text(self, "ПОДАЧА ВИНА", item_point(Model.SERVE + Vector2(0, -0.3)), 13, Color("29484b"))
-	serve_label.rotation.x = -PI / 2
+	_build_storage_and_tray()
 	rag = Node3D.new()
 	add_child(rag)
 	rag_surface = Props.box(rag, Vector3(0.43, 0.055, 0.30), Vector3(0, 0.045, 0), Color("eac26b"))
@@ -183,6 +183,11 @@ func _build_worker() -> void:
 
 func update_view(model, animation_time := 0.0, resting := false) -> void:
 	dish = model.dish
+	for i in range(plates.size()):
+		plates[i].position = item_point(model.plates[i].point) + Vector3.UP * float(model.elevations["plate_%d" % i])
+		plates[i].rotation.z = -float(model.plates[i].tilt)
+	tray_liquid.visible = model.tray_wine > 0.01
+	tray_liquid.scale = Vector3(clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0), 1, clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0))
 	tomato.position = item_point(model.tomato) + Vector3.UP * model.elevations.tomato
 	tomato.visible = not model.tomato_hit
 	kitchen.update_view(model)
@@ -248,6 +253,7 @@ func _update_worker(model, time: float, resting: bool) -> void:
 	var target: Vector3 = worker.position + worker.basis * Vector3(0, 1.05, 0.4)
 	match model.held:
 		"jug": target = jug.position + Vector3(0, 0.35, 0)
+		"plate_0", "plate_1", "plate_2": target = plates[int(model.held.get_slice("_", 1))].position + Vector3(0, 0.05, 0)
 		"cup": target = cup.position + Vector3(0, 0.22, 0)
 		"tomato": target = tomato.position + Vector3(0, 0.12, 0)
 		"rag": target = rag.position + Vector3(0, 0.06, 0)
@@ -270,13 +276,15 @@ func item_point(point: Vector2) -> Vector3:
 
 func pick_item(camera: Camera3D) -> String:
 	var food_pick: String = kitchen.pick_item(camera, "all")
-	var selected := ""
-	var nearest := 3.4
+	var selected := food_pick
+	var nearest: float = kitchen.pick_distance if not food_pick.is_empty() else 3.4
 	var ray_origin := camera.global_position
 	var ray_direction := -camera.global_basis.z
-	for entry in [["tomato", tomato, AABB(Vector3(-0.15, 0, -0.15), Vector3(0.3, 0.27, 0.3))], ["jug", jug, AABB(Vector3(-0.66, 0, -0.36), Vector3(1.16, 0.87, 0.72))],
+	var entries: Array = [["tomato", tomato, AABB(Vector3(-0.15, 0, -0.15), Vector3(0.3, 0.27, 0.3))], ["jug", jug, AABB(Vector3(-0.66, 0, -0.36), Vector3(1.16, 0.87, 0.72))],
 		["cup", cup, AABB(Vector3(-0.27, 0, -0.27), Vector3(0.54, 0.54, 0.54))],
-		["rag", rag, AABB(Vector3(-0.25, 0, -0.19), Vector3(0.5, 0.12, 0.38))]]:
+		["rag", rag, AABB(Vector3(-0.25, 0, -0.19), Vector3(0.5, 0.12, 0.38))]]
+	for i in range(plates.size()): entries.append(["plate_%d" % i, plates[i], AABB(Vector3(-0.4, -0.01, -0.4), Vector3(0.8, 0.055, 0.8))])
+	for entry in entries:
 		var node: Node3D = entry[1]
 		if not node.visible: continue
 		var bounds: AABB = entry[2]
@@ -286,4 +294,36 @@ func pick_item(camera: Camera3D) -> String:
 		if distance < nearest:
 			nearest = distance
 			selected = entry[0]
-	return selected if not selected.is_empty() else food_pick
+	return selected
+
+func _build_storage_and_tray() -> void:
+	var layout = Model.Layout
+	var wood := Color("a76f4e")
+	var metal := Color("244047")
+	for height in layout.LEVELS:
+		Props.box(self, Vector3(1.1, 0.06, 1.1), Vector3(layout.SHELF_X, height - 0.03, layout.SHELF_Z), wood)
+		Props.collision_box(self, Vector3(1.1, 0.06, 1.1), Vector3(layout.SHELF_X, height - 0.03, layout.SHELF_Z))
+	for x in [-0.51, 0.51]:
+		for z in [-0.51, 0.51]:
+			Props.solid_box(self, Vector3(0.07, 1.45, 0.07), Vector3(layout.SHELF_X + x, 0.725, layout.SHELF_Z + z), metal)
+	# Shallow lips keep the stock visible from the cook's side.
+	for level in [0, 1]:
+		Props.box(self, Vector3(1.02, 0.09, 0.025), Vector3(layout.SHELF_X, layout.LEVELS[level] + 0.045, layout.SHELF_Z + 0.50), wood.lightened(0.1))
+	Props.box(self, Vector3(1.3, 0.07, 0.66), Vector3(1.5, layout.CROCKERY_Y - 0.035, layout.CROCKERY_Z - 0.03), wood)
+	for i in range(3):
+		var plate := Node3D.new()
+		add_child(plate)
+		Props.cylinder(plate, 0.39, 0.02, Vector3(0, 0.01, 0), Color("e7eee1"))
+		var rim := TorusMesh.new()
+		rim.inner_radius = 0.35
+		rim.outer_radius = 0.39
+		Props.shape(plate, rim, Vector3(0, 0.025, 0), Color("83b9ac"))
+		plates.append(plate)
+	var center := Vector3(layout.TRAY.x, layout.TRAY_Y, layout.TRAY.y)
+	Props.box(self, Vector3(layout.TRAY_HALF.x * 2, 0.03, layout.TRAY_HALF.y * 2), center - Vector3.UP * 0.015, Color("778e91"))
+	for side in [-1, 1]:
+		Props.box(self, Vector3(0.025, 0.065, layout.TRAY_HALF.y * 2), center + Vector3(side * layout.TRAY_HALF.x, 0.015, 0), Color("abc3ba"))
+		Props.box(self, Vector3(layout.TRAY_HALF.x * 2, 0.065, 0.025), center + Vector3(0, 0.015, side * layout.TRAY_HALF.y), Color("abc3ba"))
+	tray_liquid = Props.box(self, Vector3(layout.TRAY_HALF.x * 1.85, 0.008, layout.TRAY_HALF.y * 1.85), center + Vector3.UP * 0.008, WINE_COLOR)
+	var label := Props.text(self, "ПОДАЧА", center + Vector3(0, 0.012, layout.TRAY_HALF.y + 0.16), 16, Color("25464a"))
+	label.rotation.x = -PI / 2

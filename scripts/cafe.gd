@@ -3,7 +3,7 @@ const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const SAVE_PATH := "user://station_cafe.save"
-const ITEM_NAMES := {"jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
 var cookbook: Node
 var feedback: Node
 var player: CharacterBody3D
@@ -241,6 +241,7 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 		var current: Vector2 = station.model.get(item) if station.type_id == "counter" else station.model.positions[item]
 		var limited_target: Vector2 = target.clamp(-station.model.BOUNDS, station.model.BOUNDS)
 		var support: float = maxf(station.model.surface_at(current), station.model.surface_at(limited_target)) - station.model.BASE_Y
+		if station.type_id == "counter": support = maxf(station.model.support_at(current, station.model.BASE_Y + height), station.model.support_at(limited_target, station.model.BASE_Y + height)) - station.model.BASE_Y
 		height = clampf(height, support, 1.1)
 		command.target = [target.x, target.y]
 		command.height = height
@@ -384,3 +385,4 @@ func _build_room() -> void:
 	for x in [-9.2, 15.2]:
 		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
 		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+

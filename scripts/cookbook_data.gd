@@ -10,7 +10,8 @@ const RECIPES := {
 				"id": "wine", "name": "Вино", "role": 0,
 				"lines": [
 					{"id": "volume", "label": "200–250 мл", "detail": "Кружка вмещает 300 мл. Недолив и перелив снижают качество."},
-					{"id": "thrift", "label": "Бережливость", "detail": "Не более 5 мл вне посуды. Пролитое можно собрать тряпкой и выжать обратно в ёмкость."}
+					{"id": "thrift", "label": "Бережливость", "detail": "Не более 5 мл вне посуды и подноса. Пролитое можно собрать тряпкой и выжать обратно в ёмкость."},
+					{"id": "utensil", "label": "В чашке", "detail": "Вино без чашки на подносе принимается, но оценка ниже на одну ступень."}
 				]
 			}
 		]
@@ -22,7 +23,8 @@ const RECIPES := {
 				"id": "potato", "name": "Картофель", "role": 0,
 				"lines": [
 					{"id": "faces", "label": "6 сторон", "detail": "Каждая из шести сторон должна полностью подрумяниться."},
-					{"id": "portion", "label": "Порция", "detail": "На заказ нужна одна картофелина на тарелке. Падение само по себе не снижает качество."}
+					{"id": "portion", "label": "Порция", "detail": "На заказ нужна одна картофелина на подносе. Падение само по себе не снижает качество."},
+					{"id": "utensil", "label": "На тарелке", "detail": "Еда прямо на подносе принимается, но оценка ниже на одну ступень."}
 				]
 			}
 		]
@@ -34,7 +36,8 @@ const RECIPES := {
 				"id": "sausage", "name": "Сосиска", "role": 0,
 				"lines": [
 					{"id": "coating", "label": "Покрытие ≥90%", "detail": "Покрытие видно по цвету сосиски и в карточке блюда."},
-					{"id": "portion", "label": "Порция", "detail": "На заказ нужна одна сосиска на тарелке."}
+					{"id": "portion", "label": "Порция", "detail": "На заказ нужна одна сосиска на подносе."},
+					{"id": "utensil", "label": "На тарелке", "detail": "Еда прямо на подносе принимается, но оценка ниже на одну ступень."}
 				]
 			}
 		]
@@ -102,43 +105,32 @@ static func components(dish: String, model = null) -> Array:
 
 static func _served(dish: String, component_id: String, model) -> bool:
 	match dish:
-		"wine": return model.cup.distance_to(model.SERVE) < 0.4 and model.held != "cup" and absf(float(model.elevations.cup)) < 0.1 and model.filled > 0
-		"potato":
-			for i in range(model.potatoes.size()):
-				if model.potatoes[i].potato_state == "plate" and not (model.held == "potato" and model.potato_index == i): return true
-			return false
-		"sausage":
-			for i in range(model.sausages.size()):
-				if model.sausages[i].sausage_state == "plate" and not (model.held == "sausage" and model.sausage_index == i): return true
-			return false
+		"wine": return model.served_wine() > 0
+		"potato", "sausage": return model.served_index(dish) >= 0
 		"meal":
 			if component_id == "steak": return model.meat_state == "plate" and model.hands.find("steak") < 0
 			return model.served_pasta > 0
 	return false
 
 static func _live(dish: String, line_id: String, model, served: bool) -> String:
+	if line_id == "utensil": return mark(model.served_in_dish(dish))
 	match dish:
 		"wine":
-			if line_id == "volume": return "%d мл" % roundi(model.filled)
+			if line_id == "volume": return "%d мл" % roundi(model.served_wine() if served else model.filled)
 			if line_id == "thrift": return "%s · %.0f мл" % [mark(model.spilled() + model.soaked + model.lost <= 5), model.spilled() + model.soaked + model.lost]
 		"potato":
 			if line_id == "faces":
 				var faces := 0
 				if served:
-					for item in model.potatoes:
-						if item.potato_state == "plate":
-							for heat in item.potato_heat:
-								if heat >= 0.999: faces += 1
-							break
+					for heat in model.potatoes[model.served_index("potato")].potato_heat:
+						if heat >= 0.999: faces += 1
 				else: faces = model.cooked_faces()
 				return "%d/6" % faces
 			if line_id == "portion": return mark(served)
 		"sausage":
 			if line_id == "coating":
 				var coat: float = model.sausage_coating
-				if served:
-					for item in model.sausages:
-						if item.sausage_state == "plate": coat = item.sausage_coating; break
+				if served: coat = model.sausages[model.served_index("sausage")].sausage_coating
 				return "%d%%" % roundi(coat * 100)
 			if line_id == "portion": return mark(served)
 		"meal":
