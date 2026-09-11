@@ -53,10 +53,10 @@ func kitchen_phase() -> String:
 	return kitchen.training.phase if kitchen != null else "?"
 func expected_stage() -> String:
 	if role == "host":
-		return ["wait-guest", "parallel-recording", "start-kitchen", "shared-zones", "observer-ack", "kitchen-idle", "quit"][clampi(stage, 0, 6)]
+		return ["wait-guest", "parallel-recording", "start-kitchen", "shared-zones", "observer-ack", "await-idle-after-release", "quit"][clampi(stage, 0, 6)]
 	if role == "guest":
-		return ["host-wine", "open-potato", "potato-ready", "book-and-roster", "kitchen-role", "ack-then-leave", "local-restore"][clampi(stage, 0, 6)] if stage < 30 else ("guest-bell" if stage == 30 else "guest-resume")
-	return ["count-stations", "kitchen-recording", "kitchen-idle"][clampi(stage, 0, 2)]
+		return ["host-wine", "open-potato", "potato-ready", "book-and-roster", "kitchen-role", "host-release-then-leave", "local-restore"][clampi(stage, 0, 6)] if stage < 30 else ("guest-bell" if stage == 30 else "guest-resume")
+	return ["count-stations", "kitchen-recording", "wait-release", "wait-idle"][clampi(stage, 0, 3)]
 func timeout_message() -> String:
 	var first = game.service.by_id(1) if is_instance_valid(game) else null
 	var second = game.service.by_id(2) if is_instance_valid(game) else null
@@ -112,7 +112,9 @@ func host_tick() -> void:
 		print("CHECK: both live roles share zones")
 		stage = 4
 	elif stage == 4 and barrier.has_from("kitchen-live", member_named("observer")):
-		print("CHECK: host held kitchen until observer ack")
+		if kitchen.training.phase != "recording": fail("Host lost kitchen recording before observer ack")
+		print("CHECK: host received observer ack and released kitchen")
+		barrier.send("kitchen-release")
 		stage = 5
 	elif stage == 5 and kitchen.training.phase == "idle" and game.session.members.size() < 3:
 		if not saw_parallel: fail("No concurrent sessions")
@@ -166,8 +168,11 @@ func guest_tick() -> void:
 		if kitchen.training.role_for(game.session.local_id()) != 1: fail("Wrong assignment")
 		game.session.send_input(kitchen, {}, {"grab": "salt"})
 		stage = 5
-	elif stage == 5 and kitchen.model.hands[1] == "salt" and kitchen.model.hands[0] == "pasta_salt_tool" and barrier.has_from("kitchen-live", member_named("observer")):
+	elif stage == 5 and kitchen.model.hands[1] == "salt" and kitchen.model.hands[0] == "pasta_salt_tool" and barrier.has_from("kitchen-release", 1):
+		if kitchen.training.phase != "recording": fail("Guest left after kitchen already idle")
 		if not saw_parallel: fail("Parallel training not seen")
+		if not barrier.has_from("kitchen-release", 1): fail("kitchen-release not from host")
+		print("CHECK: guest received host kitchen release")
 		game.session.leave("")
 		stage = 6
 func observer_tick() -> void:
@@ -186,9 +191,12 @@ func observer_tick() -> void:
 		print("CHECK: observer replicated kitchen recording with both roles")
 		barrier.send("kitchen-live")
 		stage = 2
-	elif stage == 2 and kitchen.training.phase == "idle":
+	elif stage == 2 and barrier.has_from("kitchen-release", 1):
+		print("CHECK: observer received host kitchen release")
+		stage = 3
+	elif stage == 3 and kitchen.training.phase == "idle":
 		if not barrier.has_from("kitchen-live", game.session.local_id()): fail("Observer finished without its own ack")
-		print("PASS: late observer sees station sessions and cancelled live take")
+		print("PASS: late observer sees station sessions and host-released live take cleanup")
 		game.session.leave("")
 		if is_instance_valid(game):
 			game._shutdown_tree(game)
