@@ -67,13 +67,17 @@ func run() -> void:
 	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
 	for edge_name in ["ZoneEdgeFront", "ZoneEdgeBack", "ZoneEdgeLeft", "ZoneEdgeRight"]:
 		assert(station.get_node_or_null(edge_name) != null, "training zone should show a visible floor outline on every side")
+	assert(is_equal_approx(station.get_node("ZoneEdgeLeft").position.x, station.training_zone_min().x), "left outline should match the logical station boundary")
+	assert(is_equal_approx(station.get_node("ZoneEdgeRight").position.x, station.training_zone_max().x), "right outline should match the logical station boundary")
 	for index in range(game.service.stations.size() - 1):
 		var left = game.service.stations[index]
 		var right = game.service.stations[index + 1]
-		var visual_width_left: float = game.service.Definition.TYPES[left.type_id].width
-		var visual_width_right: float = game.service.Definition.TYPES[right.type_id].width
-		var gap: float = (right.position.x - left.position.x) - (visual_width_left + visual_width_right) / 2.0
-		assert(gap >= 0.4, "adjacent stations should leave a small readable visual gap")
+		var left_edge: float = left.position.x + left.training_zone_max().x
+		var right_edge: float = right.position.x + right.training_zone_min().x
+		assert(absf(left_edge - right_edge) < 0.0001, "adjacent station zones should meet without overlap")
+		var center_distance: float = right.position.x - left.position.x
+		var minimum_physical_width: float = maxf(game.service.Definition.TYPES[left.type_id].width, game.service.Definition.TYPES[right.type_id].width)
+		assert(center_distance >= minimum_physical_width, "station centers should be separated by at least the wider station")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()

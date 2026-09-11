@@ -84,7 +84,7 @@ func _ready() -> void:
 		zone_labels.append(label)
 	var zone_min := training_zone_min()
 	var zone_max := training_zone_max()
-	var extent: float = (Definition.TYPES[type_id].width / 2.0 + 0.6) * TRAINING_ZONE_SCALE
+	var extent: float = zone_max.x
 	var zone_depth: float = zone_max.y - zone_min.y
 	var outline_color := Color("cbad72")
 	var outline_thickness := TRAINING_ZONE_OUTLINE_THICKNESS
