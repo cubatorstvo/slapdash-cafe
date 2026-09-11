@@ -1,9 +1,9 @@
 extends RefCounted
 ## Shared coordinates for furniture, initial stock and support surfaces.
 const SHELF_HOME := Vector2(-2.72, 0.55)
-const SHELF_HALF := Vector2(0.55, 0.55)
+const SHELF_HALF := Vector2(0.55, 0.275)
 const SHELF_YAW := PI / 4.0
-const SHELF_PULL := SHELF_HALF.y * 0.5 # one quarter of the full 1.1 m shelf depth
+const SHELF_PULL := 0.55 # preserve the cook-facing edge while removing the far half of the old 1.1 m depth
 const LEVELS := [0.35, 0.85, 1.40]
 const TRAY := Vector2(1.35, -0.15)
 const TRAY_HALF := Vector2(0.58, 0.77)

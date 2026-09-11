@@ -58,7 +58,7 @@ func reset(recipe := "") -> void:
 	jug = Layout.shelf_point(Vector2(-0.1, 0.0))
 	cup = Vector2(1.93, Layout.CROCKERY_Z)
 	rag = Vector2(0.7, 0.87)
-	tomato = Layout.shelf_point(Vector2(0.33, 0.25))
+	tomato = Layout.shelf_point(Vector2(0.33, 0.10))
 	tomato_velocity = Vector3.ZERO
 	tomato_flying = false
 	tomato_hit = false
@@ -98,11 +98,11 @@ func reset(recipe := "") -> void:
 	potatoes.clear()
 	sausages.clear()
 	for i in range(3):
-		potato = Layout.shelf_point(Vector2(-0.30 + i * 0.30, 0.20))
+		potato = Layout.shelf_point(Vector2(-0.30 + i * 0.30, 0.08))
 		potato_state = "table"
 		elevations.potato = Layout.LEVELS[0] - BASE_Y
 		potatoes.append(_capture_food("potato"))
-		sausage = Layout.shelf_point(Vector2(0.0, -0.27 + i * 0.27))
+		sausage = Layout.shelf_point(Vector2(-0.38 + i * 0.38, 0.04))
 		previous_sausage = sausage
 		elevations.sausage = Layout.LEVELS[1] - BASE_Y
 		sausages.append(_capture_food("sausage"))
