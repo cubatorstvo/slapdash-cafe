@@ -6,7 +6,7 @@ const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const Props = preload("res://scripts/props.gd")
-const TRAINING_ZONE_SCALE := 1.5
+const TRAINING_ZONE_SCALE := 1.2
 const TRAINING_ZONE_CENTER_Z := 0.30
 const TRAINING_ZONE_BASE_HALF_DEPTH := 2.60
 var bell: Node3D
@@ -44,11 +44,11 @@ func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
 
 func training_zone_min() -> Vector2:
-	var half_width: float = (Definition.TYPES[type_id].width / 2.0 + 0.5) * TRAINING_ZONE_SCALE
+	var half_width: float = Definition.TYPES[type_id].width / 2.0 * TRAINING_ZONE_SCALE
 	return Vector2(-half_width, TRAINING_ZONE_CENTER_Z - TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
 
 func training_zone_max() -> Vector2:
-	var half_width: float = (Definition.TYPES[type_id].width / 2.0 + 0.5) * TRAINING_ZONE_SCALE
+	var half_width: float = Definition.TYPES[type_id].width / 2.0 * TRAINING_ZONE_SCALE
 	return Vector2(half_width, TRAINING_ZONE_CENTER_Z + TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
 
 func _ready() -> void:

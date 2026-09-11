@@ -18,8 +18,16 @@ func _ready() -> void:
 	rng.randomize()
 
 func initial_stations() -> void:
-	for index in range(3): add_station("counter", Vector3((index - 1) * 5.6, 0, -1.4))
-	add_station("kitchen", Vector3(11.8, 0, -1.4))
+	const ROW_CENTER_X := 3.0
+	var types := ["counter", "counter", "counter", "kitchen"]
+	var zone_widths: Array[float] = []
+	for type_id in types: zone_widths.append(float(Definition.TYPES[type_id].width) * Station.TRAINING_ZONE_SCALE)
+	var row_width := 0.0
+	for width in zone_widths: row_width += width
+	var x := ROW_CENTER_X - row_width / 2.0 + zone_widths[0] / 2.0
+	for index in range(types.size()):
+		if index > 0: x += (zone_widths[index - 1] + zone_widths[index]) / 2.0
+		add_station(types[index], Vector3(x, 0, -1.4))
 
 func add_station(type_id: String, point: Vector3, id := 0) -> Node3D:
 	var station := Station.new()

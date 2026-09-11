@@ -2,7 +2,7 @@ extends RefCounted
 ## Two commands act on one shared kitchen. Completed orders replay joint snapshots.
 const Pourable = preload("res://scripts/pourable.gd")
 const Quality = preload("res://scripts/dish_quality.gd")
-const BOUNDS := Vector2(3.05, 2.65) * 1.5
+const BOUNDS := Vector2(3.05, 2.65)
 const BASE_Y := 1.015
 const GRILL := Vector2(-1.4, -0.15)
 const STOVE := Vector2(1.4, -0.15)
