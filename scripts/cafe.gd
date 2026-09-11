@@ -194,9 +194,8 @@ func bind_training() -> void:
 		last_menu_revision = ""
 		if bound_station != station.station_id or bound_revision != run.revision:
 			player.station = station
-			var width: float = station.Definition.TYPES[station.type_id].width / 2 + 0.5
-			player.zone_min = Vector2(-width, -2.3)
-			player.zone_max = Vector2(width, 2.9)
+			player.zone_min = station.training_zone_min()
+			player.zone_max = station.training_zone_max()
 			if station.role_count() > 1 and run.live_roles.size() == 1:
 				if local_role == 0: player.zone_max.x = 0
 				else: player.zone_min.x = 0

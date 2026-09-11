@@ -6,6 +6,9 @@ const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const Props = preload("res://scripts/props.gd")
+const TRAINING_ZONE_SCALE := 1.5
+const TRAINING_ZONE_CENTER_Z := 0.30
+const TRAINING_ZONE_BASE_HALF_DEPTH := 2.60
 var bell: Node3D
 var bell_cap: Node3D
 var bell_flash := 0.0
@@ -40,6 +43,14 @@ var was_resting := true
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
 
+func training_zone_min() -> Vector2:
+	var half_width: float = (Definition.TYPES[type_id].width / 2.0 + 0.5) * TRAINING_ZONE_SCALE
+	return Vector2(-half_width, TRAINING_ZONE_CENTER_Z - TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
+
+func training_zone_max() -> Vector2:
+	var half_width: float = (Definition.TYPES[type_id].width / 2.0 + 0.5) * TRAINING_ZONE_SCALE
+	return Vector2(half_width, TRAINING_ZONE_CENTER_Z + TRAINING_ZONE_BASE_HALF_DEPTH * TRAINING_ZONE_SCALE)
+
 func _ready() -> void:
 	if crew.is_empty(): crew = Definition.crew(type_id, station_id)
 	model = Model.new() if type_id == "counter" else TeamModel.new()
@@ -70,9 +81,12 @@ func _ready() -> void:
 		label.pixel_size = 0.004
 		label.hide()
 		zone_labels.append(label)
-	var extent: float = Definition.TYPES[type_id].width / 2 + 0.6
-	for z in [-2.1, 2.8]: Props.box(self, Vector3(extent * 2, 0.01, 0.035), Vector3(0, 0.01, z), Color("cbad72"))
-	for spec in [[Vector3(0.02, 2.5, 5.2), Vector3(-extent, 1.25, 0.3)], [Vector3(0.02, 2.5, 5.2), Vector3(extent, 1.25, 0.3)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, -2.3)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, 2.9)]]:
+	var zone_min := training_zone_min()
+	var zone_max := training_zone_max()
+	var extent: float = (Definition.TYPES[type_id].width / 2.0 + 0.6) * TRAINING_ZONE_SCALE
+	var zone_depth: float = zone_max.y - zone_min.y
+	for z in [zone_min.y + 0.2 * TRAINING_ZONE_SCALE, zone_max.y - 0.1 * TRAINING_ZONE_SCALE]: Props.box(self, Vector3(extent * 2, 0.01, 0.035), Vector3(0, 0.01, z), Color("cbad72"))
+	for spec in [[Vector3(0.02, 2.5, zone_depth), Vector3(-extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(0.02, 2.5, zone_depth), Vector3(extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_min.y)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_max.y)]]:
 		var wall := Props.box(self, spec[0], spec[1], Color("86d7c2"))
 		wall.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		wall.material_override.albedo_color.a = 0.03

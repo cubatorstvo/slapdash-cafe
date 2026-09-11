@@ -55,10 +55,10 @@ func _init() -> void:
 func reset(recipe := "") -> void:
 	if not recipe.is_empty(): dish = recipe
 	super.reset()
-	jug = Vector2(Layout.SHELF_X - 0.1, Layout.SHELF_Z)
+	jug = Layout.shelf_point(Vector2(-0.1, 0.0))
 	cup = Vector2(1.93, Layout.CROCKERY_Z)
 	rag = Vector2(0.7, 0.87)
-	tomato = Vector2(Layout.SHELF_X + 0.33, Layout.SHELF_Z + 0.25)
+	tomato = Layout.shelf_point(Vector2(0.33, 0.25))
 	tomato_velocity = Vector3.ZERO
 	tomato_flying = false
 	tomato_hit = false
@@ -98,11 +98,11 @@ func reset(recipe := "") -> void:
 	potatoes.clear()
 	sausages.clear()
 	for i in range(3):
-		potato = Vector2(Layout.SHELF_X - 0.30 + i * 0.30, Layout.SHELF_Z + 0.20)
+		potato = Layout.shelf_point(Vector2(-0.30 + i * 0.30, 0.20))
 		potato_state = "table"
 		elevations.potato = Layout.LEVELS[0] - BASE_Y
 		potatoes.append(_capture_food("potato"))
-		sausage = Vector2(Layout.SHELF_X, Layout.SHELF_Z - 0.27 + i * 0.27)
+		sausage = Layout.shelf_point(Vector2(0.0, -0.27 + i * 0.27))
 		previous_sausage = sausage
 		elevations.sausage = Layout.LEVELS[1] - BASE_Y
 		sausages.append(_capture_food("sausage"))

@@ -275,7 +275,9 @@ func apply_input(sender: int, packet: Dictionary) -> void:
 	if motion is Dictionary and M.valid_pose(motion.get("pose")):
 		var clean := {"pose": clean_pose(motion.pose), "use": motion.get("use", false) == true}
 		if M.numbers(motion.get("aim"), 3): clean.aim = motion.aim
-		if M.numbers(motion.get("target"), 2): clean.target = [clampf(motion.target[0], -3, 3), clampf(motion.target[1], -2.65, 2.65)]
+		if M.numbers(motion.get("target"), 2):
+			var bounds: Vector2 = station.model.BOUNDS
+			clean.target = [clampf(motion.target[0], -bounds.x, bounds.x), clampf(motion.target[1], -bounds.y, bounds.y)]
 		if M.finite(motion.get("height")): clean.height = clampf(motion.height, -1.0, 1.1)
 		if M.numbers(motion.get("pan_tilt"), 2): clean.pan_tilt = motion.pan_tilt
 		run.inputs[role] = clean

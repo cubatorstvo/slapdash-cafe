@@ -300,15 +300,21 @@ func _build_storage_and_tray() -> void:
 	var layout = Model.Layout
 	var wood := Color("a76f4e")
 	var metal := Color("244047")
+	var product_shelf := Node3D.new()
+	product_shelf.name = "ProductShelf"
+	add_child(product_shelf)
+	var shelf_center: Vector2 = layout.shelf_center()
+	product_shelf.position = Vector3(shelf_center.x, 0, shelf_center.y)
+	product_shelf.rotation.y = layout.SHELF_YAW
 	for height in layout.LEVELS:
-		Props.box(self, Vector3(1.1, 0.06, 1.1), Vector3(layout.SHELF_X, height - 0.03, layout.SHELF_Z), wood)
-		Props.collision_box(self, Vector3(1.1, 0.06, 1.1), Vector3(layout.SHELF_X, height - 0.03, layout.SHELF_Z))
+		Props.box(product_shelf, Vector3(1.1, 0.06, 1.1), Vector3(0, height - 0.03, 0), wood)
+		Props.collision_box(product_shelf, Vector3(1.1, 0.06, 1.1), Vector3(0, height - 0.03, 0))
 	for x in [-0.51, 0.51]:
 		for z in [-0.51, 0.51]:
-			Props.solid_box(self, Vector3(0.07, 1.45, 0.07), Vector3(layout.SHELF_X + x, 0.725, layout.SHELF_Z + z), metal)
+			Props.solid_box(product_shelf, Vector3(0.07, 1.45, 0.07), Vector3(x, 0.725, z), metal)
 	# Shallow lips keep the stock visible from the cook's side.
 	for level in [0, 1]:
-		Props.box(self, Vector3(1.02, 0.09, 0.025), Vector3(layout.SHELF_X, layout.LEVELS[level] + 0.045, layout.SHELF_Z + 0.50), wood.lightened(0.1))
+		Props.box(product_shelf, Vector3(1.02, 0.09, 0.025), Vector3(0, layout.LEVELS[level] + 0.045, 0.50), wood.lightened(0.1))
 	Props.box(self, Vector3(1.3, 0.07, 0.66), Vector3(1.5, layout.CROCKERY_Y - 0.035, layout.CROCKERY_Z - 0.03), wood)
 	for i in range(3):
 		var plate := Node3D.new()

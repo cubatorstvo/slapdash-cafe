@@ -4,6 +4,11 @@ func _initialize() -> void: run.call_deferred()
 func run() -> void:
 	var m = Model.new()
 	m.reset("sausage")
+	var expected_shelf_center: Vector2 = m.Layout.SHELF_HOME + m.Layout.shelf_forward() * (m.Layout.SHELF_HALF.y * 0.5)
+	assert(m.Layout.shelf_center().distance_to(expected_shelf_center) < 0.0001, "product shelf should be pulled forward by one quarter depth")
+	assert(is_equal_approx(m.Layout.SHELF_YAW, PI / 4.0), "product shelf should face the cook at 45 degrees")
+	for point in [m.jug, m.tomato, m.potatoes[0].potato, m.potatoes[1].potato, m.potatoes[2].potato, m.sausages[0].sausage, m.sausages[1].sausage, m.sausages[2].sausage]:
+		assert(m.Layout.shelf_contains(point), "initial stock should remain on the rotated shelf")
 	m.pick_up("plate_2")
 	m.move_item("plate_2", Vector2.ZERO)
 	m.put_down()
@@ -53,6 +58,13 @@ func run() -> void:
 	await process_frame
 	game.service.open_for_business = false
 	for i in range(5): await process_frame
+	var station = game.service.by_id(1)
+	var zone_size: Vector2 = station.training_zone_max() - station.training_zone_min()
+	assert(is_equal_approx(zone_size.x, (station.Definition.TYPES.counter.width + 1.0) * 1.5), "training zone width should be 1.5x")
+	assert(is_equal_approx(zone_size.y, 5.2 * 1.5), "training zone depth should be 1.5x")
+	assert(station.model.BOUNDS == Vector2(3.35, 2.65) * 1.5, "counter object movement bounds should match the enlarged zone")
+	var shelf = station.view.get_node("ProductShelf")
+	assert(is_equal_approx(shelf.rotation.y, PI / 4.0), "visible product shelf should use the 45 degree rotation")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()
