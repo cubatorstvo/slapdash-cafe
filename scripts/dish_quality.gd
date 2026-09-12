@@ -1,5 +1,5 @@
 extends RefCounted
-## Transparent objective grading. Style is independent and currently has no detectors.
+## Transparent objective grading. Style is independent of recipe compliance.
 const STYLE_MULTIPLIERS := [1.0, 1.2, 1.5, 2.0]
 const PRICE_FACTORS := {"D": 0.2, "C": 0.4, "B": 0.6, "A": 0.8, "S": 1.0}
 
@@ -30,4 +30,6 @@ static func text(report: Dictionary) -> String:
 		for line in component.lines: lines.append(str(line))
 		lines.append("")
 	lines.append("Качество блюда: " + report.grade)
+	if report.get("style_count", 0) > 0:
+		lines.append("Эффектная готовка: " + ", ".join(report.get("style_tricks", [])) + " · +20%")
 	return "\n".join(lines)

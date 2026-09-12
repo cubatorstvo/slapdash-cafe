@@ -21,6 +21,7 @@ func setup() -> void:
 	game.service.initial_stations(true)
 	game.service.revenue = 73 if role == "guest" else 0
 	if role == "host":
+		game.service.progress.stars = 1
 		game.service.progress.cash = 200
 		game.service.purchase("decor", "sign")
 		game.service.purchase("upgrade", "", 3)

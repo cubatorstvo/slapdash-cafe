@@ -31,7 +31,7 @@ func build(root_game: Node3D) -> void:
 		slots.append({"node": marker, "label": label})
 	ribbon = Node3D.new()
 	add_child(ribbon)
-	Props.box(ribbon, Vector3(12.9, 0.11, 0.04), Vector3(10.2, 1.0, 0.65), Color("bfa565"))
+	Props.box(ribbon, Vector3(6.0, 0.11, 0.04), Vector3(13.8, 1.0, 0.65), Color("bfa565"))
 	var sign := Node3D.new()
 	add_child(sign)
 	decor.sign = sign
@@ -53,6 +53,7 @@ func build(root_game: Node3D) -> void:
 		for i in range(4):
 			var leaf := Props.ball(plants, 0.3, Vector3(x + sin(i*1.7)*0.3, 0.95+i*0.20, 8.8), Color("84ad78"))
 			leaf.scale = Vector3(0.7, 1.8, 0.65)
+	build_night()
 	refresh()
 
 func board_hit(camera: Camera3D) -> bool:
@@ -66,6 +67,122 @@ func refresh() -> void:
 	for id in decor: decor[id].visible = id in progress.decorations
 	for i in range(slots.size()):
 		slots[i].node.visible = game.service.by_id(i + 1) == null
-		slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\n[M] Купить · 120" if i < 2 or (i == 2 and progress.expanded) else "РАСШИРЕНИЕ ЗАЛА\nПервая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[M] Купить · 250"
+		if i < 3:
+			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[M] Купить · 120"
+		else:
+			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[M] Купить · 250"
 	ribbon.visible = not progress.expanded
-	star_label.text = "★ ☆ ☆ ☆ ☆" if progress.stars > 0 else "☆ ☆ ☆ ☆ ☆"
+	star_label.text = "★ ★ ☆ ☆ ☆" if progress.stars >= 2 else "★ ☆ ☆ ☆ ☆" if progress.stars == 1 else "☆ ☆ ☆ ☆ ☆"
+	decor.lights.hide()
+	refresh_night()
+
+var night_controls: Array = []
+var lab_parts: Array = []
+var lab_caption: Label3D
+var night_room_light: OmniLight3D
+var cable_root: Node3D
+var cable_stamp := ""
+var cable_preview: MeshInstance3D
+
+func build_night() -> void:
+	Props.solid_box(self, Vector3(3.6, 0.12, 1.0), Vector3(0, 0.85, 8.3), Color("9b795c"))
+	for x in [-1.5, 1.5]: Props.solid_box(self, Vector3(0.12,0.8,0.8), Vector3(x,0.4,8.3), Color("526d65"))
+	lab_caption = Props.text(self, "ЛАБОРАТОРИЯ", Vector3(0,2.35,8.3), 27, Color("edd09d"))
+	lab_caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lab_caption.pixel_size = 0.005
+	for i in range(3):
+		var pos := Vector3(-0.85 + i * 0.85, 1.04, 8.2)
+		var switch := Props.box(self, Vector3(0.3,0.16,0.32), pos, [Color("79b8c9"),Color("e6c671"),Color("83bc8e")][i])
+		night_controls.append({"node": switch, "action": "lab_switch", "index": i, "hint": "(E) Подключить " + ["колбу", "питание", "стабилизатор"][i]})
+		var part := Node3D.new()
+		add_child(part)
+		part.position = Vector3(pos.x,0.94,8.6)
+		Props.cylinder(part,0.22,0.13,Vector3.ZERO,Color("516d69"))
+		Props.cylinder(part,0.16,0.55,Vector3(0,0.32,0),[Color("93d5d2"),Color("e0cd79"),Color("a2cb87")][i])
+		Props.ball(part,0.16,Vector3(0,0.65,0),Color("e9dcaf"))
+		lab_parts.append(part)
+	var start := Props.box(self, Vector3(0.38,0.16,0.38), Vector3(-1.48,1.04,8.1), Color("c68d6d"))
+	night_controls.append({"node": start, "action": "lab_begin", "hint": "(E) Взять комплект лаборатории"})
+	var reel := Props.cylinder(self,0.2,0.15,Vector3(1.48,1.03,8.15),Color("e2c080"))
+	night_controls.append({"node": reel, "action": "garland_begin", "hint": "(E) Взять гирлянду · 40"})
+	var bed := Props.solid_box(self,Vector3(1.3,2.4,0.12),Vector3(5,1.2,10.35),Color("936f56"))
+	night_controls.append({"node": bed, "action": "next_day", "hint": "(E) Отдохнуть до утра"})
+	Props.text(self,"КОМНАТА ОТДЫХА",Vector3(5,2.8,10.1),25,Color("e7c891")).billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	cable_root = Node3D.new()
+	add_child(cable_root)
+	cable_preview = Props.line(self,Vector3.ZERO,Vector3.UP,0.018,Color("a9ce9d"))
+	cable_preview.hide()
+	night_room_light = OmniLight3D.new()
+	add_child(night_room_light)
+	night_room_light.position = Vector3(0,3.5,7.8)
+	night_room_light.omni_range = 9
+	night_room_light.light_color = Color("ffcf90")
+	night_room_light.light_energy = 1.5
+
+func night_target(camera: Camera3D) -> Dictionary:
+	if game.service.progress.shift != "night": return {}
+	var origin := camera.global_position
+	var direction := -camera.global_basis.z
+	for entry in night_controls:
+		var point: Vector3 = entry.node.global_position
+		var box := AABB(point - Vector3(0.25,0.22,0.3),Vector3(0.5,0.44,0.6))
+		if entry.action == "next_day": box = AABB(point - Vector3(0.7,1.2,0.2),Vector3(1.4,2.4,0.4))
+		var hit = box.intersects_ray(origin,direction)
+		if hit != null and origin.distance_to(hit) <= 4.2:
+			var result: Dictionary = {"action": entry.action, "hint": entry.hint}
+			if entry.has("index"): result.index = entry.index
+			if entry.action == "lab_begin" and game.service.progress.lab_stage < 3: result.hint += " · %d" % P.LAB_PRICES[game.service.progress.lab_stage]
+			return result
+	if game.service.progress.garland_builder == game.session.local_id() and not game.service.progress.garland_complete:
+		for z in [-7.35, 10.35]:
+			if absf(direction.z) < 0.001: continue
+			var distance: float = (z - origin.z) / direction.z
+			var point: Vector3 = origin + direction * distance
+			if distance > 0 and distance <= 4.2 and game.service.valid_wall_point(point):
+				return {"action": "garland_anchor", "point": [point.x,point.y,point.z], "hint": "(E) Закрепить гирлянду · %d/4" % game.service.progress.garland_points.size()}
+	return {}
+
+func night_action_position(action: String, data: Dictionary) -> Vector3:
+	if action == "garland_anchor":
+		var point = data.get("point", [])
+		if preload("res://scripts/team_cooking_model.gd").numbers(point, 3): return Vector3(point[0],point[1],point[2])
+		return Vector3.INF
+	for entry in night_controls:
+		if entry.action == action and (action != "lab_switch" or entry.index == int(data.get("index",-1))): return entry.node.global_position
+	return Vector3.INF
+
+func refresh_night() -> void:
+	var p = game.service.progress
+	for i in range(lab_parts.size()): lab_parts[i].visible = i < p.lab_stage
+	var names := ["Колба", "Питание", "Стабилизатор"]
+	var schemes := [[0,1,2],[2,0,1],[1,2,0]]
+	lab_caption.text = "ЛАБОРАТОРИЯ ГОТОВА" if p.lab_stage >= 3 else "ЛАБОРАТОРИЯ · %d/3" % p.lab_stage
+	if p.lab_step >= 0 and p.lab_stage < 3:
+		lab_caption.text += "\nПодключи: " + names[schemes[p.lab_stage][p.lab_step]] + " · %d/3" % p.lab_step
+	night_room_light.visible = p.shift == "night"
+	var next := str(p.garland_points)
+	if next == cable_stamp: return
+	cable_stamp = next
+	for child in cable_root.get_children(): child.queue_free()
+	var points: Array = p.garland_points
+	for i in range(points.size()):
+		var end := Vector3(points[i][0],points[i][1],points[i][2])
+		Props.ball(cable_root,0.06,end,Color("c69f72"))
+		if i == 0: continue
+		var start := Vector3(points[i-1][0],points[i-1][1],points[i-1][2])
+		var previous := start
+		for j in range(1,13):
+			var t := float(j)/12.0
+			var point := start.lerp(end,t) - Vector3.UP * sin(t*PI)*0.22
+			Props.line(cable_root,previous,point,0.013,Color("574c3a"))
+			if j % 2 == 0: Props.ball(cable_root,0.065,point,Color("ffcf82")).material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			previous = point
+
+func _process(_delta: float) -> void:
+	if game == null or not is_instance_valid(cable_preview): return
+	var target := night_target(game.camera)
+	cable_preview.visible = target.get("action", "") == "garland_anchor" and not game.service.progress.garland_points.is_empty()
+	if cable_preview.visible:
+		var from: Array = game.service.progress.garland_points.back()
+		var to: Array = target.point
+		Props.align_line(cable_preview,Vector3(from[0],from[1],from[2]),Vector3(to[0],to[1],to[2]))

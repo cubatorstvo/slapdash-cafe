@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-first-star-10"
+const PROTOCOL := "slapdash-cafe-shifts-11"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -189,6 +189,18 @@ func _action(value: Dictionary) -> void:
 
 func execute_action(sender: int, value: Dictionary) -> void:
 	var action: String = value.get("action", "")
+	if action in ["lab_begin", "lab_switch", "garland_begin", "garland_anchor", "next_day"]:
+		if action in ["lab_begin", "garland_begin", "next_day"] and sender != 1:
+			message_to(sender, "Это действие подтверждает хозяин кафе.")
+			return
+		var target: Vector3 = game.development.night_action_position(action, value)
+		var location: Array = player_poses.get(sender, {}).get("position", [])
+		var peer_position: Vector3 = game.player.global_position if sender == 1 else Vector3(location[0], location[1], location[2]) if location.size() == 3 else Vector3.INF
+		if peer_position.distance_to(target) > 4.5: return
+		var error: String = game.service.night_action(action, value, sender)
+		if not error.is_empty(): message_to(sender, error)
+		else: game.save_cafe()
+		return
 	if action in ["buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
 			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
@@ -199,14 +211,14 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			"banquet": error = game.service.start_banquet(sender)
 			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
 			"save":
-				message_to(sender, "Кафе сохранено." if game.save_cafe() else "Не удалось записать сохранение.")
+				message_to(sender, "Сохранение идёт в фоне." if game.save_cafe() else "Не удалось записать сохранение.")
 				return
 			"new_cafe":
 				if not game.service.any_training() and not game.service.progress.busy(): game.new_cafe()
 				return
 			"business":
 				if game.service.progress.busy(): return
-				game.service.open_for_business = not game.service.open_for_business
+				game.service.toggle_business()
 		if not error.is_empty(): message_to(sender, error)
 		else:
 			game.service.progress.revision += 1
@@ -218,6 +230,12 @@ func execute_action(sender: int, value: Dictionary) -> void:
 	if game.service.is_showcase(station) and action in ["keep", "accept"]: return
 	if game.service.is_showcase(station) and action == "cancel":
 		if sender == run.lead: game.service.finish_banquet(false, "Личный показ прерван.")
+		return
+	if action == "manual":
+		if near_peer(sender, station, 5.0): game.service.request_manual(station, str(value.get("dish", "wine")), sender)
+		return
+	if game.service.progress.phase == "tasting" and action == "cancel":
+		if sender == run.lead: game.service.finish_banquet(false, "Дегустация прервана.")
 		return
 	if action == "open":
 		if not near_peer(sender, station, 5.0): return
@@ -366,11 +384,13 @@ func _world(packet: PackedByteArray) -> void:
 	for entry in data.stations:
 		ids.append(entry.id)
 		var station: Node3D = game.service.by_id(entry.id)
-		if station == null: station = game.service.add_station(entry.type, int(entry.slot))
+		if station == null: station = game.service.add_station(entry.type, int(entry.slot), entry.get("manual", false))
+		station.manual_station = entry.get("manual", false)
 		station.crew = entry.crew
 		station.upgrades = entry.upgrades
 		station.apply_upgrades()
 		station.state = entry.state
+		station.customer_id = int(entry.get("customer_id", -1))
 		station.order_dish = str(entry.get("order_dish", ""))
 		station.recipes = {}
 		var qualities: Dictionary = entry.get("recipe_quality", {})

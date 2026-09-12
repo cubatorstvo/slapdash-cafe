@@ -132,7 +132,7 @@ func run() -> void:
 
 	print("[6/7] Fixed station slots, save/load drafts and malformed data rejection")
 	var saved: Dictionary = bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version == 5, "Station save uses slot format")
+	check(saved.version == 6, "Station save uses slot format")
 	for entry in saved.stations:
 		check(entry.has("slot") and not entry.has("position") and not entry.has("yaw") and not entry.has("id"), "Slot save omits transforms and runtime IDs")
 	check(service.load_data(saved), "Station save loads")
@@ -141,7 +141,8 @@ func run() -> void:
 	var damaged := saved.duplicate(true)
 	damaged.stations[1].slot = damaged.stations[0].slot
 	check(not service.load_data(damaged) and service.by_id(1) != null, "Reject duplicate slot without replacing world")
-	check(game.save_cafe(), "Atomic save to disk")
+	check(game.save_cafe(), "Queue background save")
+	game.save_writer.flush()
 
 	print("[7/7] UI ownership and restart revision")
 	first = service.by_id(1)

@@ -38,7 +38,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе и гости"], ["stations", "Кухня"], ["decor", "Украшения"], ["star", "Первая звезда"]]:
+	for entry in [["overview", "Кафе и гости"], ["stations", "Кухня"], ["decor", "Украшения"], ["star", "Звёзды"], ["night", "После закрытия"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -113,8 +113,9 @@ func rebuild() -> void:
 	match tab:
 		"overview":
 			label(content, progress.objective(service.stations, service.served, service.open_for_business), 23)
-			button(content, "Закрыть приём гостей" if service.open_for_business else "Открыть кафе", func(): send({"action": "business"}), host and not progress.busy())
-			label(content, "Посетитель примерно каждые %.0f с. Уже принятые заказы выполняются и после закрытия." % progress.arrival_interval())
+			button(content, "Закончить смену" if service.open_for_business else "Открыть кафе", func(): send({"action": "business"}), host and not progress.busy() and progress.shift in ["morning", "open"])
+			label(content, "Смена: 8 минут. После последних заказов — ночь без таймера. Отдохнуть до утра можно у двери справа от верстака.", 16)
+			label(content, "Первые гости приходят по одному: начни с вина, затем попробуй картофель и сосиску." if progress.stars == 0 else "Посетитель примерно каждые %.0f с. Уже принятые заказы выполняются и после закрытия." % progress.arrival_interval())
 			label(content, "СПРОС С МОМЕНТА ОТКРЫТИЯ", 19)
 			for dish in progress.available_dishes():
 				var counts: Dictionary = progress.demand.get(dish, {})
@@ -130,22 +131,22 @@ func rebuild() -> void:
 			else: button(content, "Новое прохождение…", func(): confirm_reset = true; rebuild(), host and not progress.busy() and not service.any_training())
 		"stations":
 			label(content, "Каждая станция приходит со своей бригадой. Покажи ей каждое блюдо лично.", 19)
-			var can_buy: bool = host and not progress.busy()
-			button(content, "Новая тяп-ляп стойка + повар · 120", func(): send({"action": "buy", "kind": "counter"}), can_buy and progress.cash >= P.COUNTER_PRICE and service.stations.filter(func(s): return s.type_id == "counter").size() < (3 if progress.expanded else 2))
+			var can_buy: bool = host and not progress.busy() and progress.stars >= 1
+			button(content, "Новая тяп-ляп стойка + повар · 120", func(): send({"action": "buy", "kind": "counter"}), can_buy and progress.cash >= P.COUNTER_PRICE and service.stations.filter(func(s): return s.type_id == "counter" and not s.manual_station).size() < 2)
 			for station in service.stations:
 				var id: int = station.station_id
-				label(content, "СТАНЦИЯ %d · %s" % [id, Definition.TYPES[station.type_id].title], 20)
+				label(content, "ТВОЯ СТОЙКА · готовь заказы лично" if station.manual_station else "СТАНЦИЯ %d · %s" % [id, Definition.TYPES[station.type_id].title], 20)
 				for dish in station.dishes():
 					var record: Dictionary = station.recipes.get(dish, {})
-					label(content, Definition.DISHES[dish] + (" · %s · %.1f с" % [record.get("quality", {}).get("grade", "?"), record.get("duration", 0)] if not record.is_empty() else " · ждёт первого показа"))
+					label(content, Definition.DISHES[dish] + (" · %s · %.1f с" % [record.get("quality", {}).get("grade", "?"), record.get("duration", 0)] if not record.is_empty() else " · готовишь лично" if station.manual_station else " · ждёт первого показа"))
 				if station.type_id == "counter":
-					if "sauce_ramp" in station.upgrades: label(content, "✓ Соусный жёлоб установлен · для нового способа запиши новый показ", 15)
+					if "sauce_ramp" in station.upgrades: label(content, "✓ Соусный трамплин установлен · поймай тарелкой · эффектная готовка +20%", 15)
 					else:
-						button(content, "Соусный жёлоб сбоку · 75", func(): send({"action": "buy", "kind": "upgrade", "station": id}), can_buy and progress.cash >= P.UPGRADE_PRICE and station.state == "idle")
+						button(content, "Соусный трамплин сбоку · 75", func(): send({"action": "buy", "kind": "upgrade", "station": id}), can_buy and progress.cash >= P.UPGRADE_PRICE and station.state == "idle")
 						label(content, "Наклонный жёлоб с соусом и площадкой внизу. Ещё один способ приготовить сосиску. Старый показ сохраняется.", 15)
-			label(content, "ПОСЛЕ ПЕРВОЙ ЗВЕЗДЫ", 20)
-			button(content, "Расширить зал · 180" if not progress.expanded else "✓ Зал расширен", func(): send({"action": "buy", "kind": "expansion"}), can_buy and progress.stars > 0 and not progress.expanded and progress.cash >= P.EXPANSION_PRICE)
-			label(content, "Открывает место для третьей стойки и отдельной кухни на двоих.", 15)
+			label(content, "ПОСЛЕ ВТОРОЙ ЗВЕЗДЫ", 20)
+			button(content, "Расширить зал · 180" if not progress.expanded else "✓ Зал расширен", func(): send({"action": "buy", "kind": "expansion"}), can_buy and progress.stars >= 2 and not progress.expanded and progress.cash >= P.EXPANSION_PRICE)
+			label(content, "Открывает место отдельной кухни на двоих. Личная стойка остаётся за тобой.", 15)
 			button(content, "Мясо и макароны + два повара · 250", func(): send({"action": "buy", "kind": "kitchen"}), can_buy and progress.expanded and service.by_id(4) == null and progress.cash >= P.KITCHEN_PRICE)
 		"decor":
 			label(content, "Больше уюта — больше гостей", 23)
@@ -153,12 +154,17 @@ func rebuild() -> void:
 			for id in P.DECOR:
 				var key: String = id
 				var item: Dictionary = P.DECOR[id]
-				button(content, ("✓ " if id in progress.decorations else "") + "%s · %d · +%d популярности" % [item.name, item.price, item.popularity], func(): send({"action": "buy", "kind": "decor", "item": key}), host and not progress.busy() and not id in progress.decorations and progress.cash >= item.price)
-				label(content, item.description, 15)
+				button(content, ("✓ " if id in progress.decorations else "") + "%s · %d · +%d популярности" % [item.name, item.price, item.popularity], func(): send({"action": "buy", "kind": "decor", "item": key}), host and progress.stars >= 1 and id != "lights" and not progress.busy() and not id in progress.decorations and progress.cash >= item.price)
+				label(content, "После первой звезды возьми катушку на ночном верстаке за 40 и выбери четыре точки крепления на стенах. +15 популярности." if id == "lights" else item.description, 15)
 		"star":
-			label(content, "ПЕРВАЯ ЗВЕЗДА · ПРИЁМ ИНСПЕКТОРА", 23)
+			label(content, "ПЕРВАЯ ЗВЕЗДА · ДЕГУСТАТОР" if progress.stars == 0 else "ВТОРАЯ ЗВЕЗДА · БАНКЕТ", 23)
 			if not progress.result.is_empty(): label(content, progress.result, 20)
 			for requirement in progress.star_requirements(service.stations, service.served): label(content, ("✓ " if requirement.done else "○ ") + requirement.text)
+			if progress.stars == 0:
+				label(content, "Дострой лабораторию по вечерам и лично обслужи 15 гостей. Затем один дегустатор попросит вино, картофель и сосиску, каждое на B или лучше. Время свободное, плохое блюдо можно повторить.\nНаграда: первая звезда, 120 и доступ к станциям с клонами.")
+				button(content, "Пригласить дегустатора", func(): send({"action": "banquet"}, true), host and progress.can_attempt(service.stations, service.served) and not service.any_training())
+				if progress.busy(): button(content, "Закончить дегустацию", func(): send({"action": "cancel_banquet"}, true), host)
+				return
 			label(content, "1. Личный показ: картофель на B или лучше за 2 минуты. Инспектор ждёт у станции №1. Рабочий рецепт остаётся прежним.\n2. Бригады: девять заказов — по три каждого блюда. За 4 минуты обслужить минимум восемь, из них шесть — на B или лучше.\nДелегация ждёт свободную обученную станцию. Кафе временно принимает только её заказы.")
 			var estimate := 0.0
 			for dish in P.DISHES:
@@ -167,7 +173,13 @@ func rebuild() -> void:
 					if station.recipes.has(dish): times.append(float(station.recipes[dish].duration))
 				if not times.is_empty(): estimate += float(times.min()) * 3.0
 			label(content, "Объём готовки по самым быстрым записям: %.0f с. Бригады работают параллельно; подход гостей тоже занимает время." % estimate, 15)
-			label(content, "Награда: звезда, 200 денег, доступ к расширению и кухне на двоих. Повторная попытка бесплатна.")
+			label(content, "Награда: вторая звезда, 200 денег, доступ к расширению и кухне на двоих. Повторная попытка бесплатна.")
 			button(content, "Пригласить инспектора", func(): send({"action": "banquet"}, true), host and progress.can_attempt(service.stations, service.served) and not service.any_training())
 			if progress.busy(): button(content, "Прервать проверку и подготовиться ещё", func(): send({"action": "cancel_banquet"}, true), host)
+		"night":
+			label(content, "Ночью кафе отдыхает", 23)
+			label(content, "У верстака в задней части зала — лаборатория и катушка. У двери справа можно перейти к следующему дню. Ночь длится столько, сколько захочешь.")
+			label(content, "Лаборатория: %d/3. Комплекты стоят 40, 60 и 80. Возьми комплект на верстаке и подключи три контакта по его указаниям." % progress.lab_stage)
+			label(content, "После первой звезды: гирлянда своими руками. Возьми катушку за 40, наведи взгляд на стену и закрепи четыре точки через E. Готовая гирлянда добавляет 15 популярности.")
+			label(content, "Соусный трамплин можно купить во вкладке кухни после первой звезды. Он подбрасывает сосиску — попробуй поймать её тарелкой.")
 	scroll.set_deferred("scroll_vertical", offset)

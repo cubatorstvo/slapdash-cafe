@@ -44,6 +44,7 @@ func _exit_tree() -> void:
 	shutdown()
 
 func announce(station: Node3D, message: String, point: Vector3) -> void:
+	if station != game.local_station() or station.training.purpose != "lesson" or station.training.phase != "recording": return
 	one_shot(station, "ready")
 	station.pulse_at(point)
 	if station == game.local_station(): game.hud.show_toast(message)

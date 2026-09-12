@@ -121,7 +121,22 @@ func show_station(station: Node3D) -> void:
 	_label(training_box, "СТАНЦИЯ %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title], 23)
 	var names := PackedStringArray()
 	for member in station.crew: names.append(member.name)
-	_label(training_box, "Бригада: " + ", ".join(names), 16)
+	if not station.manual_station: _label(training_box, "Бригада: " + ", ".join(names), 16)
+	if station.manual_station and not run.active():
+		var dish: String = game.service.manual_order(station)
+		_label(training_box, "Твоя стойка · готовь лично", 23)
+		if dish.is_empty():
+			_label(training_box, "Заказов пока нет. Можно потренироваться бесплатно.")
+			for recipe in station.dishes():
+				var key: String = recipe
+				_button(training_box, station.Definition.DISHES[key], func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": key}))
+		else:
+			_label(training_box, station.Definition.DISHES[dish], 20)
+			_button(training_box, "Приготовить заказ", func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": dish}))
+		_button(training_box, "Вернуться", close)
+		panel.show()
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		return
 	if not run.active():
 		recipe_choice = OptionButton.new()
 		training_box.add_child(recipe_choice)
@@ -136,6 +151,7 @@ func show_station(station: Node3D) -> void:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()
 		_label(training_box, "Качество блюда: %s" % report.grade, 17)
+		if report.get("style_count", 0) > 0: _label(training_box, "Еда под потолком · эффектность +20%", 17)
 		if run.phase == "review":
 			var details := PackedStringArray()
 			for criterion in report.criteria: details.append(criterion.label)

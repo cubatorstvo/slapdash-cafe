@@ -26,7 +26,7 @@ var sausage_plate_offset := Vector2.ZERO
 var potatoes: Array = []
 var sausages: Array = []
 const POTATO_FIELDS := ["potato_plate_offset","potato", "potato_velocity", "potato_orientation", "potato_heat", "potato_state", "fall_speed"]
-const SAUSAGE_FIELDS := ["sausage_plate_offset","sausage", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip", "sausage_state", "sausage_velocity", "previous_sausage", "sausage_fall_speed"]
+const SAUSAGE_FIELDS := ["sausage_launched", "sausage_high", "sausage_showy", "sausage_plate_offset","sausage", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip", "sausage_state", "sausage_velocity", "previous_sausage", "sausage_fall_speed"]
 var tomato := Vector2(1.85, -0.1)
 var tomato_velocity := Vector3.ZERO
 var tomato_flying := false
@@ -45,6 +45,9 @@ var potato_state := "pan"
 var sausage_fall_speed := 0.0
 var fall_speed := 0.0
 var falls := 0
+var sausage_launched := false
+var sausage_high := false
+var sausage_showy := false
 var sausage_angle := 0.0
 var sausage_phase := 0.0
 var sausage_coating := 0.0
@@ -79,6 +82,9 @@ func reset(recipe := "") -> void:
 	fall_speed = 0
 	sausage_fall_speed = 0
 	falls = 0
+	sausage_launched = false
+	sausage_high = false
+	sausage_showy = false
 	sausage_angle = 0
 	sausage_phase = 0
 	sausage_coating = 0
@@ -145,6 +151,7 @@ func pick_up(item: String) -> void:
 		elevations.potato += 0.12
 	elif item == "sausage":
 		sausage_state = "held"
+		sausage_launched = false
 		elevations.sausage += 0.55
 		sausage_velocity = Vector2.ZERO
 		previous_sausage = sausage
@@ -307,32 +314,39 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			sausage_fall_speed = -0.5
 			falls += 1
 	elif sausage_state == "ramp" and sauce_ramp:
-		sausage.y = minf(RAMP_END, sausage.y + delta * 0.48)
+		sausage.y = minf(RAMP_END, sausage.y + delta * (1.4 + (sausage.y - RAMP_START) * 1.8))
 		sausage.x = RAMP_X
 		elevations.sausage = ramp_height(sausage.y) - BASE_Y
-		sausage_coating = minf(1, sausage_coating + delta * 0.60)
+		sausage_coating = minf(1, sausage_coating + delta * 3.0)
 		if sausage.y >= RAMP_END:
 			sausage_state = "falling"
-			sausage_fall_speed = 0.0
-			sausage_velocity = Vector2(0, 0.15)
+			sausage_fall_speed = -6.6
+			sausage_velocity = Vector2(-0.7, -0.12)
+			sausage_launched = true
+			sausage_high = false
 	elif sausage_state == "falling":
 		for i in range(plates.size()):
-			if sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
+			if sausage_fall_speed >= 0 and sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
+				if sausage_launched and sausage_high: sausage_showy = true
+				sausage_launched = false
 				sausage_state = "plate_%d" % i
 				sausage_plate_offset = sausage - plates[i].point
 				elevations.sausage = float(elevations[sausage_state]) + 0.035
 				sausage_velocity = Vector2.ZERO
 				previous_sausage = sausage
 				return
-		sausage_fall_speed += delta * 4
-		elevations.sausage = clampf(float(elevations.sausage) - sausage_fall_speed * delta, support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y, MAX_LIFT)
+		sausage_fall_speed += delta * (7.2 if sausage_launched else 4.0)
+		elevations.sausage = clampf(float(elevations.sausage) - sausage_fall_speed * delta, support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y, 4.0 - BASE_Y if sausage_launched else MAX_LIFT)
 		sausage = (sausage + sausage_velocity * delta).clamp(-BOUNDS, BOUNDS)
-		sausage_velocity *= exp(-2 * delta)
+		if sausage_launched:
+			if BASE_Y + float(elevations.sausage) >= 2.8: sausage_high = true
+		else: sausage_velocity *= exp(-2 * delta)
 		sausage_angle = move_toward(sausage_angle, 0, delta * 3)
 		if elevations.sausage <= support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y:
 			sausage_state = _food_rest("sausage", sausage)
 			elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 			sausage_slip = 0
+			sausage_launched = false
 	if sausage.distance_to(SAUCE_CENTER) < 0.34 and float(elevations.sausage) <= 0.13:
 		sausage_coating = minf(1, sausage_coating + delta * 1.4)
 	previous_sausage = sausage
@@ -475,7 +489,11 @@ func _store_food(kind: String) -> void:
 func _load_food(kind: String, index: int) -> void:
 	var stock := potatoes if kind == "potato" else sausages
 	if kind == "potato": potato_index = index
-	else: sausage_index = index
+	else:
+		sausage_index = index
+		sausage_launched = false
+		sausage_high = false
+		sausage_showy = false
 	for key in stock[index]:
 		if key == "elevation": elevations[kind] = stock[index][key]
 		else: set(key, stock[index][key].duplicate(true) if stock[index][key] is Array else stock[index][key])
@@ -587,6 +605,12 @@ static func decode_stock(stock: Array) -> Array:
 	return result
 
 func _utensil_grade(report: Dictionary) -> Dictionary:
+	if dish == "sausage":
+		var served := served_index("sausage")
+		if served >= 0 and sausages[served].get("sausage_showy", false):
+			report.style_count = 1
+			report.style_multiplier = Quality.style_multiplier(1)
+			report.style_tricks = ["Еда под потолком"]
 	var correct := served_in_dish(dish)
 	report.criteria.append({"label": "Подходящая посуда: " + ("✓" if correct else "×"), "value": 1.0 if correct else 0.0})
 	if report.present and not correct:

@@ -2,8 +2,11 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
-const SAVE_PATH := "user://first_star_cafe.save"
+const SAVE_PATH := "user://shifts_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var daylight: DirectionalLight3D
+var room_environment: WorldEnvironment
+var save_writer: Node
 var office: CanvasLayer
 var development: Node3D
 var development_stamp := ""
@@ -34,6 +37,8 @@ var last_menu_revision := ""
 var taught := {"book": false, "grab": false, "use": false, "height": false}
 
 func _ready() -> void:
+	save_writer = preload("res://scripts/cafe_save_writer.gd").new()
+	add_child(save_writer)
 	_build_room()
 	player = Player.new()
 	add_child(player)
@@ -146,6 +151,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E:
+				if not recording:
+					var night: Dictionary = development.night_target(camera)
+					if not night.is_empty():
+						session.request_action(night)
+						return
 				if not recording and development.board_hit(camera):
 					office.open()
 					return
@@ -294,6 +304,9 @@ func _physics_process(delta: float) -> void:
 	if display_stamp != development_stamp:
 		development_stamp = display_stamp
 		development.refresh()
+	var night: bool = service.progress.shift == "night"
+	daylight.light_energy = lerpf(daylight.light_energy, 0.12 if night else 0.75, minf(1, delta * 0.6))
+	room_environment.environment.ambient_light_energy = lerpf(room_environment.environment.ambient_light_energy, 0.26 if night else 0.35, minf(1, delta * 0.6))
 	feedback.update(delta)
 	if menu.opened() or cookbook.opened or office.opened(): hud.recipe_panel.hide()
 	hud.bottom.visible = false
@@ -301,10 +314,10 @@ func _physics_process(delta: float) -> void:
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
 func refresh_hud() -> void:
-	hud.clone_status.text = "%d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
+	hud.clone_status.text = "День %d · %d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.day, service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
 	hud.controls.text = ""
 	hud.supplies.text = ""
-	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "ГОСТИ: ПАУЗА"
+	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"
 	hud.goal.text = service.progress.objective(service.stations, service.served, service.open_for_business)
 	hud.progress.value = 0
 	hud.prompt.text = ""
@@ -312,11 +325,16 @@ func refresh_hud() -> void:
 	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
+		var night: Dictionary = development.night_target(camera)
+		if not night.is_empty(): hud.prompt.text = night.get("hint", "(E) Взаимодействовать")
+		if service.progress.shift == "open":
+			var left: int = ceili(service.Progression.SHIFT_SECONDS - service.progress.shift_elapsed)
+			hud.clock.text = "%d:%02d до закрытия" % [left / 60, left % 60]
 		if service.progress.phase in ["showcase", "service"]: hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 		if development.board_hit(camera): hud.prompt.text = "(E) Моё кафе"
 		station = nearest_station()
 		if station != null:
-			if hud.prompt.text.is_empty(): hud.prompt.text = "[E] %s" % station.Definition.TYPES[station.type_id].title
+			if hud.prompt.text.is_empty() or hud.prompt.text == "B · Книга": hud.prompt.text = "(E) Личная стойка · приготовить" if station.manual_station else "[E] %s" % station.Definition.TYPES[station.type_id].title
 			if station.state == "cooking":
 				var record: Dictionary = station.recipes.get(station.order_dish, {})
 				if record.has("quality"):
@@ -326,13 +344,16 @@ func refresh_hud() -> void:
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
+	if service.progress.shift == "open" and not service.progress.busy():
+		hud.clock.text += " · закрытие через %d:%02d" % [ceili(maxf(0, service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))/60, ceili(maxf(0,service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))%60]
+	if service.progress.shift == "closing": hud.clock.text += " · последний заказ"
 	if service.progress.phase == "showcase":
 		hud.goal.text = "Инспектор · картофель на B или лучше"
 		hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 	hud.progress.value = 100 if station.model.success() else 0
 	if local_role >= 0 and station.training.phase == "recording":
 		if station.bell_hit(camera):
-			hud.prompt.text = "(E) Подать инспектору" if service.is_showcase(station) else "(E) Завершить показ"
+			hud.prompt.text = "(E) Подать блюдо" if station.training.purpose != "lesson" else "(E) Подать инспектору" if service.is_showcase(station) else "(E) Завершить показ"
 			return
 		var item := held_item(station)
 		if item.is_empty():
@@ -351,13 +372,8 @@ func refresh_hud() -> void:
 
 func save_cafe() -> bool:
 	if session.is_guest() or "--fresh-cafe" in OS.get_cmdline_user_args(): return false
-	var file := FileAccess.open(SAVE_PATH + ".tmp", FileAccess.WRITE)
-	if file == null: return false
-	file.store_buffer(var_to_bytes(service.save_data()).compress(FileAccess.COMPRESSION_DEFLATE))
-	var error := file.get_error()
-	file.close()
-	if error != OK: return false
-	return DirAccess.rename_absolute(SAVE_PATH + ".tmp", SAVE_PATH) == OK
+	save_writer.request(service.save_data(), SAVE_PATH)
+	return true
 
 func load_cafe() -> void:
 	if "--fresh-cafe" in OS.get_cmdline_user_args(): return
@@ -369,7 +385,9 @@ func load_cafe() -> void:
 	if not data is Dictionary or not service.load_data(data): hud.notice.text = "Сохранение не прочитано. Открыто новое кафе."
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(session): save_cafe()
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and is_instance_valid(session):
+		save_cafe()
+		save_writer.flush()
 	elif what == NOTIFICATION_PREDELETE:
 		_shutdown_tree(self)
 
@@ -393,7 +411,9 @@ func _build_room() -> void:
 	environment.environment.ambient_light_color = Color("f4e2c7")
 	environment.environment.ambient_light_energy = 0.35
 	add_child(environment)
+	room_environment = environment
 	var sun := DirectionalLight3D.new()
+	daylight = sun
 	add_child(sun)
 	sun.rotation_degrees = Vector3(-60, -25, 0)
 	sun.light_color = Color("fff4e2")

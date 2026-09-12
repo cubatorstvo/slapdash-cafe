@@ -13,6 +13,7 @@ const TRAINING_ZONE_OUTLINE_THICKNESS := 0.04
 var bell: Node3D
 var bell_cap: Node3D
 var bell_flash := 0.0
+var manual_station := false
 var station_id := 1
 var slot_index := 0
 var type_id := "counter"
@@ -219,6 +220,10 @@ func refresh(local_peer: int, delta: float) -> void:
 		zone_labels[role].visible = zone_panels[role].visible
 
 	was_resting = resting
+	if manual_station:
+		for student in students: student.hide()
+		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
+		view.station_label.text = "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
 	if is_instance_valid(taster): direct_attention(taster)
 
 func direct_attention(person: Node3D) -> void:
@@ -243,7 +248,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
+	return {"manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
@@ -252,6 +257,7 @@ func world_entry() -> Dictionary:
 	data.erase("drafts")
 	data.known = recipes.keys()
 	data.order_dish = order_dish
+	data.customer_id = customer_id
 	data.recipe_times = {}
 	data.recipe_quality = {}
 	for key in recipes:
@@ -347,6 +353,10 @@ func apply_upgrades() -> void:
 	for z in [Model.RAMP_START, Model.RAMP_END]:
 		var height := Model.ramp_height(z) - 0.10
 		Props.box(upgrade_view, Vector3(0.08,height,0.08), Vector3(Model.RAMP_X,height/2,z), Color("728779"))
-	var label := Props.text(upgrade_view, "СОУСНЫЙ ЖЁЛОБ", Vector3(Model.RAMP_X,1.60,Model.RAMP_START), 18, Color("efcc8e"))
+	# An improvised spring spoon visibly explains the launch at the end.
+	var spoon := Props.box(upgrade_view, Vector3(0.48,0.045,0.42), Vector3(Model.RAMP_X,0.70,Model.RAMP_END), Color("e4b668"))
+	spoon.rotation.x = -0.55
+	for i in range(4): Props.box(upgrade_view, Vector3(0.28,0.025,0.24), Vector3(Model.RAMP_X,0.45+i*0.045,Model.RAMP_END), Color("728779"))
+	var label := Props.text(upgrade_view, "СОУСНЫЙ ТРАМПЛИН", Vector3(Model.RAMP_X,1.60,Model.RAMP_START), 18, Color("efcc8e"))
 	label.pixel_size = 0.003
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED

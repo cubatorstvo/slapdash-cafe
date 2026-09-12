@@ -1,6 +1,7 @@
 extends RefCounted
 ## Per-station rehearsal. Inactive zones replay baked state, independent of live time/physics.
 var station: Node3D
+var purpose := "lesson"
 var phase := "idle"
 var dish := "wine"
 var lead := 0
@@ -23,7 +24,8 @@ func setup(owner_station: Node3D) -> void:
 func active() -> bool: return phase != "idle"
 func role_for(peer: int) -> int: return participants.find(peer) if active() and peer > 0 else -1
 
-func open(recipe: String, peer: int) -> void:
+func open(recipe: String, peer: int, mode := "lesson") -> void:
+	purpose = mode
 	dish = recipe
 	lead = peer
 	phase = "ready"
@@ -32,7 +34,7 @@ func open(recipe: String, peer: int) -> void:
 	participants.fill(0)
 	station.model.reset(dish) if station.type_id == "counter" else station.model.reset()
 	station.state = "training"
-	station.ensure_taster()
+	if purpose != "manual" or station.customer_id >= 0: station.ensure_taster()
 	info = "Выбери роль и напарника. Без напарника — последовательная запись."
 	revision += 1
 
@@ -65,7 +67,7 @@ func start_pass(assignments: Array) -> bool:
 	events.clear()
 	station.reset_taster()
 	revision += 1
-	info = "Закончил? Позвони в звонок на стойке."
+	info = "Закончил? Позвони в звонок на стойке." if purpose == "lesson" else "Заказ готовится лично. Подай блюдо звонком."
 	return true
 
 func queue_event(role: int, event: Dictionary) -> void:
@@ -86,8 +88,9 @@ func advance(delta: float) -> void:
 		_restore_inactive(tick)
 		station.model.step(commands, delta)
 		_restore_inactive(tick)
-	for role in live_roles:
-		pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
+	if purpose == "lesson":
+		for role in live_roles:
+			pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
 	tick += 1
 
 func _restore_inactive(at_tick: int) -> void:
@@ -111,6 +114,9 @@ func finish_pass(confirmed := false) -> void:
 		return
 	for role in live_roles:
 		station.model.put_down() if station.type_id == "counter" else station.model.drop(role)
+	if purpose != "lesson":
+		station.get_parent().finish_manual(station, station.model.quality())
+		return
 	for role in live_roles:
 		pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
 	if station.get_parent().is_showcase(station):
@@ -178,7 +184,7 @@ func summary() -> Dictionary:
 	for track in tracks:
 		lengths.append(track.get("frames", []).size())
 		groups.append(track.get("group", -1))
-	return {"phase": phase, "dish": dish, "lead": lead, "participants": participants, "live_roles": live_roles, "tick": tick, "revision": revision, "lengths": lengths, "groups": groups, "info": info}
+	return {"purpose": purpose, "phase": phase, "dish": dish, "lead": lead, "participants": participants, "live_roles": live_roles, "tick": tick, "revision": revision, "lengths": lengths, "groups": groups, "info": info}
 
 func apply_summary(data: Dictionary) -> void:
-	for key in ["phase", "dish", "lead", "participants", "live_roles", "tick", "revision", "info"]: set(key, data[key])
+	for key in ["purpose", "phase", "dish", "lead", "participants", "live_roles", "tick", "revision", "info"]: set(key, data[key])
