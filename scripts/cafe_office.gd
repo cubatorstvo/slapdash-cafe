@@ -1,5 +1,5 @@
 extends CanvasLayer
-## Shared cafe ledger, accessed from the office board or M.
+## Shared cafe ledger, accessed from the physical cafe computer.
 const P = preload("res://scripts/cafe_progression.gd")
 const Style = preload("res://scripts/cafe_theme.gd")
 const Definition = preload("res://scripts/station_definition.gd")
@@ -32,13 +32,13 @@ func _ready() -> void:
 	column.add_child(top)
 	heading = label(top, "МОЁ КАФЕ", 26)
 	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button(top, "Вернуться · M / Esc", close)
+	button(top, "Вернуться · Esc", close)
 	status = label(column, "", 18)
 	timer = label(column, "", 19)
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе и гости"], ["stations", "Кухня"], ["decor", "Украшения"], ["star", "Звёзды"], ["night", "После закрытия"]]:
+	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -103,83 +103,60 @@ func _process(_delta: float) -> void:
 
 func rebuild() -> void:
 	var offset := scroll.scroll_vertical
-	for child in content.get_children():
-		content.remove_child(child)
-		child.queue_free()
+	for child in content.get_children(): content.remove_child(child); child.queue_free()
 	var service = game.service
 	var progress = service.progress
 	var host: bool = not game.session.is_guest()
-	if not host: label(content, "Общие покупки и проверку подтверждает хозяин кафе. Обучать бригады можно вместе.", 15)
+	if not host: label(content,"Покупки подтверждает хозяин кафе. Коробки можно распаковывать вместе.",15)
 	match tab:
 		"overview":
-			label(content, progress.objective(service.stations, service.served, service.open_for_business), 23)
-			button(content, "Закончить смену" if service.open_for_business else "Открыть кафе", func(): send({"action": "business"}), host and not progress.busy() and progress.shift in ["morning", "open"])
-			label(content, "Смена: 8 минут. После последних заказов — ночь без таймера. Отдохнуть до утра можно у двери справа от верстака.", 16)
-			label(content, "Первые гости приходят по одному: начни с вина, затем попробуй картофель и сосиску." if progress.stars == 0 else "Посетитель примерно каждые %.0f с. Уже принятые заказы выполняются и после закрытия." % progress.arrival_interval())
-			label(content, "СПРОС С МОМЕНТА ОТКРЫТИЯ", 19)
-			for dish in progress.available_dishes():
-				var counts: Dictionary = progress.demand.get(dish, {})
-				var known := 0
-				for station in service.stations:
-					if station.recipes.has(dish): known += 1
-				label(content, "%s · умеют %d бригад\nПодано: %d    Ушли без блюда: %d    Все заняты: %d" % [Definition.DISHES[dish], known, counts.get("served", 0), counts.get("untrained", 0), counts.get("busy", 0)])
-			label(content, "Гости выбирают из открытых блюд, даже если кухня ещё не обучена. Необслуженный гость не снижает популярность.", 15)
-			button(content, "Сохранить кафе", func(): send({"action": "save"}), host)
+			label(content,progress.objective(service.stations,service.served,service.open_for_business),22)
+			button(content,"Закончить смену" if service.open_for_business else "Открыть кафе",func():send({"action":"business"},true),host and not progress.busy() and progress.shift in ["morning","open"])
+			label(content,"Личная стойка — твои заказы. Купленное оборудование приедет ко входу: забери коробку и установи на отмеченное место.")
+			label(content,"Лаборатория: закажи колбу, питание и стабилизатор. Установи на верстаке у компьютера. Клоны откроются после первой звезды.")
+			label(content,"Ночью посетителей нет. Дверь «Комната отдыха» позволяет перейти к утру. Доставки и обустройство доступны днём тоже.")
+			button(content,"Сохранить кафе",func():send({"action":"save"}),host)
+			button(content,"Папка плейтеста",func():OS.shell_open(ProjectSettings.globalize_path(game.telemetry.folder)))
+			label(content,"Отметки для плейтеста: F8 — скучно, F9 — непонятно, F10 — прикольно. События пишутся локально.",15)
 			if confirm_reset:
-				label(content, "Начать заново? Покупки и обучение этого прохождения будут сброшены.")
-				button(content, "Да, открыть новое кафе", func(): send({"action": "new_cafe"}, true), host and not progress.busy() and not service.any_training())
-			else: button(content, "Новое прохождение…", func(): confirm_reset = true; rebuild(), host and not progress.busy() and not service.any_training())
-		"stations":
-			label(content, "Каждая станция приходит со своей бригадой. Покажи ей каждое блюдо лично.", 19)
-			var can_buy: bool = host and not progress.busy() and progress.stars >= 1
-			button(content, "Новая тяп-ляп стойка + повар · 120", func(): send({"action": "buy", "kind": "counter"}), can_buy and progress.cash >= P.COUNTER_PRICE and service.stations.filter(func(s): return s.type_id == "counter" and not s.manual_station).size() < 2)
+				button(content,"Подтвердить новое прохождение",func():send({"action":"new_cafe"},true),host and not service.any_training() and not progress.busy())
+			else: button(content,"Новое прохождение…",func():confirm_reset=true;rebuild())
+		"stations", "decor", "night":
+			label(content,"ТЯП-ЛЯП МАРКЕТ · доставка в коробках",23)
+			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
 			for station in service.stations:
-				var id: int = station.station_id
-				label(content, "ТВОЯ СТОЙКА · готовь заказы лично" if station.manual_station else "СТАНЦИЯ %d · %s" % [id, Definition.TYPES[station.type_id].title], 20)
-				for dish in station.dishes():
-					var record: Dictionary = station.recipes.get(dish, {})
-					label(content, Definition.DISHES[dish] + (" · %s · %.1f с" % [record.get("quality", {}).get("grade", "?"), record.get("duration", 0)] if not record.is_empty() else " · готовишь лично" if station.manual_station else " · ждёт первого показа"))
-				if station.type_id == "counter":
-					if "sauce_ramp" in station.upgrades: label(content, "✓ Соусный трамплин установлен · поймай тарелкой · эффектная готовка +20%", 15)
-					else:
-						button(content, "Соусный трамплин сбоку · 75", func(): send({"action": "buy", "kind": "upgrade", "station": id}), can_buy and progress.cash >= P.UPGRADE_PRICE and station.state == "idle")
-						label(content, "Наклонный жёлоб с соусом и площадкой внизу. Ещё один способ приготовить сосиску. Старый показ сохраняется.", 15)
-			label(content, "ПОСЛЕ ВТОРОЙ ЗВЕЗДЫ", 20)
-			button(content, "Расширить зал · 180" if not progress.expanded else "✓ Зал расширен", func(): send({"action": "buy", "kind": "expansion"}), can_buy and progress.stars >= 2 and not progress.expanded and progress.cash >= P.EXPANSION_PRICE)
-			label(content, "Открывает место отдельной кухни на двоих. Личная стойка остаётся за тобой.", 15)
-			button(content, "Мясо и макароны + два повара · 250", func(): send({"action": "buy", "kind": "kitchen"}), can_buy and progress.expanded and service.by_id(4) == null and progress.cash >= P.KITCHEN_PRICE)
-		"decor":
-			label(content, "Больше уюта — больше гостей", 23)
-			label(content, "Украшения навсегда повышают популярность. При 30 можно претендовать на первую звезду.")
-			for id in P.DECOR:
-				var key: String = id
-				var item: Dictionary = P.DECOR[id]
-				button(content, ("✓ " if id in progress.decorations else "") + "%s · %d · +%d популярности" % [item.name, item.price, item.popularity], func(): send({"action": "buy", "kind": "decor", "item": key}), host and progress.stars >= 1 and id != "lights" and not progress.busy() and not id in progress.decorations and progress.cash >= item.price)
-				label(content, "После первой звезды возьми катушку на ночном верстаке за 40 и выбери четыре точки крепления на стенах. +15 популярности." if id == "lights" else item.description, 15)
+				label(content,"ТВОЯ СТОЙКА" if station.manual_station else "СТАНЦИЯ %d" % station.station_id,20)
+				var catalog: Array = ["sauce","plates","cup","pan","jug","rag","sauce_ramp"] if station.type_id == "counter" else ["meat_kit","pasta_kit"]
+				for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
+			label(content,"РАСШИРЕНИЕ КУХНИ",20)
+			shop_button("counter",0,service.by_id(2)!=null and service.by_id(3)!=null)
+			button(content,"Расширение зала · 180",func():send({"action":"buy","kind":"expansion"}),host and progress.stars>=2 and not progress.expanded and progress.cash>=180)
+			shop_button("kitchen",0,service.by_id(4)!=null)
+			label(content,"ЛАБОРАТОРИЯ",20)
+			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
+			label(content,"ОБУСТРОЙСТВО",20)
+			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
+		"deliveries":
+			label(content,"ДОСТАВКИ",23)
+			if progress.deliveries.is_empty(): label(content,"Все коробки разобраны.")
+			for parcel in progress.deliveries:
+				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
+				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
 		"star":
-			label(content, "ПЕРВАЯ ЗВЕЗДА · ДЕГУСТАТОР" if progress.stars == 0 else "ВТОРАЯ ЗВЕЗДА · БАНКЕТ", 23)
-			if not progress.result.is_empty(): label(content, progress.result, 20)
-			for requirement in progress.star_requirements(service.stations, service.served): label(content, ("✓ " if requirement.done else "○ ") + requirement.text)
-			if progress.stars == 0:
-				label(content, "Дострой лабораторию по вечерам и лично обслужи 15 гостей. Затем один дегустатор попросит вино, картофель и сосиску, каждое на B или лучше. Время свободное, плохое блюдо можно повторить.\nНаграда: первая звезда, 120 и доступ к станциям с клонами.")
-				button(content, "Пригласить дегустатора", func(): send({"action": "banquet"}, true), host and progress.can_attempt(service.stations, service.served) and not service.any_training())
-				if progress.busy(): button(content, "Закончить дегустацию", func(): send({"action": "cancel_banquet"}, true), host)
-				return
-			label(content, "1. Личный показ: картофель на B или лучше за 2 минуты. Инспектор ждёт у станции №1. Рабочий рецепт остаётся прежним.\n2. Бригады: девять заказов — по три каждого блюда. За 4 минуты обслужить минимум восемь, из них шесть — на B или лучше.\nДелегация ждёт свободную обученную станцию. Кафе временно принимает только её заказы.")
-			var estimate := 0.0
-			for dish in P.DISHES:
-				var times: Array = []
-				for station in service.stations:
-					if station.recipes.has(dish): times.append(float(station.recipes[dish].duration))
-				if not times.is_empty(): estimate += float(times.min()) * 3.0
-			label(content, "Объём готовки по самым быстрым записям: %.0f с. Бригады работают параллельно; подход гостей тоже занимает время." % estimate, 15)
-			label(content, "Награда: вторая звезда, 200 денег, доступ к расширению и кухне на двоих. Повторная попытка бесплатна.")
-			button(content, "Пригласить инспектора", func(): send({"action": "banquet"}, true), host and progress.can_attempt(service.stations, service.served) and not service.any_training())
-			if progress.busy(): button(content, "Прервать проверку и подготовиться ещё", func(): send({"action": "cancel_banquet"}, true), host)
-		"night":
-			label(content, "Ночью кафе отдыхает", 23)
-			label(content, "У верстака в задней части зала — лаборатория и катушка. У двери справа можно перейти к следующему дню. Ночь длится столько, сколько захочешь.")
-			label(content, "Лаборатория: %d/3. Комплекты стоят 40, 60 и 80. Возьми комплект на верстаке и подключи три контакта по его указаниям." % progress.lab_stage)
-			label(content, "После первой звезды: гирлянда своими руками. Возьми катушку за 40, наведи взгляд на стену и закрепи четыре точки через E. Готовая гирлянда добавляет 15 популярности.")
-			label(content, "Соусный трамплин можно купить во вкладке кухни после первой звезды. Он подбрасывает сосиску — попробуй поймать её тарелкой.")
-	scroll.set_deferred("scroll_vertical", offset)
+			label(content,"ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · банкет",23)
+			if not progress.result.is_empty(): label(content,progress.result)
+			if progress.stars>=2: label(content,"Две звезды получены. Доступны расширение и парная кухня.")
+			else:
+				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
+				label(content,"Один дегустатор, три стандартных блюда B или лучше. Ошибку можно повторить бесплатно. Перед проверкой установи сковороду, соус, бокал и кувшин." if progress.stars==0 else "Личный картофель B за 2 минуты; затем бригады обслуживают 9 гостей за 4 минуты. Нужно 8 подач и 6 оценок B или выше.")
+				button(content,"Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию",func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training())
+			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
+	scroll.scroll_vertical = offset
+
+func shop_button(item: String, station_id: int, installed := false) -> void:
+	var p = game.service.progress
+	var spec: Dictionary = game.shop.ITEMS[item]
+	var waiting: bool = game.shop.pending(item,station_id)
+	var gate: int = int(spec.get("star",0))
+	var suffix := " · установлено" if installed else " · доставка заказана" if waiting else " · звезда %d"%gate if p.stars<gate else " · %d"%spec.price
+	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id}),not game.session.is_guest() and not installed and not waiting and p.stars>=gate and p.cash>=spec.price and not p.busy())

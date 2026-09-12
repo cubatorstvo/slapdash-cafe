@@ -12,6 +12,10 @@ const ITEMS := ["steak", "pot", "water", "pasta_bag", "salt", "spatula", "pasta_
 const NAMES := {"steak": "стейк", "pot": "кастрюля", "water": "кувшин воды", "pasta_bag": "мешок макарон", "salt": "солонка", "spatula": "лопатка для мяса", "pasta_salt_tool": "соль для макарон", "pasta_spatula": "лопатка для макарон"}
 const ZONE_ITEMS := [["steak", "salt", "spatula"], ["pot", "water", "pasta_bag", "pasta_salt_tool", "pasta_spatula"]]
 const ZONE_VALUES := [["meat_sides", "meat_face", "meat_state", "meat_salt", "flip_time"], ["water", "pasta", "bag", "temperature", "cooked", "stirred", "pasta_salt", "served_pasta", "served_cooked", "served_stirred", "served_salt", "pitcher_water", "water_angle", "pot_angle", "spills"]]
+var equipment: Array = ["meat_kit","pasta_kit"]
+var guest_active := false
+var guest_roles: Array = []
+const GUEST_MOUTH := Vector3(0,1.5,-1.61)
 var vessels := {"water": Pourable.new(0.23, 0.44, 700.0), "pot": Pourable.new(0.36, 0.36, 900.0)}
 var water_angle := 0.0
 var pot_angle := 0.0
@@ -47,6 +51,8 @@ var elapsed := 0.0
 func _init() -> void: reset()
 
 func reset() -> void:
+	guest_active = false
+	guest_roles = [{"steak":{},"pasta":{},"drunk":0.0,"swallowed":[],"chew":0.0},{"steak":{},"pasta":{},"drunk":0.0,"swallowed":[],"chew":0.0}]
 	positions = {"steak": Vector2(-2.25, 0.45), "pot": STOVE, "water": Vector2(2.3, 0.45), "pasta_bag": Vector2(2.25, -0.55), "salt": Vector2(-0.48, -0.48), "spatula": Vector2(-0.45, 0.02), "pasta_salt_tool": Vector2(0.48, -0.48), "pasta_spatula": Vector2(0.45, 0.02)}
 	heights = {}
 	owners = {}
@@ -85,7 +91,7 @@ static func default_pose(role: int) -> Dictionary:
 	return {"position": [-1.35 if role == 0 else 1.35, 0.0, 1.85], "yaw": 0.0, "pitch": -0.2}
 
 func grab(role: int, item: String) -> bool:
-	if not item in ITEMS or not hands[role].is_empty() or not can_touch(role, item): return false
+	if not item_available(item) or not item in ITEMS or not hands[role].is_empty() or not can_touch(role, item): return false
 	if owners[item] != -1:
 		conflicts.append("Роль %d: %s занята другим участником" % [role + 1, NAMES[item]])
 		return false
@@ -109,6 +115,7 @@ func drop(role: int) -> void:
 		else: meat_state = "raw"
 
 func step(commands: Array, delta: float) -> void:
+	for info in guest_roles: info.chew = maxf(0,float(info.chew)-delta)
 	conflicts.clear()
 	pouring = [false, false]
 	for role in range(2):
@@ -118,6 +125,7 @@ func step(commands: Array, delta: float) -> void:
 			poses[role] = command.pose.duplicate(true)
 			if not poses[role].has("presentation"): poses[role].presentation = {"book": false, "page": "index"}
 			poses[role].presentation.bell = bell_count
+		if command.get("feed",false): feed(role)
 		if command.get("drop", false): drop(role)
 		var item_to_grab: String = str(command.get("grab", ""))
 		if not item_to_grab.is_empty(): grab(role, item_to_grab)
@@ -137,7 +145,7 @@ func step(commands: Array, delta: float) -> void:
 		using[role] = use_item
 	water_angle = vessels.water.angle
 	pot_angle = vessels.pot.angle
-	if meat_state == "grill" and hands.find("steak") < 0:
+	if "meat_kit" in equipment and meat_state == "grill" and hands.find("steak") < 0:
 		meat_sides[meat_face] = minf(1, float(meat_sides[meat_face]) + delta / 6.0)
 	if positions.pot.distance_to(STOVE) < 0.45 and heights.pot < 0.10 and water > 0:
 		temperature = minf(100, temperature + delta * 22)
@@ -173,23 +181,37 @@ func _use(role: int, item: String, pressed: bool, delta: float) -> void:
 func success() -> bool: return quality().grade == "S"
 
 func quality() -> Dictionary:
-	var meat_on := meat_state == "plate" and hands.find("steak") < 0
-	var pasta_on := served_pasta > 0
-	var sides := (float(meat_sides[0]) + float(meat_sides[1])) / 2 if meat_on else 0.0
-	return Quality.with_components(Quality.result([
-		{"label": "Мясо: %s · стороны %.0f%% / %.0f%%" % ["на подаче" if meat_on else "нет", float(meat_sides[0]) * 100 if meat_on else 0, float(meat_sides[1]) * 100 if meat_on else 0], "value": sides},
-		{"label": "Соль мяса ≥1 г: " + ("✓" if meat_on and meat_salt >= 1 else "×"), "value": minf(1, meat_salt) if meat_on else 0},
-		{"label": "Макароны: %.0f / 100 г" % served_pasta, "value": minf(1, served_pasta / 100)},
-		{"label": "Порция сварена: %.0f%%" % (served_cooked * 100), "value": served_cooked if pasta_on else 0},
-		{"label": "Порция перемешана: %.0f%%" % (served_stirred * 100), "value": served_stirred if pasta_on else 0},
-		{"label": "Соль макарон ≥1 г: " + ("✓" if pasta_on and served_salt >= 1 else "×"), "value": minf(1, served_salt) if pasta_on else 0}
-	], meat_on or pasta_on, []), preload("res://scripts/cookbook_data.gd").components("meal", self))
+	var meats: Array = []
+	var pastas: Array = []
+	if meat_state == "plate" and hands.find("steak") < 0: meats.append({"sides":meat_sides,"salt":meat_salt,"location":"на подаче"})
+	if served_pasta>0: pastas.append({"amount":served_pasta,"cooked":served_cooked,"stirred":served_stirred,"salt":served_salt,"location":"на подаче"})
+	for info in guest_roles:
+		if not info.steak.is_empty(): meats.append(info.steak)
+		if not info.pasta.is_empty(): pastas.append(info.pasta)
+	meats.sort_custom(func(a,b): return meat_score(a)>meat_score(b))
+	pastas.sort_custom(func(a,b): return pasta_score(a)>pasta_score(b))
+	var meat: Dictionary = meats[0] if not meats.is_empty() else {"sides":meat_sides,"salt":meat_salt,"location":"в работе"}
+	var noodles: Dictionary = pastas[0] if not pastas.is_empty() else {"amount":pasta,"cooked":cooked,"stirred":stirred,"salt":pasta_salt,"location":"в работе"}
+	var meat_on := not meats.is_empty()
+	var pasta_on := not pastas.is_empty()
+	var criteria := [{"label":"Мясо: две стороны","value":(float(meat.sides[0])+float(meat.sides[1]))/2 if meat_on else 0.0},{"label":"Соль мяса","value":minf(1,meat.salt) if meat_on else 0.0},{"label":"Макароны: 100 г","value":minf(1,noodles.amount/100) if pasta_on else 0.0},{"label":"Сварить","value":noodles.cooked if pasta_on else 0.0},{"label":"Перемешать","value":noodles.stirred if pasta_on else 0.0},{"label":"Соль макарон","value":minf(1,noodles.salt) if pasta_on else 0.0}]
+	var report := Quality.result(criteria,meat_on or pasta_on,[])
+	report.components=[{"id":"steak","name":"Стейк","role":0,"served":meat_on,"location":meat.location,"lines":["Обжарить с 2 сторон: %.0f%% / %.0f%%"%[meat.sides[0]*100,meat.sides[1]*100],"Соль: "+("✓" if meat.salt>=1 else "×"),"Лучшая порция: "+meat.location],"details":[]},{"id":"pasta","name":"Макароны","role":1,"served":pasta_on,"location":noodles.location,"lines":["Сварить: %.0f%%"%(noodles.cooked*100),"Соль: "+("✓" if noodles.salt>=1 else "×"),"Перемешать: %.0f%%"%(noodles.stirred*100),"Порция: %.0f/100 г"%noodles.amount,"Лучшая порция: "+noodles.location],"details":[]}]
+	return report
+
+static func meat_score(m: Dictionary) -> float: return (m.sides[0]+m.sides[1])/2+minf(1,m.salt)
+static func pasta_score(p: Dictionary) -> float: return minf(1,p.amount/100)+p.cooked+p.stirred+minf(1,p.salt)
 
 static func surface_at(point: Vector2) -> float:
 	return BASE_Y if absf(point.x) <= 3.05 and absf(point.y) <= 1.125 else 0.015
 
 func mouth(item: String) -> Vector3:
 	return vessels[item].mouth(Vector3(positions[item].x, BASE_Y + heights[item], positions[item].y))
+
+func pours_into_guest(item: String) -> bool:
+	if not guest_active or mouth(item).y < GUEST_MOUTH.y: return false
+	var hit: Vector2 = vessels[item].landing(Vector3(positions[item].x,BASE_Y+heights[item],positions[item].y),GUEST_MOUTH.y)
+	return hit.distance_to(Vector2(GUEST_MOUTH.x,GUEST_MOUTH.z)) < 0.24
 
 func pour_target(item: String) -> Vector2:
 	return vessels[item].landing(Vector3(positions[item].x, BASE_Y + heights[item], positions[item].y), surface_at(positions[item]))
@@ -208,6 +230,13 @@ func _pour(role: int, item: String, delta: float) -> void:
 	if amount <= 0: return
 	var target := pour_target(item)
 	var start := mouth(item)
+	var mouth_target: Vector2 = vessels[item].landing(Vector3(positions[item].x,BASE_Y+heights[item],positions[item].y),GUEST_MOUTH.y)
+	if guest_active and start.y >= GUEST_MOUTH.y and mouth_target.distance_to(Vector2(GUEST_MOUTH.x,GUEST_MOUTH.z))<0.24:
+		if item == "water": pitcher_water-=amount; guest_roles[role].drunk+=amount
+		else:
+			var fraction := amount/maxf(0.001,volume)
+			consume_pasta(pasta*fraction,pasta_salt*fraction,water*fraction)
+		return
 	if item == "water":
 		pitcher_water -= amount
 		if target.distance_to(positions.pot) < 0.34 and start.y > BASE_Y + heights.pot + 0.36 and vessels.pot.angle < 15:
@@ -241,11 +270,14 @@ func _pour(role: int, item: String, delta: float) -> void:
 func snapshot() -> Dictionary:
 	var points := {}
 	for item in ITEMS: points[item] = [positions[item].x, positions[item].y]
-	return {"served_cooked": served_cooked, "served_stirred": served_stirred, "served_salt": served_salt, "pitcher_water": pitcher_water, "water_angle": water_angle, "pot_angle": pot_angle, "spills": spills.duplicate(true), "layout": "meal-table", "positions": points, "heights": heights.duplicate(), "owners": owners.duplicate(), "hands": hands.duplicate(), "poses": poses.duplicate(true), "using": using.duplicate(),
+	return {"equipment":equipment.duplicate(),"guest_active":guest_active,"guest_roles":guest_roles.duplicate(true),"served_cooked": served_cooked, "served_stirred": served_stirred, "served_salt": served_salt, "pitcher_water": pitcher_water, "water_angle": water_angle, "pot_angle": pot_angle, "spills": spills.duplicate(true), "layout": "meal-table", "positions": points, "heights": heights.duplicate(), "owners": owners.duplicate(), "hands": hands.duplicate(), "poses": poses.duplicate(true), "using": using.duplicate(),
 		"meat_sides": meat_sides.duplicate(), "meat_face": meat_face, "meat_state": meat_state, "meat_salt": meat_salt, "flip_time": flip_time,
 		"water": water, "pasta": pasta, "bag": bag, "temperature": temperature, "cooked": cooked, "stirred": stirred, "pasta_salt": pasta_salt, "served_pasta": served_pasta, "pouring": pouring.duplicate(), "elapsed": elapsed}
 
 func restore(data: Dictionary) -> void:
+	equipment = data.get("equipment",equipment).duplicate()
+	guest_active = data.get("guest_active",false)
+	guest_roles = data.get("guest_roles",guest_roles).duplicate(true)
 	for item in ITEMS: positions[item] = Vector2(data.positions[item][0], data.positions[item][1])
 	for key in ["heights", "owners", "hands", "poses", "using", "meat_sides", "pouring"]: set(key, data[key].duplicate(true))
 	for key in ["meat_face", "meat_state", "meat_salt", "flip_time", "water", "pasta", "bag", "temperature", "cooked", "stirred", "pasta_salt", "served_pasta", "elapsed", "served_cooked", "served_stirred", "served_salt", "pitcher_water", "water_angle", "pot_angle", "spills"]: set(key, data[key])
@@ -266,7 +298,7 @@ static func valid(data: Variant) -> bool:
 		if not data.hands[role] in ITEMS + [""] or not valid_pose(data.poses[role]): return false
 		if not data.using[role] is bool or not data.pouring[role] is bool: return false
 		if not data.hands[role].is_empty() and data.owners[data.hands[role]] != role: return false
-	if not numbers(data.get("meat_sides"), 2) or not finite(data.get("meat_face")) or data.meat_face != int(data.meat_face) or not int(data.meat_face) in [0, 1] or not data.get("meat_state") in ["raw", "held", "grill", "plate"]: return false
+	if not numbers(data.get("meat_sides"), 2) or not finite(data.get("meat_face")) or data.meat_face != int(data.meat_face) or not int(data.meat_face) in [0, 1] or not data.get("meat_state") in ["raw", "held", "grill", "plate", "eaten"]: return false
 	for key in ["meat_salt", "flip_time", "water", "pasta", "bag", "temperature", "cooked", "stirred", "pasta_salt", "served_pasta", "elapsed"]:
 		if not finite(data.get(key)): return false
 	return true
@@ -291,13 +323,15 @@ func can_touch(role: int, item: String) -> bool:
 
 func zone_snapshot(role: int) -> Dictionary:
 	var data := snapshot()
-	var result := {"positions": {}, "heights": {}, "owners": {}, "hand": hands[role], "pose": poses[role].duplicate(true), "using": using[role], "pouring": pouring[role]}
+	var result := {"guest_active":guest_active,"guest_zone":guest_roles[role].duplicate(true),"positions": {}, "heights": {}, "owners": {}, "hand": hands[role], "pose": poses[role].duplicate(true), "using": using[role], "pouring": pouring[role]}
 	for item in ZONE_ITEMS[role]:
 		for key in ["positions", "heights", "owners"]: result[key][item] = data[key][item]
 	for key in ZONE_VALUES[role]: result[key] = data[key]
 	return result.duplicate(true)
 
 func restore_zone(role: int, data: Dictionary) -> void:
+	guest_active = guest_active or data.get("guest_active",false)
+	if data.has("guest_zone"): guest_roles[role] = data.guest_zone.duplicate(true)
 	for item in ZONE_ITEMS[role]:
 		positions[item] = Vector2(data.positions[item][0], data.positions[item][1])
 		heights[item] = data.heights[item]
@@ -309,3 +343,38 @@ func restore_zone(role: int, data: Dictionary) -> void:
 	for key in ZONE_VALUES[role]: set(key, data[key].duplicate(true) if data[key] is Array else data[key])
 	vessels.water.angle = water_angle
 	vessels.pot.angle = pot_angle
+
+func item_available(item: String) -> bool:
+	for info in guest_roles:
+		if item in info.swallowed: return false
+	if item == "steak": return meat_state != "eaten"
+	return ("meat_kit" in equipment if item in ZONE_ITEMS[0] else "pasta_kit" in equipment)
+
+func held_center(role: int) -> Vector3:
+	var item: String = hands[role]
+	if item.is_empty(): return Vector3(100,100,100)
+	return Vector3(positions[item].x,BASE_Y+heights[item]+(0.25 if item in vessels else 0.1),positions[item].y)
+func mouth_opening() -> float:
+	if not guest_active: return 0
+	return maxf(clampf(1-held_center(0).distance_to(GUEST_MOUTH),0,1),clampf(1-held_center(1).distance_to(GUEST_MOUTH),0,1))
+func can_feed(role := 0) -> bool: return guest_active and not hands[role].is_empty() and held_center(role).distance_to(GUEST_MOUTH)<=0.6
+func guest_drunk() -> float: return guest_roles[0].drunk+guest_roles[1].drunk
+func guest_chewing() -> float: return maxf(guest_roles[0].chew,guest_roles[1].chew)
+func consume_pasta(food: float, salt_amount: float, liquid_amount: float) -> void:
+	var old: Dictionary = guest_roles[1].pasta
+	var previous: float = old.get("amount",0.0)
+	var total := previous+food
+	if total>0:
+		guest_roles[1].pasta={"amount":total,"cooked":(previous*float(old.get("cooked",0))+food*cooked)/total,"stirred":(previous*float(old.get("stirred",0))+food*stirred)/total,"salt":float(old.get("salt",0))+salt_amount,"location":"у гостя"}
+	guest_roles[1].drunk+=liquid_amount
+	pasta=maxf(0,pasta-food); pasta_salt=maxf(0,pasta_salt-salt_amount); water=maxf(0,water-liquid_amount)
+func feed(role: int) -> bool:
+	if not can_feed(role): return false
+	var item: String = hands[role]
+	if item == "steak": guest_roles[role].steak={"sides":meat_sides.duplicate(),"salt":meat_salt,"location":"у гостя"}; meat_state="eaten"
+	elif item == "pot": consume_pasta(pasta,pasta_salt,water)
+	elif item == "water": guest_roles[role].drunk+=pitcher_water; pitcher_water=0
+	guest_roles[role].swallowed.append(item)
+	guest_roles[role].chew=0.8
+	hands[role]=""; owners[item]=-1; using[role]=false
+	return true

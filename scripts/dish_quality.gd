@@ -26,7 +26,7 @@ static func missing(report: Dictionary, roles: Array) -> Array:
 static func text(report: Dictionary) -> String:
 	var lines := PackedStringArray(["РЕЦЕПТ"])
 	for component in report.components:
-		lines.append(component.name + (" · ✓ на подаче" if component.served else " · ещё не на подаче"))
+		lines.append(component.name + (" · ✓ " + str(component.get("location","на подаче")) if component.served else " · ещё не подано"))
 		for line in component.lines: lines.append(str(line))
 		lines.append("")
 	lines.append("Качество блюда: " + report.grade)

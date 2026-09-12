@@ -13,6 +13,8 @@ const TRAINING_ZONE_OUTLINE_THICKNESS := 0.04
 var bell: Node3D
 var bell_cap: Node3D
 var bell_flash := 0.0
+var equipment: Array = ["jug","cup","plates","pan","sauce","rag","meat_kit","pasta_kit"]
+var customer_order := {}
 var manual_station := false
 var station_id := 1
 var slot_index := 0
@@ -103,12 +105,17 @@ func _ready() -> void:
 		wall.material_override.albedo_color.a = 0.03
 		wall.hide()
 		walls.append(wall)
+	apply_equipment()
 	reset_model()
+
+func apply_equipment() -> void:
+	model.equipment = equipment.duplicate()
 
 func reset_model() -> void:
 	model.reset(dishes()[0]) if type_id == "counter" else model.reset()
 
 func apply_single(command: Dictionary, delta: float) -> void:
+	if command.get("feed", false): model.feed()
 	if command.get("drop", false): model.put_down()
 	var item: String = command.get("grab", "")
 	if item in ["jug", "cup", "rag", "pan", "potato", "sausage", "tomato", "potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2", "plate_0", "plate_1", "plate_2"] and model.held.is_empty(): model.pick_up(item)
@@ -137,6 +144,7 @@ func show_tracks(tracks: Array, tick: int) -> void:
 		for role in range(role_count()):
 			if role < tracks.size() and not tracks[role].is_empty() and not tracks[role].frames.is_empty(): model.restore_zone(role, tracks[role].frames[clampi(tick, 0, tracks[role].frames.size() - 1)])
 		model.elapsed = maxf(0, tick / 60.0)
+	apply_equipment()
 
 func ensure_taster() -> void:
 	if not is_instance_valid(taster):
@@ -228,6 +236,10 @@ func refresh(local_peer: int, delta: float) -> void:
 
 func direct_attention(person: Node3D) -> void:
 	person.watching = true
+	person.mouth_amount = model.mouth_opening()
+	person.drinking = model.held in ["jug","cup","rag"] if type_id == "counter" else ("water" in model.hands or "pot" in model.hands)
+	person.drunk_ml = float(model.guest_serving.drunk) if type_id == "counter" else model.guest_drunk()
+	person.chewing = float(model.guest_serving.chew) if type_id == "counter" else model.guest_chewing()
 	var role := int(age / 5.0) % role_count()
 	person.cook_target = to_global(Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0.0, 1.55, 1.85))
 	var target := Vector3(0, 1.1, 0)
@@ -248,7 +260,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
+	return {"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
@@ -258,6 +270,7 @@ func world_entry() -> Dictionary:
 	data.known = recipes.keys()
 	data.order_dish = order_dish
 	data.customer_id = customer_id
+	data.customer_order = customer_order
 	data.recipe_times = {}
 	data.recipe_quality = {}
 	for key in recipes:

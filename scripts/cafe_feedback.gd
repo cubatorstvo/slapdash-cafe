@@ -44,7 +44,7 @@ func _exit_tree() -> void:
 	shutdown()
 
 func announce(station: Node3D, message: String, point: Vector3) -> void:
-	if station != game.local_station() or station.training.purpose != "lesson" or station.training.phase != "recording": return
+	if station != game.local_station() or station.training.phase != "recording": return
 	one_shot(station, "ready")
 	station.pulse_at(point)
 	if station == game.local_station(): game.hud.show_toast(message)
@@ -85,8 +85,10 @@ func update(_delta: float) -> void:
 					if h >= 0.999: count += 1
 				current.faces.append(count)
 				fry = fry or p.potato_state == "pan"
-			current.wine_ok = wine_ready(m.filled)
-			current.coated = m.sausage_coating >= 0.9
+			var order: Dictionary = m.chef_order
+			var volume: float = m.guest_serving.drunk if m.guest_pour else m.filled
+			current.wine_ok = volume >= float(order.get("min_ml",200)) and volume <= float(order.get("max_ml",250))
+			current.coated = m.sausage_coating >= float(order.get("coat_min",0.9)) and m.sausage_coating <= float(order.get("coat_max",1))
 			current.held = m.held
 			pour = m.flowing or m.squeezing
 		else:
@@ -111,18 +113,18 @@ func update(_delta: float) -> void:
 					var prior: int = previous.faces[i] if i < previous.faces.size() else 0
 					var held: int = latch.faces[i] if i < latch.faces.size() else 0
 					if current.faces[i] > prior and current.faces[i] > held:
-						announce(station, "Сторона готова · %d/6" % current.faces[i], Vector3(m.potatoes[i].potato.x, 1.3, m.potatoes[i].potato.y))
+						announce(station, "Сторона готова · %d/%d" % [current.faces[i],int(m.chef_order.get("faces",6))], Vector3(m.potatoes[i].potato.x, 1.3, m.potatoes[i].potato.y))
 						held = current.faces[i]
 					if i >= latch.faces.size(): latch.faces.append(held)
 					else: latch.faces[i] = held
 				if current.wine_ok and not latch.wine:
 					announce(station, "Вина достаточно", Vector3(m.cup.x, 1.5, m.cup.y))
 					latch.wine = true
-				if not wine_ready(m.filled) and (m.filled < 190 or m.filled > 260): latch.wine = false
+				if not current.wine_ok: latch.wine = false
 				if current.coated and not latch.coated:
 					announce(station, "Соуса достаточно", Vector3(m.sausage.x, 1.2, m.sausage.y))
 					latch.coated = true
-				if m.sausage_coating < 0.85: latch.coated = false
+				if not current.coated: latch.coated = false
 			else:
 				if current.sides > previous.sides and current.sides > latch.sides:
 					announce(station, "Сторона стейка готова", Vector3(-1.4, 1.2, -0.15))
@@ -132,7 +134,7 @@ func update(_delta: float) -> void:
 					latch.cooked = true
 				if m.cooked < 0.97: latch.cooked = false
 			if current.served > previous.served and current.served > latch.served:
-				announce(station, "На подаче!", Vector3(0.7, 1.1, 0.65))
+				announce(station, "Порция доставлена!", Vector3(0.7, 1.1, 0.65))
 				latch.served = current.served
 			if current.served < latch.served: latch.served = current.served
 			if current.held != previous.held: one_shot(station, "place")

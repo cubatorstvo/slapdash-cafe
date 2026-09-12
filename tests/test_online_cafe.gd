@@ -23,8 +23,13 @@ func setup() -> void:
 	if role == "host":
 		game.service.progress.stars = 1
 		game.service.progress.cash = 200
-		game.service.purchase("decor", "sign")
-		game.service.purchase("upgrade", "", 3)
+		# Seed owned assets; this test covers transport, shop purchases have their own integration test.
+		game.service.progress.decorations=["sign"]
+		game.service.progress.popularity=10
+		game.service.by_id(3).upgrades=["sauce_ramp"]
+		game.service.by_id(3).apply_upgrades()
+		game.shop.order("rag",1) # already installed: explicit rejection, no duplicate delivery
+		game.shop.order("lab_0",0)
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
 	game.session.add_child(barrier)
@@ -103,6 +108,12 @@ func host_tick() -> void:
 		game.player.global_position = first.to_global(Vector3(0, 0.02, 1.8))
 		act("open", 1, {"dish": "wine"})
 		act("pass", 1, {"participants": [1]})
+		first.model.pick_up("cup")
+		first.model.cup=Vector2(0,-1.61)
+		first.model.elevations.cup=0.135
+		first.model.filled=225
+		first.model.wine=775
+		game.session.send_input(first,{}, {"feed":true})
 		stage = 1
 	elif stage == 1 and first.training.phase == "recording" and second.training.phase == "recording":
 		print("READY: late join")
@@ -148,6 +159,9 @@ func guest_tick() -> void:
 	var kitchen = game.service.by_id(4)
 	if first.model.potatoes.size() != 3 or first.model.sausages.size() != 3 or first.model.vessels.cup == null: fail("New stock and vessels not replicated")
 	if stage == 0 and first.training.phase == "recording":
+		if first.model.guest_serving.drunk != 225 or first.model.item_available("cup"): return
+		if game.service.progress.deliveries.size()!=1: fail("Delivery state missing"); return
+		print("CHECK: consumed cup, guest volume and delivery replicated")
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
 		stage = 1
 		quit_at = timer + 0.3

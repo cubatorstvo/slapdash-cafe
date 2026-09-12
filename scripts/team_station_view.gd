@@ -3,6 +3,7 @@ const M = preload("res://scripts/team_cooking_model.gd")
 const P = preload("res://scripts/props.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 var spill_meshes: Array = []
+var equipment_nodes := {"meat_kit":[],"pasta_kit":[]}
 var items := {}
 var actors: Array = []
 var streams: Array = []
@@ -18,11 +19,15 @@ var bounds: Array = []
 func build(production := false) -> void:
 	P.solid_box(self, Vector3(6.1, 0.16, 2.25), Vector3(0, 0.92, 0), Color("b98a58"))
 	for x in [-2.65, 2.65]: P.box(self, Vector3(0.18, 0.87, 1.8), Vector3(x, 0.43, 0), Color("344e53"))
+	var before := get_child_count()
 	for point in [M.GRILL, M.STOVE]:
 		P.box(self, Vector3(1.08, 0.06, 0.9), Vector3(point.x, 1.02, point.y), Color("303d42"))
 		P.cylinder(self, 0.37, 0.035, Vector3(point.x, 1.07, point.y), Color("da7846"))
 	for n in range(7): P.box(self, Vector3(0.85, 0.035, 0.035), Vector3(M.GRILL.x, 1.1, M.GRILL.y - 0.3 + n * 0.1), Color("384046"))
 	for plate in [M.PLATE, M.PASTA_PLATE]: P.cylinder(self, 0.44, 0.025, Vector3(plate.x, 1.03, plate.y), Color("fff0d4"))
+	var new_nodes := get_children().slice(before)
+	equipment_nodes.meat_kit = new_nodes.slice(0,2)+new_nodes.slice(4,11)+[new_nodes[11]]
+	equipment_nodes.pasta_kit = new_nodes.slice(2,4)+[new_nodes[12]]
 	for item in M.ITEMS:
 		var node := Node3D.new()
 		add_child(node)
@@ -80,9 +85,12 @@ func build(production := false) -> void:
 			bounds.append(mesh)
 
 func update_view(model, _time := 0.0, _resting := false) -> void:
+	for kit in equipment_nodes:
+		for node in equipment_nodes[kit]: node.visible=kit in model.equipment
 	for item in M.ITEMS:
 		var point: Vector2 = model.positions[item]
 		var node: Node3D = items[item]
+		node.visible = model.item_available(item)
 		node.position = Vector3(point.x, M.BASE_Y + model.heights[item], point.y)
 		if item == "steak" and model.meat_state == "grill": node.position.y += 0.10
 		if item == "pot" and point.distance_to(M.STOVE) < 0.45: node.position.y += 0.075
@@ -116,7 +124,7 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 			streams[role].material_override.albedo_color = Color("a0d5e2") if item == "water" else (Color("fff5d8") if item in ["salt", "pasta_salt_tool"] else Color("edcf74"))
 			if item in model.vessels:
 				var end: Vector2 = model.pour_target(item)
-				P.align_line(streams[role], model.mouth(item), Vector3(end.x, M.surface_at(end) + 0.08, end.y))
+				P.align_line(streams[role], model.mouth(item), M.GUEST_MOUTH if model.pours_into_guest(item) else Vector3(end.x, M.surface_at(end) + 0.08, end.y))
 			else: P.align_line(streams[role], target, Vector3(target.x, M.BASE_Y + 0.08, target.z))
 	for mesh in spill_meshes: mesh.hide()
 	for i in range(model.spills.size()):
@@ -134,6 +142,7 @@ func pick_item(camera: Camera3D) -> String:
 	var best := ""
 	var distance := 100.0
 	for item in M.ITEMS:
+		if not items[item].visible: continue
 		var center: Vector3 = items[item].position + Vector3(0, 0.16, -0.12 if item in ["spatula", "pasta_spatula"] else 0)
 		var reach := (center - origin).dot(ray)
 		var radius := 0.17 if item in ["salt", "pasta_salt_tool"] else (0.32 if item in ["spatula", "pasta_spatula"] else 0.37)

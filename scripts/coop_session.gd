@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-shifts-11"
+const PROTOCOL := "slapdash-cafe-shop-12"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -112,6 +112,9 @@ func _peer_left(id: int) -> void:
 		player_avatars[id].queue_free()
 		player_avatars.erase(id)
 	if not guest:
+		for parcel in game.service.progress.deliveries:
+			if parcel.owner == id: parcel.owner = 0
+		if game.service.progress.garland_builder == id: game.service.progress.garland_builder = 0
 		for station in game.service.stations:
 			if station.training.lead == id or station.training.role_for(id) >= 0: station.training.close()
 			if station.pending_teacher == id: station.pending_teacher = 0
@@ -189,7 +192,12 @@ func _action(value: Dictionary) -> void:
 
 func execute_action(sender: int, value: Dictionary) -> void:
 	var action: String = value.get("action", "")
-	if action in ["lab_begin", "lab_switch", "garland_begin", "garland_anchor", "next_day"]:
+	if action in ["take_parcel","drop_parcel","install_parcel","garland_take","garland_remove","garland_anchor","garland_put"]:
+		var error: String = game.shop.action(sender,value)
+		if not error.is_empty(): message_to(sender,error)
+		else: game.save_cafe()
+		return
+	if action == "next_day":
 		if action in ["lab_begin", "garland_begin", "next_day"] and sender != 1:
 			message_to(sender, "Это действие подтверждает хозяин кафе.")
 			return
@@ -204,6 +212,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 	if action in ["buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
 			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
+			return
+		if action in ["buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
+			message_to(sender,"Подойди к компьютеру кафе.")
 			return
 		var error := ""
 		match action:
@@ -230,6 +241,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 	if game.service.is_showcase(station) and action in ["keep", "accept"]: return
 	if game.service.is_showcase(station) and action == "cancel":
 		if sender == run.lead: game.service.finish_banquet(false, "Личный показ прерван.")
+		return
+	if action in ["manual","open","pass"] and (game.shop.carried(sender)>=0 or game.service.progress.garland_builder==sender):
+		message_to(sender,"Сначала положи коробку или катушку.")
 		return
 	if action == "manual":
 		if near_peer(sender, station, 5.0): game.service.request_manual(station, str(value.get("dish", "wine")), sender)
@@ -327,7 +341,10 @@ func apply_input(sender: int, packet: Dictionary) -> void:
 		motion_times[sender] = Time.get_ticks_msec()
 	var event = packet.get("event", {})
 	if event is Dictionary:
-		if event.get("drop", false) == true: run.queue_event(role, {"drop": true})
+		if event.get("feed",false) == true:
+			run.queue_event(role,{"feed":true})
+			game.service.trace("feed_attempt",{"station":station.station_id,"peer":sender})
+		elif event.get("drop", false) == true: run.queue_event(role, {"drop": true})
 		elif event.get("grab", "") in (game.ITEM_NAMES.keys() + ["potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] if station.type_id == "counter" else M.ITEMS): run.queue_event(role, {"grab": event.grab})
 
 func suspend_input() -> void:
@@ -364,9 +381,9 @@ func advance(delta: float) -> void:
 	for station in game.service.stations:
 		entries.append(station.world_entry())
 		if is_instance_valid(station.taster) and not station.taster_real:
-			customers.append({"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
+			customers.append({"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
-		customers.append({"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
+		customers.append({"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
 	var data := {"protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
@@ -386,6 +403,9 @@ func _world(packet: PackedByteArray) -> void:
 		var station: Node3D = game.service.by_id(entry.id)
 		if station == null: station = game.service.add_station(entry.type, int(entry.slot), entry.get("manual", false))
 		station.manual_station = entry.get("manual", false)
+		station.equipment = entry.get("equipment",station.equipment).duplicate()
+		station.apply_equipment()
+		station.customer_order = entry.get("customer_order",{}).duplicate(true)
 		station.crew = entry.crew
 		station.upgrades = entry.upgrades
 		station.apply_upgrades()
@@ -397,6 +417,7 @@ func _world(packet: PackedByteArray) -> void:
 		for key in entry.known:
 			station.recipes[key] = {"duration": entry.recipe_times[key], "quality": qualities.get(key, {})}
 		station.model.restore(entry.model)
+		station.apply_equipment()
 		station.training.apply_summary(entry.training)
 		station.remote_summary = entry.training
 		if station.type_id == "kitchen": station.model.live_roles = entry.training.live_roles
@@ -419,6 +440,10 @@ func _world(packet: PackedByteArray) -> void:
 		var person: Node3D = remote_customers[entry.id]
 		person.position = entry.position
 		person.rotation.y = entry.yaw
+		person.mouth_amount = float(entry.get("mouth_amount",0))
+		person.drinking = entry.get("drinking",false)
+		person.drunk_ml = float(entry.get("drunk_ml",0))
+		person.chewing = float(entry.get("chewing",0))
 		person.caption.text = entry.text
 		person.react(entry.get("reaction", 0.0))
 		person.watching = entry.get("watching", false)

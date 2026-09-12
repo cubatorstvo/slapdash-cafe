@@ -1,6 +1,8 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Model = preload("res://scripts/cooking_model.gd")
+var pan_supports: Array = []
+var sauce_nodes: Array = []
 var pick_distance := 3.6
 # Interaction bounds follow the visible pan: a close rectangular body plus a
 # separate narrow handle. The old single AABB covered empty space around both.
@@ -29,6 +31,7 @@ func _ready() -> void:
 	sausage_set = Node3D.new()
 	add_child(sausage_set)
 	_build_pan()
+	pan_supports = potato_set.get_children()
 	for i in range(3):
 		potato_sides = []
 		_build_potato()
@@ -109,6 +112,7 @@ func _build_sausage() -> void:
 		Props.cylinder(sausage_set, 0.325, 0.012, point(Model.SAUCE_CENTER, 0.082), Color("b63249"))
 		var label := Props.text(sausage_set, "СОУС", point(Model.SAUCE_CENTER + Vector2(0, -0.43), 0.01), 18, Color("b53c50"))
 		label.rotation.x = -PI / 2
+	if sausage_nodes.is_empty(): sauce_nodes = sausage_set.get_children()
 	sausage = Node3D.new()
 	sausage_set.add_child(sausage)
 	sausage_skin = Props.shape(sausage, sausage_mesh, Vector3.ZERO, Color("cd8869"))
@@ -141,10 +145,14 @@ func _bend_sausage(phase: float, amplitude: float) -> void:
 func update_view(model) -> void:
 	potato_set.visible = true
 	sausage_set.visible = true
+	for node in pan_supports: node.visible = model.item_available("pan")
+	for node in sauce_nodes: node.visible = "sauce" in model.equipment
 	pan.rotation = Vector3(model.pan_tilt.y, 0, -model.pan_tilt.x)
 	model._store_food("potato")
 	model._store_food("sausage")
 	for i in range(3):
+		potato_nodes[i].visible = model.item_available("potato_%d" % i)
+		sausage_nodes[i].visible = model.item_available("sausage_%d" % i)
 		var p: Dictionary = model.potatoes[i]
 		potato_nodes[i].position = point(p.potato, p.elevation)
 		potato_bodies[i].quaternion = p.potato_orientation
@@ -171,6 +179,7 @@ func pick_item(camera: Camera3D, dish: String) -> String:
 	var nearest := 3.6
 	for entry in entries:
 		var node: Node3D = entry[1]
+		if not node.visible: continue
 		var origin := node.to_local(camera.global_position)
 		var direction := node.global_basis.inverse() * -camera.global_basis.z
 		for bounds in entry[2]:

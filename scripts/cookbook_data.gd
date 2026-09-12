@@ -87,6 +87,7 @@ static func mark(ok: bool) -> String: return "✓" if ok else "×"
 static func pct(value: float) -> String: return "%d%%" % roundi(clampf(value, 0, 1) * 100)
 
 static func components(dish: String, model = null) -> Array:
+	if model != null: return model.quality().components
 	if not dish in RECIPES: return []
 	var live: bool = model != null
 	var result: Array = []

@@ -15,6 +15,11 @@ const PLATE_CENTER := Layout.TRAY
 const RAMP_X := 2.65
 const RAMP_START := -0.65
 const RAMP_END := 0.85
+var equipment: Array = ["jug","cup","plates","pan","sauce","rag"]
+var chef_order := {}
+const GUEST_MOUTH := Vector3(0,1.50,-1.61)
+var guest_serving := {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}
+var guest_pour := false
 var sauce_ramp := false
 var plates: Array = []
 var tray_wine := 0.0
@@ -62,6 +67,9 @@ func _init() -> void:
 func reset(recipe := "") -> void:
 	if not recipe.is_empty(): dish = recipe
 	super.reset()
+	chef_order = {}
+	guest_serving = {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}
+	guest_pour = false
 	jug = Layout.shelf_point(Vector2(-0.1, 0.0))
 	cup = Vector2(1.93, Layout.CROCKERY_Z)
 	rag = Layout.RAG_HOME
@@ -122,6 +130,7 @@ func reset(recipe := "") -> void:
 
 
 func pick_up(item: String) -> void:
+	if not item_available(item): return
 	if item.begins_with("potato_") or item.begins_with("sausage_"):
 		put_down()
 		var kind := item.get_slice("_", 0)
@@ -172,7 +181,7 @@ func put_down() -> void:
 		return
 	if held == "potato":
 		var offset := potato - PAN_CENTER
-		if absf(offset.x) < PAN_HALF.x - 0.10 and absf(offset.y) < PAN_HALF.y - 0.10:
+		if item_available("pan") and absf(offset.x) < PAN_HALF.x - 0.10 and absf(offset.y) < PAN_HALF.y - 0.10:
 			potato_state = "pan"
 			elevations.potato = PAN_LIFT
 		else:
@@ -214,6 +223,8 @@ func tilt_pan(motion: Vector2) -> void:
 	pan_tilt = (pan_tilt + motion * 0.003).limit_length(0.18)
 
 func step(delta: float, use_item: bool, straighten: bool, squeeze: bool) -> void:
+	guest_pour = false
+	guest_serving.chew = maxf(0, float(guest_serving.chew)-delta)
 	super.step(delta, use_item and held in ["jug", "cup"], straighten, squeeze and held == "rag")
 	_store_food("potato")
 	_store_food("sausage")
@@ -238,6 +249,7 @@ func step(delta: float, use_item: bool, straighten: bool, squeeze: bool) -> void
 	_sync_carried_food()
 
 func _step_potato(delta: float, use_item: bool) -> void:
+	if potato_state == "eaten": return
 	if held != "pan" or not use_item: pan_tilt = pan_tilt.move_toward(Vector2.ZERO, 1.5 * delta)
 	if potato_state == "pan":
 		potato_velocity += Vector2(sin(pan_tilt.x), sin(pan_tilt.y)) * 6.0 * delta
@@ -297,6 +309,7 @@ func _step_potato(delta: float, use_item: bool) -> void:
 			potato_velocity = Vector2.ZERO
 
 func _step_sausage(delta: float, use_item: bool) -> void:
+	if sausage_state == "eaten": return
 	var motion := (sausage - previous_sausage) / maxf(delta, 0.001)
 	sausage_phase += delta * 5.5 + motion.length() * delta * 3
 	if held == "sausage":
@@ -326,6 +339,7 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			sausage_high = false
 	elif sausage_state == "falling":
 		for i in range(plates.size()):
+			if not item_available("plate_%d" % i): continue
 			if sausage_fall_speed >= 0 and sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
 				if sausage_launched and sausage_high: sausage_showy = true
 				sausage_launched = false
@@ -347,7 +361,7 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 			sausage_slip = 0
 			sausage_launched = false
-	if sausage.distance_to(SAUCE_CENTER) < 0.34 and float(elevations.sausage) <= 0.13:
+	if "sauce" in equipment and sausage.distance_to(SAUCE_CENTER) < 0.34 and float(elevations.sausage) <= 0.13:
 		sausage_coating = minf(1, sausage_coating + delta * 1.4)
 	previous_sausage = sausage
 
@@ -363,27 +377,7 @@ func success() -> bool:
 func quality() -> Dictionary:
 	_store_food("potato")
 	_store_food("sausage")
-	var Book = preload("res://scripts/cookbook_data.gd")
-	if dish == "potato":
-		var served := -1
-		for i in range(3):
-			if food_is_served("potato", i): served = i; break
-		var faces := 0
-		if served >= 0:
-			for heat in potatoes[served].potato_heat:
-				if heat >= 0.999: faces += 1
-		return _utensil_grade(Quality.with_components(Quality.result([{"label": "Обжарено сторон: %d/6" % faces, "value": faces / 6.0}], served >= 0, []), Book.components(dish, self)))
-	if dish == "sausage":
-		var served := -1
-		for i in range(3):
-			if food_is_served("sausage", i): served = i; break
-		var coat := float(sausages[served].sausage_coating) if served >= 0 else 0.0
-		return _utensil_grade(Quality.with_components(Quality.result([{"label": "Соус: %d%% / нужно ≥90%%" % roundi(coat * 100), "value": minf(1, coat / 0.9)}], served >= 0, []), Book.components(dish, self)))
-	var on_tray := served_wine() > 0
-	var volume := served_wine()
-	var amount_score := clampf(volume / 200.0, 0, 1) if volume <= 250 else clampf(1 - (volume - 250) / 50, 0, 1)
-	var waste := spilled() + soaked + lost
-	return _utensil_grade(Quality.with_components(Quality.result([{"label": "Вино: %d мл / 200–250 мл" % roundi(volume), "value": amount_score}, {"label": "Бережливость: %s · вне посуды и подноса %.0f мл" % ["✓" if waste <= 5 else "×", waste], "value": 1.0 if waste <= 5 else 0.0}], on_tray, []), Book.components(dish, self)))
+	return preload("res://scripts/chef_orders.gd").evaluate(self)
 
 func goal_text() -> String:
 	match dish:
@@ -402,6 +396,10 @@ func progress_value() -> float:
 func snapshot() -> Dictionary:
 	var data := super.snapshot()
 	data.dish = dish
+	data.guest_serving = guest_serving.duplicate(true)
+	data.chef_order = chef_order.duplicate(true)
+	data.guest_pour = guest_pour
+	data.equipment = equipment.duplicate()
 	data.plates = plates.map(func(p): return {"point": [p.point.x, p.point.y], "tilt": p.tilt})
 	data.tray_wine = tray_wine
 	data.tomato = {"position": [tomato.x, tomato.y], "velocity": [tomato_velocity.x, tomato_velocity.y, tomato_velocity.z], "flying": tomato_flying, "hit": tomato_hit, "reaction": customer_reaction}
@@ -418,6 +416,10 @@ func snapshot() -> Dictionary:
 
 func restore(data: Dictionary) -> void:
 	super.restore(data)
+	guest_serving = data.get("guest_serving", {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}).duplicate(true)
+	chef_order = data.get("chef_order",{}).duplicate(true)
+	guest_pour = data.get("guest_pour",false)
+	equipment = data.get("equipment",equipment).duplicate()
 	dish = str(data.get("dish", "wine"))
 	tray_wine = float(data.get("tray_wine", 0.0))
 	if data.has("plates"):
@@ -511,6 +513,7 @@ func _get(property: StringName):
 func _food_rest(kind: String, point: Vector2) -> String:
 	for i in range(plates.size()):
 		var key := "plate_%d" % i
+		if not item_available(key): continue
 		if point.distance_to(plates[i].point) <= PLATE_RADIUS - 0.10 and float(elevations[kind]) >= float(elevations[key]) - 0.06:
 			set(kind + "_plate_offset", point - plates[i].point)
 			return key
@@ -540,6 +543,7 @@ func _sync_carried_food() -> void:
 
 func food_is_served(kind: String, index: int) -> bool:
 	var food: Dictionary = (potatoes if kind == "potato" else sausages)[index]
+	if food[kind + "_state"] == "eaten": return false
 	if held == kind and index == (potato_index if kind == "potato" else sausage_index): return false
 	var state: String = food[kind + "_state"]
 	if state.begins_with("plate_") and held == state: return false
@@ -557,12 +561,19 @@ func served_in_dish(kind: String) -> bool:
 	return index >= 0 and str((potatoes if kind == "potato" else sausages)[index][kind + "_state"]).begins_with("plate_")
 
 func cup_on_tray() -> bool:
-	return Layout.on_tray(cup, 0.24) and held != "cup" and absf(BASE_Y + float(elevations.cup) - Layout.TRAY_Y) < 0.08
+	return item_available("cup") and Layout.on_tray(cup, 0.24) and held != "cup" and absf(BASE_Y + float(elevations.cup) - Layout.TRAY_Y) < 0.08
 
 func served_wine() -> float:
 	return tray_wine + (filled if cup_on_tray() else 0.0)
 
 func _deliver(point: Vector2, amount: float, height: float) -> void:
+	if guest_serving.active and height >= GUEST_MOUTH.y:
+		var hit: Vector2 = vessels[source].landing(vessel_base(source), GUEST_MOUTH.y) if held in vessels else point
+		if hit.distance_to(Vector2(GUEST_MOUTH.x,GUEST_MOUTH.z)) < 0.24:
+			guest_serving.drunk += amount
+			guest_pour = true
+			landing = hit
+			return
 	var receiver := receiver_at(point, height)
 	if not receiver.is_empty():
 		var accepted := Pourable.accepted(amount, filled if receiver == "cup" else wine, CUP_CAPACITY if receiver == "cup" else JUG_CAPACITY)
@@ -622,3 +633,85 @@ func _utensil_grade(report: Dictionary) -> Dictionary:
 
 static func ramp_height(z: float) -> float:
 	return lerpf(1.30, 0.65, clampf((z - RAMP_START) / (RAMP_END - RAMP_START), 0, 1))
+
+func item_available(item: String) -> bool:
+	if item in guest_serving.swallowed: return false
+	if item.begins_with("plate_"): return "plates" in equipment
+	if item in ["jug","cup","rag","pan"]: return item in equipment
+	if item.begins_with("potato_") or item.begins_with("sausage_"):
+		var kind := item.get_slice("_",0)
+		var stock: Array = potatoes if kind == "potato" else sausages
+		return stock[int(item.get_slice("_",1))][kind+"_state"] != "eaten"
+	if item in ["potato","sausage"]: return get(item+"_state") != "eaten"
+	return true
+
+func receiver_at(point: Vector2, height: float) -> String:
+	for item in ["cup","jug"]:
+		if not item_available(item) or item == held or (item == source and flowing): continue
+		var base := vessel_base(item)
+		if point.distance_to(get(item)) <= vessels[item].radius and height >= base.y + vessels[item].rim_height and vessels[item].angle < 15: return item
+	return ""
+
+func held_center() -> Vector3:
+	if held.is_empty(): return Vector3(100,100,100)
+	if held == "pan": return Vector3(pan.x, BASE_Y+PAN_LIFT, pan.y)
+	var point: Vector2 = get(held)
+	return Vector3(point.x,BASE_Y+float(elevations[held])+(0.35 if held in vessels else 0.1),point.y)
+
+func mouth_opening() -> float:
+	if not guest_serving.active: return 0
+	return clampf(1.0-held_center().distance_to(GUEST_MOUTH)/1.0,0,1)
+
+func can_feed() -> bool:
+	return guest_serving.active and not held.is_empty() and held_center().distance_to(GUEST_MOUTH) <= 0.60
+
+func food_candidate(kind: String, index: int, location: String, utensil: bool) -> Dictionary:
+	var entry: Dictionary = (potatoes if kind == "potato" else sausages)[index]
+	var candidate := {"kind":kind,"present":true,"utensil":utensil,"location":location,"id":kind+str(index)}
+	if kind == "potato":
+		var faces := 0
+		for heat in entry.potato_heat:
+			if heat >= 0.999: faces += 1
+		candidate.faces = faces
+	else: candidate.coat = entry.sausage_coating; candidate.showy = entry.get("sausage_showy",false)
+	return candidate
+
+func feed() -> bool:
+	if not can_feed(): return false
+	_store_food("potato")
+	_store_food("sausage")
+	var item := held
+	for kind in ["potato","sausage"]:
+		var stock: Array = potatoes if kind == "potato" else sausages
+		for i in range(stock.size()):
+			var state: String = stock[i][kind+"_state"]
+			var selected: bool = item == kind and i == (potato_index if kind == "potato" else sausage_index)
+			if selected or (item.begins_with("plate_") and state == item) or (item == "pan" and kind == "potato" and state == "pan"):
+				guest_serving.eaten.append(food_candidate(kind,i,"у гостя",item.begins_with("plate_") or item == "pan"))
+				stock[i][kind+"_state"] = "eaten"
+	if item == "cup": guest_serving.drunk += filled; filled = 0
+	elif item == "jug": guest_serving.drunk += wine; wine = 0
+	elif item == "rag": guest_serving.drunk += soaked; soaked = 0
+	if item not in ["potato","sausage"]: guest_serving.swallowed.append(item)
+	_load_food("potato",potato_index)
+	_load_food("sausage",sausage_index)
+	held = ""
+	guest_serving.chew = 0.8
+	return true
+
+func serving_candidates(kind: String) -> Array:
+	var result: Array = []
+	if kind == "wine":
+		if cup_on_tray() and filled > 0: result.append({"present":true,"ml":filled,"utensil":true,"location":"в бокале на подносе"})
+		if tray_wine > 0: result.append({"present":true,"ml":tray_wine,"utensil":false,"location":"на подносе"})
+		if guest_serving.drunk > 0: result.append({"present":true,"ml":guest_serving.drunk,"utensil":true,"location":"выпито гостем"})
+	else:
+		for i in range(3):
+			if food_is_served(kind,i): result.append(food_candidate(kind,i,"на подносе",str((potatoes if kind == "potato" else sausages)[i][kind+"_state"]).begins_with("plate_")))
+		for entry in guest_serving.eaten:
+			if entry.kind == kind: result.append(entry.duplicate(true))
+	return result
+
+func preview_candidate(kind: String) -> Dictionary:
+	if kind == "wine": return {"present":true,"ml":filled,"utensil":item_available("cup")}
+	return food_candidate(kind,potato_index if kind == "potato" else sausage_index,"в работе",false)

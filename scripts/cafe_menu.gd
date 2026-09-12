@@ -132,6 +132,9 @@ func show_station(station: Node3D) -> void:
 				_button(training_box, station.Definition.DISHES[key], func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": key}))
 		else:
 			_label(training_box, station.Definition.DISHES[dish], 20)
+			if not station.customer_order.is_empty():
+				_label(training_box, preload("res://scripts/chef_orders.gd").requirements(station.customer_order))
+				_label(training_box, "Оплата ×%.1f"%float(station.customer_order.get("premium",1)),16)
 			_button(training_box, "Приготовить заказ", func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": dish}))
 		_button(training_box, "Вернуться", close)
 		panel.show()

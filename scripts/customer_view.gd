@@ -1,5 +1,11 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+var mouth_amount := 0.0
+var drinking := false
+var drunk_ml := 0.0
+var chewing := 0.0
+var mouth_shape: MeshInstance3D
+var drink_label: Label3D
 var stain: MeshInstance3D
 var caption: Label3D
 var legs: Array[Node3D] = []
@@ -40,6 +46,11 @@ func _ready() -> void:
 		Props.cylinder(head, 0.26, 0.22, Vector3(0, 0.27, 0), Color("fff0cb"))
 		Props.box(self, Vector3(0.38, 0.5, 0.04), Vector3(0, 0.91, -0.185), Color("f3deb1"))
 	else: Props.ball(head, 0.25, Vector3(0, 0.13, 0.025), color.darkened(0.3)).scale.y = 0.48
+	mouth_shape = Props.ball(head,0.205,Vector3(0,-0.035,-0.248),Color("341c25"))
+	mouth_shape.scale = Vector3(0.2,0.06,0.12)
+	drink_label = Props.text(self,"",Vector3(0,2.32,0),17,Color("eacb86"))
+	drink_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	drink_label.pixel_size = 0.005
 	stain = Props.ball(head, 0.13, Vector3(0, -0.01, -0.235), Color("d9483b"))
 	stain.scale.z = 0.15
 	stain.hide()
@@ -49,6 +60,9 @@ func _ready() -> void:
 
 func walk_to(target: Vector3, delta: float) -> bool:
 	watching = false
+	mouth_amount = 0
+	drinking = false
+	chewing = maxf(0,chewing-delta)
 	var offset := target - position
 	if offset.length() < 0.04:
 		for leg in legs: leg.rotation.x = 0
@@ -79,6 +93,11 @@ func _process(delta: float) -> void:
 			yaw = sin(personality * 0.8) * 0.75
 			pitch = 0.02
 		for leg in legs: leg.rotation.x = lerpf(leg.rotation.x, 0.0, blend)
+	if drinking and mouth_amount>0.05: pitch = maxf(pitch,mouth_amount*0.95)
+	var opening := maxf(mouth_amount,absf(sin(chewing*20))*0.5 if chewing>0 else 0.0)
+	mouth_shape.scale = mouth_shape.scale.lerp(Vector3(0.2+opening*0.95,0.05+opening*1.05,0.12),blend)
+	drink_label.visible = drunk_ml>0
+	drink_label.text = "Выпито: %.0f мл" % drunk_ml
 	head.rotation.y = lerp_angle(head.rotation.y, yaw, blend)
 	head.rotation.x = lerp_angle(head.rotation.x, pitch, blend)
 	head.position.y = 1.51 + sin(personality * 1.7) * 0.008

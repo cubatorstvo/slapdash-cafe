@@ -2,8 +2,10 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
-const SAVE_PATH := "user://shifts_cafe.save"
+const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var shop: Node3D
+var telemetry: Node
 var daylight: DirectionalLight3D
 var room_environment: WorldEnvironment
 var save_writer: Node
@@ -78,6 +80,12 @@ func _ready() -> void:
 	development = preload("res://scripts/cafe_development_view.gd").new()
 	add_child(development)
 	development.build(self)
+	shop = preload("res://scripts/cafe_shop.gd").new()
+	add_child(shop)
+	shop.setup(self)
+	telemetry = preload("res://scripts/playtest_log.gd").new()
+	add_child(telemetry)
+	telemetry.begin(self)
 	load_cafe()
 	event_phase_seen = service.progress.phase
 	development.refresh()
@@ -119,8 +127,10 @@ func nearest_station() -> Node3D:
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.physical_keycode == KEY_M and not session_paused and not awaiting_serving_confirmation():
-			office.close() if office.opened() else office.open()
+		if event.physical_keycode in [KEY_F8,KEY_F9,KEY_F10]:
+			var label: String = {KEY_F8:"скучно",KEY_F9:"непонятно",KEY_F10:"прикольно"}[event.physical_keycode]
+			telemetry.event("player_mark",{"label":label,"day":service.progress.day,"activity":telemetry.activity})
+			hud.show_toast("В плейтест записано: "+label)
 			return
 		if event.physical_keycode == KEY_B and not office.opened() and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
 			cookbook.toggle()
@@ -152,12 +162,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.physical_keycode:
 			KEY_E:
 				if not recording:
-					var night: Dictionary = development.night_target(camera)
+					var night: Dictionary = interaction_target()
 					if not night.is_empty():
 						session.request_action(night)
 						return
-				if not recording and development.board_hit(camera):
+				if not recording and shop.computer_hit(camera):
 					office.open()
+					return
+				if recording and (station.model.can_feed() if station.type_id == "counter" else station.model.can_feed(local_role)):
+					session.send_input(station,{}, {"feed":true})
 					return
 				if recording and station.bell_hit(camera):
 					session.request_action({"action": "ring", "station": station.station_id})
@@ -168,7 +181,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if recording: session.request_action({"action": "retake", "station": station.station_id})
 			KEY_X:
 				if station != null: session.request_action({"action": "cancel", "station": station.station_id})
-			KEY_G: session.request_action({"action": "business"})
+			KEY_G: hud.show_toast("Открыть и закрыть кафе можно у компьютера.")
 			KEY_SPACE:
 				if player.is_on_floor(): player.velocity.y = 6.2
 	if event is InputEventMouseMotion:
@@ -299,7 +312,7 @@ func _physics_process(delta: float) -> void:
 		if event_phase_seen in ["won", "lost"]:
 			if event_phase_seen == "won": feedback.play_ui("ready")
 			menu.close()
-			office.open("star")
+			hud.show_toast(service.progress.result)
 	var display_stamp := "%d:%d" % [service.progress.revision, service.stations.size()]
 	if display_stamp != development_stamp:
 		development_stamp = display_stamp
@@ -325,13 +338,13 @@ func refresh_hud() -> void:
 	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
-		var night: Dictionary = development.night_target(camera)
+		var night: Dictionary = interaction_target()
 		if not night.is_empty(): hud.prompt.text = night.get("hint", "(E) Взаимодействовать")
 		if service.progress.shift == "open":
 			var left: int = ceili(service.Progression.SHIFT_SECONDS - service.progress.shift_elapsed)
 			hud.clock.text = "%d:%02d до закрытия" % [left / 60, left % 60]
 		if service.progress.phase in ["showcase", "service"]: hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
-		if development.board_hit(camera): hud.prompt.text = "(E) Моё кафе"
+		if shop.computer_hit(camera) and shop.carried(session.local_id())<0: hud.prompt.text = "(E) Компьютер · заказы и кафе"
 		station = nearest_station()
 		if station != null:
 			if hud.prompt.text.is_empty() or hud.prompt.text == "B · Книга": hud.prompt.text = "(E) Личная стойка · приготовить" if station.manual_station else "[E] %s" % station.Definition.TYPES[station.type_id].title
@@ -343,6 +356,8 @@ func refresh_hud() -> void:
 		return
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
+	if station.type_id == "counter" and not station.model.chef_order.is_empty(): hud.goal.text += " · "+str(station.model.chef_order.title)
+	if local_role >= 0 and station.training.phase == "recording": hud.show_recipe(station.model.quality(),station.training.dish)
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	if service.progress.shift == "open" and not service.progress.busy():
 		hud.clock.text += " · закрытие через %d:%02d" % [ceili(maxf(0, service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))/60, ceili(maxf(0,service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))%60]
@@ -352,6 +367,9 @@ func refresh_hud() -> void:
 		hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 	hud.progress.value = 100 if station.model.success() else 0
 	if local_role >= 0 and station.training.phase == "recording":
+		if station.model.can_feed() if station.type_id == "counter" else station.model.can_feed(local_role):
+			hud.prompt.text = "(E) Скормить"
+			return
 		if station.bell_hit(camera):
 			hud.prompt.text = "(E) Подать блюдо" if station.training.purpose != "lesson" else "(E) Подать инспектору" if service.is_showcase(station) else "(E) Завершить показ"
 			return
@@ -464,3 +482,10 @@ func new_cafe() -> void:
 	player.velocity = Vector3.ZERO
 	development.refresh()
 	save_cafe()
+
+func interaction_target() -> Dictionary:
+	if is_instance_valid(shop):
+		var target: Dictionary = shop.target(camera,session.local_id())
+		if not target.is_empty(): return target
+	var night: Dictionary = development.night_target(camera)
+	return night if night.get("action", "") == "next_day" else {}

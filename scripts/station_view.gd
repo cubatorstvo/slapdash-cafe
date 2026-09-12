@@ -274,14 +274,18 @@ func _build_worker() -> void:
 func update_view(model, animation_time := 0.0, resting := false) -> void:
 	dish = model.dish
 	for i in range(plates.size()):
+		plates[i].visible = model.item_available("plate_%d" % i)
 		plates[i].position = item_point(model.plates[i].point) + Vector3.UP * float(model.elevations["plate_%d" % i])
 		plates[i].rotation.z = -float(model.plates[i].tilt)
 	tray_liquid.visible = model.tray_wine > 0.01
 	tray_liquid.scale = Vector3(clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0), 1, clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0))
 	tomato.position = item_point(model.tomato) + Vector3.UP * model.elevations.tomato
-	tomato.visible = not model.tomato_hit
+	tomato.visible = not model.tomato_hit and model.item_available("tomato")
 	kitchen.update_view(model)
-	for node in [jug, cup, rag, fill_label]: node.visible = true
+	jug.visible = model.item_available("jug")
+	cup.visible = model.item_available("cup")
+	rag.visible = model.item_available("rag")
+	fill_label.visible = cup.visible
 	jug.position = item_point(model.jug)
 	jug_body.rotation.z = -deg_to_rad(model.tilt)
 	cup.position = item_point(model.cup)
@@ -328,6 +332,7 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 		var end := Vector3(model.landing.x, Model.surface_at(model.landing) + 0.01, model.landing.y)
 		var receiving: String = model.receiver_at(model.landing, start.y)
 		if not receiving.is_empty(): end.y = model.vessel_base(receiving).y + model.vessels[receiving].rim_height
+		if model.guest_pour: end = model.GUEST_MOUTH
 		stream.mesh.top_radius = 0.015 + (model.vessels[model.source].rate() / 1050.0) * 0.045
 		stream.mesh.bottom_radius = stream.mesh.top_radius
 		Props.align_line(stream, start, end)

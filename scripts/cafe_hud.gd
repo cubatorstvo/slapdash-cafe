@@ -49,7 +49,8 @@ func _ready() -> void:
 	clock = _label(row,"",18,CafeStyle.GOLD)
 	var office_button := Button.new()
 	row.add_child(office_button)
-	office_button.text = "Кафе · M"
+	office_button.text = "Кафе"
+	office_button.hide()
 	office_button.pressed.connect(func(): office_requested.emit())
 	progress = ProgressBar.new()
 	order.add_child(progress)
@@ -134,7 +135,7 @@ func show_recipe(report: Dictionary, dish: String) -> void:
 
 func show_production_recipe(report: Dictionary, dish: String, duration: float) -> void:
 	recipe_panel.show()
-	var stamp := "%s:%s:%.3f" % [dish, JSON.stringify(report), duration]
+	var stamp := "%s:%s:%.3f" % [dish, JSON.stringify([report.get("components",[]),report.grade,report.get("style_count",0),report.get("order",{})]), duration]
 	if stamp == recipe_stamp: return
 	recipe_stamp = stamp
 	for child in recipe_content.get_children(): recipe_content.remove_child(child); child.queue_free()
@@ -149,9 +150,9 @@ func show_production_recipe(report: Dictionary, dish: String, duration: float) -
 	var name := _label(heading, Data.title(dish), 14, CafeStyle.GOLD)
 	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var grade := _label(heading, str(report.get("grade", "")), 30, CafeStyle.MINT if str(report.get("grade", "")) in ["S","A"] else CafeStyle.GOLD)
-	grade.tooltip_text = "Итоговая оценка записанного блюда"
+	grade.tooltip_text = "Оценка лучшей поданной или съеденной порции"
 	grade.mouse_filter = Control.MOUSE_FILTER_STOP
-	_label(recipe_content, "Запись клона · %.1f с" % duration, 14, CafeStyle.GOLD)
+	_label(recipe_content, "Запись клона · %.1f с" % duration if duration>0 else "Текущий заказ · "+str(report.get("order",{}).get("title","Стандартный рецепт")), 14, CafeStyle.GOLD)
 	if report.get("style_count", 0) > 0:
 		_label(recipe_content, "Еда под потолком · +20%", 15, CafeStyle.GOLD)
 	for component in report.get("components", []):

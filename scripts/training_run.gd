@@ -35,6 +35,7 @@ func open(recipe: String, peer: int, mode := "lesson") -> void:
 	station.model.reset(dish) if station.type_id == "counter" else station.model.reset()
 	station.state = "training"
 	if purpose != "manual" or station.customer_id >= 0: station.ensure_taster()
+	configure_order()
 	info = "Выбери роль и напарника. Без напарника — последовательная запись."
 	revision += 1
 
@@ -61,6 +62,7 @@ func start_pass(assignments: Array) -> bool:
 	for role in live_roles: pending_tracks[role] = {"group": group_serial, "frames": []}
 	station.model.reset(dish) if station.type_id == "counter" else station.model.reset()
 	if station.type_id == "kitchen": station.model.live_roles = live_roles.duplicate()
+	configure_order()
 	phase = "recording"
 	tick = 0
 	inputs.clear()
@@ -68,7 +70,16 @@ func start_pass(assignments: Array) -> bool:
 	station.reset_taster()
 	revision += 1
 	info = "Закончил? Позвони в звонок на стойке." if purpose == "lesson" else "Заказ готовится лично. Подай блюдо звонком."
+	station.get_parent().trace("cooking_start", {"station":station.station_id,"dish":dish,"purpose":purpose,"order":station.customer_order})
 	return true
+
+func configure_order() -> void:
+	station.apply_equipment()
+	if station.type_id == "counter":
+		station.model.chef_order = station.customer_order.duplicate(true) if purpose == "manual" else {}
+		station.model.guest_serving.active = is_instance_valid(station.taster)
+	else:
+		station.model.guest_active = is_instance_valid(station.taster)
 
 func queue_event(role: int, event: Dictionary) -> void:
 	if role not in live_roles or phase != "recording": return
@@ -112,6 +123,7 @@ func finish_pass(confirmed := false) -> void:
 		events.clear()
 		info = "Не на подаче: %s. Завершить проход так или продолжить готовку? Отсутствующие компоненты снижают оценку." % ", ".join(missing)
 		return
+	station.get_parent().trace("cooking_finish", {"station":station.station_id,"dish":dish,"purpose":purpose,"seconds":tick/60.0,"grade":station.model.quality().grade})
 	for role in live_roles:
 		station.model.put_down() if station.type_id == "counter" else station.model.drop(role)
 	if purpose != "lesson":
@@ -161,6 +173,7 @@ func accept() -> bool:
 	return true
 
 func close() -> void:
+	if active(): station.get_parent().trace("cooking_close", {"station":station.station_id,"dish":dish,"phase":phase,"purpose":purpose})
 	phase = "idle"
 	participants.fill(0)
 	live_roles.clear()

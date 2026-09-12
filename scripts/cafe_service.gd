@@ -36,11 +36,12 @@ func starter_layout_positions() -> Array:
 	return positions
 
 func initial_stations(sandbox := false) -> void:
-	for slot_index in range(STARTER_TYPES.size() if sandbox else 1): add_station(STARTER_TYPES[slot_index], slot_index, not sandbox)
+	for slot_index in range(STARTER_TYPES.size() if sandbox else 1): add_station(STARTER_TYPES[slot_index], slot_index, not sandbox, not sandbox)
 
-func add_station(type_id: String, slot_index: int, manual := false) -> Node3D:
+func add_station(type_id: String, slot_index: int, manual := false, bare := false) -> Node3D:
 	var station := Station.new()
 	station.manual_station = manual
+	if bare: station.equipment = []
 	station.slot_index = slot_index
 	station.station_id = slot_index + 1
 	station.type_id = type_id
@@ -89,6 +90,7 @@ func _attach_customer(station: Node3D) -> void:
 	if station.customer_id >= 0: finish_customer(station.customer_id, false)
 
 func advance(delta: float) -> void:
+	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
 	autosave_clock += delta
@@ -134,7 +136,7 @@ func advance(delta: float) -> void:
 				station.reset_model()
 				customer.state = "cooking"
 			elif station.manual_station:
-				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nТвой заказ · [E] у стойки"
+				customer.view.caption.text = Definition.DISHES[customer.dish] + "\n" + str(station.customer_order.get("title","Твой заказ")) + " · [E] у стойки"
 			else:
 				customer.wait += delta
 				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут твоего показа · [E]"
@@ -146,10 +148,11 @@ func spawn_customer(recipe := "", banquet := false) -> bool:
 	if progress.stars == 0 and not banquet and by_id(1) != null and by_id(1).manual_station and by_id(1).state != "idle": return false
 	if recipe.is_empty():
 		var pool: Array = progress.available_dishes()
+		if progress.stars == 0 and by_id(1) != null and "jug" not in by_id(1).equipment: pool.erase("wine")
 		recipe = pool[rng.randi_range(0, pool.size() - 1)]
 		if progress.stars == 0 and progress.tutorial_served.size() < 3:
-			for starter in Progression.DISHES:
-				if starter not in progress.tutorial_served: recipe = starter; break
+			for starter in ["sausage","potato","wine"]:
+				if starter in pool and starter not in progress.tutorial_served: recipe = starter; break
 	if not recipe in Definition.DISHES: return false
 	var candidates: Array = []
 	var untrained: Array = []
@@ -181,9 +184,11 @@ func spawn_customer(recipe := "", banquet := false) -> bool:
 		if banquet: progress.banquet_finished += 1
 	else:
 		data.path = [station.to_global(Vector3(0, 0, -1.85))]
+		station.customer_order = preload("res://scripts/chef_orders.gd").choose(recipe,station.equipment,progress.manual_served,rng) if station.manual_station else {}
 		station.order_dish = recipe
 		station.customer_id = next_customer_id
 		station.state = "waiting"
+	trace("customer_arrived",{"dish":recipe,"station":data.station,"order":station.customer_order if station != null else {}})
 	customers.append(data)
 	next_customer_id += 1
 	return station != null
@@ -194,7 +199,9 @@ func finish_customer(id: int, accepted: bool) -> void:
 		var station: Node3D = by_id(customer.station)
 		var report: Dictionary = station.model.quality()
 		var paid := accepted and bool(report.get("present", false))
-		var payment := roundi((65 if customer.dish == "meal" else 25) * report.price_factor * report.style_multiplier) if paid else 0
+		var premium: float = float(station.customer_order.get("premium",1.0)) if station.manual_station else 1.0
+		var payment := roundi((65 if customer.dish == "meal" else 25) * report.price_factor * report.style_multiplier * premium) if paid else 0
+		trace("customer_finished",{"dish":customer.dish,"station":station.station_id,"grade":report.grade,"payment":payment,"accepted":paid})
 		customer.state = "leaving"
 		customer.view.caption.text = "%s · +%d\nСпасибо!" % [report.grade, payment] if paid else "Загляну позже"
 		if paid and report.get("style_count", 0) > 0: customer.view.caption.text += "\nЕда под потолком · +20%"
@@ -219,49 +226,18 @@ func finish_customer(id: int, accepted: bool) -> void:
 		return
 
 func purchase(kind: String, id: String, station_id := 0) -> String:
-	if progress.busy(): return "Покупки доступны после банкета."
-	var price := 0
-	var slot := -1
-	var station: Node3D = by_id(station_id)
-	match kind:
-		"decor":
-			if progress.stars < 1: return "Обустройство зала откроется после первой звезды."
-			if id == "lights": return "Развесь гирлянду вечером: катушка на верстаке."
-			return progress.paid_decoration(id)
-		"counter":
-			if progress.stars < 1: return "Первую бригаду откроет звезда дегустатора."
-			for index in range(1, 3):
-				if by_id(index + 1) == null:
-					slot = index
-					break
-			if slot < 0: return "Все места под стойки заняты. Следующие места — после расширения."
-			price = Progression.COUNTER_PRICE
-		"kitchen":
-			if not progress.expanded or progress.stars < 2: return "Нужны вторая звезда и расширение зала."
-			if by_id(4) != null: return "Кухня на двоих уже установлена."
-			slot = 3
-			price = Progression.KITCHEN_PRICE
-		"expansion":
-			if progress.stars < 2: return "Расширение откроется со второй звездой."
-			if progress.expanded: return "Зал уже расширен."
-			price = Progression.EXPANSION_PRICE
-		"upgrade":
-			if progress.stars < 1: return "Оборудование откроется после первой звезды."
-			if station == null or station.type_id != "counter": return "Выбери тяп-ляп стойку."
-			if station.state != "idle": return "Дождись свободной станции."
-			if "sauce_ramp" in station.upgrades: return "Соусный жёлоб уже установлен."
-			price = Progression.UPGRADE_PRICE
-		_: return "Покупка не найдена."
-	if progress.cash < price: return "Не хватает денег."
-	progress.cash -= price
-	match kind:
-		"counter", "kitchen": add_station(kind, slot)
-		"expansion": progress.expanded = true
-		"upgrade":
-			station.upgrades.append("sauce_ramp")
-			station.apply_upgrades()
-	progress.revision += 1
-	return ""
+	if progress.busy(): return "Сначала заверши проверку."
+	if kind == "expansion":
+		if progress.stars < 2: return "Нужна вторая звезда."
+		if progress.expanded: return "Зал уже расширен."
+		if progress.cash < Progression.EXPANSION_PRICE: return "Не хватает денег."
+		progress.cash -= Progression.EXPANSION_PRICE
+		progress.expanded = true
+		progress.revision += 1
+		trace("expansion")
+		return ""
+	var item := "sauce_ramp" if kind == "upgrade" else kind if kind in ["counter","kitchen"] else id
+	return game.shop.order(item, station_id)
 
 func start_banquet(peer: int) -> String:
 	if not progress.can_attempt(stations, served): return "Подготовь кафе по списку во вкладке «Звёзды»."
@@ -374,11 +350,12 @@ func save_data() -> Dictionary:
 	for station in stations:
 		var entry: Dictionary = station.save_entry()
 		entry.crew = entry.crew.duplicate(true)
+		entry.equipment = entry.equipment.duplicate()
 		entry.upgrades = entry.upgrades.duplicate()
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 6, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
+	return {"format": "station-cafe", "version": 7, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
 func clear_world() -> void:
 	for station in stations:
@@ -396,7 +373,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -422,6 +399,8 @@ func load_data(data: Dictionary) -> bool:
 	for entry in data.stations:
 		var slot_index := _saved_slot(entry, version)
 		var station := add_station(entry.type, slot_index, entry.get("manual", false))
+		station.equipment = entry.get("equipment",station.equipment).duplicate()
+		station.apply_equipment()
 		station.crew = entry.crew.duplicate(true)
 		station.upgrades = entry.upgrades.duplicate(true)
 		station.apply_upgrades()
@@ -435,6 +414,7 @@ func load_data(data: Dictionary) -> bool:
 	progress = Progression.new()
 	if data.get("progression") is Dictionary:
 		progress.restore(data.progression)
+		progress.recover_deliveries()
 		if data.progression.get("phase", "none") in ["preparing", "showcase", "service", "tasting"]: open_for_business = progress.return_open
 	spawn_clock = progress.arrival_interval()
 	return true
@@ -464,7 +444,8 @@ func matches_schema(value: Variant, schema: Variant) -> bool:
 	if schema is Dictionary:
 		if not value is Dictionary: return false
 		for key in schema:
-			if key in ["presentation", "sausage_launched", "sausage_high", "sausage_showy"] and not value.has(key): continue
+			if key in ["equipment","guest_serving","chef_order","guest_roles","guest_zone"]: continue
+			if key in ["presentation", "sausage_launched", "sausage_high", "sausage_showy", "guest_serving", "chef_order", "guest_pour", "equipment", "guest_active", "guest_roles", "guest_zone"] and not value.has(key): continue
 			if not value.has(key) or not matches_schema(value[key], schema[key]): return false
 	elif schema is Array:
 		if not value is Array: return false
@@ -486,6 +467,7 @@ func request_manual(station: Node3D, dish: String, peer: int) -> bool:
 	if station == null or not station.manual_station or station.training.active() or training_for(peer) != null or progress.busy(): return false
 	var ordered := manual_order(station)
 	if not ordered.is_empty(): dish = ordered
+	else: station.customer_order = {}
 	if not dish in station.dishes(): return false
 	station.training.dish = dish
 	_attach_customer(station)
@@ -549,6 +531,7 @@ func toggle_business() -> void:
 	progress.revision += 1
 
 func end_shift() -> void:
+	trace("shift_closed", {"day":progress.day,"elapsed":progress.shift_elapsed})
 	open_for_business = false
 	progress.shift = "closing"
 	for customer in customers:
@@ -571,61 +554,20 @@ func advance_shift(delta: float) -> void:
 
 func next_day() -> String:
 	if progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."
+	trace("next_day", {"day":progress.day+1})
 	progress.day += 1
 	progress.shift = "morning"
 	progress.shift_elapsed = 0
 	progress.revision += 1
 	return ""
 
-func night_action(action: String, data: Dictionary, peer: int) -> String:
-	if progress.shift != "night" or progress.busy(): return "Этим можно заняться после закрытия кафе."
-	match action:
-		"next_day": return next_day()
-		"lab_begin":
-			if progress.lab_stage >= 3: return "Лаборатория готова."
-			if progress.lab_step >= 0: return "Продолжи подключение на верстаке."
-			var price: int = Progression.LAB_PRICES[progress.lab_stage]
-			if progress.cash < price: return "На комплект нужно %d. Можно заработать в следующую смену." % price
-			progress.cash -= price
-			progress.lab_step = 0
-		"lab_switch":
-			if progress.lab_step < 0: return "Сначала возьми комплект на верстаке."
-			var sequences := [[0, 1, 2], [2, 0, 1], [1, 2, 0]]
-			if int(data.get("index", -1)) != sequences[progress.lab_stage][progress.lab_step]:
-				progress.lab_step = 0
-				progress.revision += 1
-				return "Контакт не тот. Схема сброшена; комплект остаётся у тебя."
-			progress.lab_step += 1
-			if progress.lab_step == 3:
-				progress.lab_stage += 1
-				progress.lab_step = -1
-		"garland_begin":
-			if progress.stars < 1: return "Сначала закончи лабораторию и получи первую звезду."
-			if progress.garland_complete: return "Гирлянда уже развешена."
-			if progress.garland_builder > 0:
-				if progress.garland_builder != peer and game.session.members.has(progress.garland_builder): return "Катушка у другого игрока."
-			else:
-				if progress.cash < 40: return "Катушка стоит 40."
-				progress.cash -= 40
-			progress.garland_builder = peer
-		"garland_anchor":
-			if progress.garland_builder != peer or progress.garland_complete: return "Возьми катушку на верстаке."
-			var raw = data.get("point")
-			if not Station.TeamModel.numbers(raw, 3): return "Выбери точку на стене."
-			var point := Vector3(raw[0], raw[1], raw[2])
-			if not valid_wall_point(point): return "Крепление должно быть на стене на доступной высоте."
-			var previous: Array = progress.garland_points.back() if not progress.garland_points.is_empty() else raw
-			var distance := point.distance_to(Vector3(previous[0], previous[1], previous[2]))
-			if not progress.garland_points.is_empty() and (distance < 0.65 or distance > 4.0): return "Оставь между креплениями от 0.65 до 4 метров."
-			progress.garland_points.append(raw.duplicate())
-			if progress.garland_points.size() == 4:
-				progress.garland_complete = true
-				progress.popularity += 15
-				progress.decorations.append("lights")
-				progress.garland_builder = 0
-	progress.revision += 1
-	return ""
+func night_action(action: String, _data: Dictionary, _peer: int) -> String:
+	if action == "next_day": return next_day()
+	return "Закажи детали у компьютера и установи их из коробки."
 
 static func valid_wall_point(point: Vector3) -> bool:
 	if point.y < 1.4 or point.y > 3.7: return false
 	return (absf(point.z + 7.35) < 0.08 or absf(point.z - 10.35) < 0.08) and point.x >= -11.5 and point.x <= 17.5
+
+func trace(kind: String, data := {}) -> void:
+	if game != null and is_instance_valid(game.telemetry): game.telemetry.event(kind,data)

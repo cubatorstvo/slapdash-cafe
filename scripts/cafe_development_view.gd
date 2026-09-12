@@ -68,9 +68,9 @@ func refresh() -> void:
 	for i in range(slots.size()):
 		slots[i].node.visible = game.service.by_id(i + 1) == null
 		if i < 3:
-			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[M] Купить · 120"
+			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[E] Компьютер · 120"
 		else:
-			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[M] Купить · 250"
+			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[E] Компьютер · 250"
 	ribbon.visible = not progress.expanded
 	star_label.text = "★ ★ ☆ ☆ ☆" if progress.stars >= 2 else "★ ☆ ☆ ☆ ☆" if progress.stars == 1 else "☆ ☆ ☆ ☆ ☆"
 	decor.lights.hide()
@@ -160,6 +160,8 @@ func refresh_night() -> void:
 	if p.lab_step >= 0 and p.lab_stage < 3:
 		lab_caption.text += "\nПодключи: " + names[schemes[p.lab_stage][p.lab_step]] + " · %d/3" % p.lab_step
 	night_room_light.visible = p.shift == "night"
+	for entry in night_controls:
+		if entry.action in ["lab_begin","lab_switch"]: entry.node.hide()
 	var next := str(p.garland_points)
 	if next == cable_stamp: return
 	cable_stamp = next
@@ -180,7 +182,7 @@ func refresh_night() -> void:
 
 func _process(_delta: float) -> void:
 	if game == null or not is_instance_valid(cable_preview): return
-	var target := night_target(game.camera)
+	var target: Dictionary = game.shop.target(game.camera,game.session.local_id()) if is_instance_valid(game.shop) else {}
 	cable_preview.visible = target.get("action", "") == "garland_anchor" and not game.service.progress.garland_points.is_empty()
 	if cable_preview.visible:
 		var from: Array = game.service.progress.garland_points.back()

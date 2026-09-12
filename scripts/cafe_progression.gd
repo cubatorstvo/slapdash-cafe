@@ -19,6 +19,9 @@ const BANQUET_SERVED := 8
 const BANQUET_GOOD := 6
 const SHIFT_SECONDS := 480.0
 const LAB_PRICES := [40, 60, 80]
+var deliveries: Array = []
+var next_delivery_id := 1
+var garland_owned := false
 var day := 1
 var shift := "morning"
 var shift_elapsed := 0.0
@@ -30,7 +33,7 @@ var tutorial_served: Array = []
 var garland_points: Array = []
 var garland_builder := 0
 var garland_complete := false
-var cash := 60
+var cash := 20
 var popularity := 0
 var stars := 0
 var decorations: Array = []
@@ -95,8 +98,8 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 	if shift == "night": return "Ночь · лаборатория %d/3 · следующий день у двери отдыха" % lab_stage if stars == 0 else "Ночь · обустрой кафе или отдохни до утра"
 	if shift == "closing": return "Заканчиваем последние заказы · затем ночной перерыв"
 	if stars == 0:
-		if can_attempt(stations, served): return "Всё готово · пригласи дегустатора"
-		return "Открой кафе · начни с личных заказов" if not opened else "Личная стойка · гости %d/15 · лаборатория %d/3" % [manual_served, lab_stage]
+		if can_attempt(stations, served): return "Всё готово · пригласи дегустатора у компьютера"
+		return "Открой кафе · начни с личных заказов" if not opened else "Гости %d/15 · лаборатория %d/3 · оборудование в компьютере" % [manual_served, lab_stage]
 
 	if phase == "preparing": return "Банкет · завершаем обычные заказы"
 	if phase == "showcase": return "Инспектор · приготовь картофель на B или лучше"
@@ -114,7 +117,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
@@ -124,3 +127,9 @@ func restore(data: Dictionary, resume_event := false) -> void:
 		phase = "none"
 		remaining = 0
 		result = "Проверка прервана при выходе. Можно пригласить инспектора снова бесплатно."
+
+func recover_deliveries() -> void:
+	for parcel in deliveries:
+		parcel.owner = 0
+	if garland_complete: garland_owned = true
+	garland_builder = 0
