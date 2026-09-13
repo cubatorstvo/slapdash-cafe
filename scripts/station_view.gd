@@ -271,7 +271,19 @@ func _build_worker() -> void:
 	left_arm = Props.line(self, Vector3.ZERO, Vector3.UP, 0.065, Color("63aa98"))
 	right_arm = Props.line(self, Vector3.ZERO, Vector3.UP, 0.065, Color("63aa98"))
 
+var catch_marker: Node3D
+
 func update_view(model, animation_time := 0.0, resting := false) -> void:
+	if catch_marker==null:
+		catch_marker=Node3D.new(); add_child(catch_marker)
+		for angle in [-PI/4,PI/4]:
+			var bar = preload("res://scripts/props.gd").box(catch_marker,Vector3(0.42,0.014,0.035),Vector3.ZERO,Color("f4ce69"))
+			bar.rotation.y=angle
+	catch_marker.visible=model.sauce_ramp and (model.sausage_state=="ramp" or model.sausage_launched)
+	if catch_marker.visible:
+		var landing: Vector2=model.ramp_landing()
+		catch_marker.position=Vector3(landing.x,model.BASE_Y+0.02,landing.y)
+
 	dish = model.dish
 	for i in range(plates.size()):
 		plates[i].visible = model.item_available("plate_%d" % i)

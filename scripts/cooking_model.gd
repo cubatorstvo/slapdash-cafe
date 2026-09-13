@@ -20,6 +20,7 @@ var chef_order := {}
 const GUEST_MOUTH := Vector3(0,1.50,-1.61)
 var guest_serving := {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}
 var guest_pour := false
+var ramp_velocity := Vector2(-0.7,-0.12)
 var sauce_ramp := false
 var plates: Array = []
 var tray_wine := 0.0
@@ -70,6 +71,7 @@ func reset(recipe := "") -> void:
 	chef_order = {}
 	guest_serving = {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}
 	guest_pour = false
+	ramp_velocity=Vector2(randf_range(-1.25,-0.45),randf_range(-0.60,0.08))
 	jug = Layout.shelf_point(Vector2(-0.1, 0.0))
 	cup = Vector2(1.93, Layout.CROCKERY_Z)
 	rag = Layout.RAG_HOME
@@ -189,6 +191,7 @@ func put_down() -> void:
 			elevations.potato = _food_height(potato_state, potato, "potato") - BASE_Y
 	elif held == "sausage":
 		if sauce_ramp and absf(sausage.x - RAMP_X) < 0.24 and sausage.y >= RAMP_START - 0.1 and sausage.y < RAMP_END and BASE_Y + float(elevations.sausage) >= ramp_height(sausage.y) - 0.12:
+			ramp_velocity=Vector2(randf_range(-1.25,-0.45),randf_range(-0.60,0.08))
 			sausage_state = "ramp"
 			sausage.x = RAMP_X
 			elevations.sausage = ramp_height(sausage.y) - BASE_Y
@@ -334,14 +337,14 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 		if sausage.y >= RAMP_END:
 			sausage_state = "falling"
 			sausage_fall_speed = -6.6
-			sausage_velocity = Vector2(-0.7, -0.12)
+			sausage_velocity = ramp_velocity
 			sausage_launched = true
 			sausage_high = false
 	elif sausage_state == "falling":
 		for i in range(plates.size()):
 			if not item_available("plate_%d" % i): continue
 			if sausage_fall_speed >= 0 and sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
-				if sausage_launched and sausage_high: sausage_showy = true
+				if held == "plate_%d"%i and sausage_fall_speed>=1.0: sausage_showy = true
 				sausage_launched = false
 				sausage_state = "plate_%d" % i
 				sausage_plate_offset = sausage - plates[i].point
@@ -398,6 +401,7 @@ func snapshot() -> Dictionary:
 	data.dish = dish
 	data.guest_serving = guest_serving.duplicate(true)
 	data.chef_order = chef_order.duplicate(true)
+	data.ramp_velocity=[ramp_velocity.x,ramp_velocity.y]
 	data.guest_pour = guest_pour
 	data.equipment = equipment.duplicate()
 	data.plates = plates.map(func(p): return {"point": [p.point.x, p.point.y], "tilt": p.tilt})
@@ -418,6 +422,8 @@ func restore(data: Dictionary) -> void:
 	super.restore(data)
 	guest_serving = data.get("guest_serving", {"active":false,"drunk":0.0,"eaten":[],"swallowed":[],"chew":0.0}).duplicate(true)
 	chef_order = data.get("chef_order",{}).duplicate(true)
+	var recorded: Array=data.get("ramp_velocity",[-0.7,-0.12])
+	ramp_velocity=Vector2(recorded[0],recorded[1])
 	guest_pour = data.get("guest_pour",false)
 	equipment = data.get("equipment",equipment).duplicate()
 	dish = str(data.get("dish", "wine"))
@@ -621,7 +627,7 @@ func _utensil_grade(report: Dictionary) -> Dictionary:
 		if served >= 0 and sausages[served].get("sausage_showy", false):
 			report.style_count = 1
 			report.style_multiplier = Quality.style_multiplier(1)
-			report.style_tricks = ["Еда под потолком"]
+			report.style_tricks = ["Ловкая подача"]
 	var correct := served_in_dish(dish)
 	report.criteria.append({"label": "Подходящая посуда: " + ("✓" if correct else "×"), "value": 1.0 if correct else 0.0})
 	if report.present and not correct:
@@ -660,10 +666,10 @@ func held_center() -> Vector3:
 
 func mouth_opening() -> float:
 	if not guest_serving.active: return 0
-	return clampf(1.0-held_center().distance_to(GUEST_MOUTH)/1.0,0,1)
+	return clampf(1.0-held_center().distance_to(GUEST_MOUTH)/1.5,0,1)
 
 func can_feed() -> bool:
-	return guest_serving.active and not held.is_empty() and held_center().distance_to(GUEST_MOUTH) <= 0.60
+	return guest_serving.active and not held.is_empty() and held_center().distance_to(GUEST_MOUTH) <= 0.95
 
 func food_candidate(kind: String, index: int, location: String, utensil: bool) -> Dictionary:
 	var entry: Dictionary = (potatoes if kind == "potato" else sausages)[index]
@@ -715,3 +721,18 @@ func serving_candidates(kind: String) -> Array:
 func preview_candidate(kind: String) -> Dictionary:
 	if kind == "wine": return {"present":true,"ml":filled,"utensil":item_available("cup")}
 	return food_candidate(kind,potato_index if kind == "potato" else sausage_index,"в работе",false)
+
+func ramp_landing() -> Vector2:
+	# Predicted crossing of table height. Fixed simulation steps match the flight integrator.
+	var point := Vector2(RAMP_X,RAMP_END)
+	var height := ramp_height(RAMP_END)
+	var speed := -6.6
+	if sausage_launched and sausage_state=="falling":
+		point=sausage; height=BASE_Y+float(elevations.sausage); speed=sausage_fall_speed
+	var velocity := sausage_velocity if sausage_launched else ramp_velocity
+	for i in range(240):
+		speed+=7.2/60.0
+		height-=speed/60.0
+		point+=velocity/60.0
+		if speed>0 and height<=BASE_Y+0.035: break
+	return point.clamp(-BOUNDS,BOUNDS)

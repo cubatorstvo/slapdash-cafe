@@ -88,10 +88,11 @@ func run() -> void:
 	var first=game.service.by_id(1)
 	check(first.equipment.is_empty() and first.manual_station and game.service.progress.stars==0,"New run starts bare and manual")
 	check(not game.shop.order("counter",0).is_empty(),"No early clone")
+	game.service.progress.cash=100
 	delivery("sauce",1)
-	check("sauce" in first.equipment and game.service.progress.cash==12,"Physical purchase updates station and cash")
+	check("sauce" in first.equipment and game.service.progress.cash==76,"Physical purchase updates station and cash")
 	delivery("plates",1)
-	check(game.service.progress.cash==2 and "plates" in first.model.equipment,"Second upgrade opens plating")
+	check(game.service.progress.cash==46 and "plates" in first.model.equipment,"Second upgrade opens plating")
 	game.service.progress.cash=500
 	delivery("lab_0")
 	check(game.service.progress.lab_stage==1,"Lab part physically installed")

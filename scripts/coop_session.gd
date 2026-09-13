@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-shop-12"
+const PROTOCOL := "slapdash-cafe-crew-13"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -209,15 +209,26 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender, error)
 		else: game.save_cafe()
 		return
-	if action in ["buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
+	if action == "create_clone":
+		var pos: Vector3 = game.player.global_position if sender==1 else Vector3.INF
+		var raw: Array=player_poses.get(sender,{}).get("position",[])
+		if sender!=1 and raw.size()==3: pos=Vector3(raw[0],raw[1],raw[2])
+		if pos.z<6.5 or absf(pos.x)>2.9 or pos.distance_to(Vector3(0,1.5,8.35))>4: return
+		var error: String=game.service.create_clone()
+		if not error.is_empty(): message_to(sender,error)
+		else: game.save_cafe()
+		return
+	if action in ["buy_bundle", "buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
 			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
 			return
-		if action in ["buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
+		if action in ["buy_bundle","buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
 			message_to(sender,"Подойди к компьютеру кафе.")
 			return
 		var error := ""
 		match action:
+			"buy_bundle":
+				if value.get("items") is Array: error=game.shop.order_bundle(value.items,int(value.get("station",0)))
 			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)))
 			"banquet": error = game.service.start_banquet(sender)
 			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
@@ -402,6 +413,7 @@ func _world(packet: PackedByteArray) -> void:
 		ids.append(entry.id)
 		var station: Node3D = game.service.by_id(entry.id)
 		if station == null: station = game.service.add_station(entry.type, int(entry.slot), entry.get("manual", false))
+		station.staffed = int(entry.get("staffed",station.role_count()))
 		station.manual_station = entry.get("manual", false)
 		station.equipment = entry.get("equipment",station.equipment).duplicate()
 		station.apply_equipment()

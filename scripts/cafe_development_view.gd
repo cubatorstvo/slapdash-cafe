@@ -53,6 +53,9 @@ func build(root_game: Node3D) -> void:
 		for i in range(4):
 			var leaf := Props.ball(plants, 0.3, Vector3(x + sin(i*1.7)*0.3, 0.95+i*0.20, 8.8), Color("84ad78"))
 			leaf.scale = Vector3(0.7, 1.8, 0.65)
+	for spec in [[Vector3(0.16,3.4,4),Vector3(-3,1.7,8.4)],[Vector3(0.16,3.4,4),Vector3(3,1.7,8.4)],[Vector3(2,3.4,0.16),Vector3(-2,1.7,6.4)],[Vector3(2,3.4,0.16),Vector3(2,1.7,6.4)],[Vector3(2,0.5,0.16),Vector3(0,3.15,6.4)]]:
+		Props.solid_box(self,spec[0],spec[1],Color("405b58"))
+	Props.text(self,"ЛАБОРАТОРИЯ",Vector3(0,2.7,6.25),25,Color("edd09d")).billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	build_night()
 	refresh()
 

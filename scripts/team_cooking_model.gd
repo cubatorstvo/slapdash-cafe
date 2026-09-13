@@ -356,8 +356,8 @@ func held_center(role: int) -> Vector3:
 	return Vector3(positions[item].x,BASE_Y+heights[item]+(0.25 if item in vessels else 0.1),positions[item].y)
 func mouth_opening() -> float:
 	if not guest_active: return 0
-	return maxf(clampf(1-held_center(0).distance_to(GUEST_MOUTH),0,1),clampf(1-held_center(1).distance_to(GUEST_MOUTH),0,1))
-func can_feed(role := 0) -> bool: return guest_active and not hands[role].is_empty() and held_center(role).distance_to(GUEST_MOUTH)<=0.6
+	return maxf(clampf(1-held_center(0).distance_to(GUEST_MOUTH)/1.5,0,1),clampf(1-held_center(1).distance_to(GUEST_MOUTH)/1.5,0,1))
+func can_feed(role := 0) -> bool: return guest_active and not hands[role].is_empty() and held_center(role).distance_to(GUEST_MOUTH)<=0.95
 func guest_drunk() -> float: return guest_roles[0].drunk+guest_roles[1].drunk
 func guest_chewing() -> float: return maxf(guest_roles[0].chew,guest_roles[1].chew)
 func consume_pasta(food: float, salt_amount: float, liquid_amount: float) -> void:

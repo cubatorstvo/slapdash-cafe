@@ -169,7 +169,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not recording and shop.computer_hit(camera):
 					office.open()
 					return
-				if recording and (station.model.can_feed() if station.type_id == "counter" else station.model.can_feed(local_role)):
+				if recording and feed_target(station):
 					session.send_input(station,{}, {"feed":true})
 					return
 				if recording and station.bell_hit(camera):
@@ -367,7 +367,7 @@ func refresh_hud() -> void:
 		hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 	hud.progress.value = 100 if station.model.success() else 0
 	if local_role >= 0 and station.training.phase == "recording":
-		if station.model.can_feed() if station.type_id == "counter" else station.model.can_feed(local_role):
+		if feed_target(station):
 			hud.prompt.text = "(E) Скормить"
 			return
 		if station.bell_hit(camera):
@@ -489,3 +489,11 @@ func interaction_target() -> Dictionary:
 		if not target.is_empty(): return target
 	var night: Dictionary = development.night_target(camera)
 	return night if night.get("action", "") == "next_day" else {}
+
+func feed_target(station: Node3D) -> bool:
+	if not (station.model.can_feed() if station.type_id=="counter" else station.model.can_feed(local_role)): return false
+	var mouth: Vector3=station.to_global(station.model.GUEST_MOUTH)
+	var direction := -camera.global_basis.z
+	var offset := mouth-camera.global_position
+	var along := offset.dot(direction)
+	return along>0 and (camera.global_position+direction*along).distance_to(mouth)<0.55

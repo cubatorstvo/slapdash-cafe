@@ -13,13 +13,16 @@ func check(value: bool, title: String) -> void:
 		printerr("FAIL: ", title)
 
 func ready_food(model, dish: String) -> void:
+	var order: Dictionary=model.chef_order.duplicate(true)
 	model.reset(dish)
+	model.chef_order=order
 	if dish == "wine":
 		model.cup = model.Layout.TRAY
 		model.elevations.cup = model.Layout.TRAY_Y - model.BASE_Y
-		model.filled = 225.0
-		model.wine = 775.0
+		model.filled = (float(order.get("min_ml",200))+float(order.get("max_ml",250)))/2
+		model.wine = 1000-model.filled
 	else:
+		model.held = ""
 		model.plates[0].point = model.Layout.TRAY
 		model.elevations.plate_0 = model.Layout.TRAY_Y - model.BASE_Y
 		if dish == "potato":
@@ -28,9 +31,12 @@ func ready_food(model, dish: String) -> void:
 			model.potato_state = "plate_0"
 		else:
 			model.sausage = model.Layout.TRAY
-			model.sausage_coating = 1.0
+			model.sausage_coating = (float(order.get("coat_min",0.9))+float(order.get("coat_max",1)))/2
 			model.sausage_state = "plate_0"
 		model.elevations[dish] = model.Layout.TRAY_Y - model.BASE_Y + 0.035
+	if dish=="sausage" and int(order.get("portions",1))==2:
+		model._store_food("sausage")
+		model.sausages[1]=model.sausages[0].duplicate(true)
 	check(model.quality().grade == "S", "Prepared fixture " + dish)
 
 func teach(station: Node3D, dish: String) -> void:
@@ -129,6 +135,7 @@ func run() -> void:
 		first.training.finish_pass(true)
 	check(p.stars == 1 and p.phase == "won" and first.recipes.is_empty(), "First star unlocks clones, personal counter stays manual")
 	buy_install("counter")
+	check(service.create_clone().is_empty(),"Create clone in repaired lab")
 	var brigade = service.by_id(2)
 	brigade.equipment=first.equipment.duplicate()
 	brigade.apply_equipment()
@@ -160,12 +167,14 @@ func run() -> void:
 	var peak := 0.0
 	var caught := false
 	for i in range(240):
+		model.held = "plate_0"
 		model.plates[0].point = model.sausage
 		model.elevations.plate_0 = 1.0 - model.BASE_Y
 		model.step(DT, false, true, false)
 		peak = maxf(peak, model.BASE_Y + float(model.elevations.sausage))
 		if model.sausage_state == "plate_0": caught = true; break
 	check(caught and peak >= 2.8 and model.sausage_coating >= 0.9 and model.sausage_showy, "High launch coats and is caught on plate")
+	model.held = ""
 	model.plates[0].point = model.Layout.TRAY
 	model.elevations.plate_0 = model.Layout.TRAY_Y - model.BASE_Y
 	model._sync_carried_food()
@@ -209,16 +218,26 @@ func run() -> void:
 	p = service.progress
 	p.cash = 1000
 	buy_install("counter")
+	check(service.create_clone().is_empty(),"Staff second brigade")
 	buy_install("plants")
 	check(service.next_day().is_empty() and p.can_attempt(service.stations, service.served), "Second-star milestone follows clone training")
 	check(service.start_banquet(1).is_empty(), "Start second-star inspection")
 	service.advance(DT)
 	first = service.by_id(1)
-	check(p.phase == "showcase" and first.training.start_pass([1]), "Personal cooking remains part of later banquet")
-	ready_food(first.model, "potato")
-	first.training.advance(DT)
-	first.training.finish_pass(true)
-	await ticks(60 * 180)
+	check(p.phase == "service" and not first.training.active(), "Delegation starts directly without inspector")
+	var chef_count := 0
+	for i in range(60*200):
+		service.advance(DT)
+		if first.state=="waiting" and not first.training.active():
+			var dish: String=service.manual_order(first)
+			if not dish.is_empty():
+				check(service.request_manual(first,dish,1),"Chef accepts delegation guest")
+				ready_food(first.model,dish)
+				first.training.advance(DT); first.training.finish_pass(true)
+				chef_count+=1
+		if i%120==0: await process_frame
+		if p.phase=="won": break
+	check(chef_count==3,"Three individual orders inside delegation")
 	check(p.stars == 2 and p.phase == "won", "Later brigade banquet still awards second star")
 	for tab in ["overview", "stations", "decor", "star", "night"]:
 		game.office.open(tab)

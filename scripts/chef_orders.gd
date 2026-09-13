@@ -70,7 +70,7 @@ static func evaluate(model) -> Dictionary:
 		chosen.score = portion.score
 		chosen.criteria.append({"label": "Порции: %d/%d" % [mini(needed,graded.size()),needed], "value": minf(1,float(graded.size())/needed)})
 	for i in range(mini(needed,graded.size())):
-		if graded[i].candidate.get("showy",false): chosen.style_count = 1; chosen.style_multiplier = 1.2; chosen.style_tricks = ["Еда под потолком"]
+		if graded[i].candidate.get("showy",false): chosen.style_count = 1; chosen.style_multiplier = 1.2; chosen.style_tricks = ["Ловкая подача"]
 	var preview: Dictionary = chosen if chosen.present else grade_candidate(model.preview_candidate(model.dish),model.dish,order,waste)
 	var lines: Array = []
 	for criterion in preview.criteria: lines.append(criterion.label)

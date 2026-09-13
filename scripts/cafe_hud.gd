@@ -154,7 +154,7 @@ func show_production_recipe(report: Dictionary, dish: String, duration: float) -
 	grade.mouse_filter = Control.MOUSE_FILTER_STOP
 	_label(recipe_content, "Запись клона · %.1f с" % duration if duration>0 else "Текущий заказ · "+str(report.get("order",{}).get("title","Стандартный рецепт")), 14, CafeStyle.GOLD)
 	if report.get("style_count", 0) > 0:
-		_label(recipe_content, "Еда под потолком · +20%", 15, CafeStyle.GOLD)
+		_label(recipe_content, "Ловкая подача · +20%", 15, CafeStyle.GOLD)
 	for component in report.get("components", []):
 		_label(recipe_content, ("✓  " if component.served else "○  ") + component.name, 18, CafeStyle.MINT if component.served else CafeStyle.CREAM)
 		for line in component.lines:

@@ -1,17 +1,17 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const ITEMS := {
-	"meat_kit": {"name":"Гриль, тарелка и приборы для мяса","price":40,"kind":"equipment","star":2},
-	"pasta_kit": {"name":"Плита, кастрюля и приборы для макарон","price":40,"kind":"equipment","star":2},
-	"sauce": {"name":"Миска соуса","price":8,"kind":"equipment"},
-	"plates": {"name":"Три тарелки","price":10,"kind":"equipment"},
-	"cup": {"name":"Бокал 300 мл","price":10,"kind":"equipment"},
-	"pan": {"name":"Дырявая сковорода с горелкой","price":18,"kind":"equipment"},
-	"jug": {"name":"Кувшин для вина","price":18,"kind":"equipment"},
-	"rag": {"name":"Тряпка","price":4,"kind":"equipment"},
+	"meat_kit": {"name":"Гриль, тарелка и приборы для мяса","price":120,"kind":"equipment","star":2},
+	"pasta_kit": {"name":"Плита, кастрюля и приборы для макарон","price":120,"kind":"equipment","star":2},
+	"sauce": {"name":"Миска соуса","price":24,"kind":"equipment"},
+	"plates": {"name":"Три тарелки","price":30,"kind":"equipment"},
+	"cup": {"name":"Бокал 300 мл","price":30,"kind":"equipment"},
+	"pan": {"name":"Дырявая сковорода с горелкой","price":54,"kind":"equipment"},
+	"jug": {"name":"Кувшин для вина","price":54,"kind":"equipment"},
+	"rag": {"name":"Тряпка","price":12,"kind":"equipment"},
 	"sauce_ramp": {"name":"Соусный трамплин","price":75,"kind":"equipment","star":1},
-	"counter": {"name":"Стол, шкафчик и повар","price":120,"kind":"station","star":1},
-	"kitchen": {"name":"Парная кухня с бригадой","price":250,"kind":"station","star":2},
+	"counter": {"name":"Стол и шкафчик","price":120,"kind":"station","star":1},
+	"kitchen": {"name":"Парная кухня","price":250,"kind":"station","star":2},
 	"lab_0": {"name":"Лабораторная колба","price":40,"kind":"lab"},
 	"lab_1": {"name":"Блок питания лаборатории","price":60,"kind":"lab"},
 	"lab_2": {"name":"Стабилизатор клонирования","price":80,"kind":"lab"},
@@ -38,7 +38,8 @@ func setup(owner_game: Node3D) -> void:
 	# A visible computer replaces the abstract cafe board.
 	computer = Node3D.new()
 	add_child(computer)
-	computer.position = Vector3(-1.8,0,6.8)
+	computer.position = Vector3(-10.7,0,-4.6)
+	computer.rotation.y=PI/2
 	Props.solid_box(computer,Vector3(1.65,0.12,0.9),Vector3(0,0.86,0),Color("99765b"))
 	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
 	Props.box(computer,Vector3(0.95,0.65,0.2),Vector3(0,1.3,-0.15),Color("d8c9a3"))
@@ -70,7 +71,7 @@ func log_event(kind: String, data := {}) -> void:
 
 func pending(item: String, station_id: int) -> bool:
 	for box in game.service.progress.deliveries:
-		if box.item == item and box.station == station_id: return true
+		if item in box.get("items",[box.item]) and box.station == station_id: return true
 	return false
 
 func order(item: String, station_id: int) -> String:
@@ -145,12 +146,13 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 	if id >= 0:
 		var parcel := parcel_by_id(id)
 		var point := installation_position(parcel)
-		if near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+ITEMS[parcel.item].name}
-		return {"action":"drop_parcel","id":id,"hint":"В руках: "+ITEMS[parcel.item].name+" · (E) Поставить коробку"}
+		if near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}
+		return {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}
+	if camera.global_position.z>6.5 and absf(camera.global_position.x)<2.9 and near_ray(camera,Vector3(0,1.5,8.35),0.65): return {"action":"create_clone","hint":"(E) Создать клона · 60 · свободно %d"%game.service.progress.free_clones}
 	for parcel in game.service.progress.deliveries:
 		if parcel.remaining <= 0 and parcel.owner == 0:
 			var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
-			if near_ray(camera,at,0.4): return {"action":"take_parcel","id":parcel.id,"hint":"(E) Взять: "+ITEMS[parcel.item].name}
+			if near_ray(camera,at,0.4): return {"action":"take_parcel","id":parcel.id,"hint":"(E) Взять: "+parcel_name(parcel)}
 	var p = game.service.progress
 	if p.garland_owned:
 		for index in range(p.garland_points.size()):
@@ -223,8 +225,10 @@ func action(peer: int, data: Dictionary) -> String:
 		if spec.kind == "equipment":
 			var station = game.service.by_id(parcel.station)
 			if station.state not in ["idle","waiting"]: return "Дождись свободной станции."
-			if parcel.item=="sauce_ramp": station.upgrades.append(parcel.item); station.apply_upgrades()
-			else: station.equipment.append(parcel.item); station.apply_equipment()
+			for item in parcel.get("items",[parcel.item]):
+				if item=="sauce_ramp": station.upgrades.append(item)
+				elif item not in station.equipment: station.equipment.append(item)
+			station.apply_equipment(); station.apply_upgrades()
 		elif spec.kind == "station": game.service.add_station(parcel.item,parcel.station-1,false,true)
 		elif spec.kind == "lab":
 			var index := int(str(parcel.item).get_slice("_",1))
@@ -245,7 +249,7 @@ func advance(delta: float) -> void:
 			if parcel.remaining==0:
 				truck_age=5
 				game.service.progress.revision+=1
-				game.service.announce("Доставка у входа: "+ITEMS[parcel.item].name)
+				game.service.announce("Доставка у входа: "+parcel_name(parcel))
 				log_event("delivery_arrived",{"item":parcel.item})
 
 func _process(delta: float) -> void:
@@ -261,7 +265,7 @@ func _process(delta: float) -> void:
 			var box := Node3D.new(); add_child(box)
 			Props.box(box,Vector3(0.52,0.5,0.48),Vector3.ZERO,Color("b28a59"))
 			Props.box(box,Vector3(0.09,0.51,0.49),Vector3.ZERO,Color("d4be91"))
-			var label := Props.text(box,ITEMS[parcel.item].name,Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+			var label := Props.text(box,parcel_name(parcel),Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 			boxes[parcel.id]=box
 		var node: Node3D = boxes[parcel.id]
 		node.visible=parcel.remaining<=0
@@ -292,3 +296,40 @@ func _process(delta: float) -> void:
 	truck_age=maxf(0,truck_age-delta)
 	truck.visible=truck_age>0
 	truck.position=Vector3(-10.8,0,2.5+(5-truck_age)*0.8)
+
+func parcel_name(parcel: Dictionary) -> String:
+	var names: PackedStringArray=[]
+	for item in parcel.get("items",[parcel.item]): names.append(ITEMS[item].name)
+	return "Комплект · станция %d · %d предметов"%[parcel.station,names.size()] if names.size()>1 else " + ".join(names)
+
+func order_bundle(items: Array, station_id: int) -> String:
+	var p=game.service.progress
+	var station=game.service.by_id(station_id)
+	if p.stars<1 or station==null or items.is_empty(): return "Комплекты доступны с первой звезды."
+	var unique: Array=[]
+	var total := 0
+	for item in items:
+		if not item is String or item in unique or not ITEMS.has(item): return "Проверь состав заказа."
+		var spec: Dictionary=ITEMS[item]
+		if spec.kind!="equipment" or item in station.equipment or item in station.upgrades or pending(item,station_id): return "Предмет уже куплен или заказан."
+		if ((item in ["meat_kit","pasta_kit"]) != (station.type_id=="kitchen")) or p.stars<int(spec.get("star",0)): return "Этот предмет недоступен станции."
+		unique.append(item); total+=int(spec.price)
+	if p.cash<total: return "Не хватает денег на комплект."
+	var error := order(unique[0],station_id)
+	if not error.is_empty(): return error
+	p.cash-=total-int(ITEMS[unique[0]].price)
+	p.deliveries.back().items=unique
+	log_event("bundle_ordered",{"station":station_id,"items":unique,"price":total})
+	return ""
+
+func reward_sauce() -> void:
+	var p=game.service.progress
+	if p.starter_reward: return
+	p.starter_reward=true
+	var station=game.service.by_id(1)
+	if "sauce" in station.equipment or pending("sauce",1): p.cash+=24
+	else:
+		var id: int=p.next_delivery_id; p.next_delivery_id+=1
+		p.deliveries.append({"id":id,"item":"sauce","station":1,"remaining":8.0,"owner":0,"position":[-10.1,0.3,4.8]})
+	game.service.announce("Первый гость обслужен! Подарок: соус для твоей стойки. Доставка у входа.")
+	p.revision+=1

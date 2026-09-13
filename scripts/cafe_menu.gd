@@ -116,12 +116,17 @@ func rebuild() -> void:
 func show_station(station: Node3D) -> void:
 	selected_station = station.station_id
 	rebuild()
+	if not station.ready_crew():
+		_label(training_box,"Нет бригады: %d/%d. Создай клонов в лаборатории."%[station.staffed,station.role_count()],22)
+		_button(training_box,"Вернуться",close)
+		panel.show(); Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+		return
 	var run = station.training
 	var showcase: bool = game.service.is_showcase(station)
 	_label(training_box, "СТАНЦИЯ %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title], 23)
 	var names := PackedStringArray()
 	for member in station.crew: names.append(member.name)
-	if not station.manual_station: _label(training_box, "Бригада: " + ", ".join(names), 16)
+	if not station.manual_station: _label(training_box, "Бригада: " + ", ".join(names) if station.ready_crew() else "Нужны клоны: %d/%d · создай в лаборатории"%[station.staffed,station.role_count()], 16)
 	if station.manual_station and not run.active():
 		var dish: String = game.service.manual_order(station)
 		_label(training_box, "Твоя стойка · готовь лично", 23)
@@ -154,7 +159,7 @@ func show_station(station: Node3D) -> void:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()
 		_label(training_box, "Качество блюда: %s" % report.grade, 17)
-		if report.get("style_count", 0) > 0: _label(training_box, "Еда под потолком · эффектность +20%", 17)
+		if report.get("style_count", 0) > 0: _label(training_box, "Ловкая подача · эффектность +20%", 17)
 		if run.phase == "review":
 			var details := PackedStringArray()
 			for criterion in report.criteria: details.append(criterion.label)

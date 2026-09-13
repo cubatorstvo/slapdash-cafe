@@ -15,6 +15,7 @@ var bell_cap: Node3D
 var bell_flash := 0.0
 var equipment: Array = ["jug","cup","plates","pan","sauce","rag","meat_kit","pasta_kit"]
 var customer_order := {}
+var staffed := -1
 var manual_station := false
 var station_id := 1
 var slot_index := 0
@@ -45,6 +46,8 @@ var student_paths: Array = []
 var walls: Array = []
 var was_resting := true
 var upgrade_view: Node3D
+
+func ready_crew() -> bool: return manual_station or staffed < 0 or staffed >= role_count()
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
@@ -232,6 +235,16 @@ func refresh(local_peer: int, delta: float) -> void:
 		for student in students: student.hide()
 		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
 		view.station_label.text = "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
+	if not manual_station: view.station_label.text="СТАНЦИЯ %d · [E] ПОКАЖИ КАК"%station_id
+	if not manual_station and staffed>=0:
+		for role in range(role_count()):
+			if role>=staffed:
+				students[role].hide()
+				if type_id=="kitchen": view.actors[role].hide()
+		if not ready_crew():
+			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
+			if type_id=="counter":
+				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
 	if is_instance_valid(taster): direct_attention(taster)
 
 func direct_attention(person: Node3D) -> void:
@@ -260,7 +273,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
+	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()

@@ -19,6 +19,8 @@ const BANQUET_SERVED := 8
 const BANQUET_GOOD := 6
 const SHIFT_SECONDS := 480.0
 const LAB_PRICES := [40, 60, 80]
+var free_clones := 0
+var starter_reward := false
 var deliveries: Array = []
 var next_delivery_id := 1
 var garland_owned := false
@@ -83,7 +85,7 @@ func star_requirements(stations: Array, served: int) -> Array:
 	return [
 		{"text": "Популярность: %d / %d" % [popularity, STAR_POPULARITY], "done": popularity >= STAR_POPULARITY},
 		{"text": "Обслужено гостей: %d / %d" % [served, REQUIRED_SERVED], "done": served >= REQUIRED_SERVED},
-		{"text": "Две бригады: %d / 2" % mini(stations.filter(func(s): return not s.manual_station).size(), 2), "done": stations.filter(func(s): return not s.manual_station).size() >= 2},
+		{"text": "Две бригады: %d / 2" % mini(stations.filter(func(s): return not s.manual_station and s.ready_crew()).size(), 2), "done": stations.filter(func(s): return not s.manual_station and s.ready_crew()).size() >= 2},
 		{"text": "Три блюда с записью B или лучше: %d / 3" % ready.size(), "done": ready.size() == 3}
 	]
 
@@ -98,8 +100,9 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 	if shift == "night": return "Ночь · лаборатория %d/3 · следующий день у двери отдыха" % lab_stage if stars == 0 else "Ночь · обустрой кафе или отдохни до утра"
 	if shift == "closing": return "Заканчиваем последние заказы · затем ночной перерыв"
 	if stars == 0:
+		if not starter_reward: return "Первый гость → соус в подарок · открой кафе у компьютера"
 		if can_attempt(stations, served): return "Всё готово · пригласи дегустатора у компьютера"
-		return "Открой кафе · начни с личных заказов" if not opened else "Гости %d/15 · лаборатория %d/3 · оборудование в компьютере" % [manual_served, lab_stage]
+		return "Открой кафе · покупки у компьютера" if not opened else "Гости %d/15 · лаборатория %d/3 · оборудование в компьютере" % [manual_served, lab_stage]
 
 	if phase == "preparing": return "Банкет · завершаем обычные заказы"
 	if phase == "showcase": return "Инспектор · приготовь картофель на B или лучше"
@@ -117,7 +120,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
