@@ -130,39 +130,17 @@ func _ready() -> void:
 	resume.pressed.connect(func(): resume_requested.emit())
 	pause_panel.hide()
 
-func show_recipe(report: Dictionary, dish: String) -> void:
-	show_production_recipe(report, dish, 0.0)
-
-func show_production_recipe(report: Dictionary, dish: String, duration: float) -> void:
-	recipe_panel.show()
-	var stamp := "%s:%s:%.3f" % [dish, JSON.stringify([report.get("components",[]),report.grade,report.get("style_count",0),report.get("order",{})]), duration]
-	if stamp == recipe_stamp: return
-	recipe_stamp = stamp
+func show_chef_request(order: Dictionary) -> void:
+	var text: String = preload("res://scripts/chef_orders.gd").special_request(order)
+	recipe_panel.visible = not text.is_empty()
+	if text.is_empty() or text == recipe_stamp: return
+	recipe_stamp = text
 	for child in recipe_content.get_children(): recipe_content.remove_child(child); child.queue_free()
-	var heading := HBoxContainer.new()
-	recipe_content.add_child(heading)
-	var icon := TextureRect.new()
-	heading.add_child(icon)
-	icon.texture = Data.ICONS[dish]
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.custom_minimum_size = Vector2(42,42)
-	var name := _label(heading, Data.title(dish), 14, CafeStyle.GOLD)
-	name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var grade := _label(heading, str(report.get("grade", "")), 30, CafeStyle.MINT if str(report.get("grade", "")) in ["S","A"] else CafeStyle.GOLD)
-	grade.tooltip_text = "Оценка лучшей поданной или съеденной порции"
-	grade.mouse_filter = Control.MOUSE_FILTER_STOP
-	_label(recipe_content, "Запись клона · %.1f с" % duration if duration>0 else "Текущий заказ · "+str(report.get("order",{}).get("title","Стандартный рецепт")), 14, CafeStyle.GOLD)
-	if report.get("style_count", 0) > 0:
-		_label(recipe_content, "Ловкая подача · +20%", 15, CafeStyle.GOLD)
-	for component in report.get("components", []):
-		_label(recipe_content, ("✓  " if component.served else "○  ") + component.name, 18, CafeStyle.MINT if component.served else CafeStyle.CREAM)
-		for line in component.lines:
-			var detail := _label(recipe_content, str(line), 14, Color("c5d2c8"))
-			detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			detail.custom_minimum_size.x = 268
-		_label(recipe_content, "", 2)
-	recipe_scroll.custom_minimum_size.y = mini(recipe_content.get_combined_minimum_size().y + 8, 360)
+	_label(recipe_content, "Пожелание гостя", 14, CafeStyle.GOLD)
+	var label := _label(recipe_content, text, 19)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.custom_minimum_size.x = 268
+	recipe_scroll.custom_minimum_size.y = 90
 
 func recipe_panel_text() -> String:
 	var parts: PackedStringArray = PackedStringArray()

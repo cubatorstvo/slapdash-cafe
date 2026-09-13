@@ -112,6 +112,7 @@ func _ready() -> void:
 	reset_model()
 
 func apply_equipment() -> void:
+	if type_id == "counter" and "rag" not in equipment: equipment.append("rag")
 	model.equipment = equipment.duplicate()
 
 func reset_model() -> void:

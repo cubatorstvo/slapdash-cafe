@@ -127,7 +127,7 @@ func rebuild() -> void:
 			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
 			for station in service.stations:
 				label(content,"ТВОЯ СТОЙКА" if station.manual_station else "СТАНЦИЯ %d" % station.station_id,20)
-				var catalog: Array = ["sauce","plates","cup","pan","jug","rag","sauce_ramp"] if station.type_id == "counter" else ["meat_kit","pasta_kit"]
+				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id == "counter" else ["meat_kit","pasta_kit"]
 				if progress.stars<1:
 					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
 				else: bundle_controls(station,catalog)

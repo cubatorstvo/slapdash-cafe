@@ -8,7 +8,6 @@ const ITEMS := {
 	"cup": {"name":"Бокал 300 мл","price":30,"kind":"equipment"},
 	"pan": {"name":"Дырявая сковорода с горелкой","price":54,"kind":"equipment"},
 	"jug": {"name":"Кувшин для вина","price":54,"kind":"equipment"},
-	"rag": {"name":"Тряпка","price":12,"kind":"equipment"},
 	"sauce_ramp": {"name":"Соусный трамплин","price":75,"kind":"equipment","star":1},
 	"counter": {"name":"Стол и шкафчик","price":120,"kind":"station","star":1},
 	"kitchen": {"name":"Парная кухня","price":250,"kind":"station","star":2},
@@ -148,7 +147,9 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		var point := installation_position(parcel)
 		if near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}
 		return {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}
-	if camera.global_position.z>6.5 and absf(camera.global_position.x)<2.9 and near_ray(camera,Vector3(0,1.5,8.35),0.65): return {"action":"create_clone","hint":"(E) Создать клона · 60 · свободно %d"%game.service.progress.free_clones}
+	if is_instance_valid(game.laboratory):
+		var lab_target: Dictionary = game.laboratory.target(camera, peer)
+		if not lab_target.is_empty(): return lab_target
 	for parcel in game.service.progress.deliveries:
 		if parcel.remaining <= 0 and parcel.owner == 0:
 			var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])

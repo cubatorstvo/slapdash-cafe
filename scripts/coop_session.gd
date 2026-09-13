@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-crew-13"
+const PROTOCOL := "slapdash-cafe-lab-14"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -209,14 +209,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender, error)
 		else: game.save_cafe()
 		return
-	if action == "create_clone":
-		var pos: Vector3 = game.player.global_position if sender==1 else Vector3.INF
-		var raw: Array=player_poses.get(sender,{}).get("position",[])
-		if sender!=1 and raw.size()==3: pos=Vector3(raw[0],raw[1],raw[2])
-		if pos.z<6.5 or absf(pos.x)>2.9 or pos.distance_to(Vector3(0,1.5,8.35))>4: return
-		var error: String=game.service.create_clone()
+	if action == "lab_press":
+		var error: String = game.laboratory.press(sender, int(value.get("revision", -1)))
 		if not error.is_empty(): message_to(sender,error)
-		else: game.save_cafe()
 		return
 	if action in ["buy_bundle", "buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
@@ -395,7 +390,7 @@ func advance(delta: float) -> void:
 			customers.append({"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
+	var data := {"laboratory": game.laboratory.state.duplicate(true), "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -442,6 +437,7 @@ func _world(packet: PackedByteArray) -> void:
 	for key in ["served", "revenue", "missed"]: game.service.set(key, data[key])
 	game.service.open_for_business = data.open
 	game.service.progress.restore(data.progression, true)
+	game.laboratory.state = data.laboratory.duplicate(true)
 	ids.clear()
 	for entry in data.customers:
 		ids.append(entry.id)

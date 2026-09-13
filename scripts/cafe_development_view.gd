@@ -156,7 +156,8 @@ func night_action_position(action: String, data: Dictionary) -> Vector3:
 
 func refresh_night() -> void:
 	var p = game.service.progress
-	for i in range(lab_parts.size()): lab_parts[i].visible = i < p.lab_stage
+	for i in range(lab_parts.size()): lab_parts[i].visible = i < p.lab_stage and p.lab_stage < 3
+	lab_caption.visible = p.lab_stage < 3
 	var names := ["Колба", "Питание", "Стабилизатор"]
 	var schemes := [[0,1,2],[2,0,1],[1,2,0]]
 	lab_caption.text = "ЛАБОРАТОРИЯ ГОТОВА" if p.lab_stage >= 3 else "ЛАБОРАТОРИЯ · %d/3" % p.lab_stage

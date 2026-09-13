@@ -92,6 +92,7 @@ func _attach_customer(station: Node3D) -> void:
 
 func advance(delta: float) -> void:
 	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
+	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
 	autosave_clock += delta
@@ -137,7 +138,7 @@ func advance(delta: float) -> void:
 				station.reset_model()
 				customer.state = "cooking"
 			elif station.manual_station:
-				customer.view.caption.text = Definition.DISHES[customer.dish] + "\n" + str(station.customer_order.get("title","Твой заказ")) + " · [E] у стойки"
+				customer.view.caption.text = (preload("res://scripts/chef_orders.gd").special_request(station.customer_order) if not preload("res://scripts/chef_orders.gd").special_request(station.customer_order).is_empty() else Definition.DISHES[customer.dish]) + " · [E] у стойки"
 			else:
 				customer.wait += delta
 				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут твоего показа · [E]"
@@ -421,6 +422,15 @@ func load_data(data: Dictionary) -> bool:
 		if version<8: progress.starter_reward=progress.manual_served>0
 		progress.recover_deliveries()
 		if data.progression.get("phase", "none") in ["preparing", "showcase", "service", "tasting"]: open_for_business = progress.return_open
+	# A rag now belongs to every counter. Refund outstanding old rag deliveries.
+	for parcel in progress.deliveries.duplicate():
+		var items: Array = parcel.get("items", [parcel.item]).duplicate()
+		if "rag" not in items: continue
+		items.erase("rag")
+		progress.cash += 12
+		if items.is_empty(): progress.deliveries.erase(parcel)
+		else: parcel.item = items[0]; parcel.items = items
+	if game != null and is_instance_valid(game.laboratory): game.laboratory.reset()
 	assign_clones()
 	spawn_clock = progress.arrival_interval()
 	return true

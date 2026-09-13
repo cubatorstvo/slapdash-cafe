@@ -28,12 +28,24 @@ static func range_score(value: float, low: float, high: float) -> float:
 	if value <= high: return 1.0
 	return clampf(1.0 - (value - high) / maxf(0.05, high * 0.5), 0, 1)
 
-static func requirements(order: Dictionary) -> String:
-	match order.dish:
-		"wine": return "Вино: %.0f–%.0f мл · бережливость" % [order.min_ml, order.max_ml]
-		"potato": return "Картофель: обжарить %d сторон · тарелка" % order.faces
-		"sausage": return "Сосиски: %d шт. · соус %.0f–%.0f%% · тарелка" % [order.portions,order.coat_min*100,order.coat_max*100]
-	return ""
+# Only deviations from the cookbook belong on the order slip. Never live progress.
+static func special_request(order: Dictionary) -> String:
+	if order.is_empty(): return ""
+	var dish: String = order.get("dish", "")
+	var base := standard(dish)
+	var changes: PackedStringArray = []
+	match dish:
+		"wine":
+			if order.get("min_ml",200.0) != base.min_ml or order.get("max_ml",250.0) != base.max_ml:
+				changes.append(("только попробовать, " if float(order.min_ml) <= 80 else "") + "%.0f–%.0f мл" % [order.min_ml,order.max_ml])
+		"potato":
+			if order.get("faces",6) != base.faces: changes.append("%d стороны" % order.faces)
+		"sausage":
+			if order.get("portions",1) != base.portions: changes.append("двойная порция")
+			if order.get("coat_min",0.9) != base.coat_min or order.get("coat_max",1.0) != base.coat_max:
+				changes.append("соус %.0f–%.0f%%" % [order.coat_min*100,order.coat_max*100])
+	if changes.is_empty(): return ""
+	return {"wine":"Вино","potato":"Картошка жареная","sausage":"Сосиска в соусе"}.get(dish,dish) + " (" + ", ".join(changes) + ")"
 
 static func grade_candidate(candidate: Dictionary, dish: String, order: Dictionary, waste: float) -> Dictionary:
 	var criteria: Array = []

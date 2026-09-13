@@ -4,6 +4,7 @@ const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var laboratory: Node3D
 var shop: Node3D
 var telemetry: Node
 var daylight: DirectionalLight3D
@@ -83,6 +84,9 @@ func _ready() -> void:
 	shop = preload("res://scripts/cafe_shop.gd").new()
 	add_child(shop)
 	shop.setup(self)
+	laboratory = preload("res://scripts/clone_laboratory.gd").new()
+	add_child(laboratory)
+	laboratory.setup(self)
 	telemetry = preload("res://scripts/playtest_log.gd").new()
 	add_child(telemetry)
 	telemetry.begin(self)
@@ -348,16 +352,12 @@ func refresh_hud() -> void:
 		station = nearest_station()
 		if station != null:
 			if hud.prompt.text.is_empty() or hud.prompt.text == "B · Книга": hud.prompt.text = "(E) Личная стойка · приготовить" if station.manual_station else "[E] %s" % station.Definition.TYPES[station.type_id].title
-			if station.state == "cooking":
-				var record: Dictionary = station.recipes.get(station.order_dish, {})
-				if record.has("quality"):
-					hud.show_production_recipe(record.quality, station.order_dish, float(record.duration))
-					if not service.progress.busy(): hud.goal.text = station.Definition.DISHES[station.order_dish]
+			if station.manual_station and not service.manual_order(station).is_empty():
+				hud.show_chef_request(station.customer_order)
 		return
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
-	if station.type_id == "counter" and not station.model.chef_order.is_empty(): hud.goal.text += " · "+str(station.model.chef_order.title)
-	if local_role >= 0 and station.training.phase == "recording": hud.show_recipe(station.model.quality(),station.training.dish)
+	if station.manual_station and not service.manual_order(station).is_empty(): hud.show_chef_request(station.customer_order)
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	if service.progress.shift == "open" and not service.progress.busy():
 		hud.clock.text += " · закрытие через %d:%02d" % [ceili(maxf(0, service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))/60, ceili(maxf(0,service.Progression.SHIFT_SECONDS-service.progress.shift_elapsed))%60]
@@ -467,6 +467,7 @@ func _build_room() -> void:
 
 
 func new_cafe() -> void:
+	laboratory.reset()
 	service.clear_world()
 	service.progress = service.Progression.new()
 	service.served = 0
