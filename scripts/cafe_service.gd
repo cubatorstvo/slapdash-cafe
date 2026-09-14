@@ -108,8 +108,8 @@ func advance(delta: float) -> void:
 		station.training.advance(delta)
 		if station.state != "cooking": continue
 		var record: Dictionary = station.recipes[station.order_dish]
-		station.show_tracks(record.tracks, station.order_tick)
-		station.order_tick += 1
+		station.order_tick += delta * 60.0 * station.order_tempo
+		station.show_tracks(record.tracks, mini(int(station.order_tick), station.Run.duration_ticks(record.tracks)-1))
 		if station.type_id == "counter":
 			for customer in customers:
 				if customer.id == station.customer_id: customer.view.react(station.model.customer_reaction)
@@ -135,6 +135,7 @@ func advance(delta: float) -> void:
 				station.state = "cooking"
 				station.order_dish = customer.dish
 				station.order_tick = 0
+				station.order_tempo = station.crew_tempo()
 				station.reset_model()
 				customer.state = "cooking"
 			elif station.manual_station:
@@ -207,6 +208,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 		var payment := roundi((65 if customer.dish == "meal" else 25) * report.price_factor * report.style_multiplier * premium) if paid else 0
 		trace("customer_finished",{"dish":customer.dish,"station":station.station_id,"grade":report.grade,"payment":payment,"accepted":paid})
 		customer.state = "leaving"
+		customer.view.playback_speed = 1.0
 		customer.view.caption.text = "%s · +%d\nСпасибо!" % [report.grade, payment] if paid else "Загляну позже"
 		if paid and report.get("style_count", 0) > 0: customer.view.caption.text += "\nЛовкая подача · +20%"
 		customer.path = [Vector3(17.4, 0, 1.65)]
@@ -431,6 +433,7 @@ func load_data(data: Dictionary) -> bool:
 		if items.is_empty(): progress.deliveries.erase(parcel)
 		else: parcel.item = items[0]; parcel.items = items
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.reset()
+	normalize_workers()
 	assign_clones()
 	spawn_clock = progress.arrival_interval()
 	return true
@@ -589,22 +592,64 @@ static func valid_wall_point(point: Vector3) -> bool:
 func trace(kind: String, data := {}) -> void:
 	if game != null and is_instance_valid(game.telemetry): game.telemetry.event(kind,data)
 
+func normalize_workers() -> void:
+	while progress.free_workers.size() < progress.free_clones:
+		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0})
+		progress.next_clone_id+=1
+	for station in stations:
+		if station.manual_station: continue
+		for role in range(station.role_count() if station.staffed<0 else station.staffed):
+			var member: Dictionary = station.crew[role]
+			if not member.has("clone_id"):
+				member.clone_id=progress.next_clone_id; progress.next_clone_id+=1
+			member.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)
+	progress.free_clones=progress.free_workers.size()
+
 func assign_clones() -> void:
+	# Existing saves keep their workers at 100%; unassigned workers retain individual tempo.
+	normalize_workers()
 	for station in stations:
 		if station.manual_station or station.staffed<0: continue
-		var count := mini(progress.free_clones,station.role_count()-station.staffed)
-		if count>0:
-			station.staffed+=count
-			progress.free_clones-=count
+		while station.staffed<station.role_count():
+			var available := -1
+			for i in range(progress.free_workers.size()):
+				if game==null or not is_instance_valid(game.laboratory) or int(game.laboratory.state.get("clone_id",0))!=int(progress.free_workers[i].id): available=i; break
+			if available<0: break
+			var worker: Dictionary=progress.free_workers.pop_at(available)
+			station.crew[station.staffed].clone_id=worker.id
+			station.crew[station.staffed].tempo=worker.tempo
+			station.staffed+=1
 			progress.revision+=1
+	progress.free_clones=progress.free_workers.size()
 
-func create_clone() -> String:
+func clone_options() -> Array:
+	var options: Array=[]
+	for station in stations:
+		if station.manual_station: continue
+		for role in range(station.role_count() if station.staffed<0 else station.staffed):
+			var member: Dictionary=station.crew[role]
+			if not member.has("clone_id"): continue
+			options.append({"id":member.clone_id,"tempo":member.get("tempo",1.0),"station":station.station_id,"name":str(member.name)+" · станция %d"%station.station_id})
+	for worker in progress.free_workers: options.append({"id":worker.id,"tempo":worker.tempo,"station":0,"name":"Свободный клон №%d"%worker.id})
+	return options
+
+func clone_data(id: int) -> Dictionary:
+	for station in stations:
+		for member in station.crew:
+			if int(member.get("clone_id",0))==id and id>0: return member
+	for worker in progress.free_workers:
+		if int(worker.id)==id: return worker
+	return {}
+
+func create_clone(tempo := 1.0) -> String:
 	if progress.stars<1 or progress.lab_stage<3: return "Нужны готовая лаборатория и первая звезда."
 	if progress.cash<60: return "Ингредиенты клона стоят 60."
 	progress.cash-=60
-	progress.free_clones+=1
+	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0)})
+	progress.next_clone_id+=1
+	progress.free_clones=progress.free_workers.size()
 	assign_clones()
 	progress.revision+=1
-	trace("clone_created",{"free":progress.free_clones})
-	announce("Клон создан · свободно %d. Незанятые места заполняются автоматически."%progress.free_clones)
+	trace("clone_created",{"free":progress.free_clones,"tempo":tempo})
+	announce("Клон создан · темп %d%% · свободно %d"%[roundi(tempo*100),progress.free_clones])
 	return ""

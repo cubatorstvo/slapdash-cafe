@@ -160,6 +160,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			sync_mouse_mode()
 			return
 	if input_blocked(): return
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed and laboratory.state.phase not in ["idle","fill","done"] and int(laboratory.state.owner)==session.local_id():
+		var action: Dictionary=laboratory.target(camera,session.local_id())
+		if not action.is_empty(): session.request_action(action); return
 	var station := local_station()
 	var recording: bool = station != null and station.training.phase == "recording" and local_role >= 0
 	if event is InputEventKey and event.pressed and not event.echo:

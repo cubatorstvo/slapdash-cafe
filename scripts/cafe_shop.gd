@@ -1,6 +1,10 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const ITEMS := {
+	"lab_power": {"name":"Усилитель · темп 100–150%","price":180,"kind":"lab_upgrade","star":2},
+	"lab_power_2": {"name":"Турбоблок · темп 140–200%","price":320,"kind":"lab_upgrade","star":2},
+	"lab_valve": {"name":"Клапан · плавнее менять уровень","price":90,"kind":"lab_upgrade","star":1},
+	"lab_damper": {"name":"Демпфер · замедлить стрелку","price":120,"kind":"lab_upgrade","star":1},
 	"meat_kit": {"name":"Гриль, тарелка и приборы для мяса","price":120,"kind":"equipment","star":2},
 	"pasta_kit": {"name":"Плита, кастрюля и приборы для макарон","price":120,"kind":"equipment","star":2},
 	"sauce": {"name":"Миска соуса","price":24,"kind":"equipment"},
@@ -92,6 +96,11 @@ func order(item: String, station_id: int) -> String:
 			for id in [2,3]:
 				if game.service.by_id(id) == null and not pending("counter",id): station_id = id; break
 		if station_id == 0 or game.service.by_id(station_id) != null: return "Свободных мест нет."
+	elif spec.kind == "lab_upgrade":
+		station_id=0
+		if p.lab_stage<3: return "Сначала собери лабораторию."
+		if item in p.lab_upgrades: return "Прибор уже установлен."
+		if item=="lab_power_2" and "lab_power" not in p.lab_upgrades: return "Сначала установи усилитель."
 	elif spec.kind == "lab":
 		station_id = 0
 		if int(item.get_slice("_",1)) < p.lab_stage: return "Деталь уже установлена."
@@ -131,6 +140,7 @@ func installation_position(parcel: Dictionary) -> Vector3:
 		if station == null: return Vector3.INF
 		var places := {"meat_kit":Vector3(-1.4,1.1,-0.15),"pasta_kit":Vector3(1.4,1.1,-0.15),"pan":Vector3(-1.05,1.2,-0.1),"sauce":Vector3(0.3,1.09,-0.7),"plates":Vector3(1.3,0.55,1.38),"cup":Vector3(1.93,0.7,1.38),"rag":Vector3(1.88,1.05,0.86),"jug":Vector3(-2.6,1.65,1.1),"sauce_ramp":Vector3(2.65,1.2,0)}
 		return station.to_global(places[parcel.item])
+	if spec.kind == "lab_upgrade": return game.laboratory.upgrade_position(parcel.item)
 	if spec.kind == "lab": return lab_position(int(str(parcel.item).get_slice("_",1)))
 	if spec.kind == "garland": return Vector3(1.48,1.1,8.15)
 	return Vector3(-9.2,1.7,-7.1) if parcel.item == "sign" else Vector3(-7.5,0.7,8.8)
@@ -231,6 +241,9 @@ func action(peer: int, data: Dictionary) -> String:
 				elif item not in station.equipment: station.equipment.append(item)
 			station.apply_equipment(); station.apply_upgrades()
 		elif spec.kind == "station": game.service.add_station(parcel.item,parcel.station-1,false,true)
+		elif spec.kind == "lab_upgrade":
+			if game.laboratory.state.phase!="idle": return "Сначала заверши цикл лаборатории."
+			if parcel.item not in p.lab_upgrades: p.lab_upgrades.append(parcel.item)
 		elif spec.kind == "lab":
 			var index := int(str(parcel.item).get_slice("_",1))
 			if index!=p.lab_stage: return "Сначала установи предыдущую деталь лаборатории."

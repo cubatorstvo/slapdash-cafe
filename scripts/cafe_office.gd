@@ -137,6 +137,7 @@ func rebuild() -> void:
 			shop_button("kitchen",0,service.by_id(4)!=null)
 			label(content,"ЛАБОРАТОРИЯ",20)
 			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
+			for item in ["lab_power","lab_power_2","lab_valve","lab_damper"]: shop_button(item,0,item in progress.lab_upgrades)
 			label(content,"ОБУСТРОЙСТВО",20)
 			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
 		"deliveries":
@@ -161,8 +162,10 @@ func shop_button(item: String, station_id: int, installed := false) -> void:
 	var spec: Dictionary = game.shop.ITEMS[item]
 	var waiting: bool = game.shop.pending(item,station_id)
 	var gate: int = int(spec.get("star",0))
+	var prerequisite: bool = spec.kind!="lab_upgrade" or (p.lab_stage>=3 and (item!="lab_power_2" or "lab_power" in p.lab_upgrades))
 	var suffix := " · установлено" if installed else " · доставка заказана" if waiting else " · звезда %d"%gate if p.stars<gate else " · %d"%spec.price
-	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id}),not game.session.is_guest() and not installed and not waiting and p.stars>=gate and p.cash>=spec.price and not p.busy())
+	if not prerequisite: suffix=" · сначала лаборатория / усилитель"
+	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id}),not game.session.is_guest() and not installed and not waiting and prerequisite and p.stars>=gate and p.cash>=spec.price and not p.busy())
 
 func bundle_controls(station: Node3D, catalog: Array) -> void:
 	var id: int=station.station_id

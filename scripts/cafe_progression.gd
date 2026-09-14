@@ -20,6 +20,9 @@ const BANQUET_GOOD := 6
 const SHIFT_SECONDS := 480.0
 const LAB_PRICES := [40, 60, 80]
 var free_clones := 0
+var free_workers: Array = []
+var next_clone_id := 1
+var lab_upgrades: Array = []
 var starter_reward := false
 var deliveries: Array = []
 var next_delivery_id := 1
@@ -107,7 +110,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 	if phase == "preparing": return "Банкет · завершаем обычные заказы"
 	if phase == "showcase": return "Инспектор · приготовь картофель на B или лучше"
 	if phase == "service": return "Банкет · %d/%d гостей · %d/%d довольны" % [banquet_served, BANQUET_SERVED, banquet_good, BANQUET_GOOD]
-	if stars >= 2: return "Две звезды! Расширь зал и открой кухню на двоих"
+	if stars >= 2: return "Две звезды · парная кухня и усилители лаборатории доступны в магазине"
 	var known := 0
 	for station in stations: known += station.recipes.size()
 	if stations.size() == 1: return "Первая звезда · купи стойку с клонами за 120"
@@ -120,7 +123,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:

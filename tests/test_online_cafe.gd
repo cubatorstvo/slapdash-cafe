@@ -31,6 +31,10 @@ func setup() -> void:
 		game.shop.order("rag",1) # already installed: explicit rejection, no duplicate delivery
 		game.shop.order_bundle(["sauce_ramp"],1)
 		game.service.progress.free_clones=2
+		game.service.normalize_workers()
+		game.service.progress.free_workers[0].tempo=0.85
+		game.service.progress.lab_upgrades=["lab_valve"]
+		game.service.by_id(1).crew[0].tempo=1.25
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
 	game.session.add_child(barrier)
@@ -162,7 +166,8 @@ func guest_tick() -> void:
 	if stage == 0 and first.training.phase == "recording":
 		if first.model.guest_serving.drunk != 225 or first.model.item_available("cup"): return
 		if game.service.progress.deliveries.size()!=1 or game.service.progress.deliveries[0].get("items",[])!=["sauce_ramp"] or game.service.progress.free_clones!=2: fail("Bundle or free clones missing"); return
-		print("CHECK: consumed cup, guest volume and delivery replicated")
+		if game.service.progress.free_workers[0].tempo!=0.85 or first.crew[0].tempo!=1.25 or "lab_valve" not in game.service.progress.lab_upgrades: fail("Individual tempo or lab upgrades missing"); return
+		print("CHECK: individual tempo, laboratory upgrades, consumed cup and deliveries replicated")
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
 		stage = 1
 		quit_at = timer + 0.3

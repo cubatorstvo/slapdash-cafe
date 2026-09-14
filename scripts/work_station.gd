@@ -29,7 +29,8 @@ var view: Node3D
 var training = Run.new()
 var state := "idle"
 var order_dish := ""
-var order_tick := 0
+var order_tick := 0.0
+var order_tempo := 1.0
 var customer_id := -1
 var pending_teacher := 0
 var pending_dish := ""
@@ -47,7 +48,19 @@ var walls: Array = []
 var was_resting := true
 var upgrade_view: Node3D
 
-func ready_crew() -> bool: return manual_station or staffed < 0 or staffed >= role_count()
+func ready_crew() -> bool:
+	var game = get_parent().game if is_inside_tree() else null
+	if game != null and is_instance_valid(game.laboratory) and game.laboratory.reserves_station(station_id): return false
+	return manual_station or staffed < 0 or staffed >= role_count()
+
+func crew_tempo() -> float:
+	var slowest := 10.0
+	for member in crew: slowest = minf(slowest,float(member.get("tempo",1.0)))
+	return clampf(slowest,0.7,10.0)
+
+func crew_name(role: int) -> String:
+	return str(crew[role].name) + " · %d%%" % roundi(float(crew[role].get("tempo",1.0))*100)
+
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
@@ -73,7 +86,7 @@ func _ready() -> void:
 	for role in range(role_count()):
 		var student := Avatar.new()
 		add_child(student)
-		student.caption.text = crew[role].name
+		student.caption.text = crew_name(role)
 		student.hide()
 		students.append(student)
 		student_paths.append([])
@@ -194,12 +207,12 @@ func refresh(local_peer: int, delta: float) -> void:
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
 		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active and not resting
-		view.name_label.text = crew[0].name + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
+		view.name_label.text = crew_name(0) + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 	else:
 		view.status.visible = state == "cooking"
 		for role in range(role_count()):
 			view.actors[role].visible = (not active and not resting) or (performing and not role in training.live_roles)
-			view.actors[role].caption.text = crew[role].name + (" · дубль" if active else "")
+			view.actors[role].caption.text = crew_name(role) + (" · дубль" if active else "")
 	view.update_view(model, age, state != "cooking")
 	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
@@ -216,11 +229,11 @@ func refresh(local_peer: int, delta: float) -> void:
 					student.rotation.y = pose.yaw
 			elif age <= delta * 1.5: student.position = home
 			student.show()
-			student.caption.text = crew[role].name + ("\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
+			student.caption.text = crew_name(role) + ("\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 			student.idle(home, delta, age, station_id * 3 + role, float(Definition.TYPES[type_id].width) / 2.0 + 0.35)
 		else:
 			student.visible = active and (role in training.live_roles or training.phase == "ready")
-			student.caption.text = crew[role].name
+			student.caption.text = crew_name(role)
 		if student.visible and active:
 			var target := Vector3(-1.4 + role * 2.8 if role_count() == 2 else 1.5, 0, -1.5)
 			if not student_paths[role].is_empty():
@@ -246,10 +259,12 @@ func refresh(local_peer: int, delta: float) -> void:
 			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
 			if type_id=="counter":
 				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+	if get_parent().game != null and is_instance_valid(get_parent().game.laboratory) and get_parent().game.laboratory.reserves_station(station_id): view.station_label.text="СТАНЦИЯ %d · ПЕРЕКАЛИБРОВКА"%station_id
 	if is_instance_valid(taster): direct_attention(taster)
 
 func direct_attention(person: Node3D) -> void:
 	person.watching = true
+	person.playback_speed = order_tempo if state == "cooking" else 1.0
 	person.mouth_amount = model.mouth_opening()
 	person.drinking = model.held in ["jug","cup","rag"] if type_id == "counter" else ("water" in model.hands or "pot" in model.hands)
 	person.drunk_ml = float(model.guest_serving.drunk) if type_id == "counter" else model.guest_drunk()
@@ -291,6 +306,7 @@ func world_entry() -> Dictionary:
 		data.recipe_times[key] = recipes[key].duration
 		data.recipe_quality[key] = recipes[key].get("quality", {})
 	data.state = state
+	data.order_tempo = order_tempo
 	data.model = model.snapshot()
 	data.training = training.summary()
 	return data

@@ -1,5 +1,6 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+var playback_speed := 1.0
 var mouth_amount := 0.0
 var drinking := false
 var drunk_ml := 0.0
@@ -60,6 +61,7 @@ func _ready() -> void:
 
 func walk_to(target: Vector3, delta: float) -> bool:
 	watching = false
+	playback_speed = 1.0
 	mouth_amount = 0
 	drinking = false
 	chewing = maxf(0,chewing-delta)
@@ -79,6 +81,7 @@ func react(time_left: float) -> void:
 	rotation.z = sin(time_left * 10) * 0.12 if time_left > 0 else 0.0
 
 func _process(delta: float) -> void:
+	delta *= playback_speed
 	personality += delta
 	var blend := 1.0 - exp(-delta * 4.5)
 	var yaw := 0.0
