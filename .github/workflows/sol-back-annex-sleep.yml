@@ -21,6 +21,17 @@ jobs:
           python .github/patch_sleep_vote.py
           git diff origin/main -- scripts/cafe_annex.gd scripts/fps_player.gd scripts/staff_evening.gd scripts/cafe.gd scripts/cafe_development_view.gd scripts/cafe_service.gd scripts/coop_session.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md > /tmp/rear_annex_sleep.patch
           test -s /tmp/rear_annex_sleep.patch
+      - name: Add temporary save diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/test_clone_laboratory.gd')
+          s=p.read_text()
+          old='''\tvar save: Dictionary=game.service.save_data()\n\tcheck(game.service.load_data(save),"Save reload")\n'''
+          new='''\tvar save: Dictionary=game.service.save_data()\n\tfor entry in save.stations:\n\t\tprint("SAVE_ENTRY type=",entry.type," slot=",entry.slot," crew=",entry.crew.size()," expected_crew=",game.service.Definition.TYPES[entry.type].roles.size()," recipes=",entry.recipes.keys()," drafts=",entry.drafts.keys()," equipment_type=",typeof(entry.equipment)," upgrades_type=",typeof(entry.upgrades))\n\t\tfor dish in entry.recipes:\n\t\t\tprint("  recipe ",dish," valid_tracks=",game.service.valid_tracks(entry.recipes[dish].get("tracks",[]),entry.type)," duration=",entry.recipes[dish].get("duration","missing"))\n\t\tfor dish in entry.drafts:\n\t\t\tprint("  draft ",dish," valid_tracks=",game.service.valid_tracks(entry.drafts[dish],entry.type))\n\tvar reload_ok: bool=game.service.load_data(save)\n\tprint("SAVE_RELOAD=",reload_ok," version=",save.version," progression_type=",typeof(save.progression)," station_count=",save.stations.size())\n\tcheck(reload_ok,"Save reload")\n'''
+          if old not in s: raise SystemExit('save block missing')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Download Godot 4.7
         run: |
           curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
@@ -47,4 +58,3 @@ jobs:
           git add scripts/cafe_annex.gd scripts/fps_player.gd scripts/staff_evening.gd scripts/cafe.gd scripts/cafe_development_view.gd scripts/cafe_service.gd scripts/coop_session.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md
           git commit -m "Move annex behind cafe and add multiplayer bed sleep"
           git push --force-with-lease origin HEAD:sol/back-annex-sleep-vote-final
-# retry 2: explicit annex dynamic-call type
