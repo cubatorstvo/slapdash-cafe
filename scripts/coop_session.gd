@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-life-17"
+const PROTOCOL := "slapdash-cafe-life-18"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -20,6 +20,7 @@ var guest := false
 var clock := 0.0
 var local_backup := {}
 var remote_customers := {}
+var sleeping_peers := {}
 
 func setup(root_game: Node3D) -> void:
 	game = root_game
@@ -83,6 +84,7 @@ func leave(message: String) -> void:
 		if is_instance_valid(actor): actor.free()
 	player_avatars.clear()
 	remote_customers.clear()
+	sleeping_peers.clear()
 	player_poses.clear()
 	members.clear()
 	handshakes.clear()
@@ -106,6 +108,7 @@ func _status(value: String) -> void:
 
 func _peer_left(id: int) -> void:
 	members.erase(id)
+	sleeping_peers.erase(id)
 	player_poses.erase(id)
 	handshakes.erase(id)
 	if player_avatars.has(id):
@@ -119,6 +122,8 @@ func _peer_left(id: int) -> void:
 			if station.training.lead == id or station.training.role_for(id) >= 0: station.training.close()
 			if station.pending_teacher == id: station.pending_teacher = 0
 		broadcast_roster()
+		_broadcast_sleep_state()
+		_try_finish_sleep()
 		_status("Участник вышел. Его незаконченный проход отменён; рабочие рецепты сохранены.")
 
 func _joined() -> void:
@@ -147,6 +152,87 @@ func _rejected(message: String) -> void: leave(message)
 
 @rpc("authority", "call_remote", "reliable", 0)
 func _roster(value: Dictionary) -> void: members = value
+
+func sleep_participants() -> Array:
+	var result: Array = []
+	if members.is_empty():
+		result.append(1)
+	else:
+		for id in members: result.append(int(id))
+	return result
+
+func local_sleep_bed() -> int:
+	return int(sleeping_peers.get(local_id(),-1))
+
+func local_sleeping() -> bool:
+	return local_sleep_bed() >= 0
+
+func sleeping_peer_for_bed(bed_index: int) -> int:
+	for id in sleeping_peers:
+		if int(sleeping_peers[id]) == bed_index: return int(id)
+	return 0
+
+func sleep_status_text() -> String:
+	var total := sleep_participants().size()
+	var ready := 0
+	for id in sleep_participants():
+		if sleeping_peers.has(id): ready += 1
+	return "Спят %d/%d" % [ready,total]
+
+func clear_sleeping() -> void:
+	sleeping_peers.clear()
+
+func _peer_world_position(id: int) -> Vector3:
+	if id == 1: return game.player.global_position
+	var raw: Array = player_poses.get(id,{}).get("position",[])
+	return Vector3(raw[0],raw[1],raw[2]) if raw.size()==3 else Vector3.INF
+
+func _broadcast_sleep_state() -> void:
+	if not connected or guest: return
+	for id in members:
+		if id != 1: _sleep_state.rpc_id(id,sleeping_peers)
+
+@rpc("authority", "call_remote", "reliable", 0)
+func _sleep_state(value: Dictionary) -> void:
+	sleeping_peers = value.duplicate(true)
+
+func _try_finish_sleep() -> bool:
+	if game.service.progress.shift != "night": return false
+	var participants := sleep_participants()
+	if participants.is_empty(): return false
+	for id in participants:
+		if not sleeping_peers.has(id): return false
+	var error: String = game.service.next_day()
+	if not error.is_empty(): return false
+	sleeping_peers.clear()
+	_broadcast_sleep_state()
+	game.service.announce("Все легли спать. Начался день %d." % game.service.progress.day)
+	game.save_cafe()
+	return true
+
+func _sleep_action(sender: int, value: Dictionary) -> String:
+	var action := str(value.get("action",""))
+	if action == "wake":
+		if sleeping_peers.has(sender):
+			sleeping_peers.erase(sender)
+			_broadcast_sleep_state()
+		return ""
+	if game.service.progress.shift != "night": return "Спать можно после окончания смены."
+	if game.service.training_for(sender) != null: return "Сначала заверши готовку."
+	if game.shop.carried(sender) >= 0 or game.service.progress.garland_builder == sender: return "Сначала освободи руки."
+	if int(game.laboratory.state.get("owner",0)) == sender and str(game.laboratory.state.get("phase","idle")) in ["fill","tune"]: return "Сначала заверши активный этап лаборатории."
+	var bed := int(value.get("bed",-1))
+	if bed < 0 or bed >= game.annex.PLAYER_BED_COUNT: return "Кровать не найдена."
+	var center: Vector3 = game.annex.player_bed_center(bed)
+	if _peer_world_position(sender).distance_to(center) > 4.5: return "Подойди к кровати."
+	var occupant := sleeping_peer_for_bed(bed)
+	if occupant > 0 and occupant != sender: return "Эта кровать уже занята."
+	sleeping_peers[sender] = bed
+	_broadcast_sleep_state()
+	if not _try_finish_sleep():
+		var name := str(members.get(sender,"Повар"))
+		game.service.announce("%s лёг спать · %s" % [name,sleep_status_text()])
+	return ""
 
 func capture_player() -> Dictionary:
 	var p: Vector3 = game.player.global_position
@@ -198,17 +284,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
 		return
-	if action == "next_day":
-		if action in ["lab_begin", "garland_begin", "next_day"] and sender != 1:
-			message_to(sender, "Это действие подтверждает хозяин кафе.")
-			return
-		var target: Vector3 = game.development.night_action_position(action, value)
-		var location: Array = player_poses.get(sender, {}).get("position", [])
-		var peer_position: Vector3 = game.player.global_position if sender == 1 else Vector3(location[0], location[1], location[2]) if location.size() == 3 else Vector3.INF
-		if peer_position.distance_to(target) > 4.5: return
-		var error: String = game.service.night_action(action, value, sender)
-		if not error.is_empty(): message_to(sender, error)
-		else: game.save_cafe()
+	if action in ["sleep","wake"]:
+		var error: String = _sleep_action(sender,value)
+		if not error.is_empty(): message_to(sender,error)
 		return
 	if action in ["lab_select","lab_restart"]:
 		var error: String=game.laboratory.selection_action(sender,value)
@@ -366,6 +444,9 @@ func suspend_input() -> void:
 
 func advance(delta: float) -> void:
 	_draw_players(delta)
+	if not guest and game.service.progress.shift != "night" and not sleeping_peers.is_empty():
+		sleeping_peers.clear()
+		_broadcast_sleep_state()
 	if not connected: return
 	if guest and connection_deadline > 0 and Time.get_ticks_msec() > connection_deadline:
 		leave("Не удалось получить состояние кафе.")
@@ -395,7 +476,7 @@ func advance(delta: float) -> void:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"laboratory": game.laboratory.state.duplicate(true), "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
+	var data := {"laboratory": game.laboratory.state.duplicate(true), "sleeping": sleeping_peers.duplicate(true), "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -408,6 +489,7 @@ func _world(packet: PackedByteArray) -> void:
 	synced = true
 	connection_deadline = 0
 	player_poses = data.players
+	sleeping_peers = data.get("sleeping",{}).duplicate(true)
 	var ids: Array = []
 	for entry in data.stations:
 		ids.append(entry.id)
@@ -496,6 +578,9 @@ func _draw_players(delta: float) -> void:
 					target = station.to_global(Vector3(point.x, 1.14 + height, point.y))
 		avatar.perform(pose, target, held)
 		avatar.caption.text = str(members[id])
+		if sleeping_peers.has(id):
+			game.annex.settle_player_avatar(avatar,int(sleeping_peers[id]))
+			avatar.caption.text += "\nСпит"
 		if station != null and avatar.book.current_page == station.training.dish:
 			avatar.book.set_live(station.model)
 		else:

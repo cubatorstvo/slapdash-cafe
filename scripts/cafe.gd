@@ -30,6 +30,7 @@ var session_paused := false
 var bound_station := 0
 var bound_revision := -1
 var local_role := -1
+var sleep_bed_bound := -1
 var grip := Vector3.FORWARD
 # Camera-relative reach is stable even when looking above the horizon.
 var grip_distance := 1.5
@@ -140,6 +141,10 @@ func nearest_station() -> Node3D:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
+	if is_instance_valid(session) and session.local_sleeping():
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_E:
+			session.request_action({"action":"wake"})
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode in [KEY_F8,KEY_F9,KEY_F10]:
 			var label: String = {KEY_F8:"скучно",KEY_F9:"непонятно",KEY_F10:"прикольно"}[event.physical_keycode]
@@ -312,12 +317,24 @@ func build_motion(station: Node3D, delta: float) -> Dictionary:
 		command.pan_tilt = [pan_tilt.x, pan_tilt.y]
 	return command
 
+func sync_sleep_pose() -> void:
+	var bed: int = session.local_sleep_bed() if is_instance_valid(session) else -1
+	if bed >= 0:
+		if sleep_bed_bound != bed:
+			player.enter_sleep(Annex.player_sleep_position(bed),Annex.player_sleep_yaw(bed))
+			sleep_bed_bound = bed
+	elif sleep_bed_bound >= 0:
+		var previous_bed := sleep_bed_bound
+		sleep_bed_bound = -1
+		player.exit_sleep(Annex.player_bed_exit(previous_bed))
+
 func _physics_process(delta: float) -> void:
 	bind_training()
+	sync_sleep_pose()
 	if cookbook.opened and (menu.opened() or awaiting_serving_confirmation()): cookbook.close()
 	if session_paused and not session.online(): return
-	var move := Vector2.ZERO if input_blocked() else Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
-	if not awaiting_serving_confirmation(): player.advance(delta, move.limit_length())
+	var move := Vector2.ZERO if input_blocked() or session.local_sleeping() else Vector2(float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)), float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W)))
+	if not awaiting_serving_confirmation() and not session.local_sleeping(): player.advance(delta, move.limit_length())
 	var station := local_station()
 	if station != null and station.training.phase == "recording" and local_role >= 0: session.send_input(station, build_motion(station, delta))
 	if not session.is_guest(): service.advance(delta)
@@ -340,7 +357,7 @@ func _physics_process(delta: float) -> void:
 	feedback.update(delta)
 	if menu.opened() or cookbook.opened or office.opened(): hud.recipe_panel.hide()
 	hud.bottom.visible = false
-	hud.crosshair.visible = not cookbook.opened and not menu.opened() and not office.opened()
+	hud.crosshair.visible = not cookbook.opened and not menu.opened() and not office.opened() and not session.local_sleeping()
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
 func refresh_hud() -> void:
@@ -352,6 +369,10 @@ func refresh_hud() -> void:
 	hud.progress.value = 0
 	hud.prompt.text = ""
 	hud.recipe_panel.hide()
+	if session.local_sleeping():
+		hud.goal.text = "Сон · ожидание остальных игроков"
+		hud.prompt.text = session.sleep_status_text() + " · E встать"
+		return
 	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
@@ -456,8 +477,7 @@ func _build_room() -> void:
 			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
 	Props.collision_box(self, Vector3(30, 0.2, 19), Vector3(3, -0.10, 1.5))
 	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
-	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, 10.6), Color("244c50"))
-	Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(17.8, 2.3, 1.5), Color("2e5355"))
+	for x in [-11.8,17.8]: Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
 	Annex.build_shell(self)
 	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
 	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
@@ -480,6 +500,7 @@ func _build_room() -> void:
 
 
 func new_cafe() -> void:
+	if is_instance_valid(session): session.clear_sleeping()
 	laboratory.reset()
 	service.clear_world()
 	service.progress = service.Progression.new()
@@ -498,6 +519,9 @@ func new_cafe() -> void:
 	save_cafe()
 
 func interaction_target() -> Dictionary:
+	if is_instance_valid(annex):
+		var sleep_target: Dictionary = annex.sleep_target(camera,session.local_id())
+		if not sleep_target.is_empty(): return sleep_target
 	if is_instance_valid(shop):
 		var target: Dictionary = shop.target(camera,session.local_id())
 		if not target.is_empty(): return target

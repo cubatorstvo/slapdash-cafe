@@ -110,11 +110,6 @@ func build_night() -> void:
 	night_controls.append({"node": start_button, "action": "lab_begin", "hint": "(E) Взять комплект лаборатории"})
 	var reel := Props.cylinder(lab_root,0.2,0.15,Vector3(1.48,1.03,8.15),Color("e2c080"))
 	night_controls.append({"node": reel, "action": "garland_begin", "hint": "(E) Взять гирлянду · 40"})
-	var sleep_control := Props.box(self,Vector3(0.58,0.18,0.42),Annex.PLAYER_SLEEP_POINT,Color("d8c998"))
-	night_controls.append({"node": sleep_control, "action": "next_day", "hint": "(E) Отдохнуть до утра"})
-	var sleep_label := Props.text(self,"ОТДОХНУТЬ ДО УТРА",Annex.PLAYER_SLEEP_POINT+Vector3(0,0.55,0),18,Color("e7c891"))
-	sleep_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sleep_label.pixel_size = 0.004
 	cable_root = Node3D.new()
 	add_child(cable_root)
 	cable_preview = Props.line(self,Vector3.ZERO,Vector3.UP,0.018,Color("a9ce9d"))

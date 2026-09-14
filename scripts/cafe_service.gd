@@ -563,7 +563,7 @@ func start_tasting_dish() -> void:
 func toggle_business() -> void:
 	if progress.busy(): return
 	if progress.shift == "night":
-		announce("Смена закончена. Отдохни у двери, чтобы начать следующий день.")
+		announce("Смена закончена. Ляг на свободную кровать в комнате отдыха.")
 		return
 	if progress.shift == "closing": return
 	if open_for_business:
@@ -596,7 +596,7 @@ func advance_shift(delta: float) -> void:
 		progress.shift = "night"
 		progress.night_elapsed=0.0
 		progress.revision += 1
-		announce("Смена закончена. Клоны бегут в комнату отдыха; посмотри, как устроились, или сразу начинай новый день.")
+		announce("Смена закончена. Клоны бегут в комнату отдыха. Новый день начнётся, когда все игроки лягут спать.")
 		if game != null: game.save_cafe()
 
 func next_day() -> String:

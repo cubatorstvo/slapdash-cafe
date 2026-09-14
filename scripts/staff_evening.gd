@@ -67,8 +67,8 @@ func settle(actor: Node3D, spot: Dictionary, identity: int) -> void:
 func route_for(info: Dictionary, target: Vector3) -> Array:
 	var home: Vector3=info.home
 	if bool(info.get("from_lab",false)):
-		return [home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(-10.4,0,4.8),Vector3(-10.4,0,Annex.REST_DOOR_Z),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
-	return [home,Vector3(home.x,0,4.8),Vector3(-10.4,0,4.8),Vector3(-10.4,0,Annex.REST_DOOR_Z),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
+		return [home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
+	return [home,Vector3(home.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
 
 func _process(_delta: float) -> void:
 	if game==null: return
