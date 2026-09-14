@@ -1,0 +1,32 @@
+name: Export async lab implementation
+on:
+  push:
+    branches:
+      - sol/async-lab-rest
+    paths:
+      - .github/workflows/sol-export-async-lab.yml
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/async-lab-rest
+      - name: Apply implementation
+        run: python .github/sol_async_patch.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: async-lab-rest-files
+          path: |
+            scripts/clone_laboratory.gd
+            scripts/staff_evening.gd
+            scripts/work_station.gd
+            scripts/cafe_service.gd
+            scripts/cafe_progression.gd
+            scripts/coop_session.gd
+            scripts/steam_lobby.gd
+            tests/test_clone_laboratory.gd
+            tests/test_cafe_life.gd
+            docs/LABORATORY_AND_RECIPE_BOOK.md
