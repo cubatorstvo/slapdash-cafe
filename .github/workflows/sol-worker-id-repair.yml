@@ -1,0 +1,89 @@
+name: Sol worker identity repair
+on:
+  push:
+    branches: [sol/lounge-polish-3]
+    paths:
+      - '.github/workflows/sol-worker-id-repair.yml'
+permissions:
+  contents: write
+jobs:
+  repair-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/lounge-polish-3
+          fetch-depth: 0
+      - name: Apply repair
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/cafe_service.gd')
+          s=p.read_text()
+          old='''func normalize_workers() -> void:\n\twhile progress.free_workers.size() < progress.free_clones:\n\t\tprogress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})\n\t\tprogress.next_clone_id+=1\n\tfor worker in progress.free_workers:\n\t\tworker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)\n\t\tworker.rest=1.0\n\tfor station in stations:\n\t\tif station.manual_station: continue\n\t\tfor role in range(station.role_count() if station.staffed<0 else station.staffed):\n\t\t\tvar member: Dictionary = station.crew[role]\n\t\t\tif not member.has("clone_id"):\n\t\t\t\tmember.clone_id=progress.next_clone_id; progress.next_clone_id+=1\n\t\t\tmember.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)\n\t\t\tmember.rest=progress.rest_multiplier\n\tprogress.free_clones=progress.free_workers.size()\n'''
+          new='''func normalize_workers() -> void:\n\t# Saves from several prototype generations can contain clone_id=0, stale next_clone_id,\n\t# or duplicated ids. Stations render by staffed count, but evening actors use clone_id as\n\t# their identity, so repair the identity set before any clone is assigned or animated.\n\tvar max_existing_id := 0\n\tfor station in stations:\n\t\tif station.manual_station: continue\n\t\tvar active_roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())\n\t\tfor role in range(active_roles): max_existing_id=maxi(max_existing_id,int(station.crew[role].get("clone_id",0)))\n\tfor worker in progress.free_workers: max_existing_id=maxi(max_existing_id,int(worker.get("id",0)))\n\tprogress.next_clone_id=maxi(1,progress.next_clone_id,max_existing_id+1)\n\n\tvar used_ids := {}\n\tfor station in stations:\n\t\tif station.manual_station: continue\n\t\tvar active_roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())\n\t\tfor role in range(active_roles):\n\t\t\tvar member: Dictionary=station.crew[role]\n\t\t\tvar id:=int(member.get("clone_id",0))\n\t\t\tif id<=0 or used_ids.has(id):\n\t\t\t\tid=progress.next_clone_id\n\t\t\t\tprogress.next_clone_id+=1\n\t\t\t\tmember.clone_id=id\n\t\t\tused_ids[id]=true\n\t\t\tmember.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)\n\t\t\tmember.rest=progress.rest_multiplier\n\n\tfor worker in progress.free_workers:\n\t\tvar id:=int(worker.get("id",0))\n\t\tif id<=0 or used_ids.has(id):\n\t\t\tid=progress.next_clone_id\n\t\t\tprogress.next_clone_id+=1\n\t\t\tworker.id=id\n\t\tused_ids[id]=true\n\t\tworker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)\n\t\tworker.rest=1.0\n\n\twhile progress.free_workers.size()<progress.free_clones:\n\t\tvar id:=progress.next_clone_id\n\t\tprogress.next_clone_id+=1\n\t\tprogress.free_workers.append({"id":id,"tempo":1.0,"rest":1.0})\n\t\tused_ids[id]=true\n\tprogress.free_clones=progress.free_workers.size()\n'''
+          if old not in s: raise SystemExit('normalize_workers block not found')
+          p.write_text(s.replace(old,new,1))
+
+          Path('tests/test_worker_identity.gd').write_text(r'''extends SceneTree
+var failures:=0
+func _initialize() -> void: run.call_deferred()
+func check(ok: bool, text: String) -> void:
+	if not ok: failures+=1; printerr("FAIL: ",text)
+func run() -> void:
+	var game=preload("res://scenes/cafe.tscn").instantiate(); root.add_child(game); await process_frame
+	game.set_physics_process(false)
+	game.service.clear_world()
+	game.service.progress=game.service.Progression.new()
+	var counter=game.service.add_station("counter",1,false,true)
+	counter.staffed=1
+	counter.crew[0].clone_id=0
+	var kitchen=game.service.add_station("kitchen",2,false,true)
+	kitchen.staffed=2
+	kitchen.crew[0].clone_id=5
+	kitchen.crew[1].clone_id=5
+	game.service.progress.free_workers=[{"id":5,"tempo":1.0,"rest":1.0}]
+	game.service.progress.free_clones=1
+	game.service.progress.next_clone_id=1
+	game.service.normalize_workers()
+	var assigned: Array=[]
+	for station in [counter,kitchen]:
+		for role in range(station.staffed): assigned.append(int(station.crew[role].clone_id))
+	check(assigned.size()==3,"Three staffed roles remain staffed")
+	check(assigned.all(func(id): return id>0),"Every staffed role receives a positive clone id")
+	var unique:=assigned.duplicate(); unique.sort();
+	check(unique[0]!=unique[1] and unique[1]!=unique[2],"Duplicate staffed clone ids are repaired")
+	var free_id:=int(game.service.progress.free_workers[0].id)
+	check(free_id>0 and free_id not in assigned,"Free clone id cannot collide with a staffed clone")
+	check(game.service.progress.next_clone_id>maxi(free_id,assigned.max()),"Next clone id advances beyond every live identity")
+	game.service.progress.shift="night"
+	game.service.progress.night_elapsed=0.0
+	check(game.evening.workers().size()==3,"Every staffed clone participates in the evening")
+	game.evening._process(0.0)
+	check(game.evening.performers.size()==3,"Every staffed clone receives a distinct evening actor")
+	game._shutdown_tree(game); game.free()
+	print("PASS: worker identity repair keeps every staffed clone in evening and morning scenes" if failures==0 else "FAILURES: %d"%failures)
+	quit(0 if failures==0 else 1)
+''')
+          PY
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Parse and import
+        run: /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit
+      - name: Tests
+        run: |
+          set -e
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . -- --fresh-cafe --script tests/test_worker_identity.gd
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . -- --fresh-cafe --script tests/test_cafe_annex.gd
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . -- --fresh-cafe --script tests/test_cafe_life.gd
+      - name: Publish final branch
+        run: |
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/cafe_service.gd tests/test_worker_identity.gd
+          git commit -m "Repair clone identities across saved stations"
+          git branch -f sol/worker-id-repair-final HEAD
+          git push -f origin sol/worker-id-repair-final
