@@ -1,0 +1,272 @@
+name: Sol async laboratory and rest cycle
+on:
+  push:
+    branches: [sol/async-lab-rest]
+    paths:
+      - '.github/workflows/sol-async-lab-rest.yml'
+permissions:
+  contents: write
+jobs:
+  implement-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/async-lab-rest
+          fetch-depth: 0
+      - name: Implement asynchronous lab and nightly rest
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def edit(path, old, new, count=1):
+              p = Path(path)
+              s = p.read_text()
+              if s.count(old) < count:
+                  raise SystemExit(f'Expected block not found in {path}: {old[:120]!r}')
+              p.write_text(s.replace(old, new, count))
+
+          # --- Laboratory: two active interventions separated by autonomous growth. ---
+          edit('scripts/clone_laboratory.gd',
+               'const BALANCE_SECONDS := 6.0\nconst BUTTON := Vector3(0,1.12,7.85)',
+               'const BALANCE_SECONDS := 6.0\nconst GROW_PREP_SECONDS := 75.0\nconst GROW_FINISH_SECONDS := 75.0\nconst BUTTON := Vector3(0,1.12,7.85)')
+          edit('scripts/clone_laboratory.gd',
+               'var little_clone: Node3D\nvar pulse_seen := 0',
+               'var little_clone: Node3D\nvar growth_legs: Node3D\nvar pulse_seen := 0')
+          edit('scripts/clone_laboratory.gd',
+               '\tlittle_clone.hide()\n\tfor i in range(10):',
+               '''\tlittle_clone.hide()\n\t# The machine exposes the joke/progress physically: legs first, then the whole clone.\n\tgrowth_legs = Node3D.new()\n\tapparatus.add_child(growth_legs)\n\tgrowth_legs.position = Vector3(0.98,1.03,7.98)\n\tfor x in [-0.065,0.065]:\n\t\tvar leg := Node3D.new()\n\t\tgrowth_legs.add_child(leg)\n\t\tleg.position.x = x\n\t\tProps.box(leg,Vector3(0.095,0.36,0.12),Vector3(0,0.18,0),Color("344e48"))\n\tgrowth_legs.hide()\n\tfor i in range(10):''')
+          edit('scripts/clone_laboratory.gd',
+               '''\t\t\t"fill": text="Удерживай E / ЛКМ — уровень растёт; отпусти — падает"\n\t\t\t"fill_ready": text="(E / ЛКМ) К стабилизатору"\n\t\t\t"tune": text="(E / ЛКМ) Зафиксировать стрелку"\n\t\t\t"ready": text="(E / ЛКМ) Сохранить результат" if int(state.clone_id)>0 else "(E / ЛКМ) Выпустить клона · уже оплачено"''',
+               '''\t\t\t"fill": text="Удерживай E / ЛКМ — уровень растёт; отпусти — падает"\n\t\t\t"grow_blank": text="Аппарат выращивает заготовку · можно идти в кафе"\n\t\t\t"stage2_ready": text="(E / ЛКМ) Заготовка готова · к стабилизатору"\n\t\t\t"fill_ready": text="(E / ЛКМ) К стабилизатору"\n\t\t\t"tune": text="(E / ЛКМ) Зафиксировать стрелку"\n\t\t\t"grow_finish": text="Клон дозревает · можно идти в кафе"\n\t\t\t"ready": text="(E / ЛКМ) Сохранить результат" if int(state.clone_id)>0 else "(E / ЛКМ) Выпустить клона · уже оплачено"''')
+          edit('scripts/clone_laboratory.gd',
+               '''\t\t"fill_ready": state.phase="tune"; state.age=0.0; state.needle=0.0\n\t\t"tune":\n\t\t\t# Use the displayed server age within a bounded network-delay window for guests.\n\t\t\tvar age: float=state.age\n\t\t\tif peer!=1 and is_finite(observed_age) and observed_age>=age-0.35 and observed_age<=age: age=observed_age\n\t\t\tstate.needle=pingpong(age*(0.42 if state.damper else 1.2),1.0)\n\t\t\tstate.needle_quality=zone_quality(state.needle)\n\t\t\tstate.tempo=snappedf(lerpf(state.low,state.high,state.fill_quality*0.6+state.needle_quality*0.4),0.01)\n\t\t\tstate.phase="ready"\n\t\t"ready":''',
+               '''\t\t"fill_ready", "stage2_ready": state.phase="tune"; state.age=0.0; state.needle=0.0\n\t\t"tune":\n\t\t\t# Use the displayed server age within a bounded network-delay window for guests.\n\t\t\tvar age: float=state.age\n\t\t\tif peer!=1 and is_finite(observed_age) and observed_age>=age-0.35 and observed_age<=age: age=observed_age\n\t\t\tstate.needle=pingpong(age*(0.42 if state.damper else 1.2),1.0)\n\t\t\tstate.needle_quality=zone_quality(state.needle)\n\t\t\tstate.tempo=snappedf(lerpf(state.low,state.high,state.fill_quality*0.6+state.needle_quality*0.4),0.01)\n\t\t\tstate.phase="grow_finish" if int(state.clone_id)==0 else "ready"\n\t\t\tstate.age=0.0\n\t\t"grow_blank", "grow_finish": return ""\n\t\t"ready":''')
+
+          old_advance = '''func advance(delta: float) -> void:\n\tif state.phase=="idle": return\n\tif state.phase not in ["done","failed"] and (not inside(peer_position(int(state.owner))) or game.service.training_for(int(state.owner))!=null):\n\t\tgame.service.trace("cloning_cancelled",{"reason":"left_apparatus"})\n\t\treset(); game.service.assign_clones(); return\n\tstate.age=float(state.age)+delta\n\tmatch state.phase:\n\t\t"fill":\n\t\t\tvar held := local_holding() if int(state.owner)==1 else false\n\t\t\tif int(state.owner)!=1:\n\t\t\t\tvar pose: Dictionary=game.session.player_poses.get(int(state.owner),{})\n\t\t\t\theld=pose.get("lab_hold",false) and Time.get_ticks_msec()-int(pose.get("received_at",0))<350\n\t\t\tadvance_balance(delta,held)\n\t\t"tune": state.needle=pingpong(float(state.age)*(0.42 if state.damper else 1.2),1.0)\n\t\t"done", "failed":\n\t\t\tif float(state.age)>2.5: reset()\n'''
+          new_advance = '''func advance(delta: float) -> void:\n\tif state.phase=="idle": return\n\tvar owner := int(state.owner)\n\tvar autonomous := state.phase in ["grow_blank","stage2_ready","grow_finish","ready"]\n\tif state.phase not in ["done","failed"]:\n\t\tif owner>1 and not game.session.members.has(owner):\n\t\t\tgame.service.trace("cloning_cancelled",{"reason":"owner_disconnected"})\n\t\t\treset(); game.service.assign_clones(); return\n\t\tif not autonomous and (not inside(peer_position(owner)) or game.service.training_for(owner)!=null):\n\t\t\tgame.service.trace("cloning_cancelled",{"reason":"left_apparatus"})\n\t\t\treset(); game.service.assign_clones(); return\n\tstate.age=float(state.age)+delta\n\tmatch state.phase:\n\t\t"fill":\n\t\t\tvar held := local_holding() if owner==1 else false\n\t\t\tif owner!=1:\n\t\t\t\tvar pose: Dictionary=game.session.player_poses.get(owner,{})\n\t\t\t\theld=pose.get("lab_hold",false) and Time.get_ticks_msec()-int(pose.get("received_at",0))<350\n\t\t\tadvance_balance(delta,held)\n\t\t"grow_blank":\n\t\t\tif float(state.age)>=GROW_PREP_SECONDS:\n\t\t\t\tstate.phase="stage2_ready"; state.age=0.0; state.revision=int(state.revision)+1; state.pulse=int(state.pulse)+1\n\t\t\t\tstate.notice="Заготовка готова и спокойно ждёт тебя"\n\t\t"tune": state.needle=pingpong(float(state.age)*(0.42 if state.damper else 1.2),1.0)\n\t\t"grow_finish":\n\t\t\tif float(state.age)>=GROW_FINISH_SECONDS:\n\t\t\t\tstate.phase="ready"; state.age=0.0; state.revision=int(state.revision)+1; state.pulse=int(state.pulse)+1\n\t\t\t\tstate.notice="Клон дозрел и ждёт выпуска"\n\t\t"done", "failed":\n\t\t\tif float(state.age)>2.5: reset()\n'''
+          edit('scripts/clone_laboratory.gd', old_advance, new_advance)
+          edit('scripts/clone_laboratory.gd',
+               '''\tif float(state.balanced)>=BALANCE_SECONDS-0.00001:\n\t\tstate.fill_quality=clampf(float(state.integral)/maxf(0.001,float(state.exposure)),0,1)\n\t\tstate.phase="fill_ready"; state.revision=int(state.revision)+1\n\nfunc _process(_delta: float) -> void:''',
+               '''\tif float(state.balanced)>=BALANCE_SECONDS-0.00001:\n\t\tstate.fill_quality=clampf(float(state.integral)/maxf(0.001,float(state.exposure)),0,1)\n\t\tif int(state.clone_id)==0:\n\t\t\tstate.phase="grow_blank"; state.age=0.0; state.notice="Аппарат выращивает заготовку · можешь заняться кафе"\n\t\telse: state.phase="fill_ready"\n\t\tstate.revision=int(state.revision)+1\n\nfunc countdown(total: float) -> String:\n\tvar seconds := maxi(0,ceili(total-float(state.age)))\n\treturn "%d:%02d" % [seconds/60,seconds%60]\n\nfunc _process(_delta: float) -> void:''')
+          edit('scripts/clone_laboratory.gd',
+               '''\tlittle_clone.visible = state.phase in ["ready","done"]\n\tlittle_clone.rotation.z = sin(float(state.age)*8)*0.09 if state.phase=="done" else 0.0\n\tlittle_clone.scale = Vector3.ONE * (0.85 + minf(0.15,float(state.age)*0.2) if state.phase=="done" else 0.85)''',
+               '''\tgrowth_legs.visible = state.phase in ["grow_blank","stage2_ready","grow_finish"]\n\tif growth_legs.visible:\n\t\tvar leg_progress := clampf(float(state.age)/GROW_PREP_SECONDS,0.0,1.0) if state.phase=="grow_blank" else 1.0\n\t\tgrowth_legs.scale=Vector3(1,0.25+0.75*leg_progress,1)\n\t\tgrowth_legs.rotation.z=sin(float(state.age)*6.0)*0.08\n\tlittle_clone.visible = state.phase in ["grow_finish","ready","done"]\n\tlittle_clone.rotation.z = sin(float(state.age)*8)*0.09 if state.phase=="done" else 0.0\n\tvar maturity := clampf(float(state.age)/GROW_FINISH_SECONDS,0.0,1.0) if state.phase=="grow_finish" else 1.0\n\tlittle_clone.scale = Vector3.ONE * ((0.45+0.40*maturity) if state.phase=="grow_finish" else (0.85+minf(0.15,float(state.age)*0.2) if state.phase=="done" else 0.85))''')
+          old_titles = '''\tvar titles := {"idle":"ТЯП-КЛОН · %d–%d%%"%[roundi(limits.x*100),roundi(limits.y*100)],"fill":"1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ","fill_ready":"КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ","tune":"2 · ПОЙМАЙ СТРЕЛКУ","ready":"3 · РЕЗУЛЬТАТ ГОТОВ","done":"ЕЩЁ ОДИН Я!","failed":"ПШШШ! НЕ ПОЛУЧИЛОСЬ"}\n\tvar fill: float=float(state.integral)/maxf(0.001,float(state.exposure))\n\tresult_label.text=""\n\tif state.phase!="idle": result_label.text="Колба: %d%%"%roundi(fill*100)\n\tif state.phase=="ready" and int(state.clone_id)>0:\n\t\tvar worker: Dictionary=game.service.clone_data(int(state.clone_id))\n\t\tresult_label.text+=" · прежний темп %d%%"%roundi(float(worker.get("tempo",1.0))*100)\n\tif state.phase in ["ready","done"]: result_label.text+=" · Стрелка: %d%%\\nТемп клона: %d%%"%[roundi(float(state.needle_quality)*100),roundi(float(state.tempo)*100)]\n\tif state.phase=="idle": titles.idle += " · свободно %d" % game.service.progress.free_clones\n\tcaption.text = str(titles[state.phase]) + ("\\n"+str(state.notice) if not str(state.notice).is_empty() else "")'''
+          new_titles = '''\tvar title := ""\n\tmatch state.phase:\n\t\t"idle": title="ТЯП-КЛОН · %d–%d%% · свободно %d"%[roundi(limits.x*100),roundi(limits.y*100),game.service.progress.free_clones]\n\t\t"fill": title="1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ"\n\t\t"grow_blank": title="РАСТУТ НОГИ · %s · ИДИ РАБОТАЙ"%countdown(GROW_PREP_SECONDS)\n\t\t"stage2_ready": title="НОГИ ГОТОВЫ · НУЖЕН СТАБИЛИЗАТОР"\n\t\t"fill_ready": title="КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ"\n\t\t"tune": title="2 · ПОЙМАЙ СТРЕЛКУ"\n\t\t"grow_finish": title="КЛОН ДОЗРЕВАЕТ · %s · ИДИ РАБОТАЙ"%countdown(GROW_FINISH_SECONDS)\n\t\t"ready": title="3 · КЛОН ГОТОВ"\n\t\t"done": title="ЕЩЁ ОДИН Я!"\n\t\t"failed": title="ПШШШ! НЕ ПОЛУЧИЛОСЬ"\n\tvar fill: float=float(state.integral)/maxf(0.001,float(state.exposure))\n\tresult_label.text=""\n\tif state.phase!="idle": result_label.text="Колба: %d%%"%roundi(fill*100)\n\tif state.phase=="ready" and int(state.clone_id)>0:\n\t\tvar worker: Dictionary=game.service.clone_data(int(state.clone_id))\n\t\tresult_label.text+=" · прежний темп %d%%"%roundi(float(worker.get("tempo",1.0))*100)\n\tif state.phase in ["grow_finish","ready","done"]: result_label.text+=" · Стрелка: %d%%\\nТемп клона: %d%%"%[roundi(float(state.needle_quality)*100),roundi(float(state.tempo)*100)]\n\tcaption.text = title + ("\\n"+str(state.notice) if not str(state.notice).is_empty() else "")'''
+          edit('scripts/clone_laboratory.gd', old_titles, new_titles)
+
+          # --- Daily rest modifies only today's effective tempo. Permanent lab tempo remains intact. ---
+          edit('scripts/work_station.gd',
+               '''func crew_tempo() -> float:\n\tvar slowest := 10.0\n\tfor member in crew: slowest = minf(slowest,float(member.get("tempo",1.0)))\n\treturn clampf(slowest,0.7,10.0)\n\nfunc crew_name(role: int) -> String:\n\treturn str(crew[role].name) + " · %d%%" % roundi(float(crew[role].get("tempo",1.0))*100)''',
+               '''func crew_tempo() -> float:\n\tvar slowest := 11.0\n\tfor member in crew:\n\t\tvar effective := float(member.get("tempo",1.0))*float(member.get("rest",1.0))\n\t\tslowest = minf(slowest,effective)\n\treturn clampf(slowest,0.63,11.0)\n\nfunc crew_name(role: int) -> String:\n\tvar base := float(crew[role].get("tempo",1.0))\n\tvar rest := float(crew[role].get("rest",1.0))\n\tvar text := str(crew[role].name) + " · %d%%" % roundi(base*rest*100)\n\tif not is_equal_approx(rest,1.0): text += " · отдых %d%%" % roundi(rest*100)\n\treturn text''')
+
+          edit('scripts/cafe_service.gd',
+               '''func next_day() -> String:\n\tif progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."\n\ttrace("next_day", {"day":progress.day+1})''',
+               '''func next_day() -> String:\n\tif progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."\n\tif game != null and is_instance_valid(game.evening): game.evening.apply_rest()\n\ttrace("next_day", {"day":progress.day+1})''')
+          edit('scripts/cafe_service.gd',
+               'announce("Кафе закрыто до утра. Можно заняться лабораторией и обустройством или отдохнуть.")',
+               'announce("Смена закончена. Клоны бегут в комнату отдыха; посмотри, как устроились, или сразу начинай новый день.")')
+          edit('scripts/cafe_service.gd',
+               '''func normalize_workers() -> void:\n\twhile progress.free_workers.size() < progress.free_clones:\n\t\tprogress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0})\n\t\tprogress.next_clone_id+=1\n\tfor station in stations:\n\t\tif station.manual_station: continue\n\t\tfor role in range(station.role_count() if station.staffed<0 else station.staffed):\n\t\t\tvar member: Dictionary = station.crew[role]\n\t\t\tif not member.has("clone_id"):\n\t\t\t\tmember.clone_id=progress.next_clone_id; progress.next_clone_id+=1\n\t\t\tmember.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)\n\tprogress.free_clones=progress.free_workers.size()''',
+               '''func normalize_workers() -> void:\n\twhile progress.free_workers.size() < progress.free_clones:\n\t\tprogress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})\n\t\tprogress.next_clone_id+=1\n\tfor worker in progress.free_workers:\n\t\tworker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)\n\t\tworker.rest=clampf(float(worker.get("rest",1.0)),0.9,1.1)\n\tfor station in stations:\n\t\tif station.manual_station: continue\n\t\tfor role in range(station.role_count() if station.staffed<0 else station.staffed):\n\t\t\tvar member: Dictionary = station.crew[role]\n\t\t\tif not member.has("clone_id"):\n\t\t\t\tmember.clone_id=progress.next_clone_id; progress.next_clone_id+=1\n\t\t\tmember.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)\n\t\t\tmember.rest=clampf(float(member.get("rest",1.0)),0.9,1.1)\n\tprogress.free_clones=progress.free_workers.size()''')
+          edit('scripts/cafe_service.gd',
+               '''\t\t\tstation.crew[station.staffed].clone_id=worker.id\n\t\t\tstation.crew[station.staffed].tempo=worker.tempo\n\t\t\tstation.staffed+=1''',
+               '''\t\t\tstation.crew[station.staffed].clone_id=worker.id\n\t\t\tstation.crew[station.staffed].tempo=worker.tempo\n\t\t\tstation.crew[station.staffed].rest=worker.get("rest",1.0)\n\t\t\tstation.staffed+=1''')
+          edit('scripts/cafe_service.gd',
+               'progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0)})',
+               'progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":1.0})')
+          edit('scripts/cafe_progression.gd',
+               '''\tif shift == "night": return "Ночь · лаборатория %d/3 · следующий день у двери отдыха" % lab_stage if stars == 0 else "Ночь · обустрой кафе или отдохни до утра"''',
+               '''\tif shift == "night": return "Ночь · клоны устраиваются в комнате отдыха · следующий день у двери"''')
+
+          # Deterministic rest-room crowd. Good places fill first; worker-to-place assignment rotates by day.
+          Path('scripts/staff_evening.gd').write_text(r'''extends Node3D
+## End-of-shift celebration plus deterministic rest spots. Rest affects only the next day.
+const Avatar=preload("res://scripts/cook_avatar.gd")
+const Props=preload("res://scripts/props.gd")
+const REST_SPOTS := [
+	{"position":Vector3(6.0,0.62,9.55),"quality":1.10,"pose":"bed"},
+	{"position":Vector3(8.7,0.62,9.55),"quality":1.08,"pose":"bed"},
+	{"position":Vector3(11.2,0.72,9.45),"quality":1.03,"pose":"bench"},
+	{"position":Vector3(13.4,0.80,9.45),"quality":1.00,"pose":"table"},
+	{"position":Vector3(7.2,0.06,8.45),"quality":0.96,"pose":"floor"},
+	{"position":Vector3(9.7,0.06,8.45),"quality":0.94,"pose":"floor"},
+	{"position":Vector3(6.0,0.92,9.55),"quality":0.92,"pose":"stack"},
+	{"position":Vector3(14.5,0.0,9.0),"quality":0.90,"pose":"stand"}
+]
+var game: Node3D
+var performers := {}
+
+func setup(owner_game: Node3D) -> void:
+	game=owner_game
+	# A deliberately undersized rest area: early clones fit, later clones improvise.
+	for x in [6.0,8.7]:
+		Props.solid_box(self,Vector3(2.15,0.24,0.88),Vector3(x,0.28,9.55),Color("80634f"))
+		Props.box(self,Vector3(1.75,0.16,0.72),Vector3(x,0.46,9.55),Color("b9a477"))
+		Props.box(self,Vector3(0.48,0.12,0.65),Vector3(x-0.62,0.58,9.55),Color("e5d9b8"))
+	Props.solid_box(self,Vector3(2.0,0.42,0.62),Vector3(11.2,0.25,9.45),Color("637b70"))
+	Props.solid_box(self,Vector3(1.1,0.78,0.72),Vector3(13.4,0.39,9.45),Color("8d6b50"))
+
+func workers() -> Array:
+	var result: Array=[]
+	for station in game.service.stations:
+		if station.manual_station: continue
+		for role in range(station.role_count() if station.staffed<0 else station.staffed):
+			var member: Dictionary=station.crew[role]
+			var id:=int(member.get("clone_id",0))
+			if id<=0: continue
+			var home: Vector3=station.to_global(Vector3((-1.35 if role==0 else 1.35) if station.role_count()==2 else 0,0,1.85))
+			result.append({"id":id,"name":str(member.name),"home":home,"station":station})
+	for worker in game.service.progress.free_workers:
+		var id:=int(worker.get("id",0))
+		if id>0: result.append({"id":id,"name":"Свободный клон №%d"%id,"home":Vector3(1.0,0,7.95),"station":null})
+	result.sort_custom(func(a,b): return int(a.id)<int(b.id))
+	return result
+
+func rest_spot(index: int) -> Dictionary:
+	if index<REST_SPOTS.size(): return REST_SPOTS[index].duplicate(true)
+	var layer:=1+int((index-REST_SPOTS.size())/2)
+	var side: float=-1.0 if index%2==0 else 1.0
+	return {"position":Vector3(6.0+side*0.18,0.92+layer*0.28,9.55),"quality":0.90,"pose":"stack"}
+
+func plan() -> Array:
+	var entries:=workers()
+	var result: Array=[]
+	if entries.is_empty(): return result
+	# Every usable place is filled from best to worst, but clone identities rotate between nights.
+	for spot_index in range(entries.size()):
+		var worker_index:=posmod(spot_index+game.service.progress.day,entries.size())
+		result.append({"worker":entries[worker_index],"spot":rest_spot(spot_index)})
+	return result
+
+func apply_rest() -> void:
+	var summary: Array=[]
+	for assignment in plan():
+		var worker: Dictionary=game.service.clone_data(int(assignment.worker.id))
+		if worker.is_empty(): continue
+		worker.rest=clampf(float(assignment.spot.quality),0.9,1.1)
+		summary.append({"id":assignment.worker.id,"rest":worker.rest})
+	game.service.progress.revision+=1
+	game.service.trace("rest_applied",{"day":game.service.progress.day+1,"workers":summary})
+
+func settle(actor: Node3D, spot: Dictionary, identity: int) -> void:
+	actor.position=spot.position
+	actor.book.set_reading(false)
+	actor.notebook.hide()
+	actor.rotation=Vector3.ZERO
+	actor.head.rotation=Vector3.ZERO
+	for leg in actor.legs: leg.rotation.x=0
+	match str(spot.pose):
+		"bed": actor.rotation.z=PI/2; actor.rotation.y=PI if identity%2==0 else 0.0
+		"bench": actor.rotation.z=0.35; actor.rotation.y=PI/2
+		"table": actor.rotation.z=1.18; actor.rotation.y=-PI/2
+		"floor": actor.rotation.z=PI/2; actor.rotation.y=identity*0.7
+		"stack": actor.rotation.z=PI/2; actor.rotation.y=PI if identity%2==0 else 0.0
+		"stand": actor.rotation.y=PI; actor.head.rotation.x=0.38
+
+func _process(_delta: float) -> void:
+	if game==null: return
+	if game.service.progress.shift!="night":
+		for entry in performers.values(): entry.actor.queue_free(); entry.hat.queue_free()
+		performers.clear()
+		return
+	var assignments:=plan()
+	var current_ids: Array=[]
+	for index in range(assignments.size()):
+		var info: Dictionary=assignments[index].worker
+		var spot: Dictionary=assignments[index].spot
+		var id:=int(info.id)
+		current_ids.append(id)
+		if not performers.has(id):
+			var actor:=Avatar.new(); add_child(actor)
+			var hat:=Node3D.new(); add_child(hat)
+			Props.cylinder(hat,0.26,0.22,Vector3.ZERO,Color("fff0cb"))
+			Props.cylinder(hat,0.29,0.04,Vector3(0,-0.09,0),Color("eee0b6"))
+			performers[id]={"actor":actor,"hat":hat}
+		var entry: Dictionary=performers[id]
+		var actor: Node3D=entry.actor
+		var hat: Node3D=entry.hat
+		var t:=maxf(0,game.service.progress.night_elapsed-index*0.18)
+		var variant:=id%3
+		var home: Vector3=info.home
+		var target:=Vector3(spot.position.x,0,spot.position.z)
+		var route: Array=[home,Vector3(home.x,0,4.8),Vector3(5,0,4.8),Vector3(5,0,8.15),target]
+		var speed: float=[3.6,4.6,2.9][variant]
+		var distance:=maxf(0,t-0.85)*speed
+		var point:=home
+		var direction:=Vector3.BACK
+		var done:=false
+		for i in range(1,route.size()):
+			var segment: Vector3=route[i]-route[i-1]
+			if distance<=segment.length(): point=route[i-1]+segment.normalized()*distance; direction=segment; break
+			distance-=segment.length(); point=route[i]
+			if i==route.size()-1: done=true
+		var station=info.station
+		var training:=station!=null and station.training.active()
+		actor.visible=not training
+		if done:
+			settle(actor,spot,id)
+			actor.caption.text=str(info.name)+"\nОтдых %d%%"%roundi(float(spot.quality)*100)
+		else:
+			actor.position=point
+			actor.rotation.y=atan2(-direction.x,-direction.z)
+			actor.caption.text=str(info.name)+" · смена закончилась!"
+			actor.celebrate(t,variant,t<0.85)
+		actor.hat.visible=not done and t<0.42
+		hat.visible=t>=0.42 and not training
+		var ht:=clampf(t-0.42,0,1.25)
+		hat.position=home+Vector3(sin(id*2.7)*ht*1.6,maxf(0.12,1.8+2.2*ht-3.0*ht*ht),cos(id*2.7)*ht*1.5)
+		hat.rotation=Vector3(ht*5,ht*3,ht*4)
+		if t>1.67: hat.position.y=0.12
+	for id in performers.keys():
+		if id not in current_ids:
+			performers[id].actor.queue_free(); performers[id].hat.queue_free(); performers.erase(id)
+''')
+
+          # Multiplayer protocol changes because lab state now contains new phases understood by the UI.
+          edit('scripts/coop_session.gd','const PROTOCOL := "slapdash-cafe-life-16"','const PROTOCOL := "slapdash-cafe-life-17"')
+          edit('scripts/steam_lobby.gd','const PROTOCOL := "slapdash-cafe-stations-9"','const PROTOCOL := "slapdash-cafe-stations-10"')
+
+          # --- Focused regression tests. ---
+          p=Path('tests/test_clone_laboratory.gd')
+          s=p.read_text()
+          old='''\tcheck(lab.state.phase=="fill_ready","Balance phase completes")\n\tlab.press(1,lab.state.revision)\n\tlab.advance((0.5 if good else 0.97)/(0.42 if lab.state.damper else 1.2))\n\tlab.press(1,lab.state.revision)\n\tcheck(lab.state.phase=="ready","Needle accepts any zone")'''
+          new='''\tif target_id==0:\n\t\tcheck(lab.state.phase=="grow_blank","New clone starts autonomous first growth stage")\n\t\tgame.player.position=Vector3(-6,0.02,0)\n\t\tlab.advance(lab.GROW_PREP_SECONDS-1.0)\n\t\tcheck(lab.state.phase=="grow_blank","Player may leave while blank grows")\n\t\tlab.advance(1.1)\n\t\tcheck(lab.state.phase=="stage2_ready","Finished stage waits for player")\n\t\tlab.advance(30.0)\n\t\tcheck(lab.state.phase=="stage2_ready","Ready stage waits indefinitely without penalty")\n\t\tgame.player.position=Vector3(0,0.02,7)\n\telse:\n\t\tcheck(lab.state.phase=="fill_ready","Calibration proceeds directly to stabilizer")\n\tlab.press(1,lab.state.revision)\n\tlab.advance((0.5 if good else 0.97)/(0.42 if lab.state.damper else 1.2))\n\tlab.press(1,lab.state.revision)\n\tif target_id==0:\n\t\tcheck(lab.state.phase=="grow_finish","Needle starts autonomous maturation")\n\t\tgame.player.position=Vector3(-6,0.02,0)\n\t\tlab.advance(lab.GROW_FINISH_SECONDS)\n\t\tcheck(lab.state.phase=="ready","Mature clone waits for release")\n\t\tgame.player.position=Vector3(0,0.02,7)\n\telse: check(lab.state.phase=="ready","Needle accepts any zone")'''
+          if old not in s: raise SystemExit('test_clone_laboratory helper block not found')
+          p.write_text(s.replace(old,new,1).replace('PASS: balance scoring, individual tempo, calibration, upgrades, persistence and ownership','PASS: asynchronous clone growth, balance scoring, individual tempo, calibration, upgrades, persistence and ownership'))
+
+          p=Path('tests/test_cafe_life.gd')
+          s=p.read_text()
+          old='''\tp.night_elapsed=25; game.evening._process(DT)\n\tcheck(not entry.actor.visible,"Staff reach rest room")\n\tservice.next_day(); game.evening._process(DT)\n\tcheck(game.evening.performers.is_empty(),"Morning clears night props and opens cafe")'''
+          new='''\tp.night_elapsed=25; game.evening._process(DT)\n\tcheck(entry.actor.visible and "Отдых" in entry.actor.caption.text,"Staff settle visibly into rest spots")\n\tvar resting_id: int=st.crew[0].clone_id\n\tservice.next_day(); game.evening._process(DT)\n\tvar rested: Dictionary=service.clone_data(resting_id)\n\tcheck(float(rested.get("rest",1.0))>=0.9 and float(rested.get("rest",1.0))<=1.1,"Night assigns bounded next-day rest multiplier")\n\tcheck(is_equal_approx(st.crew_tempo(),float(rested.tempo)*float(rested.rest)),"Rest multiplies effective tempo without changing permanent tempo")\n\tcheck(game.evening.performers.is_empty(),"Morning clears night props and opens cafe")'''
+          if old not in s: raise SystemExit('test_cafe_life rest block not found')
+          p.write_text(s.replace(old,new,1).replace('PASS: paid flask risk, graded filling, queue, meal handoff, night celebration and auto-opening','PASS: paid flask risk, graded filling, queue, meal handoff, visible rest quality and auto-opening'))
+
+          # Keep the design note in sync with the implemented first iteration.
+          p=Path('docs/LABORATORY_AND_RECIPE_BOOK.md')
+          s=p.read_text()
+          note='''\n## Асинхронное выращивание и отдых\n\nНовый клон создаётся параллельно дневной работе кафе. После колбы аппарат сам выращивает заготовку 75 секунд; готовый этап ждёт игрока без штрафа. После стабилизатора клон дозревает ещё 75 секунд и снова ждёт выпуска. Во время обоих автоматических этапов игрок свободно готовит, обучает клонов и занимается покупками. Перекалибровка существующего работника остаётся короткой процедурой без ожидания.\n\nПосле смены клоны бросают шапки, бегут в комнату отдыха и занимают доступные места от лучших к худшим. Место задаёт множитель темпа следующего дня в диапазоне 90–110%; постоянный темп из лаборатории не меняется, усталость между днями не накапливается. Переход к утру рассчитывает отдых сразу — ждать анимацию сна не требуется. Текущая комната использует фиксированный набор мест; покупки и расширение мест добавляются отдельным следующим слоем.\n'''
+          if '## Асинхронное выращивание и отдых' not in s: p.write_text(s.rstrip()+"\n"+note)
+          PY
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit
+      - name: Focused tests
+        run: |
+          set -e
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_tempo.gd
+          /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd
+      - name: Commit tested implementation
+        run: |
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/clone_laboratory.gd scripts/staff_evening.gd scripts/work_station.gd scripts/cafe_service.gd scripts/cafe_progression.gd scripts/coop_session.gd scripts/steam_lobby.gd tests/test_clone_laboratory.gd tests/test_cafe_life.gd docs/LABORATORY_AND_RECIPE_BOOK.md
+          git commit -m "Run clone growth alongside cafe work and add nightly rest"
+          git push origin HEAD:sol/async-lab-rest
