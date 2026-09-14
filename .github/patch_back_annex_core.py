@@ -21,6 +21,12 @@ if old not in s: raise SystemExit('interaction target block not found')
 s=s.replace(old,new,1)
 p.write_text(s)
 
+p=Path('scripts/cafe_annex.gd')
+s=p.read_text()
+s=s.replace('var occupant := game.session.sleeping_peer_for_bed(index)','var occupant: int = int(game.session.sleeping_peer_for_bed(index))')
+s=s.replace('''\tif "book" in actor and actor.book: actor.book.set_reading(false)\n\tif "notebook" in actor and actor.notebook: actor.notebook.hide()\n\tif "head" in actor and actor.head: actor.head.rotation=Vector3.ZERO\n\tif "legs" in actor:\n\t\tfor leg in actor.legs: leg.rotation.x=0\n''','''\tactor.book.set_reading(false)\n\tactor.notebook.hide()\n\tactor.head.rotation=Vector3.ZERO\n\tfor leg in actor.legs: leg.rotation.x=0\n''')
+p.write_text(s)
+
 p=Path('scripts/cafe_development_view.gd')
 s=p.read_text()
 old='''\tvar sleep_control := Props.box(self,Vector3(0.58,0.18,0.42),Annex.PLAYER_SLEEP_POINT,Color("d8c998"))\n\tnight_controls.append({"node": sleep_control, "action": "next_day", "hint": "(E) Отдохнуть до утра"})\n\tvar sleep_label := Props.text(self,"ОТДОХНУТЬ ДО УТРА",Annex.PLAYER_SLEEP_POINT+Vector3(0,0.55,0),18,Color("e7c891"))\n\tsleep_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED\n\tsleep_label.pixel_size = 0.004\n'''
