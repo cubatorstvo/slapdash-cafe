@@ -54,12 +54,18 @@ func ready_crew() -> bool:
 	return manual_station or staffed < 0 or staffed >= role_count()
 
 func crew_tempo() -> float:
-	var slowest := 10.0
-	for member in crew: slowest = minf(slowest,float(member.get("tempo",1.0)))
-	return clampf(slowest,0.7,10.0)
+	var slowest := 11.0
+	for member in crew:
+		var effective := float(member.get("tempo",1.0))*float(member.get("rest",1.0))
+		slowest = minf(slowest,effective)
+	return clampf(slowest,0.63,11.0)
 
 func crew_name(role: int) -> String:
-	return str(crew[role].name) + " · %d%%" % roundi(float(crew[role].get("tempo",1.0))*100)
+	var base := float(crew[role].get("tempo",1.0))
+	var rest := float(crew[role].get("rest",1.0))
+	var text := str(crew[role].name) + " · %d%%" % roundi(base*rest*100)
+	if not is_equal_approx(rest,1.0): text += " · отдых %d%%" % roundi(rest*100)
+	return text
 
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()

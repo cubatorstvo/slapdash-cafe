@@ -101,7 +101,7 @@ func can_attempt(stations: Array, served: int) -> bool:
 
 func objective(stations: Array, served: int, opened: bool) -> String:
 	if phase == "tasting": return "Дегустатор · блюдо %d/3 на B или лучше" % (tasting_done.size() + 1)
-	if shift == "night": return "Ночь · лаборатория %d/3 · следующий день у двери отдыха" % lab_stage if stars == 0 else "Ночь · обустрой кафе или отдохни до утра"
+	if shift == "night": return "Ночь · клоны устраиваются в комнате отдыха · следующий день у двери"
 	if shift == "closing": return "Заканчиваем последние заказы · затем ночной перерыв"
 	if stars == 0:
 		if not starter_reward: return "Первый гость → соус в подарок · открой кафе у компьютера"

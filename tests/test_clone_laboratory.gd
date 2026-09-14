@@ -13,11 +13,28 @@ func cycle(good := true, target_id := 0) -> void:
 		if lab.state.phase!="fill": break
 		# Deliberately poor attempt keeps filling; good input balances in the green band.
 		lab.advance_balance(DT, true if not good and i<180 else float(lab.state.level)<0.32)
-	check(lab.state.phase=="fill_ready","Balance phase completes")
+	if target_id==0:
+		check(lab.state.phase=="grow_blank","New clone starts autonomous first growth stage")
+		game.player.position=Vector3(-6,0.02,0)
+		lab.advance(lab.GROW_PREP_SECONDS-1.0)
+		check(lab.state.phase=="grow_blank","Player may leave while blank grows")
+		lab.advance(1.1)
+		check(lab.state.phase=="stage2_ready","Finished stage waits for player")
+		lab.advance(30.0)
+		check(lab.state.phase=="stage2_ready","Ready stage waits indefinitely without penalty")
+		game.player.position=Vector3(0,0.02,7)
+	else:
+		check(lab.state.phase=="fill_ready","Calibration proceeds directly to stabilizer")
 	lab.press(1,lab.state.revision)
 	lab.advance((0.5 if good else 0.97)/(0.42 if lab.state.damper else 1.2))
 	lab.press(1,lab.state.revision)
-	check(lab.state.phase=="ready","Needle accepts any zone")
+	if target_id==0:
+		check(lab.state.phase=="grow_finish","Needle starts autonomous maturation")
+		game.player.position=Vector3(-6,0.02,0)
+		lab.advance(lab.GROW_FINISH_SECONDS)
+		check(lab.state.phase=="ready","Mature clone waits for release")
+		game.player.position=Vector3(0,0.02,7)
+	else: check(lab.state.phase=="ready","Needle accepts any zone")
 func run() -> void:
 	game=preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game); await process_frame
@@ -87,5 +104,5 @@ func run() -> void:
 	game.session.members.erase(7); lab.advance(3.0)
 	check(lab.state.phase=="idle","Disconnect releases laboratory")
 	game._shutdown_tree(game); game.free()
-	print("PASS: balance scoring, individual tempo, calibration, upgrades, persistence and ownership" if not failed else "FAILED")
+	print("PASS: asynchronous clone growth, balance scoring, individual tempo, calibration, upgrades, persistence and ownership" if not failed else "FAILED")
 	quit(1 if failed else 0)

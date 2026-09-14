@@ -596,11 +596,12 @@ func advance_shift(delta: float) -> void:
 		progress.shift = "night"
 		progress.night_elapsed=0.0
 		progress.revision += 1
-		announce("Кафе закрыто до утра. Можно заняться лабораторией и обустройством или отдохнуть.")
+		announce("Смена закончена. Клоны бегут в комнату отдыха; посмотри, как устроились, или сразу начинай новый день.")
 		if game != null: game.save_cafe()
 
 func next_day() -> String:
 	if progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."
+	if game != null and is_instance_valid(game.evening): game.evening.apply_rest()
 	trace("next_day", {"day":progress.day+1})
 	progress.day += 1
 	progress.shift = "open"
@@ -623,8 +624,11 @@ func trace(kind: String, data := {}) -> void:
 
 func normalize_workers() -> void:
 	while progress.free_workers.size() < progress.free_clones:
-		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0})
+		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})
 		progress.next_clone_id+=1
+	for worker in progress.free_workers:
+		worker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)
+		worker.rest=clampf(float(worker.get("rest",1.0)),0.9,1.1)
 	for station in stations:
 		if station.manual_station: continue
 		for role in range(station.role_count() if station.staffed<0 else station.staffed):
@@ -632,6 +636,7 @@ func normalize_workers() -> void:
 			if not member.has("clone_id"):
 				member.clone_id=progress.next_clone_id; progress.next_clone_id+=1
 			member.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)
+			member.rest=clampf(float(member.get("rest",1.0)),0.9,1.1)
 	progress.free_clones=progress.free_workers.size()
 
 func assign_clones() -> void:
@@ -647,6 +652,7 @@ func assign_clones() -> void:
 			var worker: Dictionary=progress.free_workers.pop_at(available)
 			station.crew[station.staffed].clone_id=worker.id
 			station.crew[station.staffed].tempo=worker.tempo
+			station.crew[station.staffed].rest=worker.get("rest",1.0)
 			station.staffed+=1
 			progress.revision+=1
 	progress.free_clones=progress.free_workers.size()
@@ -674,7 +680,7 @@ func create_clone(tempo := 1.0, prepaid := false) -> String:
 	if progress.stars<1 or progress.lab_stage<3: return "Нужны готовая лаборатория и первая звезда."
 	if not prepaid and progress.cash<60: return "Ингредиенты клона стоят 60."
 	if not prepaid: progress.cash-=60
-	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0)})
+	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":1.0})
 	progress.next_clone_id+=1
 	progress.free_clones=progress.free_workers.size()
 	assign_clones()

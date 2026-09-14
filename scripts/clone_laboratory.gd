@@ -2,6 +2,8 @@ extends Node3D
 ## One host-owned physical apparatus. A cycle is transient; only a finished clone is saved.
 const Props = preload("res://scripts/props.gd")
 const BALANCE_SECONDS := 6.0
+const GROW_PREP_SECONDS := 75.0
+const GROW_FINISH_SECONDS := 75.0
 const BUTTON := Vector3(0,1.12,7.85)
 var game: Node3D
 var state := fresh_state()
@@ -11,6 +13,7 @@ var needle: MeshInstance3D
 var button: MeshInstance3D
 var caption: Label3D
 var little_clone: Node3D
+var growth_legs: Node3D
 var pulse_seen := 0
 var revision_seen := -1
 var burst_sound: AudioStreamPlayer3D
@@ -96,6 +99,16 @@ func setup(owner_game: Node3D) -> void:
 		Props.box(little_clone,Vector3(0.095,0.18,0.12),Vector3(x,0.1,0),Color("344e48"))
 	for x in [-0.21,0.21]: Props.box(little_clone,Vector3(0.09,0.32,0.09),Vector3(x,0.36,0),Color("79b8a2"))
 	little_clone.hide()
+	# The machine exposes progress physically: legs first, then the whole clone.
+	growth_legs = Node3D.new()
+	apparatus.add_child(growth_legs)
+	growth_legs.position = Vector3(0.98,1.03,7.98)
+	for x in [-0.065,0.065]:
+		var leg := Node3D.new()
+		growth_legs.add_child(leg)
+		leg.position.x = x
+		Props.box(leg,Vector3(0.095,0.36,0.12),Vector3(0,0.18,0),Color("344e48"))
+	growth_legs.hide()
 	for i in range(10):
 		var drop:=Props.ball(apparatus,0.05,Vector3(-0.94,1.4,7.96),Color("c4bc61"))
 		drop.hide(); burst_parts.append(drop)
@@ -167,8 +180,11 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		match state.phase:
 			"idle": text="(E) Начать · 60" if selected_clone().is_empty() else "(E) Перекалибровать · попытка 20"
 			"fill": text="Удерживай E / ЛКМ — уровень растёт; отпусти — падает"
+			"grow_blank": text="Аппарат выращивает заготовку · можно идти в кафе"
+			"stage2_ready": text="(E / ЛКМ) Заготовка готова · к стабилизатору"
 			"fill_ready": text="(E / ЛКМ) К стабилизатору"
 			"tune": text="(E / ЛКМ) Зафиксировать стрелку"
+			"grow_finish": text="Клон дозревает · можно идти в кафе"
 			"ready": text="(E / ЛКМ) Сохранить результат" if int(state.clone_id)>0 else "(E / ЛКМ) Выпустить клона · уже оплачено"
 			"done": text="Готово!"
 			"failed": text="Жидкость испорчена · нужна новая попытка"
@@ -196,7 +212,7 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 			state.level=0.0; state.age=0.0; state.balanced=0.0; state.exposure=0.0; state.integral=0.0; state.armed=false; state.notice=""
 			game.service.trace("cloning_started",{"peer":peer,"clone":state.clone_id})
 		"fill": return ""
-		"fill_ready": state.phase="tune"; state.age=0.0; state.needle=0.0
+		"fill_ready", "stage2_ready": state.phase="tune"; state.age=0.0; state.needle=0.0
 		"tune":
 			# Use the displayed server age within a bounded network-delay window for guests.
 			var age: float=state.age
@@ -204,7 +220,9 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 			state.needle=pingpong(age*(0.42 if state.damper else 1.2),1.0)
 			state.needle_quality=zone_quality(state.needle)
 			state.tempo=snappedf(lerpf(state.low,state.high,state.fill_quality*0.6+state.needle_quality*0.4),0.01)
-			state.phase="ready"
+			state.phase="grow_finish" if int(state.clone_id)==0 else "ready"
+			state.age=0.0
+		"grow_blank", "grow_finish": return ""
 		"ready":
 			if int(state.clone_id)>0:
 				var worker: Dictionary=game.service.clone_data(int(state.clone_id))
@@ -226,18 +244,32 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 
 func advance(delta: float) -> void:
 	if state.phase=="idle": return
-	if state.phase not in ["done","failed"] and (not inside(peer_position(int(state.owner))) or game.service.training_for(int(state.owner))!=null):
-		game.service.trace("cloning_cancelled",{"reason":"left_apparatus"})
-		reset(); game.service.assign_clones(); return
+	var owner := int(state.owner)
+	var autonomous := state.phase in ["grow_blank","stage2_ready","grow_finish","ready"]
+	if state.phase not in ["done","failed"]:
+		if owner>1 and not game.session.members.has(owner):
+			game.service.trace("cloning_cancelled",{"reason":"owner_disconnected"})
+			reset(); game.service.assign_clones(); return
+		if not autonomous and (not inside(peer_position(owner)) or game.service.training_for(owner)!=null):
+			game.service.trace("cloning_cancelled",{"reason":"left_apparatus"})
+			reset(); game.service.assign_clones(); return
 	state.age=float(state.age)+delta
 	match state.phase:
 		"fill":
-			var held := local_holding() if int(state.owner)==1 else false
-			if int(state.owner)!=1:
-				var pose: Dictionary=game.session.player_poses.get(int(state.owner),{})
+			var held := local_holding() if owner==1 else false
+			if owner!=1:
+				var pose: Dictionary=game.session.player_poses.get(owner,{})
 				held=pose.get("lab_hold",false) and Time.get_ticks_msec()-int(pose.get("received_at",0))<350
 			advance_balance(delta,held)
+		"grow_blank":
+			if float(state.age)>=GROW_PREP_SECONDS:
+				state.phase="stage2_ready"; state.age=0.0; state.revision=int(state.revision)+1; state.pulse=int(state.pulse)+1
+				state.notice="Заготовка готова и спокойно ждёт тебя"
 		"tune": state.needle=pingpong(float(state.age)*(0.42 if state.damper else 1.2),1.0)
+		"grow_finish":
+			if float(state.age)>=GROW_FINISH_SECONDS:
+				state.phase="ready"; state.age=0.0; state.revision=int(state.revision)+1; state.pulse=int(state.pulse)+1
+				state.notice="Клон дозрел и ждёт выпуска"
 		"done", "failed":
 			if float(state.age)>2.5: reset()
 
@@ -261,7 +293,14 @@ func advance_balance(delta: float, held: bool) -> void:
 	state.balanced=float(state.balanced)+sample*speed
 	if float(state.balanced)>=BALANCE_SECONDS-0.00001:
 		state.fill_quality=clampf(float(state.integral)/maxf(0.001,float(state.exposure)),0,1)
-		state.phase="fill_ready"; state.revision=int(state.revision)+1
+		if int(state.clone_id)==0:
+			state.phase="grow_blank"; state.age=0.0; state.notice="Аппарат выращивает заготовку · можешь заняться кафе"
+		else: state.phase="fill_ready"
+		state.revision=int(state.revision)+1
+
+func countdown(total: float) -> String:
+	var seconds := maxi(0,ceili(total-float(state.age)))
+	return "%d:%02d" % [seconds/60,seconds%60]
 
 func _process(_delta: float) -> void:
 	if game == null: return
@@ -276,25 +315,41 @@ func _process(_delta: float) -> void:
 	liquid.position.y = 1.02+0.38*level
 	needle.position.x = -0.58+1.16*float(state.needle)
 	button.position.y = BUTTON.y - (0.035 if state.phase=="done" else 0.0)
-	little_clone.visible = state.phase in ["ready","done"]
+	growth_legs.visible = state.phase in ["grow_blank","stage2_ready","grow_finish"]
+	if growth_legs.visible:
+		var leg_progress := clampf(float(state.age)/GROW_PREP_SECONDS,0.0,1.0) if state.phase=="grow_blank" else 1.0
+		growth_legs.scale=Vector3(1,0.25+0.75*leg_progress,1)
+		growth_legs.rotation.z=sin(float(state.age)*6.0)*0.08
+	little_clone.visible = state.phase in ["grow_finish","ready","done"]
 	little_clone.rotation.z = sin(float(state.age)*8)*0.09 if state.phase=="done" else 0.0
-	little_clone.scale = Vector3.ONE * (0.85 + minf(0.15,float(state.age)*0.2) if state.phase=="done" else 0.85)
+	var maturity := clampf(float(state.age)/GROW_FINISH_SECONDS,0.0,1.0) if state.phase=="grow_finish" else 1.0
+	little_clone.scale = Vector3.ONE * ((0.45+0.40*maturity) if state.phase=="grow_finish" else (0.85+minf(0.15,float(state.age)*0.2) if state.phase=="done" else 0.85))
 	progress_bar.scale.x=maxf(0.001,float(state.balanced)/BALANCE_SECONDS)
 	progress_bar.position.x=-1.2+0.26*progress_bar.scale.x
 	for item in upgrade_nodes: upgrade_nodes[item].visible=item in game.service.progress.lab_upgrades
 	var selected:=selected_clone()
 	selector_label.text="НОВЫЙ КЛОН" if selected.is_empty() else str(selected.name)+" · %d%%"%roundi(float(selected.tempo)*100)
 	var limits:=tempo_range()
-	var titles := {"idle":"ТЯП-КЛОН · %d–%d%%"%[roundi(limits.x*100),roundi(limits.y*100)],"fill":"1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ","fill_ready":"КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ","tune":"2 · ПОЙМАЙ СТРЕЛКУ","ready":"3 · РЕЗУЛЬТАТ ГОТОВ","done":"ЕЩЁ ОДИН Я!","failed":"ПШШШ! НЕ ПОЛУЧИЛОСЬ"}
+	var title := ""
+	match state.phase:
+		"idle": title="ТЯП-КЛОН · %d–%d%% · свободно %d"%[roundi(limits.x*100),roundi(limits.y*100),game.service.progress.free_clones]
+		"fill": title="1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ"
+		"grow_blank": title="РАСТУТ НОГИ · %s · ИДИ РАБОТАЙ"%countdown(GROW_PREP_SECONDS)
+		"stage2_ready": title="НОГИ ГОТОВЫ · НУЖЕН СТАБИЛИЗАТОР"
+		"fill_ready": title="КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ"
+		"tune": title="2 · ПОЙМАЙ СТРЕЛКУ"
+		"grow_finish": title="КЛОН ДОЗРЕВАЕТ · %s · ИДИ РАБОТАЙ"%countdown(GROW_FINISH_SECONDS)
+		"ready": title="3 · КЛОН ГОТОВ"
+		"done": title="ЕЩЁ ОДИН Я!"
+		"failed": title="ПШШШ! НЕ ПОЛУЧИЛОСЬ"
 	var fill: float=float(state.integral)/maxf(0.001,float(state.exposure))
 	result_label.text=""
 	if state.phase!="idle": result_label.text="Колба: %d%%"%roundi(fill*100)
 	if state.phase=="ready" and int(state.clone_id)>0:
 		var worker: Dictionary=game.service.clone_data(int(state.clone_id))
 		result_label.text+=" · прежний темп %d%%"%roundi(float(worker.get("tempo",1.0))*100)
-	if state.phase in ["ready","done"]: result_label.text+=" · Стрелка: %d%%\nТемп клона: %d%%"%[roundi(float(state.needle_quality)*100),roundi(float(state.tempo)*100)]
-	if state.phase=="idle": titles.idle += " · свободно %d" % game.service.progress.free_clones
-	caption.text = str(titles[state.phase]) + ("\n"+str(state.notice) if not str(state.notice).is_empty() else "")
+	if state.phase in ["grow_finish","ready","done"]: result_label.text+=" · Стрелка: %d%%\nТемп клона: %d%%"%[roundi(float(state.needle_quality)*100),roundi(float(state.tempo)*100)]
+	caption.text = title + ("\n"+str(state.notice) if not str(state.notice).is_empty() else "")
 	if int(state.revision)!=revision_seen:
 		if state.phase=="failed": burst_sound.play()
 		if revision_seen>=0 and state.phase not in ["done","idle"] and game.camera.global_position.distance_to(BUTTON)<5: game.feedback.play_ui("click")

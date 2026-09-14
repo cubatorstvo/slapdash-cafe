@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-life-16"
+const PROTOCOL := "slapdash-cafe-life-17"
 var game: Node3D
 var transport := "offline"
 var synced := false
