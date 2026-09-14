@@ -1,6 +1,5 @@
 extends RefCounted
-## Shared geometry and activity anchors for the fully furnished lounge preview.
-## Expansion stages are catalogue metadata; the current playtest uses the largest shell.
+## Shared staged geometry: meshes, collisions, leisure anchors and routes use the same layout.
 const ROOM_STAGES := [
 	{"id":"small","back_z":18.5},
 	{"id":"medium","back_z":22.0},
@@ -13,7 +12,35 @@ const BEDS_Z := 25.7
 const GRID_STEP := 0.40
 const WALK_MARGIN := 0.34
 
-static func catalogue() -> Array:
+static func back_z(tier: int) -> float:
+	return float(ROOM_STAGES[clampi(tier,0,2)].back_z)
+
+static func bed_center(tier: int) -> Vector3:
+	return Vector3(AISLE_X,0.48,back_z(tier)-1.3)
+
+static func offsets(tier: int) -> Dictionary:
+	if tier==0:
+		return {"rocking_chair":Vector3(0,0,-2),"beanbag":Vector3(0,0,-2.1),"bookcase":Vector3(0,0,-8),"floor_lamp":Vector3(0,0,-2.1)}
+	if tier==1:
+		return {"bookcase":Vector3(0,0,-8),"board_games":Vector3(7.3,0,-2.5),"tea_station":Vector3(-7.2,0,-2),"snack_fridge":Vector3(0,0,-2.05)}
+	return {}
+
+static func catalogue(tier := 2, owned: Array = []) -> Array:
+	var result: Array=[]
+	var shifts:=offsets(tier)
+	for spec in _base_catalogue():
+		var required: int=["small","medium","large"].find(spec.stage)
+		if required>tier or (not owned.is_empty() and spec.id not in owned): continue
+		spec.position+=Vector3(shifts.get(spec.id,Vector3.ZERO))
+		result.append(spec)
+	return result
+
+static func item_position(id: String, tier: int) -> Vector3:
+	for spec in catalogue(tier):
+		if spec.id==id: return spec.position
+	return Vector3(AISLE_X,0,12.0)
+
+static func _base_catalogue() -> Array:
 	return [
 		{"id":"sofa","title":"Диван на троих","stage":"small","position":Vector3(6.5,0,14.7),"yaw":0.0},
 		{"id":"television","title":"Телевизор с тумбой","stage":"small","position":Vector3(6.5,0,11.3),"yaw":PI},
@@ -35,7 +62,20 @@ static func catalogue() -> Array:
 static func slot(id: String, item: String, point: Vector3, approach: Vector3, yaw: float, pose: String, activity: String) -> Dictionary:
 	return {"id":id,"item":item,"position":point,"approach":approach,"yaw":yaw,"pose":pose,"activity":activity,"quality":1.0}
 
-static func activity_slots() -> Array:
+static func activity_slots(tier := 2, owned: Array = []) -> Array:
+	var result: Array=[]
+	var installed: Array=[]
+	for spec in catalogue(tier,owned): installed.append(spec.id)
+	var shifts:=offsets(tier)
+	for spot in _base_slots():
+		if spot.item not in installed: continue
+		var shift: Vector3=shifts.get(spot.item,Vector3.ZERO)
+		spot.position+=shift
+		spot.approach+=shift
+		result.append(spot)
+	return result
+
+static func _base_slots() -> Array:
 	# Interleave areas so even a small crew makes several corners feel inhabited.
 	return [
 		slot("sofa_left","sofa",Vector3(5.62,-0.10,14.45),Vector3(5.62,0,13.65),0,"watch","Смотрит телевизор"),
@@ -60,7 +100,7 @@ static func activity_slots() -> Array:
 		slot("snack_break","snack_fridge",Vector3(16.8,0,21.5),Vector3(16.8,0,21.5),PI,"snack","Выбирает перекус")
 	]
 
-static func obstacles() -> Array:
+static func obstacles(tier := 2, owned: Array = []) -> Array:
 	# Footprints also generate the furniture collision proxies.
 	var result: Array = [
 		Rect2(4.87,14.10,3.26,1.22), Rect2(5.12,10.92,2.76,0.74),
@@ -74,16 +114,45 @@ static func obstacles() -> Array:
 	]
 	for point in [Vector2(5.5,21.0),Vector2(7.9,21.0),Vector2(6.7,19.8),Vector2(6.7,22.2),Vector2(12.8,21.55),Vector2(14.2,21.55)]:
 		result.append(Rect2(point-Vector2(0.25,0.25),Vector2(0.50,0.50)))
-	result.append(Rect2(3.15,23.48,6.10,0.14))
-	result.append(Rect2(11.55,23.48,6.00,0.14))
-	result.append(Rect2(8.56,11.26,0.48,0.48))
-	result.append(Rect2(16.81,25.46,0.48,0.48))
-	for x in [4.7,7.95,11.2,14.45]:
-		result.append(Rect2(x-1.175,BEDS_Z-0.525,2.35,1.05))
+	var ids:=obstacle_items()
+	var installed: Array=[]
+	for spec in catalogue(tier,owned): installed.append(spec.id)
+	var shifted: Array=[]
+	var shifts:=offsets(tier)
+	for i in range(result.size()):
+		if ids[i] not in installed: continue
+		var shift: Vector3=shifts.get(ids[i],Vector3.ZERO)
+		var rect: Rect2=result[i]
+		rect.position+=Vector2(shift.x,shift.z)
+		shifted.append(rect)
+	if tier==2:
+		shifted.append(Rect2(3.15,23.48,6.10,0.14))
+		shifted.append(Rect2(11.55,23.48,6.00,0.14))
+	if "plants" in installed:
+		shifted.append(Rect2(8.56,11.26,0.48,0.48))
+		shifted.append(Rect2(16.81,back_z(tier)-1.54,0.48,0.48))
+	var bed:=bed_center(tier)
+	shifted.append(Rect2(bed.x-1.325,bed.z-0.625,2.65,1.25))
+	return shifted
+
+static func obstacle_items() -> Array:
+	return ["sofa","television","sofa","rocking_chair","foosball","arcade","table_tennis","board_games","bookcase","beanbag","tea_station","jukebox","aquarium","plants","floor_lamp","snack_fridge","board_games","board_games","board_games","board_games","tea_station","tea_station"]
+
+static func obstacle_heights(tier: int, owned: Array) -> Array:
+	var installed: Array=[]
+	for spec in catalogue(tier,owned): installed.append(spec.id)
+	var result: Array=[]
+	var ids:=obstacle_items()
+	for i in range(ids.size()):
+		if ids[i] not in installed: continue
+		result.append(2.0 if i in [5,8,11,15] else 0.44 if i in [16,17,18,19] else 0.70 if i in [20,21] else 0.85)
+	if tier==2: result.append(2.0); result.append(2.0)
+	if "plants" in installed: result.append(0.85); result.append(0.85)
+	result.append(0.54)
 	return result
 
-static func walkable(point: Vector3, blockers: Array) -> bool:
-	if point.x<3.34 or point.x>17.36 or point.z<11.18 or point.z>26.52: return false
+static func walkable(point: Vector3, blockers: Array, tier := 2) -> bool:
+	if point.x<3.34 or point.x>17.36 or point.z<11.18 or point.z>back_z(tier)-0.48: return false
 	for rect: Rect2 in blockers:
 		if rect.grow(WALK_MARGIN).has_point(Vector2(point.x,point.z)): return false
 	return true
@@ -91,7 +160,7 @@ static func walkable(point: Vector3, blockers: Array) -> bool:
 static func grid_point(cell: Vector2i) -> Vector3:
 	return Vector3(3.4+cell.x*GRID_STEP,0,11.25+cell.y*GRID_STEP)
 
-static func nearest_cell(point: Vector3, blockers: Array) -> Vector2i:
+static func nearest_cell(point: Vector3, blockers: Array, tier := 2) -> Vector2i:
 	var best := Vector2i(-1,-1)
 	var distance := INF
 	for x in range(35):
@@ -99,15 +168,15 @@ static func nearest_cell(point: Vector3, blockers: Array) -> Vector2i:
 			var cell := Vector2i(x,z)
 			var candidate := grid_point(cell)
 			var next_distance := point.distance_squared_to(candidate)
-			if next_distance<distance and walkable(candidate,blockers):
+			if next_distance<distance and walkable(candidate,blockers,tier):
 				best=cell
 				distance=next_distance
 	return best
 
-static func approach_path(target: Vector3) -> Array:
-	var blockers := obstacles()
-	var start := nearest_cell(ENTRANCE,blockers)
-	var goal := nearest_cell(target,blockers)
+static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:
+	var blockers := obstacles(tier,owned)
+	var start := nearest_cell(ENTRANCE,blockers,tier)
+	var goal := nearest_cell(target,blockers,tier)
 	var frontier: Array[Vector2i] = [start]
 	var previous := {start:start}
 	var cursor := 0
@@ -117,7 +186,7 @@ static func approach_path(target: Vector3) -> Array:
 		for offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:
 			var next: Vector2i=cell+offset
 			if next.x<0 or next.x>=35 or next.y<0 or next.y>=39 or previous.has(next): continue
-			if not walkable(grid_point(next),blockers): continue
+			if not walkable(grid_point(next),blockers,tier): continue
 			previous[next]=cell
 			frontier.append(next)
 	if not previous.has(goal): return []
@@ -139,13 +208,14 @@ static func approach_path(target: Vector3) -> Array:
 			if before.normalized().dot(after.normalized())<0.999: result.append(reverse_path[i])
 	return result
 
-static func overflow_slot(index: int) -> Dictionary:
-	var blockers := obstacles()
+static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionary:
+	var blockers := obstacles(tier,owned)
 	var candidates: Array = []
 	for z in range(12,24):
 		for x in [9.1,11.5,16.4]:
 			var point:=Vector3(x,0,float(z)+0.25)
-			if walkable(point,blockers): candidates.append(point)
+			if walkable(point,blockers,tier): candidates.append(point)
+	if candidates.is_empty(): candidates.append(ENTRANCE)
 	if index>=candidates.size():
 		# Unlimited crews share roomy floor perches in distinct vertical layers.
 		var base: Vector3=candidates[index%candidates.size()]
@@ -153,6 +223,43 @@ static func overflow_slot(index: int) -> Dictionary:
 	var point: Vector3=candidates[index]
 	return slot("overflow_%d"%index,"floor",point,point,0,"floor","Устроился на ковре")
 
-static func rest_spot(index: int) -> Dictionary:
-	var slots:=activity_slots()
-	return slots[index].duplicate(true) if index<slots.size() else overflow_slot(index-slots.size())
+static func rest_spot(index: int, tier := 2, owned: Array = []) -> Dictionary:
+	var slots:=activity_slots(tier,owned)
+	return slots[index].duplicate(true) if index<slots.size() else overflow_slot(index-slots.size(),tier,owned)
+
+static func sleep_spot(leisure: Dictionary, identity: int, tier: int) -> Dictionary:
+	var spot: Dictionary=leisure.duplicate(true)
+	spot.sleep_rotation=Vector3.ZERO
+	spot.sleep_kind="standing"
+	spot.activity="Спит стоя"
+	match str(leisure.item):
+		"sofa":
+			var layer: int=["sofa_left","sofa_middle","sofa_right"].find(leisure.id)
+			spot.position=item_position("sofa",tier)+Vector3(-1.05,0.68+maxi(0,layer)*0.32,-0.1)
+			spot.sleep_rotation=Vector3(0,0,-PI/2)
+			spot.sleep_kind="lying"
+			spot.activity="Спит поперёк дивана"
+		"board_games", "tea_station":
+			var layer: int=0
+			for other in _base_slots():
+				if other.id==leisure.id: break
+				if other.item==leisure.item: layer+=1
+			spot.position=item_position(leisure.item,tier)+Vector3(-0.6,1.03+layer*0.30,0)
+			spot.sleep_rotation=Vector3(0,0,-PI/2)
+			spot.sleep_kind="lying"
+			spot.activity="Спит на столе"
+		"rocking_chair","beanbag":
+			spot.sleep_kind="seated"
+			spot.activity="Задремал в кресле"
+		"arcade","bookcase","aquarium","snack_fridge":
+			spot.sleep_rotation=Vector3(-0.12,float(leisure.yaw),0.06)
+			spot.activity="Спит, уткнувшись носом"
+		_:
+			if identity%2==0:
+				spot.position=Vector3(leisure.approach)+Vector3(0,0.17,0)
+				spot.sleep_rotation=Vector3(PI/2,PI/2,0)
+				spot.sleep_kind="lying"
+				spot.activity="Спит на полу"
+			else:
+				spot.sleep_rotation=Vector3(0,float(leisure.yaw),0.08)
+	return spot

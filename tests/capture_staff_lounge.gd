@@ -22,6 +22,10 @@ func run() -> void:
 	root.add_child(game)
 	await process_frame
 	game.set_physics_process(false)
+	game.service.progress.lounge_tier=2
+	game.service.progress.lounge_items=preload("res://scripts/lounge_progression.gd").GOODS.keys()
+	game.annex.refresh_shell()
+	await process_frame
 	game.hud.hide(); game.menu.hide()
 	game.player.position=Vector3(-6,0,5)
 	camera=Camera3D.new()

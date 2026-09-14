@@ -1,5 +1,5 @@
 extends Node3D
-## Original low-poly furniture and ambient motion for the full lounge playtest.
+## Purchased low-poly furnishings, staged interiors and ambient motion.
 const P = preload("res://scripts/props.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
 const WOOD := Color("976c4f")
@@ -8,6 +8,9 @@ const CREAM := Color("f1d9ae")
 const TEAL := Color("528d82")
 const GOLD := Color("dca458")
 const INK := Color("263d45")
+var tier := 0
+var owned: Array = ["sofa"]
+var improved: Array = []
 var game: Node3D
 var fixtures := {}
 var rods: Array = []
@@ -18,11 +21,14 @@ var pong_ball: Node3D
 var arcade_sprite: Node3D
 var ambient_clock := 0.0
 
-func setup(owner_game: Node3D) -> void:
+func setup(owner_game: Node3D, room_tier := 0, items: Array = ["sofa"], upgrades: Array = []) -> void:
 	game=owner_game
+	tier=room_tier
+	owned=items.duplicate()
+	improved=upgrades.duplicate()
 	name="StaffLounge"
 	add_to_group("staff_lounge")
-	for spec in Layout.catalogue():
+	for spec in Layout.catalogue(tier,owned):
 		var item:=Node3D.new()
 		item.name=str(spec.id).to_pascal_case()
 		add_child(item)
@@ -47,12 +53,19 @@ func setup(owner_game: Node3D) -> void:
 			"plants": build_plant(item,1.0)
 			"floor_lamp": build_lamp(item)
 			"snack_fridge": build_fridge(item)
+		if spec.id in improved:
+			# A visible brass badge and fresh upholstery identify improved furnishings.
+			var badge:=label(item,"★",Vector3(0,1.55,0),30)
+			badge.modulate=GOLD
+			badge.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+			box(item,Vector3(0.42,0.035,0.28),Vector3(0,0.12,-0.48),GOLD)
 	build_interior()
 	# Shared footprint proxies keep walking and clone routes consistent.
-	var blockers:=Layout.obstacles()
-	for i in range(blockers.size()-4):
+	var blockers:=Layout.obstacles(tier,owned)
+	var heights:=Layout.obstacle_heights(tier,owned)
+	for i in range(blockers.size()-1):
 		var rect: Rect2=blockers[i]
-		var height: float=2.0 if i in [5,8,11,15,22,23] else 0.44 if i in [16,17,18,19] else 0.70 if i in [20,21] else 0.85
+		var height: float=heights[i]
 		P.collision_box(self,Vector3(rect.size.x,height,rect.size.y),Vector3(rect.get_center().x,height*0.5,rect.get_center().y))
 
 func box(parent: Node3D, size: Vector3, at: Vector3, color: Color) -> MeshInstance3D:
@@ -96,8 +109,8 @@ func build_sofa(parent: Node3D) -> void:
 		cushion.rotation.z=x*0.20
 	box(parent,Vector3(0.48,0.035,0.78),Vector3(1.0,0.67,-0.14),Color("e3caa0"))
 	var table:=Node3D.new()
-	add_child(table)
-	table.position=Vector3(6.5,0,12.75)
+	parent.add_child(table)
+	table.position=Vector3(0,0,-1.95)
 	legs(table,1.52,0.6,0.35)
 	box(table,Vector3(1.8,0.09,0.8),Vector3(0,0.39,0),WOOD)
 	box(table,Vector3(0.22,0.025,0.09),Vector3(0.35,0.46,0.06),INK)
@@ -300,50 +313,54 @@ func rug(at: Vector3, size: Vector2, color: Color) -> void:
 		for i in range(12): box(self,Vector3(0.022,0.01,0.16),at+Vector3(-size.x*0.45+i*size.x*0.9/11.0,0,end*(size.y*0.5+0.045)),CREAM)
 
 func build_interior() -> void:
-	# Keep the central entrance-to-beds aisle open.
+	var back:=Layout.back_z(tier)
+	var depth:=back-10.6
+	var middle: float=(10.6+back)*0.5
+	# The starter room already has warm light; purchases add visible layers.
 	rug(Vector3(6.45,0.016,13.60),Vector2(5.35,5.0),Color("a86f59"))
-	rug(Vector3(6.45,0.016,20.55),Vector2(5.40,5.0),Color("7b8966"))
-	rug(Vector3(14.15,0.016,17.1),Vector2(5.30,10.40),Color("667a79"))
-	rug(Vector3(10.4,0.016,17.55),Vector2(1.25,11.2),Color("b39870"))
-	# A slatted divider marks the sleeping alcove while keeping a broad opening.
-	for side in [Vector2(3.15,9.25),Vector2(11.55,17.55)]:
-		box(self,Vector3(side.y-side.x,0.28,0.14),Vector3((side.x+side.y)*0.5,2.05,23.55),WOOD)
-		for i in range(int((side.y-side.x)/0.50)):
-			box(self,Vector3(0.055,1.95,0.07),Vector3(side.x+0.14+i*0.50,1.03,23.55),WOOD)
-	box(self,Vector3(14.55,0.10,16.1),Vector3(10.35,4.60,18.75),Color("c1b69a"))
-	for z in [11.0,18.2,26.70]:
+	if "textiles" in owned:
+		rug(Vector3(14.15,0.016,middle),Vector2(5.30,depth-2.0),Color("667a79"))
+		rug(Vector3(10.4,0.016,middle-0.5),Vector2(1.25,depth-3.5),Color("b39870"))
+		if tier==2: rug(Vector3(6.45,0.016,20.55),Vector2(5.40,5.0),Color("7b8966"))
+	if tier==2:
+		for side in [Vector2(3.15,9.25),Vector2(11.55,17.55)]:
+			box(self,Vector3(side.y-side.x,0.28,0.14),Vector3((side.x+side.y)*0.5,2.05,23.55),WOOD)
+			for i in range(int((side.y-side.x)/0.50)):
+				box(self,Vector3(0.055,1.95,0.07),Vector3(side.x+0.14+i*0.50,1.03,23.55),WOOD)
+	box(self,Vector3(14.55,0.10,depth-0.3),Vector3(10.35,4.60,middle),Color("c1b69a"))
+	for z in [11.0,middle,back-0.30]:
 		box(self,Vector3(14.5,0.16,0.16),Vector3(10.35,4.40,z),WOOD)
 	for x in [3.02,17.68]:
-		box(self,Vector3(0.07,1.00,16.0),Vector3(x,0.50,18.75),Color("8c7357"))
-		box(self,Vector3(0.10,0.055,16.0),Vector3(x,1.02,18.75),GOLD)
-	for z in [13.0,20.0]:
+		box(self,Vector3(0.07,1.00,depth-0.4),Vector3(x,0.50,middle),Color("8c7357"))
+		box(self,Vector3(0.10,0.055,depth-0.4),Vector3(x,1.02,middle),GOLD)
+	for z in [13.0,back-3.0]:
 		for x in [6.6,13.7]:
 			P.line(self,Vector3(x,4.55,z),Vector3(x,3.65,z),0.015,INK)
 			glow(P.cylinder(self,0.42,0.25,Vector3(x,3.58,z),CREAM,0.27),0.28)
-			add_light(self,Vector3(x,3.35,z),Color("ffdeb0"),0.95,6.0)
-	add_light(self,Vector3(10.4,3.25,25.6),Color("f6d0a0"),0.65,7.0)
-	# String lights above the open central walk, with a gentle sag.
-	for i in range(25):
-		var z:=11.3+i*0.49
-		var y:=3.95-sin(i*PI/24)*0.28
-		if i>0: P.line(self,Vector3(10.4,3.95-sin((i-1)*PI/24)*0.28,z-0.49),Vector3(10.4,y,z),0.012,DARK_WOOD)
-		if i%2==0: glow(P.ball(self,0.048,Vector3(10.4,y-0.055,z),GOLD),0.6)
-	# Original framed art and soft curtains on the side wall.
+			add_light(self,Vector3(x,3.35,z),Color("ffdeb0"),0.75,6.0)
+	add_light(self,Vector3(10.4,3.25,back-1.4),Color("f6d0a0"),0.65,7.0)
+	if "ambient" in owned:
+		for i in range(25):
+			var z:=11.3+i*(depth-2.3)/24.0
+			var y:=3.95-sin(i*PI/24)*0.28
+			if i>0: P.line(self,Vector3(10.4,3.95-sin((i-1)*PI/24)*0.28,z-(depth-2.3)/24.0),Vector3(10.4,y,z),0.012,DARK_WOOD)
+			if i%2==0: glow(P.ball(self,0.048,Vector3(10.4,y-0.055,z),GOLD),0.6)
+		add_light(self,Vector3(6.5,2.8,middle),Color("ffbf84"),0.5,7.0)
 	for z in [13.0,18.2,21.2]:
+		if z>back-2.0: continue
 		box(self,Vector3(0.12,1.30,1.66),Vector3(17.64,2.65,z),WOOD)
 		glow(box(self,Vector3(0.025,1.12,1.47),Vector3(17.56,2.65,z),Color("496e80")),0.15)
-		for edge in [-1,1]:
-			box(self,Vector3(0.15,1.62,0.30),Vector3(17.45,2.54,z+edge*0.82),Color("c68b71"))
-	for point in [Vector3(8.8,0,11.5),Vector3(17.05,0,25.7)]:
-		var plant:=Node3D.new()
-		add_child(plant)
-		plant.position=point
-		build_plant(plant,0.72)
-	var sign:=label(self,"ЗДЕСЬ МОЖНО НИЧЕГО НЕ УСПЕВАТЬ",Vector3(10.4,3.10,26.77),32)
+		if "textiles" in owned:
+			for edge in [-1,1]:
+				box(self,Vector3(0.15,1.62,0.30),Vector3(17.45,2.54,z+edge*0.82),Color("c68b71"))
+	if "plants" in owned:
+		for point in [Vector3(8.8,0,11.5),Vector3(17.05,0,back-1.3)]:
+			var plant:=Node3D.new()
+			add_child(plant)
+			plant.position=point
+			build_plant(plant,0.72)
+	var sign:=label(self,"ЗДЕСЬ МОЖНО НИЧЕГО НЕ УСПЕВАТЬ",Vector3(10.4,3.10,back-0.23),32)
 	sign.rotation.y=PI
-	for x in [4.7,7.95,11.2,14.45]:
-		box(self,Vector3(0.8,0.035,0.88),Vector3(x+0.32,0.59,Layout.BEDS_Z),TEAL)
-		box(self,Vector3(0.42,0.025,0.90),Vector3(x+0.58,0.615,Layout.BEDS_Z),Color("6a9e8c"))
 
 func _process(delta: float) -> void:
 	if game==null or not is_instance_valid(game.service): return
@@ -351,9 +368,10 @@ func _process(delta: float) -> void:
 	ambient_clock+=delta
 	var night: bool=game.service.progress.shift=="night"
 	var clock: float=game.service.progress.night_elapsed if night else ambient_clock
-	television_ball.position.x=sin(clock*0.13)*0.67
-	arcade_sprite.position.x=snappedf(sin(clock*0.37)*0.22,0.11)
-	arcade_sprite.position.y=1.54-fposmod(clock*0.07,0.32)
+	if is_instance_valid(television_ball): television_ball.position.x=sin(clock*0.13)*0.67
+	if is_instance_valid(arcade_sprite):
+		arcade_sprite.position.x=snappedf(sin(clock*0.37)*0.22,0.11)
+		arcade_sprite.position.y=1.54-fposmod(clock*0.07,0.32)
 	for i in range(fishes.size()):
 		fishes[i].position=Vector3(sin(clock*0.33+i*1.9)*0.61,0.98+fmod(i*0.13,0.39)+sin(clock+i)*0.02,-0.08)
 		fishes[i].rotation.y=0.0 if cos(clock*0.33+i*1.9)>0 else PI
@@ -361,7 +379,7 @@ func _process(delta: float) -> void:
 	if night and is_instance_valid(game.evening):
 		for entry in game.evening.performers.values():
 			if entry.get("settled",false): occupied[str(entry.get("item",""))]=true
-	rocking_root.rotation.x=sin(clock*1.7)*0.065 if occupied.has("rocking_chair") else 0.0
+	if is_instance_valid(rocking_root): rocking_root.rotation.x=sin(clock*1.7)*0.065 if occupied.has("rocking_chair") else 0.0
 	for i in range(rods.size()):
 		rods[i].rotation.x=sin(clock*4.4+i)*0.65 if occupied.has("foosball") else 0.0
-	pong_ball.position=Vector3(sin(clock*1.3)*0.35,0.88+absf(sin(clock*2.6))*0.43,sin(clock*2.6)*1.19) if occupied.has("table_tennis") else Vector3(0.52,0.82,1.0)
+	if is_instance_valid(pong_ball): pong_ball.position=Vector3(sin(clock*1.3)*0.35,0.88+absf(sin(clock*2.6))*0.43,sin(clock*2.6)*1.19) if occupied.has("table_tennis") else Vector3(0.52,0.82,1.0)

@@ -27,6 +27,11 @@ var starter_reward := false
 var deliveries: Array = []
 var next_delivery_id := 1
 var garland_owned := false
+var lounge_tier := 0
+var lounge_items: Array = ["sofa"]
+var lounge_upgrades: Array = []
+var rest_multiplier := 1.0
+var rest_report := {}
 var night_elapsed := 0.0
 var day := 1
 var shift := "morning"
@@ -101,7 +106,7 @@ func can_attempt(stations: Array, served: int) -> bool:
 
 func objective(stations: Array, served: int, opened: bool) -> String:
 	if phase == "tasting": return "Дегустатор · блюдо %d/3 на B или лучше" % (tasting_done.size() + 1)
-	if shift == "night": return "Ночь · клоны устраиваются в комнате отдыха · следующий день у двери"
+	if shift == "night": return "Ночь · отдых и покупки · для нового дня всем в Шеф-кровать"
 	if shift == "closing": return "Заканчиваем последние заказы · затем ночной перерыв"
 	if stars == 0:
 		if not starter_reward: return "Первый гость → соус в подарок · открой кафе у компьютера"
@@ -124,12 +129,14 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
 	for key in snapshot():
 		if data.has(key): set(key, data[key])
+	lounge_tier=clampi(lounge_tier,0,2)
+	rest_multiplier=clampf(rest_multiplier,1.0,1.30)
 	if busy() and not resume_event:
 		phase = "none"
 		remaining = 0

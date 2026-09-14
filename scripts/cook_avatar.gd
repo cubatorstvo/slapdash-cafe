@@ -72,6 +72,9 @@ func observe(target: Vector3, neighbor: Vector3, delta: float, index: int) -> vo
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), Vector3(0.1, 1.15, -0.36) + pencil.position)
 
 func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
+	reset_lounge_accessories()
+	rotation=Vector3.ZERO
+	hat.show()
 	notebook.hide()
 	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
 	position = Vector3(pose.position[0], pose.position[1], pose.position[2])
@@ -233,3 +236,31 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 			head.rotation.x=-0.08
 	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
 	P.align_line(arms[1],Vector3(0.3,1.2,0),right)
+
+func reset_lounge_accessories() -> void:
+	for node in [lounge_legs,lounge_floor_legs,lounge_cup,lounge_paddle,lounge_snack]:
+		if is_instance_valid(node): node.hide()
+	for leg in legs:
+		leg.show()
+		leg.rotation=Vector3.ZERO
+
+func sleep_pose(spot: Dictionary, clock: float, identity: int) -> void:
+	reset_lounge_accessories()
+	hat.hide()
+	notebook.hide()
+	book.set_reading(false)
+	position=spot.position
+	rotation=spot.sleep_rotation
+	var seated: bool=str(spot.sleep_kind)=="seated"
+	if seated:
+		if not is_instance_valid(lounge_legs): build_lounge_accessories(); reset_lounge_accessories()
+		lounge_legs.show()
+		for leg in legs: leg.hide()
+		rotation.y=float(spot.get("yaw",0))
+	head.rotation=Vector3(0.26 if seated else 0.08,0,sin(clock*1.3+identity)*0.025)
+	position.y+=sin(clock*1.3+identity)*0.008
+	for i in range(arms.size()):
+		var side: float=-1.0 if i==0 else 1.0
+		var hand:=Vector3(side*0.18,0.92,-0.26)
+		if identity%3==1: hand=Vector3(side*0.38,1.52,0.08)
+		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)

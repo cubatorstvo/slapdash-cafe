@@ -15,7 +15,7 @@ func run() -> void:
 	check(game.shop.lab_position(1).z>Annex.CAFE_BACK_Z,"Laboratory deliveries target rear room")
 	check(Annex.rest_spot(0).position.z>Annex.CAFE_BACK_Z,"Clone rest spots are behind cafe")
 	check(Annex.REST_AREA>100.0,"Rest room is roughly triple the previous area")
-	check(Annex.player_bed_center(3).x<Annex.REST_X_MAX,"Four player beds fit inside expanded rest room")
+	check(Annex.player_bed_center(3).x<Annex.REST_X_MAX,"Shared chef bed fits inside the room")
 	game.player.global_position=Annex.REST_DOOR_CAFE
 	game.annex.advance_doors(0.30)
 	check(game.annex.door_openness("rest")>0.9,"Rest door opens for approaching player")
@@ -42,14 +42,19 @@ func run() -> void:
 	var day_before: int=game.service.progress.day
 	game.session.members={1:"Хост",7:"Гость"}
 	game.player.global_position=Annex.player_bed_center(0)
-	var guest_bed:=Annex.player_bed_center(1)
+	var guest_bed:=Annex.player_bed_center(0)
 	game.session.player_poses[7]={"position":[guest_bed.x,guest_bed.y,guest_bed.z],"yaw":0.0,"pitch":0.0}
 	game.session.execute_action(1,{"action":"sleep","bed":0})
 	check(game.service.progress.shift=="night" and game.session.sleeping_peers.has(1),"First player lies down and waits")
 	check(game.session.sleep_status_text()=="Спят 1/2","Sleep status counts connected players")
 	game.session.execute_action(7,{"action":"sleep","bed":0})
-	check(not game.session.sleeping_peers.has(7),"Two players cannot occupy one bed")
-	game.session.execute_action(7,{"action":"sleep","bed":1})
+	check(game.session.sleeping_peers.get(7,-1)==1,"Second player occupies the next stack layer")
+	check(game.service.progress.day==day_before and game.session.sleep_scene_active(),"Readiness starts the shared scene before morning")
+	game.session.execute_action(1,{"action":"skip_sleep"})
+	game.session.advance(0.1)
+	check(game.service.progress.day==day_before,"One vote cannot skip a multiplayer scene")
+	game.session.execute_action(7,{"action":"skip_sleep"})
+	game.session.advance(0.1)
 	check(game.service.progress.day==day_before+1 and game.service.progress.shift=="open","All connected players sleeping starts next day")
 	check(game.session.sleeping_peers.is_empty(),"Sleep readiness clears after morning")
 	check(game.service.open_for_business,"Morning automatically opens cafe")

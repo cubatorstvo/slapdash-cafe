@@ -1,7 +1,9 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
-const ITEMS := {
+const LoungeProgress = preload("res://scripts/lounge_progression.gd")
+const Layout = preload("res://scripts/lounge_layout.gd")
+var ITEMS := {
 	"lab_power": {"name":"Усилитель · темп 100–150%","price":180,"kind":"lab_upgrade","star":2},
 	"lab_power_2": {"name":"Турбоблок · темп 140–200%","price":320,"kind":"lab_upgrade","star":2},
 	"lab_valve": {"name":"Клапан · плавнее менять уровень","price":90,"kind":"lab_upgrade","star":1},
@@ -35,6 +37,7 @@ var saved_status := ""
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
+	ITEMS.merge(LoungeProgress.shop_items())
 	local_ghost = Props.box(self,Vector3(0.55,0.2,0.45),Vector3.ZERO,Color("83ceab"))
 	local_ghost.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	local_ghost.material_override.albedo_color.a = 0.35
@@ -85,7 +88,11 @@ func order(item: String, station_id: int) -> String:
 	if p.stars < int(spec.get("star",0)): return "Откроется после звезды %d." % spec.star
 	if p.busy(): return "Сначала заверши проверку."
 	var station = game.service.by_id(station_id)
-	if spec.kind == "equipment":
+	if spec.kind == "lounge":
+		station_id=0
+		var error:=LoungeProgress.item_error(p,spec)
+		if not error.is_empty(): return error
+	elif spec.kind == "equipment":
 		if station == null or ((item in ["meat_kit","pasta_kit"]) != (station.type_id == "kitchen")): return "Выбери тяп-ляп стойку."
 		if item in station.equipment or item in station.upgrades: return "Уже установлено."
 	elif spec.kind == "station":
@@ -136,6 +143,8 @@ func garland_reel_position() -> Vector3: return Annex.lab_world(Vector3(1.48,1.1
 
 func installation_position(parcel: Dictionary) -> Vector3:
 	var spec: Dictionary = ITEMS[parcel.item]
+	if spec.kind == "lounge":
+		return Layout.item_position(str(spec.lounge_id),game.service.progress.lounge_tier)+Vector3.UP*0.8
 	if spec.kind == "station": return game.service.slot_position(parcel.station-1)+Vector3.UP
 	if spec.kind == "equipment":
 		var station = game.service.by_id(parcel.station)
@@ -231,11 +240,18 @@ func action(peer: int, data: Dictionary) -> String:
 	elif action_name == "drop_parcel":
 		if parcel.owner!=peer: return "Коробка не у тебя."
 		parcel.owner=0
-		parcel.position=[clampf(position.x,-11.1,17.1),0.3,clampf(position.z,-6.8,9.7)]
+		var back: float=Layout.back_z(p.lounge_tier)-0.8 if position.x>Annex.DIVIDER_X else Annex.LAB_BACK_Z-0.8 if position.x>Annex.LAB_X_MIN else 9.7
+		parcel.position=[clampf(position.x,-11.1,17.1),0.3,clampf(position.z,-6.8,back)]
 	elif action_name == "install_parcel":
 		if parcel.owner!=peer or position.distance_to(installation_position(parcel))>4.5: return "Поднеси коробку к отмеченному месту."
 		var spec: Dictionary = ITEMS[parcel.item]
-		if spec.kind == "equipment":
+		if spec.kind == "lounge":
+			if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
+			var error:=LoungeProgress.item_error(p,spec)
+			if not error.is_empty(): return error
+			if bool(spec.upgrade): p.lounge_upgrades.append(spec.lounge_id)
+			else: p.lounge_items.append(spec.lounge_id)
+		elif spec.kind == "equipment":
 			var station = game.service.by_id(parcel.station)
 			if station.state not in ["idle","waiting"]: return "Дождись свободной станции."
 			for item in parcel.get("items",[parcel.item]):

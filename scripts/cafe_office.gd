@@ -1,5 +1,6 @@
 extends CanvasLayer
 ## Shared cafe ledger, accessed from the physical cafe computer.
+const Lounge = preload("res://scripts/lounge_progression.gd")
 const P = preload("res://scripts/cafe_progression.gd")
 const Style = preload("res://scripts/cafe_theme.gd")
 const Definition = preload("res://scripts/station_definition.gd")
@@ -39,7 +40,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
+	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -115,7 +116,7 @@ func rebuild() -> void:
 			button(content,"Закончить смену" if service.open_for_business else "Открыть кафе",func():send({"action":"business"},true),host and not progress.busy() and progress.shift in ["morning","open"])
 			label(content,"Личная стойка — твои заказы. Купленное оборудование приедет ко входу: забери коробку и установи на отмеченное место.")
 			label(content,"Свободных клонов: %d. Создание в лаборатории — 60.\nЛаборатория: закажи колбу, питание и стабилизатор. Установи на верстаке в лаборатории. Клоны откроются после первой звезды."%progress.free_clones)
-			label(content,"Ночью посетителей нет. Дверь «Комната отдыха» позволяет перейти к утру. Доставки и обустройство доступны днём тоже.")
+			label(content,"Ночью посетителей нет. Все игроки ложатся в общую Шеф-кровать, чтобы начать новый день. Доставки и обустройство доступны днём тоже.")
 			button(content,"Сохранить кафе",func():send({"action":"save"}),host)
 			button(content,"Папка плейтеста",func():OS.shell_open(ProjectSettings.globalize_path(game.telemetry.folder)))
 			label(content,"Отметки для плейтеста: F8 — скучно, F9 — непонятно, F10 — прикольно. События пишутся локально.",15)
@@ -140,6 +141,8 @@ func rebuild() -> void:
 			for item in ["lab_power","lab_power_2","lab_valve","lab_damper"]: shop_button(item,0,item in progress.lab_upgrades)
 			label(content,"ОБУСТРОЙСТВО",20)
 			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
+		"lounge":
+			lounge_page()
 		"deliveries":
 			label(content,"ДОСТАВКИ",23)
 			if progress.deliveries.is_empty(): label(content,"Все коробки разобраны.")
@@ -185,3 +188,29 @@ func bundle_controls(station: Node3D, catalog: Array) -> void:
 			else: selections[id].erase(item)
 			rebuild())
 	button(content,"Заказать комплект · %d"%total,func():send({"action":"buy_bundle","station":id,"items":selections[id].duplicate()}),total>0 and game.service.progress.cash>=total and not game.service.progress.busy() and not game.session.is_guest())
+
+func lounge_page() -> void:
+	var p=game.service.progress
+	var forecast:=Lounge.report(p,game.evening.workers().size())
+	var host: bool=not game.session.is_guest()
+	label(content,"КОМНАТА ОТДЫХА · "+str(Lounge.STAGES[p.lounge_tier].name),23)
+	label(content,"Сегодня: +%d%% к темпу всех клонов. Завтра: +%d%%."%[roundi((p.rest_multiplier-1.0)*100),roundi(float(forecast.bonus)*100)],20)
+	label(content,"Мест: %d · клонов: %d · уют: +%d%%. Бонус делится на всю команду, максимум +30%%. Если мест не хватает, общий бонус меньше."%[forecast.places,forecast.workers,roundi(float(forecast.comfort)*100)])
+	label(content,"На ночь каждый выбирает одно развлечение. Кровать шефов общая; смешные места сна клонов на темп не влияют. Покупки начнут помогать со следующего утра.",15)
+	if p.lounge_tier<2:
+		var next: Dictionary=Lounge.STAGES[p.lounge_tier+1]
+		var suffix: String=" · нужна звезда %d"%next.star if p.stars<int(next.star) else " · %d"%next.price
+		button(content,"Расширить: "+str(next.name)+suffix,func():send({"action":"buy","kind":"lounge_expansion"}),host and p.stars>=int(next.star) and p.cash>=int(next.price) and not p.busy() and game.session.sleeping_peers.is_empty())
+	label(content,"МЕБЕЛЬ И УЮТ · доставка в коробках",20)
+	for id in Lounge.GOODS:
+		var spec: Dictionary=game.shop.ITEMS["rest_"+id]
+		lounge_button("rest_"+id,spec,id in p.lounge_items)
+		if id in p.lounge_items and float(Lounge.GOODS[id].quality)>0:
+			lounge_button("rest_upgrade_"+id,game.shop.ITEMS["rest_upgrade_"+id],id in p.lounge_upgrades)
+
+func lounge_button(item: String, spec: Dictionary, installed: bool) -> void:
+	var p=game.service.progress
+	var error:=Lounge.item_error(p,spec)
+	var waiting: bool=game.shop.pending(item,0)
+	var suffix: String=" · установлено" if installed else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
+	button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0}),not game.session.is_guest() and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())

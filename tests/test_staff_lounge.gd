@@ -13,6 +13,11 @@ func run() -> void:
 	await process_frame
 	game.set_physics_process(false)
 	await physics_frame
+	var p=game.service.progress
+	p.lounge_tier=2
+	p.lounge_items=preload("res://scripts/lounge_progression.gd").GOODS.keys()
+	game.annex.refresh_shell()
+	await physics_frame
 	var lounge: Node3D=get_first_node_in_group("staff_lounge")
 	check(lounge!=null and lounge.fixtures.size()==15,"Fifteen full-size lounge furnishings constructed")
 	check(Annex.REST_AREA>240.0,"Largest lounge shell is active")
@@ -35,11 +40,10 @@ func run() -> void:
 				query.transform=Transform3D(Basis.IDENTITY,point+Vector3(0,0.90,0))
 				check(space.intersect_shape(query,1).is_empty(),"Clear physical route: "+str(spot.id))
 	for index in range(4):
-		check(Annex.player_bed_exit(index).z<Annex.player_bed_center(index).z,"Bed exit remains in front of its mattress")
+		check(Annex.player_bed_exit(index,2).z<Annex.player_bed_center(index,2).z,"Bed exit remains in front of its mattress")
 		check(Layout.approach_path(Annex.player_bed_exit(index)).size()>1,"Player bed has reachable access")
 
 	print("STAGE 2/4: daily assignment, capacity and overflow")
-	var p=game.service.progress
 	p.stars=1; p.lab_stage=3; p.shift="night"
 	for i in range(24): check(game.service.create_clone(1.0,true).is_empty(),"Create preview worker")
 	var assignments: Array=game.evening.plan()
@@ -75,8 +79,9 @@ func run() -> void:
 		check(not performer.actor.hat.visible and performer.hat.visible,"Thrown hat remains separate from leisure pose")
 		check(performer.actor.position.is_finite(),"Leisure pose has finite position")
 	game.evening.apply_rest()
+	check(p.rest_multiplier>1.0 and p.rest_multiplier<=1.30,"Installed entertainment gives a bounded daily bonus")
 	for worker in game.evening.workers():
-		check(is_equal_approx(float(game.service.clone_data(worker.id).rest),1.0),"Preview supplies no productivity bonus")
+		check(is_equal_approx(float(game.service.clone_data(worker.id).rest),p.rest_multiplier),"All workers share the same daily bonus")
 	for index in range(game.service.stations.size()):
 		check(records[index]==var_to_bytes(game.service.stations[index].recipes),"Leisure preserves recorded recipes")
 	p.shift="open"
@@ -86,5 +91,5 @@ func run() -> void:
 	print("STAGE 4/4: result")
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: furnished lounge, physical routes, daily places, overflow and neutral preview" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: furnished lounge, physical routes, daily places, overflow and shared rest" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

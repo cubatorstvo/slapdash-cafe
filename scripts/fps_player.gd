@@ -62,8 +62,8 @@ func enter_sleep(point: Vector3, yaw: float) -> void:
 	global_position = point
 	rotation.y = yaw
 	body_collider.set_deferred("disabled",true)
-	camera.position = Vector3(0,0.18,0)
-	camera.rotation = Vector3(-0.12,0,PI/2)
+	camera.position = Vector3(1.5,0.18,0)
+	camera.rotation = Vector3(-0.12,0,-PI/2)
 
 func exit_sleep(point: Vector3) -> void:
 	if not sleeping: return

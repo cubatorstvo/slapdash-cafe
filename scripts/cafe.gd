@@ -5,6 +5,7 @@ const Service = preload("res://scripts/cafe_service.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var sleep_cinematic: Node3D
 var evening: Node3D
 var annex: Node3D
 var laboratory: Node3D
@@ -98,6 +99,9 @@ func _ready() -> void:
 	annex=Annex.new()
 	add_child(annex)
 	annex.setup(self)
+	sleep_cinematic=preload("res://scripts/sleep_cinematic.gd").new()
+	add_child(sleep_cinematic)
+	sleep_cinematic.setup(self)
 	telemetry = preload("res://scripts/playtest_log.gd").new()
 	add_child(telemetry)
 	telemetry.begin(self)
@@ -108,7 +112,7 @@ func _ready() -> void:
 	sync_mouse_mode()
 
 func input_blocked() -> bool:
-	return (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+	return (is_instance_valid(session) and session.sleep_scene_active()) or (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
 
 func awaiting_serving_confirmation() -> bool:
 	if not is_instance_valid(service) or not is_instance_valid(session): return false
@@ -141,6 +145,10 @@ func nearest_station() -> Node3D:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if is_instance_valid(steam) and steam.overlay_open: return
+	if is_instance_valid(session) and session.sleep_scene_active():
+		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_SPACE:
+			session.request_action({"action":"skip_sleep"})
+		return
 	if is_instance_valid(session) and session.local_sleeping():
 		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_E:
 			session.request_action({"action":"wake"})
@@ -321,14 +329,18 @@ func sync_sleep_pose() -> void:
 	var bed: int = session.local_sleep_bed() if is_instance_valid(session) else -1
 	if bed >= 0:
 		if sleep_bed_bound != bed:
-			player.enter_sleep(Annex.player_sleep_position(bed),Annex.player_sleep_yaw(bed))
+			player.enter_sleep(Annex.player_sleep_position(bed,service.progress.lounge_tier),Annex.player_sleep_yaw(bed))
 			sleep_bed_bound = bed
 	elif sleep_bed_bound >= 0:
 		var previous_bed := sleep_bed_bound
 		sleep_bed_bound = -1
-		player.exit_sleep(Annex.player_bed_exit(previous_bed))
+		player.exit_sleep(Annex.player_bed_exit(previous_bed,service.progress.lounge_tier))
 
 func _physics_process(delta: float) -> void:
+	if session.sleep_scene_active():
+		session.advance(delta)
+		sync_sleep_pose()
+		return
 	bind_training()
 	sync_sleep_pose()
 	if cookbook.opened and (menu.opened() or awaiting_serving_confirmation()): cookbook.close()
@@ -366,6 +378,7 @@ func refresh_hud() -> void:
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"
 	hud.goal.text = service.progress.objective(service.stations, service.served, service.open_for_business)
+	if service.progress.rest_multiplier>1.0: hud.goal.text+=" · отдых +%d%%"%roundi((service.progress.rest_multiplier-1.0)*100)
 	hud.progress.value = 0
 	hud.prompt.text = ""
 	hud.recipe_panel.hide()
@@ -525,8 +538,7 @@ func interaction_target() -> Dictionary:
 	if is_instance_valid(shop):
 		var target: Dictionary = shop.target(camera,session.local_id())
 		if not target.is_empty(): return target
-	var night: Dictionary = development.night_target(camera)
-	return night if night.get("action", "") == "next_day" else {}
+	return {}
 
 func feed_target(station: Node3D) -> bool:
 	if not (station.model.can_feed() if station.type_id=="counter" else station.model.can_feed(local_role)): return false

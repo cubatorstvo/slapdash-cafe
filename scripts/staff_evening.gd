@@ -1,8 +1,9 @@
 extends Node3D
-## Evening leisure preview: one stable activity per worker and day, neutral rest multiplier.
+## One activity per worker and evening; a shared bonus and cosmetic sleep poses.
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Props=preload("res://scripts/props.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
+const Rest=preload("res://scripts/lounge_progression.gd")
 const Lounge=preload("res://scripts/lounge_layout.gd")
 var game: Node3D
 var performers := {}
@@ -31,30 +32,37 @@ func workers() -> Array:
 	return result
 
 func rest_spot(index: int) -> Dictionary:
-	return Annex.rest_spot(index)
+	return Lounge.rest_spot(index,game.service.progress.lounge_tier,game.service.progress.lounge_items)
 
 func plan() -> Array:
 	var entries:=workers()
-	var stamp: String=str(game.service.progress.day)
+	var p=game.service.progress
+	var stamp: String=str(p.day)+":"+Rest.stamp(p)
 	for worker in entries: stamp+=":%d:%s"%[worker.id,str(worker.home)]
 	if stamp==plan_stamp: return cached_plan
 	plan_stamp=stamp
 	cached_plan=[]
-	var slots:=Lounge.activity_slots()
+	var slots:=Rest.slots(p)
+	# Rotate the workers across the best occupied places, never their individual bonus.
+	var occupied:=mini(entries.size(),slots.size())
 	for index in range(entries.size()):
-		var slot_index:=posmod(index+game.service.progress.day*7,slots.size())
-		var spot: Dictionary=slots[slot_index].duplicate(true) if index<slots.size() else Lounge.overflow_slot(index-slots.size())
+		var slot_index:=posmod(index+p.day*7,maxi(1,occupied))
+		var spot: Dictionary=slots[slot_index].duplicate(true) if index<slots.size() else Lounge.overflow_slot(index-slots.size(),p.lounge_tier,p.lounge_items)
 		var worker: Dictionary=entries[index]
 		var route:=route_for(worker,spot.approach)
 		cached_plan.append({"worker":worker,"spot":spot,"route":route})
 	return cached_plan
 
 func apply_rest() -> void:
+	var p=game.service.progress
+	var forecast:=Rest.report(p,workers().size())
+	p.rest_report=forecast.duplicate(true)
+	p.rest_multiplier=float(forecast.multiplier)
 	var summary: Array=[]
 	for assignment in plan():
 		var worker: Dictionary=game.service.clone_data(int(assignment.worker.id))
 		if worker.is_empty(): continue
-		worker.rest=1.0
+		worker.rest=p.rest_multiplier
 		summary.append({"id":assignment.worker.id,"rest":worker.rest})
 	game.service.progress.revision+=1
 	game.service.trace("rest_applied",{"day":game.service.progress.day+1,"workers":summary})
@@ -69,7 +77,7 @@ func route_for(info: Dictionary, target: Vector3) -> Array:
 		route=[home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
 	else:
 		route=[home,Vector3(home.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
-	var inside_route:=Lounge.approach_path(target)
+	var inside_route:=Lounge.approach_path(target,game.service.progress.lounge_tier,game.service.progress.lounge_items)
 	for point in inside_route:
 		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
 	return route
@@ -77,7 +85,7 @@ func route_for(info: Dictionary, target: Vector3) -> Array:
 func _process(_delta: float) -> void:
 	if game==null: return
 	if game.service.progress.shift!="night":
-		for entry in performers.values(): entry.actor.queue_free(); entry.hat.queue_free()
+		for entry in performers.values(): entry.actor.queue_free(); entry.hat.queue_free(); entry.sleepy.queue_free()
 		performers.clear()
 		plan_stamp=""
 		cached_plan.clear()
@@ -93,13 +101,21 @@ func _process(_delta: float) -> void:
 			var actor:=Avatar.new(); add_child(actor)
 			actor.add_to_group("automatic_door_actor")
 			var hat:=Node3D.new(); add_child(hat)
+			var sleepy:=Props.text(self,"z Z z",Vector3.ZERO,22,Color("f1d9ae"))
+			sleepy.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+			sleepy.pixel_size=0.005
+			sleepy.hide()
 			Props.cylinder(hat,0.26,0.22,Vector3.ZERO,Color("fff0cb"))
 			Props.cylinder(hat,0.29,0.04,Vector3(0,-0.09,0),Color("eee0b6"))
-			performers[id]={"actor":actor,"hat":hat}
+			performers[id]={"actor":actor,"hat":hat,"sleepy":sleepy}
 		var entry: Dictionary=performers[id]
 		var actor: Node3D=entry.actor
 		var hat: Node3D=entry.hat
-		var t:=maxf(0,game.service.progress.night_elapsed-index*0.18)
+		entry.sleepy.hide()
+		var clock: float=game.service.progress.night_elapsed
+		var cinematic: bool=game.session.sleep_scene_active()
+		if cinematic: clock=maxf(clock,float(game.session.sleep_scene.night_start)+game.session.sleep_scene_age()*9.0)
+		var t:=maxf(0,clock-index*0.18)
 		var variant:=id%3
 		var home: Vector3=info.home
 		var route: Array=assignments[index].route
@@ -135,6 +151,23 @@ func _process(_delta: float) -> void:
 		hat.position=home+Vector3(sin(id*2.7)*ht*1.6,maxf(0.12,1.8+2.2*ht-3.0*ht*ht),cos(id*2.7)*ht*1.5)
 		hat.rotation=Vector3(ht*5,ht*3,ht*4)
 		if t>1.67: hat.position.y=0.12
+		if cinematic and done:
+			var age: float=game.session.sleep_scene_age()
+			var blend:=smoothstep(0.0,1.0,clampf((age-2.1-float(index%10)*0.09)/1.3,0,1))
+			if blend>0:
+				var from_position: Vector3=actor.position
+				var from_rotation: Vector3=actor.rotation
+				var sleeping_spot:=Lounge.sleep_spot(spot,id,game.service.progress.lounge_tier)
+				actor.sleep_pose(sleeping_spot,age,id)
+				actor.position=from_position.lerp(actor.position,blend)
+				actor.position.y+=sin(blend*PI)*0.35
+				var target_rotation: Vector3=actor.rotation
+				actor.rotation=Vector3(lerp_angle(from_rotation.x,target_rotation.x,blend),lerp_angle(from_rotation.y,target_rotation.y,blend),lerp_angle(from_rotation.z,target_rotation.z,blend))
+				actor.caption.text=str(info.name)+" · "+str(sleeping_spot.activity)
+				actor.caption.visible=false
+				entry.settled=false
+				entry.sleepy.visible=blend>0.9
+				entry.sleepy.position=actor.head.global_position+Vector3(0,0.45+sin(age*1.4+id)*0.08,0)
 	for id in performers.keys():
 		if id not in current_ids:
-			performers[id].actor.queue_free(); performers[id].hat.queue_free(); performers.erase(id)
+			performers[id].actor.queue_free(); performers[id].hat.queue_free(); performers[id].sleepy.queue_free(); performers.erase(id)

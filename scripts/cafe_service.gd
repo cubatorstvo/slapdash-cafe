@@ -258,6 +258,11 @@ func finish_customer(id: int, accepted: bool) -> void:
 
 func purchase(kind: String, id: String, station_id := 0) -> String:
 	if progress.busy(): return "Сначала заверши проверку."
+	if kind == "lounge_expansion":
+		if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
+		var error: String=preload("res://scripts/lounge_progression.gd").expand(progress)
+		if error.is_empty(): trace("lounge_expanded",{"tier":progress.lounge_tier})
+		return error
 	if kind == "expansion":
 		if progress.stars < 2: return "Нужна вторая звезда."
 		if progress.expanded: return "Зал уже расширен."
@@ -385,7 +390,7 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 8, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
+	return {"format": "station-cafe", "version": 9, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business}
 
 func clear_world() -> void:
 	for station in stations:
@@ -403,7 +408,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -612,7 +617,7 @@ func next_day() -> String:
 	return ""
 
 func night_action(action: String, _data: Dictionary, _peer: int) -> String:
-	if action == "next_day": return next_day()
+	if action == "next_day": return "Для нового дня всем нужно лечь в Шеф-кровать."
 	return "Закажи детали у компьютера и установи их из коробки."
 
 static func valid_wall_point(point: Vector3) -> bool:
@@ -624,11 +629,11 @@ func trace(kind: String, data := {}) -> void:
 
 func normalize_workers() -> void:
 	while progress.free_workers.size() < progress.free_clones:
-		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})
+		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":progress.rest_multiplier})
 		progress.next_clone_id+=1
 	for worker in progress.free_workers:
 		worker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)
-		worker.rest=clampf(float(worker.get("rest",1.0)),0.9,1.1)
+		worker.rest=progress.rest_multiplier
 	for station in stations:
 		if station.manual_station: continue
 		for role in range(station.role_count() if station.staffed<0 else station.staffed):
@@ -636,7 +641,7 @@ func normalize_workers() -> void:
 			if not member.has("clone_id"):
 				member.clone_id=progress.next_clone_id; progress.next_clone_id+=1
 			member.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)
-			member.rest=clampf(float(member.get("rest",1.0)),0.9,1.1)
+			member.rest=progress.rest_multiplier
 	progress.free_clones=progress.free_workers.size()
 
 func assign_clones() -> void:
@@ -680,7 +685,7 @@ func create_clone(tempo := 1.0, prepaid := false) -> String:
 	if progress.stars<1 or progress.lab_stage<3: return "Нужны готовая лаборатория и первая звезда."
 	if not prepaid and progress.cash<60: return "Ингредиенты клона стоят 60."
 	if not prepaid: progress.cash-=60
-	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":1.0})
+	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":progress.rest_multiplier})
 	progress.next_clone_id+=1
 	progress.free_clones=progress.free_workers.size()
 	assign_clones()
