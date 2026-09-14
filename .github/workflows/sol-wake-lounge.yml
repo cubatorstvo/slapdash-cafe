@@ -1,0 +1,48 @@
+name: Sol wake cinematic and lounge life
+on:
+  push:
+    branches:
+      - sol/wake-cutscene-lounge-life
+    paths:
+      - .github/workflows/sol-wake-lounge.yml
+permissions:
+  contents: write
+jobs:
+  implement-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/wake-cutscene-lounge-life
+          fetch-depth: 0
+      - name: Apply implementation patch
+        run: |
+          python .github/patch_wake_lounge.py
+          git diff origin/main -- scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd docs/STAFF_LOUNGE.md > /tmp/wake_lounge.patch
+          test -s /tmp/wake_lounge.patch
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Parse and import
+        run: timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit
+      - name: Focused tests
+        run: |
+          set -e
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_tempo.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd -- --fresh-cafe
+      - name: Publish clean tested branch
+        run: |
+          git reset --hard origin/main
+          git clean -fd
+          git switch -C sol/wake-cutscene-lounge-life-final origin/main
+          git apply /tmp/wake_lounge.patch
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd docs/STAFF_LOUNGE.md
+          git commit -m "Add morning wake scene and lively lounge animations"
+          git push --force-with-lease origin HEAD:sol/wake-cutscene-lounge-life-final
