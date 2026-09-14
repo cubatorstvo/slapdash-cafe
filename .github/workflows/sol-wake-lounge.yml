@@ -19,7 +19,8 @@ jobs:
         run: |
           python .github/patch_wake_lounge.py
           python .github/fix_wake_types.py
-          git diff origin/main -- scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd docs/STAFF_LOUNGE.md > /tmp/wake_lounge.patch
+          python .github/fix_stale_lounge_test.py
+          git diff origin/main -- scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd tests/test_cafe_life.gd docs/STAFF_LOUNGE.md > /tmp/wake_lounge.patch
           test -s /tmp/wake_lounge.patch
       - name: Download Godot 4.7
         run: |
@@ -47,6 +48,6 @@ jobs:
           git apply /tmp/wake_lounge.patch
           git config user.name ChatGPT
           git config user.email noreply@openai.com
-          git add scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd docs/STAFF_LOUNGE.md
+          git add scripts/coop_session.gd scripts/sleep_cinematic.gd scripts/cook_avatar.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_cafe_annex.gd tests/test_cafe_life.gd docs/STAFF_LOUNGE.md
           git commit -m "Add morning wake scene and lively lounge animations"
           git push --force-with-lease origin HEAD:sol/wake-cutscene-lounge-life-final
