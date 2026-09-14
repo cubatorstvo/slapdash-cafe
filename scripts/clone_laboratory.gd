@@ -119,7 +119,7 @@ func setup(owner_game: Node3D) -> void:
 	result_label=Props.text(apparatus,"",Vector3(0,2.44,8.04),20,Color("b5dbb6")); result_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; result_label.pixel_size=0.004
 	Props.box(apparatus,Vector3(0.23,0.1,0.24),Vector3(-1.48,1.09,7.88),Color("bc7869"))
 	for item in ["lab_power","lab_power_2","lab_valve","lab_damper"]:
-		var root:=Node3D.new(); add_child(root); root.position=upgrade_position(item); upgrade_nodes[item]=root
+		var root:=Node3D.new(); add_child(root); root.position=upgrade_local_position(item); upgrade_nodes[item]=root
 		Props.box(root,Vector3(0.38,0.34,0.28),Vector3.ZERO,Color("ba9067") if "power" in item else Color("779e9b"))
 		for i in range(3): Props.ball(root,0.035,Vector3(-0.1+i*0.1,0.05,-0.15),Color("b9df91"))
 		Props.line(root,Vector3(0,-0.1,0),Vector3(-root.position.x*0.35,-0.22,-0.25),0.025,Color("514e43"))
@@ -132,8 +132,14 @@ func reset() -> void:
 	var selected: int=state.get("selected",0)
 	state=fresh_state(); state.revision=revision+1; state.pulse=pulse; state.selected=selected
 
-func upgrade_position(item: String) -> Vector3:
+func upgrade_local_position(item: String) -> Vector3:
 	return {"lab_power":Vector3(-1.40,1.25,8.5),"lab_power_2":Vector3(1.42,1.25,8.5),"lab_valve":Vector3(-0.65,1.25,8.6),"lab_damper":Vector3(0.55,1.25,8.6)}[item]
+
+func upgrade_position(item: String) -> Vector3:
+	return to_global(upgrade_local_position(item))
+
+func operator_position() -> Vector3:
+	return to_global(Vector3(0,0.02,7.0))
 
 func local_holding() -> bool:
 	return not game.input_blocked() and int(state.owner)==game.session.local_id() and state.phase=="fill" and (Input.is_physical_key_pressed(KEY_E) or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
@@ -162,16 +168,18 @@ func peer_position(peer: int) -> Vector3:
 	return Vector3(raw[0],raw[1],raw[2]) if raw.size()==3 else Vector3.INF
 
 func inside(position: Vector3) -> bool:
-	return absf(position.x)<2.9 and position.z>6.5 and position.distance_to(BUTTON)<3.6
+	var local := to_local(position)
+	return absf(local.x)<2.9 and local.z>6.5 and local.distance_to(BUTTON)<3.6
 
 func target(camera: Camera3D, peer: int) -> Dictionary:
 	if not inside(camera.global_position): return {}
 	if state.phase=="idle":
 		for side in [-1,1]:
-			if game.shop.near_ray(camera,Vector3(side*0.42,1.12,7.76),0.15): return {"action":"lab_select","direction":side,"revision":state.revision,"hint":"(E) Выбрать клона / создание нового"}
-	elif int(state.owner)==peer and state.phase not in ["done","failed"] and game.shop.near_ray(camera,Vector3(-1.48,1.09,7.88),0.18):
+			if game.shop.near_ray(camera,to_global(Vector3(side*0.42,1.12,7.76)),0.15): return {"action":"lab_select","direction":side,"revision":state.revision,"hint":"(E) Выбрать клона / создание нового"}
+	elif int(state.owner)==peer and state.phase not in ["done","failed"] and game.shop.near_ray(camera,to_global(Vector3(-1.48,1.09,7.88)),0.18):
 		return {"action":"lab_restart","revision":state.revision,"hint":"(E) Прервать · ингредиенты потрачены"}
-	if not game.shop.near_ray(camera,Vector3(0,1.5,8) if state.phase!="idle" else BUTTON,1.3 if state.phase!="idle" else 0.25): return {}
+	var interaction_point := to_global(Vector3(0,1.5,8)) if state.phase!="idle" else to_global(BUTTON)
+	if not game.shop.near_ray(camera,interaction_point,1.3 if state.phase!="idle" else 0.25): return {}
 	var text := ""
 	if game.service.progress.lab_stage<3: text="Сначала собери лабораторию"
 	elif game.service.progress.stars<1: text="Клонирование · нужна первая звезда"

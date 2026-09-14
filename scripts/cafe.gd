@@ -2,9 +2,11 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
+const Annex = preload("res://scripts/cafe_annex.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
 var evening: Node3D
+var annex: Node3D
 var laboratory: Node3D
 var shop: Node3D
 var telemetry: Node
@@ -87,10 +89,14 @@ func _ready() -> void:
 	shop.setup(self)
 	laboratory = preload("res://scripts/clone_laboratory.gd").new()
 	add_child(laboratory)
+	Annex.place_lab(laboratory)
 	laboratory.setup(self)
 	evening=preload("res://scripts/staff_evening.gd").new()
 	add_child(evening)
 	evening.setup(self)
+	annex=Annex.new()
+	add_child(annex)
+	annex.setup(self)
 	telemetry = preload("res://scripts/playtest_log.gd").new()
 	add_child(telemetry)
 	telemetry.begin(self)
@@ -451,8 +457,8 @@ func _build_room() -> void:
 	Props.collision_box(self, Vector3(30, 0.2, 19), Vector3(3, -0.10, 1.5))
 	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
 	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, 10.6), Color("244c50"))
-	for x in [-11.8, 17.8]:
-		Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
+	Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(17.8, 2.3, 1.5), Color("2e5355"))
+	Annex.build_shell(self)
 	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
 	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
 	Props.text(self, "SLAPDASH CAFE", Vector3(0, 3.49, -7.31), 62, Color("f4cc86"))

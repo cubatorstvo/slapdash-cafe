@@ -47,8 +47,8 @@ func run() -> void:
 	check(service.next_day().is_empty() and service.open_for_business and p.shift=="open","Sleep automatically opens next shift")
 	service.open_for_business=false
 	p.stars=1; p.lab_stage=3; p.cash=500
-	game.player.position=Vector3(0,0.02,7)
 	var lab=game.laboratory
+	game.player.global_position=lab.operator_position()
 	lab.reset(); lab.state.selected=0; lab.press(1,lab.state.revision)
 	check(p.cash==440,"Attempt charged once at start")
 	lab.advance_balance(0.1,true)

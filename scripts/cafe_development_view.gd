@@ -1,6 +1,7 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const P = preload("res://scripts/cafe_progression.gd")
+const Annex = preload("res://scripts/cafe_annex.gd")
 var game: Node3D
 var board: Node3D
 var decor := {}
@@ -53,9 +54,6 @@ func build(root_game: Node3D) -> void:
 		for i in range(4):
 			var leaf := Props.ball(plants, 0.3, Vector3(x + sin(i*1.7)*0.3, 0.95+i*0.20, 8.8), Color("84ad78"))
 			leaf.scale = Vector3(0.7, 1.8, 0.65)
-	for spec in [[Vector3(0.16,3.4,4),Vector3(-3,1.7,8.4)],[Vector3(0.16,3.4,4),Vector3(3,1.7,8.4)],[Vector3(2,3.4,0.16),Vector3(-2,1.7,6.4)],[Vector3(2,3.4,0.16),Vector3(2,1.7,6.4)],[Vector3(2,0.5,0.16),Vector3(0,3.15,6.4)]]:
-		Props.solid_box(self,spec[0],spec[1],Color("405b58"))
-	Props.text(self,"ЛАБОРАТОРИЯ",Vector3(0,2.7,6.25),25,Color("edd09d")).billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	build_night()
 	refresh()
 
@@ -81,6 +79,7 @@ func refresh() -> void:
 
 var night_controls: Array = []
 var lab_parts: Array = []
+var lab_root: Node3D
 var lab_caption: Label3D
 var night_room_light: OmniLight3D
 var cable_root: Node3D
@@ -88,39 +87,44 @@ var cable_stamp := ""
 var cable_preview: MeshInstance3D
 
 func build_night() -> void:
-	Props.solid_box(self, Vector3(3.6, 0.12, 1.0), Vector3(0, 0.85, 8.3), Color("9b795c"))
-	for x in [-1.5, 1.5]: Props.solid_box(self, Vector3(0.12,0.8,0.8), Vector3(x,0.4,8.3), Color("526d65"))
-	lab_caption = Props.text(self, "ЛАБОРАТОРИЯ", Vector3(0,2.35,8.3), 27, Color("edd09d"))
+	lab_root = Node3D.new()
+	add_child(lab_root)
+	Annex.place_lab(lab_root)
+	Props.solid_box(lab_root, Vector3(3.6, 0.12, 1.0), Vector3(0, 0.85, 8.3), Color("9b795c"))
+	for x in [-1.5, 1.5]: Props.solid_box(lab_root, Vector3(0.12,0.8,0.8), Vector3(x,0.4,8.3), Color("526d65"))
+	lab_caption = Props.text(lab_root, "ЛАБОРАТОРИЯ", Vector3(0,2.35,8.3), 27, Color("edd09d"))
 	lab_caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lab_caption.pixel_size = 0.005
 	for i in range(3):
 		var pos := Vector3(-0.85 + i * 0.85, 1.04, 8.2)
-		var switch := Props.box(self, Vector3(0.3,0.16,0.32), pos, [Color("79b8c9"),Color("e6c671"),Color("83bc8e")][i])
+		var switch := Props.box(lab_root, Vector3(0.3,0.16,0.32), pos, [Color("79b8c9"),Color("e6c671"),Color("83bc8e")][i])
 		night_controls.append({"node": switch, "action": "lab_switch", "index": i, "hint": "(E) Подключить " + ["колбу", "питание", "стабилизатор"][i]})
 		var part := Node3D.new()
-		add_child(part)
+		lab_root.add_child(part)
 		part.position = Vector3(pos.x,0.94,8.6)
 		Props.cylinder(part,0.22,0.13,Vector3.ZERO,Color("516d69"))
 		Props.cylinder(part,0.16,0.55,Vector3(0,0.32,0),[Color("93d5d2"),Color("e0cd79"),Color("a2cb87")][i])
 		Props.ball(part,0.16,Vector3(0,0.65,0),Color("e9dcaf"))
 		lab_parts.append(part)
-	var start := Props.box(self, Vector3(0.38,0.16,0.38), Vector3(-1.48,1.04,8.1), Color("c68d6d"))
-	night_controls.append({"node": start, "action": "lab_begin", "hint": "(E) Взять комплект лаборатории"})
-	var reel := Props.cylinder(self,0.2,0.15,Vector3(1.48,1.03,8.15),Color("e2c080"))
+	var start_button := Props.box(lab_root, Vector3(0.38,0.16,0.38), Vector3(-1.48,1.04,8.1), Color("c68d6d"))
+	night_controls.append({"node": start_button, "action": "lab_begin", "hint": "(E) Взять комплект лаборатории"})
+	var reel := Props.cylinder(lab_root,0.2,0.15,Vector3(1.48,1.03,8.15),Color("e2c080"))
 	night_controls.append({"node": reel, "action": "garland_begin", "hint": "(E) Взять гирлянду · 40"})
-	var bed := Props.solid_box(self,Vector3(1.3,2.4,0.12),Vector3(5,1.2,10.35),Color("936f56"))
-	night_controls.append({"node": bed, "action": "next_day", "hint": "(E) Отдохнуть до утра"})
-	Props.text(self,"КОМНАТА ОТДЫХА",Vector3(5,2.8,10.1),25,Color("e7c891")).billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	var sleep_control := Props.box(self,Vector3(0.58,0.18,0.42),Annex.PLAYER_SLEEP_POINT,Color("d8c998"))
+	night_controls.append({"node": sleep_control, "action": "next_day", "hint": "(E) Отдохнуть до утра"})
+	var sleep_label := Props.text(self,"ОТДОХНУТЬ ДО УТРА",Annex.PLAYER_SLEEP_POINT+Vector3(0,0.55,0),18,Color("e7c891"))
+	sleep_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sleep_label.pixel_size = 0.004
 	cable_root = Node3D.new()
 	add_child(cable_root)
 	cable_preview = Props.line(self,Vector3.ZERO,Vector3.UP,0.018,Color("a9ce9d"))
 	cable_preview.hide()
 	night_room_light = OmniLight3D.new()
 	add_child(night_room_light)
-	night_room_light.position = Vector3(0,3.5,7.8)
-	night_room_light.omni_range = 9
+	night_room_light.position = Annex.lab_world(Vector3(0,3.5,7.8))
+	night_room_light.omni_range = 7
 	night_room_light.light_color = Color("ffcf90")
-	night_room_light.light_energy = 1.5
+	night_room_light.light_energy = 1.1
 
 func night_target(camera: Camera3D) -> Dictionary:
 	if game.service.progress.shift != "night": return {}

@@ -1,5 +1,6 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+const Annex = preload("res://scripts/cafe_annex.gd")
 const ITEMS := {
 	"lab_power": {"name":"Усилитель · темп 100–150%","price":180,"kind":"lab_upgrade","star":2},
 	"lab_power_2": {"name":"Турбоблок · темп 140–200%","price":320,"kind":"lab_upgrade","star":2},
@@ -130,7 +131,8 @@ func parcel_by_id(id: int) -> Dictionary:
 		if parcel.id == id: return parcel
 	return {}
 
-func lab_position(index: int) -> Vector3: return Vector3(-0.85+index*0.85,1.05,8.6)
+func lab_position(index: int) -> Vector3: return Annex.lab_world(Vector3(-0.85+index*0.85,1.05,8.6))
+func garland_reel_position() -> Vector3: return Annex.lab_world(Vector3(1.48,1.1,8.15))
 
 func installation_position(parcel: Dictionary) -> Vector3:
 	var spec: Dictionary = ITEMS[parcel.item]
@@ -142,7 +144,7 @@ func installation_position(parcel: Dictionary) -> Vector3:
 		return station.to_global(places[parcel.item])
 	if spec.kind == "lab_upgrade": return game.laboratory.upgrade_position(parcel.item)
 	if spec.kind == "lab": return lab_position(int(str(parcel.item).get_slice("_",1)))
-	if spec.kind == "garland": return Vector3(1.48,1.1,8.15)
+	if spec.kind == "garland": return garland_reel_position()
 	return Vector3(-9.2,1.7,-7.1) if parcel.item == "sign" else Vector3(-7.5,0.7,8.8)
 
 func near_ray(camera: Camera3D, point: Vector3, radius: float) -> bool:
@@ -169,7 +171,7 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		for index in range(p.garland_points.size()):
 			var raw: Array = p.garland_points[index]
 			if near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.16): return {"action":"garland_remove","index":index,"hint":"(E) Снять гирлянду и перевесить"}
-		if near_ray(camera,Vector3(1.48,1.1,8.15),0.3): return {"action":"garland_put" if p.garland_builder==peer else "garland_take","hint":"(E) Положить катушку" if p.garland_builder==peer else "(E) Взять гирлянду"}
+		if near_ray(camera,garland_reel_position(),0.3): return {"action":"garland_put" if p.garland_builder==peer else "garland_take","hint":"(E) Положить катушку" if p.garland_builder==peer else "(E) Взять гирлянду"}
 	if p.garland_builder == peer:
 		for z in [-7.35,10.35]:
 			var dir := -camera.global_basis.z

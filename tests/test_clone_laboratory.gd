@@ -22,7 +22,7 @@ func cycle(good := true, target_id := 0) -> void:
 		check(lab.state.phase=="stage2_ready","Finished stage waits for player")
 		lab.advance(30.0)
 		check(lab.state.phase=="stage2_ready","Ready stage waits indefinitely without penalty")
-		game.player.position=Vector3(0,0.02,7)
+		game.player.global_position=lab.operator_position()
 	else:
 		check(lab.state.phase=="fill_ready","Calibration proceeds directly to stabilizer")
 	lab.press(1,lab.state.revision)
@@ -33,7 +33,7 @@ func cycle(good := true, target_id := 0) -> void:
 		game.player.position=Vector3(-6,0.02,0)
 		lab.advance(lab.GROW_FINISH_SECONDS)
 		check(lab.state.phase=="ready","Mature clone waits for release")
-		game.player.position=Vector3(0,0.02,7)
+		game.player.global_position=lab.operator_position()
 	else: check(lab.state.phase=="ready","Needle accepts any zone")
 func run() -> void:
 	game=preload("res://scenes/cafe.tscn").instantiate()
@@ -41,7 +41,7 @@ func run() -> void:
 	game.set_physics_process(false)
 	var lab=game.laboratory
 	var p=game.service.progress
-	game.player.position=Vector3(0,0.02,7)
+	game.player.global_position=lab.operator_position()
 	check(not lab.press(1,lab.state.revision).is_empty(),"First star gate")
 	p.stars=1; p.lab_stage=3; p.cash=1000
 	var counter=game.service.add_station("counter",1,false,true)
@@ -70,7 +70,7 @@ func run() -> void:
 		game.shop.action(1,{"action":"take_parcel","id":parcel.id})
 		game.player.position=lab.upgrade_position(item)-Vector3.UP
 		check(game.shop.action(1,{"action":"install_parcel","id":parcel.id}).is_empty(),"Install delivered lab equipment")
-	game.player.position=Vector3(0,0.02,7)
+	game.player.global_position=lab.operator_position()
 	cycle(true)
 	check(lab.state.tempo==1.5 and lab.state.damper,"Power increases ceiling; damper helps separately")
 	lab.press(1,lab.state.revision)
@@ -88,9 +88,10 @@ func run() -> void:
 	var save: Dictionary=game.service.save_data()
 	check(game.service.load_data(save),"Save reload")
 	check(game.service.by_id(4).crew_tempo()==0.7 and "lab_damper" in game.service.progress.lab_upgrades,"Individual rates and lab upgrades persist")
-	game.player.position=Vector3(0,0.02,7)
+	game.player.global_position=lab.operator_position()
 	lab.reset(); lab.state.selected=0
-	game.session.members[7]="Guest"; game.session.player_poses[7]={"position":[0,0.02,7]}
+	game.session.members[7]="Guest"; var remote_lab_position: Vector3=lab.operator_position()
+	game.session.player_poses[7]={"position":[remote_lab_position.x,remote_lab_position.y,remote_lab_position.z]}
 	game.session.execute_action(7,{"action":"lab_press","revision":lab.state.revision})
 	check(lab.state.owner==7,"Remote player owns cycle")
 	game.session.player_poses[7].lab_hold=true; game.session.player_poses[7].received_at=Time.get_ticks_msec()
