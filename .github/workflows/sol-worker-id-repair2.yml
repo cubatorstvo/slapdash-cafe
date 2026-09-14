@@ -44,3 +44,4 @@ jobs:
           git commit -m "Repair clone identities across saved stations"
           git branch -f sol/worker-id-repair-final HEAD
           git push -f origin sol/worker-id-repair-final
+# rerun after Godot type fix
