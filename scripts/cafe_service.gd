@@ -628,20 +628,47 @@ func trace(kind: String, data := {}) -> void:
 	if game != null and is_instance_valid(game.telemetry): game.telemetry.event(kind,data)
 
 func normalize_workers() -> void:
-	while progress.free_workers.size() < progress.free_clones:
-		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})
-		progress.next_clone_id+=1
-	for worker in progress.free_workers:
-		worker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)
-		worker.rest=1.0
+	# Old prototype saves may carry clone_id=0, duplicate ids or a stale next_clone_id.
+	# Stations render by staffed count, while evening actors are keyed by clone id, so make
+	# every active worker identity positive and unique before assignment or animation.
+	var max_existing_id := 0
 	for station in stations:
 		if station.manual_station: continue
-		for role in range(station.role_count() if station.staffed<0 else station.staffed):
-			var member: Dictionary = station.crew[role]
-			if not member.has("clone_id"):
-				member.clone_id=progress.next_clone_id; progress.next_clone_id+=1
+		var active_roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		for role in range(active_roles): max_existing_id=maxi(max_existing_id,int(station.crew[role].get("clone_id",0)))
+	for worker in progress.free_workers: max_existing_id=maxi(max_existing_id,int(worker.get("id",0)))
+	progress.next_clone_id=maxi(maxi(1,progress.next_clone_id),max_existing_id+1)
+
+	var used_ids := {}
+	for station in stations:
+		if station.manual_station: continue
+		var active_roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		for role in range(active_roles):
+			var member: Dictionary=station.crew[role]
+			var id:=int(member.get("clone_id",0))
+			if id<=0 or used_ids.has(id):
+				id=progress.next_clone_id
+				progress.next_clone_id+=1
+				member.clone_id=id
+			used_ids[id]=true
 			member.tempo=clampf(float(member.get("tempo",1.0)),0.7,10.0)
 			member.rest=progress.rest_multiplier
+
+	for worker in progress.free_workers:
+		var id:=int(worker.get("id",0))
+		if id<=0 or used_ids.has(id):
+			id=progress.next_clone_id
+			progress.next_clone_id+=1
+			worker.id=id
+		used_ids[id]=true
+		worker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)
+		worker.rest=1.0
+
+	while progress.free_workers.size()<progress.free_clones:
+		var id: int=progress.next_clone_id
+		progress.next_clone_id+=1
+		progress.free_workers.append({"id":id,"tempo":1.0,"rest":1.0})
+		used_ids[id]=true
 	progress.free_clones=progress.free_workers.size()
 
 func assign_clones() -> void:
