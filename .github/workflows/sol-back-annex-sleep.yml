@@ -1,0 +1,49 @@
+name: Sol rear annex and multiplayer sleep
+on:
+  push:
+    branches:
+      - sol/back-annex-sleep-vote
+    paths:
+      - .github/workflows/sol-back-annex-sleep.yml
+permissions:
+  contents: write
+jobs:
+  implement-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/back-annex-sleep-vote
+          fetch-depth: 0
+      - name: Apply implementation patches
+        run: |
+          python .github/patch_back_annex_core.py
+          python .github/patch_sleep_vote.py
+          git diff origin/main -- scripts/cafe_annex.gd scripts/fps_player.gd scripts/staff_evening.gd scripts/cafe.gd scripts/cafe_development_view.gd scripts/cafe_service.gd scripts/coop_session.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md > /tmp/rear_annex_sleep.patch
+          test -s /tmp/rear_annex_sleep.patch
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Parse and import
+        run: timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit
+      - name: Focused tests
+        run: |
+          set -e
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_tempo.gd --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd --fresh-cafe
+      - name: Publish clean tested branch
+        run: |
+          git reset --hard origin/main
+          git clean -fd
+          git switch -C sol/back-annex-sleep-vote-final origin/main
+          git apply /tmp/rear_annex_sleep.patch
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/cafe_annex.gd scripts/fps_player.gd scripts/staff_evening.gd scripts/cafe.gd scripts/cafe_development_view.gd scripts/cafe_service.gd scripts/coop_session.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md
+          git commit -m "Move annex behind cafe and add multiplayer bed sleep"
+          git push --force-with-lease origin HEAD:sol/back-annex-sleep-vote-final
