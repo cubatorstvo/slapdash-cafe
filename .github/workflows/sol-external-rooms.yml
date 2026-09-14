@@ -33,11 +33,11 @@ jobs:
       - name: Focused tests
         run: |
           set -e
-          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd
-          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd
-          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd
-          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_tempo.gd
-          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_tempo.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd -- --fresh-cafe
       - name: Publish clean tested branch
         run: |
           git reset --hard origin/main
@@ -49,4 +49,4 @@ jobs:
           git add scripts/cafe_annex.gd scripts/cafe.gd scripts/clone_laboratory.gd scripts/cafe_shop.gd scripts/cafe_development_view.gd scripts/staff_evening.gd tests/test_clone_laboratory.gd tests/test_cafe_life.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md
           git commit -m "Move laboratory and rest room into external annex"
           git push --force-with-lease origin HEAD:sol/external-lab-rest-final
-# retry after explicit Godot 4.7 type annotations
+# tests run with isolated fresh cafe state
