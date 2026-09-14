@@ -48,7 +48,7 @@ static func rest_spot(index: int) -> Dictionary:
 	]
 	if index < spots.size(): return spots[index].duplicate(true)
 	var layer := 1 + int((index - spots.size()) / 2)
-	var side := -1.0 if index % 2 == 0 else 1.0
+	var side: float = -1.0 if index % 2 == 0 else 1.0
 	return {"position":Vector3(-16.15 + side * 0.18,0.92 + layer * 0.28,-1.65),"quality":0.90,"pose":"stack"}
 
 static func build_shell(parent: Node3D) -> void:
@@ -71,7 +71,7 @@ static func build_shell(parent: Node3D) -> void:
 		var lintel_height := WALL_HEIGHT-DOOR_HEIGHT
 		Props.solid_box(parent,Vector3(WALL_THICKNESS,lintel_height,DOOR_WIDTH),Vector3(CAFE_WEST_X,DOOR_HEIGHT+lintel_height*0.5-0.05,door_z),wall_color)
 		for side in [-1.0,1.0]:
-			Props.box(parent,Vector3(0.28,DOOR_HEIGHT+0.20,0.13),Vector3(CAFE_WEST_X+0.04,(DOOR_HEIGHT+0.20)*0.5,door_z+side*(DOOR_WIDTH*0.5+0.05)),Color("bd9667"))
+			Props.box(parent,Vector3(0.28,DOOR_HEIGHT+0.20,0.13),Vector3(CAFE_WEST_X+0.04,(DOOR_HEIGHT+0.20)*0.5,door_z+float(side)*(DOOR_WIDTH*0.5+0.05)),Color("bd9667"))
 	var lab_sign := Props.text(parent,"ЛАБОРАТОРИЯ",Vector3(CAFE_WEST_X+0.32,3.12,LAB_DOOR_Z),24,Color("edd09d"))
 	lab_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lab_sign.pixel_size = 0.005
@@ -82,8 +82,8 @@ static func build_shell(parent: Node3D) -> void:
 	for spec in [[Vector3(ANNEX_CENTER_X,3.25,REST_DOOR_Z),Color("ffd29a")],[Vector3(ANNEX_CENTER_X,3.25,LAB_DOOR_Z),Color("b7e0cb")]]:
 		var light := OmniLight3D.new()
 		parent.add_child(light)
-		light.position = spec[0]
-		light.light_color = spec[1]
+		light.position = Vector3(spec[0])
+		light.light_color = Color(spec[1])
 		light.light_energy = 0.85
 		light.omni_range = 6.0
 
@@ -94,7 +94,6 @@ static func _build_rest_furniture(parent: Node3D) -> void:
 		Props.box(parent,Vector3(0.48,0.12,0.65),Vector3(x-0.62,0.58,-1.65),Color("e5d9b8"))
 	Props.solid_box(parent,Vector3(2.0,0.42,0.62),Vector3(-16.10,0.25,0.70),Color("637b70"))
 	Props.solid_box(parent,Vector3(1.1,0.78,0.72),Vector3(-13.30,0.39,1.05),Color("8d6b50"))
-	Props.box(parent,Vector3(0.58,0.18,0.42),PLAYER_SLEEP_POINT,Color("d8c998"))
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
@@ -110,8 +109,8 @@ func _build_door(id: String, door_z: float, color: Color) -> void:
 	for side in [-1.0,1.0]:
 		var leaf := Node3D.new()
 		root.add_child(leaf)
-		var closed_z := side * DOOR_WIDTH * 0.25
-		var open_z := side * DOOR_WIDTH * 0.69
+		var closed_z: float = float(side) * DOOR_WIDTH * 0.25
+		var open_z: float = float(side) * DOOR_WIDTH * 0.69
 		leaf.position = Vector3(0,DOOR_HEIGHT*0.5,closed_z)
 		Props.solid_box(leaf,Vector3(0.11,DOOR_HEIGHT,DOOR_WIDTH*0.46),Vector3.ZERO,color)
 		var inset := Props.box(leaf,Vector3(0.025,0.72,DOOR_WIDTH*0.32),Vector3(0.065,0.18,0),Color("b8d0c7"))
@@ -130,7 +129,7 @@ func advance_doors(delta: float) -> void:
 		var root: Node3D = door.root
 		if _someone_near(root.global_position): door.hold = 0.85
 		else: door.hold = maxf(0.0,float(door.hold)-delta)
-		var target := 1.0 if float(door.hold)>0.0 else 0.0
+		var target: float = 1.0 if float(door.hold)>0.0 else 0.0
 		door.amount = move_toward(float(door.amount),target,delta*4.2)
 		for leaf_data in door.leaves:
 			var leaf: Node3D = leaf_data.node
