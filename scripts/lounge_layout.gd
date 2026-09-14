@@ -78,7 +78,7 @@ static func activity_slots(tier := 2, owned: Array = []) -> Array:
 static func _base_slots() -> Array:
 	# Interleave areas so even a small crew makes several corners feel inhabited.
 	return [
-		slot("sofa_left","sofa",Vector3(5.62,-0.10,14.45),Vector3(5.62,0,13.65),0,"watch","Смотрит телевизор"),
+		slot("sofa_left","sofa",Vector3(5.62,-0.10,14.45),Vector3(5.62,0,13.65),0,"chat","Болтает на диване"),
 		slot("football_left","foosball",Vector3(12.85,0,13.9),Vector3(12.85,0,13.9),-PI/2,"foosball","Играет в настольный футбол"),
 		slot("football_right","foosball",Vector3(15.15,0,13.9),Vector3(15.15,0,13.9),PI/2,"foosball","Играет в настольный футбол"),
 		slot("rocker","rocking_chair",Vector3(4.55,-0.10,18.5),Vector3(5.6,0,18.5),-PI/2,"rock","Качается в кресле"),
@@ -88,13 +88,13 @@ static func _base_slots() -> Array:
 		slot("board_right","board_games",Vector3(7.9,-0.14,21.0),Vector3(8.65,0,21.0),PI/2,"board","Обдумывает ход"),
 		slot("ping_front","table_tennis",Vector3(14,0,16.82),Vector3(14,0,16.82),PI,"pingpong","Играет в пинг-понг"),
 		slot("ping_back","table_tennis",Vector3(14,0,20.78),Vector3(14,0,20.78),0,"pingpong","Играет в пинг-понг"),
-		slot("sofa_middle","sofa",Vector3(6.5,-0.10,14.45),Vector3(6.5,0,13.65),0,"watch","Смотрит телевизор"),
+		slot("sofa_middle","sofa",Vector3(6.5,-0.10,14.45),Vector3(6.5,0,13.65),0,"chat","Рассказывает историю"),
 		slot("beanbag_seat","beanbag",Vector3(8.2,-0.10,18.6),Vector3(8.2,0,19.5),PI,"relax","Отдыхает в кресле-мешке"),
 		slot("aquarium_viewer","aquarium",Vector3(4.65,0,16.6),Vector3(4.65,0,16.6),PI/2,"fish","Наблюдает за рыбками"),
 		slot("book_reader","bookcase",Vector3(4.25,0,22.3),Vector3(4.25,0,22.3),PI/2,"read","Листает книгу"),
 		slot("music_listener","jukebox",Vector3(16,0,16.2),Vector3(16,0,16.2),-PI/2,"music","Слушает музыку"),
 		slot("tea_right","tea_station",Vector3(14.2,0.10,21.55),Vector3(14.2,0,20.95),PI,"tea","Пьёт чай"),
-		slot("sofa_right","sofa",Vector3(7.38,-0.10,14.45),Vector3(7.38,0,13.65),0,"watch","Смотрит телевизор"),
+		slot("sofa_right","sofa",Vector3(7.38,-0.10,14.45),Vector3(7.38,0,13.65),0,"chat","Смеётся с соседями"),
 		slot("board_front","board_games",Vector3(6.7,-0.14,19.8),Vector3(6.7,0,19.1),PI,"board","Играет в настолку"),
 		slot("board_back","board_games",Vector3(6.7,-0.14,22.2),Vector3(6.7,0,22.9),0,"board","Обдумывает ход"),
 		slot("snack_break","snack_fridge",Vector3(16.8,0,21.5),Vector3(16.8,0,21.5),PI,"snack","Выбирает перекус")
@@ -209,19 +209,36 @@ static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Arra
 	return result
 
 static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionary:
-	var blockers := obstacles(tier,owned)
-	var candidates: Array = []
+	var blockers:=obstacles(tier,owned)
+	var ring: Array=[]
+	for center_z in [14.0,16.6,19.2,21.8,24.3]:
+		if center_z>back_z(tier)-1.25: continue
+		var center:=Vector3(AISLE_X,0,center_z)
+		for spoke in range(6):
+			var angle:=TAU*float(spoke)/6.0
+			var point:=center+Vector3(cos(angle)*1.08,0,sin(angle)*0.82)
+			if walkable(point,blockers,tier): ring.append({"point":point,"center":center})
+	if not ring.is_empty():
+		var chosen: Dictionary=ring[index%ring.size()]
+		var base: Vector3=chosen.point
+		var layer: int=int(index/ring.size())
+		var point:=base+Vector3(0,layer*0.34,0)
+		var toward: Vector3=Vector3(chosen.center)-base
+		var yaw: float=atan2(-toward.x,-toward.z)
+		var activity: String=["Перекидывается мячиком","Болтает на ковре","Смеётся в кружке","Слушает байку"][index%4]
+		return slot("overflow_%d"%index,"floor",point,base,yaw,"floor",activity)
+	var candidates: Array=[]
 	for z in range(12,24):
 		for x in [9.1,11.5,16.4]:
 			var point:=Vector3(x,0,float(z)+0.25)
 			if walkable(point,blockers,tier): candidates.append(point)
 	if candidates.is_empty(): candidates.append(ENTRANCE)
-	if index>=candidates.size():
-		# Unlimited crews share roomy floor perches in distinct vertical layers.
-		var base: Vector3=candidates[index%candidates.size()]
-		return slot("overflow_%d"%index,"floor",base+Vector3(0,(index/candidates.size())*0.34,0),base,0,"floor","Устроился на ковре")
-	var point: Vector3=candidates[index]
-	return slot("overflow_%d"%index,"floor",point,point,0,"floor","Устроился на ковре")
+	var base: Vector3=candidates[index%candidates.size()]
+	var layer: int=int(index/candidates.size())
+	var point:=base+Vector3(0,layer*0.34,0)
+	var toward:=Vector3(AISLE_X,0,clampf(base.z,12.5,back_z(tier)-1.3))-base
+	var yaw: float=atan2(-toward.x,-toward.z) if toward.length()>0.05 else float(index%4)*PI/2.0
+	return slot("overflow_%d"%index,"floor",point,base,yaw,"floor","Болтает на ковре")
 
 static func rest_spot(index: int, tier := 2, owned: Array = []) -> Dictionary:
 	var slots:=activity_slots(tier,owned)

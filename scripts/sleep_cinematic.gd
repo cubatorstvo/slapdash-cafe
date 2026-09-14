@@ -63,7 +63,7 @@ func begin() -> void:
 	game.hud.pause_panel.hide()
 	game.hud.hide()
 	Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
-	var back:=Layout.back_z(game.service.progress.lounge_tier)
+	var back: float=Layout.back_z(game.service.progress.lounge_tier)
 	shot.global_position=Vector3(3.55,4.02,11.05)
 	shot.look_at(Vector3(10.6,1.05,(10.6+back)*0.5+1.4),Vector3.UP)
 	shot.make_current()
@@ -90,12 +90,38 @@ func _process(_delta: float) -> void:
 		return
 	var age: float=game.session.sleep_scene_age()
 	var scene: Dictionary=game.session.sleep_scene
+	var phase: String=game.session.sleep_scene_phase()
 	var forecast:=Rest.report(game.service.progress,game.evening.workers().size())
-	title.text="СМЕНА ЗАКОНЧЕНА" if age<2.1 else "ТИХИЙ ЧАС ДЛЯ ОЧЕНЬ УСТАВШИХ"
-	hint.text="Завтра: +%d%% к темпу команды\nПробел · пропустить вместе (%d/%d)"%[roundi(float(forecast.bonus)*100),scene.skips.size(),scene.participants.size()]
-	shade.color=Color(0,0,0,maxf(clampf(1.0-age/0.4,0,1),clampf((age-6.45)/0.55,0,1)))
+	var back: float=Layout.back_z(game.service.progress.lounge_tier)
+	if phase=="sleep":
+		title.text="СМЕНА ЗАКОНЧЕНА" if age<2.1 else "ТИХИЙ ЧАС ДЛЯ ОЧЕНЬ УСТАВШИХ"
+		hint.text="Завтра: +%d%% к темпу команды\nПробел · пропустить вместе (%d/%d)"%[roundi(float(forecast.bonus)*100),scene.skips.size(),scene.participants.size()]
+		shade.color=Color(0,0,0,maxf(clampf(1.0-age/0.4,0,1),clampf((age-6.45)/0.55,0,1)))
+		if is_instance_valid(self_avatar):
+			self_avatar.visible=game.session.local_sleeping()
+			if self_avatar.visible:
+				game.annex.settle_player_avatar(self_avatar,game.session.local_sleep_bed())
+				self_avatar.caption.hide()
+		return
+
+	# The black frame at the end of the sleep shot becomes the first frame of morning.
+	title.text="ДОБРОЕ УТРО · ДЕНЬ %d"%int(scene.get("morning_day",game.service.progress.day))
+	hint.text="Клоны уже бегут на рабочие места\nПробел · пропустить вместе (%d/%d)"%[scene.skips.size(),scene.participants.size()]
+	shade.color=Color(0,0,0,clampf(1.0-age/0.65,0,1))
+	var daylight_blend: float=smoothstep(0.0,1.0,clampf(age/1.45,0,1))
+	game.daylight.light_energy=lerpf(0.12,0.75,daylight_blend)
+	game.room_environment.environment.ambient_light_energy=lerpf(0.26,0.35,daylight_blend)
+	var travel: float=smoothstep(0.0,1.0,clampf((age-0.55)/4.3,0,1))
+	var camera_start: Vector3=Vector3(15.7,4.15,back-1.0)
+	var camera_end: Vector3=Vector3(12.0,3.15,8.15)
+	var look_start: Vector3=Vector3(10.4,1.0,maxf(13.4,back-4.0))
+	var look_end: Vector3=Vector3(3.0,1.05,-1.4)
+	shot.global_position=camera_start.lerp(camera_end,travel)
+	shot.look_at(look_start.lerp(look_end,travel),Vector3.UP)
 	if is_instance_valid(self_avatar):
 		self_avatar.visible=game.session.local_sleeping()
 		if self_avatar.visible:
-			game.annex.settle_player_avatar(self_avatar,game.session.local_sleep_bed())
+			var layer: int=game.session.local_sleep_bed()
+			var rise: float=smoothstep(0.0,1.0,clampf(age/1.15,0,1))
+			self_avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier),0.0,rise,game.session.local_id())
 			self_avatar.caption.hide()

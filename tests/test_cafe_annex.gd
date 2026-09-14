@@ -1,5 +1,6 @@
 extends SceneTree
 const Annex=preload("res://scripts/cafe_annex.gd")
+const Lounge=preload("res://scripts/lounge_layout.gd")
 var failures:=0
 func _initialize() -> void: run.call_deferred()
 func check(ok: bool, text: String) -> void:
@@ -56,8 +57,18 @@ func run() -> void:
 	game.session.execute_action(7,{"action":"skip_sleep"})
 	game.session.advance(0.1)
 	check(game.service.progress.day==day_before+1 and game.service.progress.shift=="open","All connected players sleeping starts next day")
-	check(game.session.sleeping_peers.is_empty(),"Sleep readiness clears after morning")
+	check(game.session.sleep_scene_active() and game.session.sleep_scene_phase()=="wake","Morning keeps a synchronized wake scene active")
+	check(not game.session.sleeping_peers.is_empty(),"Players remain in the shared bed during the wake shot")
+	game.evening._process(0.0)
+	check(game.evening.performers.size()==1,"Worker actor survives into the morning run-back scene")
+	game.session.execute_action(1,{"action":"skip_sleep"})
+	game.session.execute_action(7,{"action":"skip_sleep"})
+	game.session.advance(0.1)
+	check(not game.session.sleep_scene_active() and game.session.sleeping_peers.is_empty(),"Unanimous morning skip completes the cinematic and clears sleepers")
 	check(game.service.open_for_business,"Morning automatically opens cafe")
+	var floor_a:=Lounge.overflow_slot(0,2,[])
+	var floor_b:=Lounge.overflow_slot(1,2,[])
+	check(absf(float(floor_a.yaw)-float(floor_b.yaw))>0.05,"Floor lounge spots face different directions around social groups")
 	game._shutdown_tree(game); game.free()
 	print("PASS: rear annex, expanded rest room, automatic doors, clone route and multiplayer bed sleep" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

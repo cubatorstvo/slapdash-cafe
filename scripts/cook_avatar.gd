@@ -170,7 +170,7 @@ func build_lounge_accessories() -> void:
 func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 	if not is_instance_valid(lounge_legs): build_lounge_accessories()
 	var pose:=str(spot.pose)
-	var seated: bool=pose in ["watch","rock","tea","board","relax","floor"]
+	var seated: bool=pose in ["watch","chat","rock","tea","board","relax","floor"]
 	position=spot.position
 	rotation=Vector3(0,float(spot.get("yaw",0)),0)
 	head.rotation=Vector3(sin(clock*0.75+identity)*0.025,sin(clock*0.3+identity)*0.055,0)
@@ -194,6 +194,21 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 	match pose:
 		"watch":
 			head.rotation.y=sin(clock*0.25+identity)*0.09
+		"chat":
+			var talk:=fposmod(clock+identity*1.37,6.4)
+			var side: float=-1.0 if str(spot.id)=="sofa_right" else 1.0 if str(spot.id)=="sofa_left" else sin(clock*0.43+identity)
+			head.rotation.y=side*(0.52+sin(clock*0.8+identity)*0.16)
+			head.rotation.x=sin(clock*2.4+identity)*0.06
+			if talk<2.35:
+				var gesture:=sin(talk/2.35*PI)
+				right=right.lerp(Vector3(0.52,1.18,-0.28),gesture)
+				left=left.lerp(Vector3(-0.40,1.04,-0.33),gesture*0.55)
+			elif talk>4.35 and talk<5.45:
+				var laugh:=sin((talk-4.35)/1.10*PI)
+				rotation.z=sin(clock*8.0+identity)*0.035*laugh
+				head.rotation.x=-0.12*clampf(laugh,0,1)
+				left.y-=0.08*clampf(laugh,0,1)
+				right.y-=0.08*clampf(laugh,0,1)
 		"rock":
 			rotation.x=sin(clock*1.7)*0.065
 		"tea":
@@ -233,9 +248,69 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 			lounge_snack.position=right
 		"floor":
 			position.y-=0.50
-			head.rotation.x=-0.08
+			var floor_beat:=fposmod(clock*0.78+identity*1.11,7.0)
+			head.rotation.x=-0.08+sin(clock*1.7+identity)*0.05
+			head.rotation.y=sin(clock*0.62+identity)*0.48
+			if floor_beat<2.2:
+				var story:=sin(floor_beat/2.2*PI)
+				right=right.lerp(Vector3(0.50,1.03,-0.28),story)
+			elif floor_beat>4.6 and floor_beat<5.8:
+				var laugh:=sin((floor_beat-4.6)/1.2*PI)
+				rotation.z=sin(clock*9.0+identity)*0.045*laugh
+				left.y-=0.10*laugh
+				right.y-=0.10*laugh
 	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
 	P.align_line(arms[1],Vector3(0.3,1.2,0),right)
+
+func lounge_ball_react(target: Vector3, pass_phase: float, throwing: bool) -> void:
+	var local_target: Vector3=to_local(target)
+	head.rotation.y=clampf(atan2(-local_target.x,-local_target.z),-1.0,1.0)
+	head.rotation.x=clampf(-atan2(local_target.y-1.45,maxf(0.2,Vector2(local_target.x,local_target.z).length())),-0.35,0.35)
+	var reach: float=sin(clampf(pass_phase,0.0,1.0)*PI)
+	var right:=Vector3(0.30,0.82,-0.43)
+	var left:=Vector3(-0.30,0.82,-0.43)
+	if throwing:
+		right=right.lerp(Vector3(0.48,1.34,-0.30),clampf(1.2-pass_phase,0.0,1.0))
+	else:
+		var catch: float=smoothstep(0.55,1.0,pass_phase)
+		right=right.lerp(Vector3(0.20,1.24,-0.38),catch)
+		left=left.lerp(Vector3(-0.20,1.24,-0.38),catch)
+	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
+	P.align_line(arms[1],Vector3(0.3,1.2,0),right+Vector3(0,reach*0.04,0))
+
+func morning_wake_pose(at: Vector3, yaw: float, rise: float, identity: int) -> void:
+	reset_lounge_accessories()
+	hat.hide(); notebook.hide(); book.set_reading(false)
+	var eased: float=smoothstep(0.0,1.0,clampf(rise,0.0,1.0))
+	position=at-Vector3.UP*(1.0-eased)*0.28
+	rotation=Vector3(0,yaw,0)
+	head.rotation=Vector3(-0.34*(1.0-eased)+sin(identity*1.7+eased*PI)*0.06,0,0)
+	for i in range(legs.size()): legs[i].rotation.x=(1.0-eased)*(0.75 if i==0 else -0.55)
+	for i in range(arms.size()):
+		var side: float=-1.0 if i==0 else 1.0
+		var sleepy:=Vector3(side*0.33,0.84,-0.18)
+		var stretch:=Vector3(side*0.48,1.92,-0.04)
+		var hand:=stretch.lerp(sleepy,eased)
+		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)
+
+func morning_run(clock: float, variant: int) -> void:
+	reset_lounge_accessories()
+	hat.hide(); notebook.hide(); book.set_reading(false)
+	var kind: int=posmod(variant,5)
+	var beat: float=clock*float([11.0,9.0,14.0,10.5,12.0][kind])
+	var bounce: float=float([0.08,0.20,0.045,0.11,0.14][kind])
+	position.y+=absf(sin(beat))*bounce
+	rotation.x=-0.10 if kind==2 else 0.0
+	rotation.z=sin(beat*0.5)*0.07 if kind in [1,4] else 0.0
+	for i in range(legs.size()): legs[i].rotation.x=sin(beat+i*PI)*float([0.62,0.82,0.95,0.70,0.78][kind])
+	head.rotation=Vector3(-0.06,sin(beat*0.22+kind)*0.17,0)
+	for i in range(arms.size()):
+		var side: float=-1.0 if i==0 else 1.0
+		var hand:=Vector3(side*0.38,0.90,-0.12+sin(beat+i*PI)*0.28)
+		if kind==1 and i==1: hand=Vector3(0.62,1.72,-0.05+sin(beat)*0.12)
+		elif kind==3: hand=Vector3(side*0.72,1.30,-0.12+sin(beat+i)*0.08)
+		elif kind==4 and i==0: hand=Vector3(-0.54,1.55,-0.10)
+		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)
 
 func reset_lounge_accessories() -> void:
 	for node in [lounge_legs,lounge_floor_legs,lounge_cup,lounge_paddle,lounge_snack]:

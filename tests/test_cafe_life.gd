@@ -78,7 +78,7 @@ func run() -> void:
 	var resting_id: int=st.crew[0].clone_id
 	service.next_day(); game.evening._process(DT)
 	var rested: Dictionary=service.clone_data(resting_id)
-	check(is_equal_approx(float(rested.get("rest",1.0)),1.0),"Visual lounge preview gives neutral next-day rest multiplier")
+	check(is_equal_approx(float(rested.get("rest",1.0)),float(p.rest_multiplier)),"Visual lounge preview applies shared next-day rest multiplier")
 	check(is_equal_approx(st.crew_tempo(),float(rested.tempo)*float(rested.rest)),"Rest multiplies effective tempo without changing permanent tempo")
 	check(game.evening.performers.is_empty(),"Morning clears night props and opens cafe")
 	game._shutdown_tree(game); game.free()

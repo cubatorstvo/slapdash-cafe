@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-rest-20"
+const PROTOCOL := "slapdash-cafe-wake-21"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -24,6 +24,7 @@ var sleeping_peers := {}
 var sleep_scene := {}
 var sleep_revision := 0
 const SLEEP_SECONDS := 7.0
+const WAKE_SECONDS := 5.8
 
 func setup(root_game: Node3D) -> void:
 	game = root_game
@@ -181,6 +182,9 @@ func sleep_scene_active() -> bool:
 func sleep_scene_age() -> float:
 	return float(sleep_scene.get("age",0.0))
 
+func sleep_scene_phase() -> String:
+	return str(sleep_scene.get("phase","sleep"))
+
 func _compact_sleep_stack() -> void:
 	var ids: Array=sleeping_peers.keys()
 	ids.sort_custom(func(a,b):return int(sleeping_peers[a])<int(sleeping_peers[b]))
@@ -216,8 +220,9 @@ func _sleep_state(value: Dictionary, scene: Dictionary, revision: int) -> void:
 	sleeping_peers=value.duplicate(true)
 	var previous_age:=sleep_scene_age()
 	var same_scene: bool=sleep_scene.get("serial",-1)==scene.get("serial",-2)
+	var same_phase: bool=sleep_scene_phase()==str(scene.get("phase","sleep"))
 	sleep_scene=scene.duplicate(true)
-	if same_scene and sleep_scene_active(): sleep_scene.age=maxf(previous_age,sleep_scene_age())
+	if same_scene and same_phase and sleep_scene_active(): sleep_scene.age=maxf(previous_age,sleep_scene_age())
 
 func _try_finish_sleep() -> bool:
 	if guest or sleep_scene_active() or game.service.progress.shift!="night": return false
@@ -227,27 +232,42 @@ func _try_finish_sleep() -> bool:
 	if participants.is_empty(): return false
 	for id in participants:
 		if not sleeping_peers.has(id): return false
-	sleep_scene={"active":true,"age":0.0,"serial":sleep_revision+1,"participants":participants,"skips":[],"night_start":game.service.progress.night_elapsed}
+	sleep_scene={"active":true,"phase":"sleep","age":0.0,"serial":sleep_revision+1,"participants":participants,"skips":[],"night_start":game.service.progress.night_elapsed}
 	_broadcast_sleep_state()
+	return true
+
+func _scene_unanimous() -> bool:
+	var participants: Array=sleep_scene.get("participants",[])
+	var skips: Array=sleep_scene.get("skips",[])
+	if participants.is_empty(): return false
+	for id in participants:
+		if id not in skips: return false
 	return true
 
 func _advance_sleep(delta: float) -> void:
 	if not sleep_scene_active(): return
-	sleep_scene.age=minf(SLEEP_SECONDS,sleep_scene_age()+delta)
+	var phase: String=sleep_scene_phase()
+	var duration: float=SLEEP_SECONDS if phase=="sleep" else WAKE_SECONDS
+	sleep_scene.age=minf(duration,sleep_scene_age()+delta)
 	if guest: return
-	if game.service.progress.shift!="night":
-		clear_sleeping()
+	if phase=="sleep" and game.service.progress.shift!="night":
+		clear_sleeping(); _broadcast_sleep_state(); return
+	if phase=="wake" and game.service.progress.shift!="open":
+		clear_sleeping(); _broadcast_sleep_state(); return
+	if sleep_scene_age()<duration and not _scene_unanimous(): return
+	if phase=="sleep":
+		var error: String=game.service.next_day()
+		if not error.is_empty():
+			clear_sleeping()
+			_broadcast_sleep_state()
+			game.service.announce(error)
+			return
+		sleep_scene.phase="wake"
+		sleep_scene.age=0.0
+		sleep_scene.skips=[]
+		sleep_scene.morning_day=game.service.progress.day
 		_broadcast_sleep_state()
-		return
-	var unanimous: bool=not sleep_scene.participants.is_empty()
-	for id in sleep_scene.participants:
-		if id not in sleep_scene.skips: unanimous=false
-	if sleep_scene_age()<SLEEP_SECONDS and not unanimous: return
-	var error: String=game.service.next_day()
-	if not error.is_empty():
-		clear_sleeping()
-		_broadcast_sleep_state()
-		game.service.announce(error)
+		game.save_cafe()
 		return
 	clear_sleeping()
 	_broadcast_sleep_state()
@@ -496,7 +516,7 @@ func suspend_input() -> void:
 func advance(delta: float) -> void:
 	_advance_sleep(delta)
 	_draw_players(delta)
-	if not guest and game.service.progress.shift != "night" and not sleeping_peers.is_empty():
+	if not guest and game.service.progress.shift != "night" and not sleep_scene_active() and not sleeping_peers.is_empty():
 		clear_sleeping()
 		_broadcast_sleep_state()
 	if not connected: return
@@ -631,8 +651,14 @@ func _draw_players(delta: float) -> void:
 		avatar.perform(pose, target, held)
 		avatar.caption.text = str(members[id])
 		if sleeping_peers.has(id):
-			game.annex.settle_player_avatar(avatar,int(sleeping_peers[id]))
-			avatar.caption.text += "\nСпит"
+			var layer: int=int(sleeping_peers[id])
+			if sleep_scene_active() and sleep_scene_phase()=="wake":
+				var rise: float=smoothstep(0.0,1.0,clampf(sleep_scene_age()/1.15,0.0,1.0))
+				avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier),0.0,rise,int(id))
+				avatar.caption.text += "\nПросыпается"
+			else:
+				game.annex.settle_player_avatar(avatar,layer)
+				avatar.caption.text += "\nСпит"
 		if station != null and avatar.book.current_page == station.training.dish:
 			avatar.book.set_live(station.model)
 		else:

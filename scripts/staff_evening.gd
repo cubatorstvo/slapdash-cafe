@@ -9,9 +9,12 @@ var game: Node3D
 var performers := {}
 var plan_stamp := ""
 var cached_plan: Array = []
+var lounge_ball: Node3D
 
 func setup(owner_game: Node3D) -> void:
 	game=owner_game
+	lounge_ball=Props.ball(self,0.105,Vector3.ZERO,Color("e6b45f"))
+	lounge_ball.hide()
 
 func workers() -> Array:
 	var result: Array=[]
@@ -82,15 +85,56 @@ func route_for(info: Dictionary, target: Vector3) -> Array:
 		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
 	return route
 
+func _sample_route(route: Array, distance: float) -> Dictionary:
+	var point: Vector3=route[0]
+	var direction:=Vector3.BACK
+	var done:=route.size()<2
+	for i in range(1,route.size()):
+		var segment: Vector3=Vector3(route[i])-Vector3(route[i-1])
+		if distance<=segment.length():
+			point=Vector3(route[i-1])+segment.normalized()*distance
+			direction=segment
+			return {"position":point,"direction":direction,"done":false}
+		distance-=segment.length()
+		point=Vector3(route[i])
+		direction=segment
+		if i==route.size()-1: done=true
+	return {"position":point,"direction":direction,"done":done}
+
+func _animate_floor_ball(clock: float) -> void:
+	if not is_instance_valid(lounge_ball): return
+	var floor_group: Array=[]
+	for id in performers:
+		var entry: Dictionary=performers[id]
+		if entry.get("settled",false) and str(entry.get("item",""))=="floor" and is_instance_valid(entry.actor): floor_group.append({"id":int(id),"actor":entry.actor})
+	if floor_group.size()<2:
+		lounge_ball.hide()
+		return
+	floor_group.sort_custom(func(a,b): return int(a.id)<int(b.id))
+	var duration: float=2.25
+	var turn: int=int(floor(clock/duration))
+	var sender: Dictionary=floor_group[turn%floor_group.size()]
+	var receiver: Dictionary=floor_group[(turn+1)%floor_group.size()]
+	var pass_phase: float=fposmod(clock,duration)/duration
+	var from: Vector3=sender.actor.head.global_position+Vector3(0,-0.48,0)
+	var to: Vector3=receiver.actor.head.global_position+Vector3(0,-0.48,0)
+	lounge_ball.global_position=from.lerp(to,pass_phase)+Vector3.UP*sin(pass_phase*PI)*0.72
+	lounge_ball.show()
+	sender.actor.lounge_ball_react(to,pass_phase,true)
+	receiver.actor.lounge_ball_react(from,pass_phase,false)
+
 func _process(_delta: float) -> void:
 	if game==null: return
-	if game.service.progress.shift!="night":
+	var cinematic: bool=game.session.sleep_scene_active()
+	var wake_scene: bool=cinematic and game.session.sleep_scene_phase()=="wake"
+	if game.service.progress.shift!="night" and not wake_scene:
 		for entry in performers.values(): entry.actor.queue_free(); entry.hat.queue_free(); entry.sleepy.queue_free()
 		performers.clear()
 		plan_stamp=""
 		cached_plan.clear()
+		if is_instance_valid(lounge_ball): lounge_ball.hide()
 		return
-	var assignments:=plan()
+	var assignments: Array=cached_plan if wake_scene and not cached_plan.is_empty() else plan()
 	var current_ids: Array=[]
 	for index in range(assignments.size()):
 		var info: Dictionary=assignments[index].worker
@@ -112,28 +156,58 @@ func _process(_delta: float) -> void:
 		var actor: Node3D=entry.actor
 		var hat: Node3D=entry.hat
 		entry.sleepy.hide()
+		var station=info.station
+		var training: bool=station!=null and station.training.active()
+		actor.visible=not training
+
+		if wake_scene:
+			var age: float=game.session.sleep_scene_age()
+			var start_delay: float=0.20+float(index%10)*0.075
+			var rise_duration: float=0.82+float(id%3)*0.08
+			var sleeping_spot:=Lounge.sleep_spot(spot,id,game.service.progress.lounge_tier)
+			entry.settled=false
+			entry.item=str(spot.item)
+			actor.caption.visible=false
+			actor.hat.hide()
+			if age<start_delay:
+				actor.sleep_pose(sleeping_spot,age,id)
+			elif age<start_delay+rise_duration:
+				var rise: float=smoothstep(0.0,1.0,clampf((age-start_delay)/rise_duration,0,1))
+				var from: Vector3=sleeping_spot.position
+				var to: Vector3=spot.approach
+				var at:=from.lerp(to,rise)+Vector3.UP*sin(rise*PI)*0.16
+				actor.morning_wake_pose(at,float(spot.get("yaw",0)),rise,id)
+			else:
+				var run_clock: float=age-start_delay-rise_duration
+				var reverse_route: Array=assignments[index].route.duplicate()
+				reverse_route.reverse()
+				var variant: int=id%5
+				var speed: float=[4.4,5.15,3.85,4.75,4.15][variant]
+				var sample: Dictionary=_sample_route(reverse_route,run_clock*speed)
+				actor.position=sample.position
+				var direction: Vector3=sample.direction
+				actor.rotation.y=atan2(-direction.x,-direction.z)
+				if sample.done:
+					actor.position=info.home
+					actor.rotation.y=station.global_rotation.y if station!=null else 0.0
+					actor.celebrate(run_clock,variant%3,false)
+				else: actor.morning_run(run_clock,variant)
+				hat.visible=not training and not sample.done
+			continue
+
 		var clock: float=game.service.progress.night_elapsed
-		var cinematic: bool=game.session.sleep_scene_active()
 		if cinematic: clock=maxf(clock,float(game.session.sleep_scene.night_start)+game.session.sleep_scene_age()*9.0)
 		var t:=maxf(0,clock-index*0.18)
 		var variant:=id%3
 		var home: Vector3=info.home
 		var route: Array=assignments[index].route
 		var speed: float=[3.6,4.6,2.9][variant]
-		var distance:=maxf(0,t-0.85)*speed
-		var point:=home
-		var direction:=Vector3.BACK
-		var done:=false
-		for i in range(1,route.size()):
-			var segment: Vector3=route[i]-route[i-1]
-			if distance<=segment.length(): point=route[i-1]+segment.normalized()*distance; direction=segment; break
-			distance-=segment.length(); point=route[i]
-			if i==route.size()-1: done=true
-		var station=info.station
-		var training: bool = station!=null and station.training.active()
+		var sample: Dictionary=_sample_route(route,maxf(0,t-0.85)*speed)
+		var point: Vector3=sample.position
+		var direction: Vector3=sample.direction
+		var done: bool=sample.done
 		entry.settled=done and not training
 		entry.item=str(spot.item)
-		actor.visible=not training
 		if done:
 			settle(actor,spot,id)
 			actor.caption.text=str(info.name)+"\n"+str(spot.activity)
@@ -171,3 +245,8 @@ func _process(_delta: float) -> void:
 	for id in performers.keys():
 		if id not in current_ids:
 			performers[id].actor.queue_free(); performers[id].hat.queue_free(); performers[id].sleepy.queue_free(); performers.erase(id)
+	if wake_scene or cinematic:
+		if is_instance_valid(lounge_ball): lounge_ball.hide()
+	else:
+		_animate_floor_ball(game.service.progress.night_elapsed)
+
