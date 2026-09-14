@@ -49,3 +49,4 @@ jobs:
           git add scripts/cafe_annex.gd scripts/cafe.gd scripts/clone_laboratory.gd scripts/cafe_shop.gd scripts/cafe_development_view.gd scripts/staff_evening.gd tests/test_clone_laboratory.gd tests/test_cafe_life.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md
           git commit -m "Move laboratory and rest room into external annex"
           git push --force-with-lease origin HEAD:sol/external-lab-rest-final
+# retry after explicit Godot 4.7 type annotations
