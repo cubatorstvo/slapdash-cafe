@@ -1,6 +1,8 @@
 extends Node3D
 ## Laboratory and expanded rest room live behind the cafe, opposite the cooking stations.
 const Props = preload("res://scripts/props.gd")
+const LoungeLayout = preload("res://scripts/lounge_layout.gd")
+const LoungeFurniture = preload("res://scripts/lounge_furniture.gd")
 
 const CAFE_X_MIN := -11.8
 const CAFE_X_MAX := 17.8
@@ -11,7 +13,7 @@ const LAB_X_MAX := DIVIDER_X
 const LAB_BACK_Z := 16.2
 const REST_X_MIN := DIVIDER_X
 const REST_X_MAX := CAFE_X_MAX
-const REST_BACK_Z := 18.5
+const REST_BACK_Z := LoungeLayout.MAX_BACK_Z
 const LAB_DOOR_X := -1.1
 const REST_DOOR_X := 10.4
 const DOOR_WIDTH := 1.8
@@ -40,7 +42,7 @@ static func place_lab(node: Node3D) -> void:
 	node.rotation.y = LAB_ROTATION_Y
 
 static func player_bed_center(index: int) -> Vector3:
-	var centers := [Vector3(4.7,0.48,17.15),Vector3(7.95,0.48,17.15),Vector3(11.20,0.48,17.15),Vector3(14.45,0.48,17.15)]
+	var centers := [Vector3(4.7,0.48,LoungeLayout.BEDS_Z),Vector3(7.95,0.48,LoungeLayout.BEDS_Z),Vector3(11.20,0.48,LoungeLayout.BEDS_Z),Vector3(14.45,0.48,LoungeLayout.BEDS_Z)]
 	return centers[clampi(index,0,centers.size()-1)]
 
 static func player_sleep_position(index: int) -> Vector3:
@@ -52,23 +54,10 @@ static func player_sleep_yaw(_index: int) -> float:
 
 static func player_bed_exit(index: int) -> Vector3:
 	var center := player_bed_center(index)
-	return Vector3(center.x,0.02,15.65)
+	return Vector3(center.x,0.02,24.15)
 
 static func rest_spot(index: int) -> Dictionary:
-	var spots := [
-		{"position":Vector3(4.65,0.62,12.75),"quality":1.10,"pose":"bed"},
-		{"position":Vector3(7.35,0.62,12.75),"quality":1.08,"pose":"bed"},
-		{"position":Vector3(10.10,0.72,12.80),"quality":1.03,"pose":"bench"},
-		{"position":Vector3(13.05,0.80,12.85),"quality":1.00,"pose":"table"},
-		{"position":Vector3(5.25,0.06,14.45),"quality":0.96,"pose":"floor"},
-		{"position":Vector3(8.05,0.06,14.45),"quality":0.94,"pose":"floor"},
-		{"position":Vector3(4.65,0.92,12.75),"quality":0.92,"pose":"stack"},
-		{"position":Vector3(15.55,0.0,13.25),"quality":0.90,"pose":"stand"}
-	]
-	if index < spots.size(): return spots[index].duplicate(true)
-	var layer := 1 + int((index - spots.size()) / 2)
-	var side: float = -1.0 if index % 2 == 0 else 1.0
-	return {"position":Vector3(4.65 + side * 0.18,0.92 + layer * 0.28,12.75),"quality":0.90,"pose":"stack"}
+	return LoungeLayout.rest_spot(index)
 
 static func build_shell(parent: Node3D) -> void:
 	var wall_color := Color("2e5355")
@@ -93,7 +82,7 @@ static func build_shell(parent: Node3D) -> void:
 	rest_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	rest_sign.pixel_size = 0.005
 	_build_rest_furniture(parent)
-	for spec in [[Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,3.25,13.35),Color("b7e0cb")],[Vector3(7.0,3.25,13.6),Color("ffd29a")],[Vector3(13.5,3.25,16.0),Color("ffd29a")]]:
+	for spec in [[Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,3.25,13.35),Color("b7e0cb")]]:
 		var light := OmniLight3D.new()
 		parent.add_child(light)
 		light.position = Vector3(spec[0])
@@ -117,12 +106,9 @@ static func _build_cafe_back_wall(parent: Node3D, color: Color) -> void:
 			Props.box(parent,Vector3(0.13,DOOR_HEIGHT+0.20,0.28),Vector3(door_x+float(side)*(DOOR_WIDTH*0.5+0.05),(DOOR_HEIGHT+0.20)*0.5,CAFE_BACK_Z-0.04),Color("bd9667"))
 
 static func _build_rest_furniture(parent: Node3D) -> void:
-	for x in [4.65,7.35]:
-		Props.solid_box(parent,Vector3(2.15,0.24,0.88),Vector3(x,0.28,12.75),Color("80634f"))
-		Props.box(parent,Vector3(1.75,0.16,0.72),Vector3(x,0.46,12.75),Color("b9a477"))
-		Props.box(parent,Vector3(0.48,0.12,0.65),Vector3(x-0.62,0.58,12.75),Color("e5d9b8"))
-	Props.solid_box(parent,Vector3(2.0,0.42,0.62),Vector3(10.10,0.25,12.80),Color("637b70"))
-	Props.solid_box(parent,Vector3(1.1,0.78,0.72),Vector3(13.05,0.39,12.85),Color("8d6b50"))
+	var lounge := LoungeFurniture.new()
+	parent.add_child(lounge)
+	lounge.setup(parent)
 	for index in range(PLAYER_BED_COUNT):
 		var center := player_bed_center(index)
 		Props.solid_box(parent,Vector3(2.35,0.28,1.05),Vector3(center.x,0.26,center.z),Color("80634f"))

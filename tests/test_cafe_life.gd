@@ -74,13 +74,13 @@ func run() -> void:
 	var entry: Dictionary=game.evening.performers.values()[0]
 	check(entry.hat.visible and not entry.actor.hat.visible,"Chef throws physical hat")
 	p.night_elapsed=25; game.evening._process(DT)
-	check(entry.actor.visible and "Отдых" in entry.actor.caption.text,"Staff settle visibly into rest spots")
+	check(entry.actor.visible and entry.get("settled",false),"Staff settle visibly into lounge activities")
 	var resting_id: int=st.crew[0].clone_id
 	service.next_day(); game.evening._process(DT)
 	var rested: Dictionary=service.clone_data(resting_id)
-	check(float(rested.get("rest",1.0))>=0.9 and float(rested.get("rest",1.0))<=1.1,"Night assigns bounded next-day rest multiplier")
+	check(is_equal_approx(float(rested.get("rest",1.0)),1.0),"Visual lounge preview gives neutral next-day rest multiplier")
 	check(is_equal_approx(st.crew_tempo(),float(rested.tempo)*float(rested.rest)),"Rest multiplies effective tempo without changing permanent tempo")
 	check(game.evening.performers.is_empty(),"Morning clears night props and opens cafe")
 	game._shutdown_tree(game); game.free()
-	print("PASS: paid flask risk, graded filling, queue, meal handoff, visible rest quality and auto-opening" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: paid flask risk, graded filling, queue, meal handoff, visible leisure and auto-opening" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

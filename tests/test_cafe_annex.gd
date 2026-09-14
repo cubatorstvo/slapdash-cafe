@@ -36,7 +36,7 @@ func run() -> void:
 		var performer: Dictionary=game.evening.performers.values()[0]
 		check(performer.actor.global_position.z>Annex.CAFE_BACK_Z,"Night worker settles behind cafe in rest room")
 		check(performer.actor.global_position.x>Annex.REST_X_MIN,"Night worker settles in expanded rest room")
-		check("Отдых" in performer.actor.caption.text,"Settled worker exposes rest quality")
+		check(performer.get("settled",false) and not str(performer.get("item","")).is_empty(),"Settled worker occupies a lounge activity")
 	var planned: Array=game.evening.route_for({"home":station.global_position,"from_lab":false},Annex.rest_spot(0).position)
 	check(Annex.REST_DOOR_CAFE in planned and Annex.REST_DOOR_ROOM in planned,"Night route explicitly crosses automatic rest door")
 	var day_before: int=game.service.progress.day

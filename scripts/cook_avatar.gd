@@ -130,3 +130,106 @@ func celebrate(clock: float, variant: int, throwing: bool) -> void:
 		var side: float=-1 if i==0 else 1
 		var high: bool=throwing or variant!=1
 		P.align_line(arms[i],Vector3(side*0.3,1.2,0),Vector3(side*(0.6 if high else 0.35),1.8+sin(beat+i)*0.12 if high else 0.9,-0.2+sin(beat+i*PI)*0.24))
+
+var lounge_legs: Node3D
+var lounge_floor_legs: Node3D
+var lounge_cup: Node3D
+var lounge_paddle: Node3D
+var lounge_snack: Node3D
+
+func build_lounge_accessories() -> void:
+	lounge_legs=Node3D.new()
+	add_child(lounge_legs)
+	for side in [-1,1]:
+		P.line(lounge_legs,Vector3(side*0.14,0.65,0),Vector3(side*0.17,0.62,-0.43),0.095,Color("293d4b"))
+		P.line(lounge_legs,Vector3(side*0.17,0.62,-0.43),Vector3(side*0.17,0.18,-0.44),0.085,Color("293d4b"))
+		P.box(lounge_legs,Vector3(0.22,0.13,0.32),Vector3(side*0.17,0.145,-0.52),Color("24323b"))
+	lounge_floor_legs=Node3D.new()
+	add_child(lounge_floor_legs)
+	for side in [-1,1]:
+		P.line(lounge_floor_legs,Vector3(side*0.14,0.65,0),Vector3(side*0.36,0.57,-0.28),0.095,Color("293d4b"))
+		P.line(lounge_floor_legs,Vector3(side*0.36,0.57,-0.28),Vector3(-side*0.12,0.57,-0.43),0.085,Color("293d4b"))
+		P.box(lounge_floor_legs,Vector3(0.22,0.13,0.28),Vector3(-side*0.12,0.565,-0.46),Color("24323b"))
+	lounge_cup=Node3D.new()
+	add_child(lounge_cup)
+	P.cylinder(lounge_cup,0.066,0.13,Vector3.ZERO,Color("f1d9ae"))
+	P.cylinder(lounge_cup,0.052,0.008,Vector3(0,0.069,0),Color("584438"))
+	lounge_paddle=Node3D.new()
+	add_child(lounge_paddle)
+	var face:=P.ball(lounge_paddle,0.13,Vector3.ZERO,Color("bb7565"))
+	face.scale=Vector3(0.85,1.0,0.16)
+	P.line(lounge_paddle,Vector3(0,-0.10,0),Vector3(0,-0.25,0),0.025,Color("976c4f"))
+	lounge_snack=Node3D.new()
+	add_child(lounge_snack)
+	P.box(lounge_snack,Vector3(0.15,0.22,0.09),Vector3.ZERO,Color("dca458"))
+	P.box(lounge_snack,Vector3(0.11,0.07,0.012),Vector3(0,0,-0.05),Color("f1d9ae"))
+
+func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
+	if not is_instance_valid(lounge_legs): build_lounge_accessories()
+	var pose:=str(spot.pose)
+	var seated: bool=pose in ["watch","rock","tea","board","relax","floor"]
+	position=spot.position
+	rotation=Vector3(0,float(spot.get("yaw",0)),0)
+	head.rotation=Vector3(sin(clock*0.75+identity)*0.025,sin(clock*0.3+identity)*0.055,0)
+	hat.hide()
+	notebook.hide()
+	book.set_reading(pose=="read")
+	lounge_legs.visible=seated and pose!="floor"
+	lounge_floor_legs.visible=pose=="floor"
+	for leg in legs:
+		leg.visible=not seated
+		leg.rotation=Vector3.ZERO
+	lounge_cup.visible=pose=="tea"
+	lounge_paddle.visible=pose=="pingpong"
+	lounge_snack.visible=pose=="snack"
+	var left:=Vector3(-0.34,0.83,-0.15)
+	var right:=Vector3(0.34,0.83,-0.15)
+	if seated:
+		left=Vector3(-0.30,0.78,-0.43)
+		right=Vector3(0.30,0.78,-0.43)
+	var beat:=sin(clock*1.4+identity)
+	match pose:
+		"watch":
+			head.rotation.y=sin(clock*0.25+identity)*0.09
+		"rock":
+			rotation.x=sin(clock*1.7)*0.065
+		"tea":
+			var sip:=maxf(0.0,sin(clock*0.8+identity))
+			right=Vector3(0.29,0.92,-0.35).lerp(Vector3(0.10,1.45,-0.29),sip)
+			lounge_cup.position=right
+		"board":
+			head.rotation.x=0.28
+			right=Vector3(0.27,0.92,-0.54-0.14*maxf(0,beat))
+		"relax":
+			head.rotation.x=-0.1
+			left=Vector3(-0.48,0.89,0.02)
+			right=Vector3(0.48,0.89,0.02)
+		"foosball":
+			head.rotation.x=0.20
+			left=Vector3(-0.28,1.10,-0.41+sin(clock*4.4)*0.025)
+			right=Vector3(0.28,1.10,-0.41-sin(clock*4.4)*0.025)
+		"arcade":
+			head.rotation.x=0.10
+			left=Vector3(-0.23,1.08,-0.43)
+			right=Vector3(0.23,1.08+maxf(0,sin(clock*5))*0.04,-0.43)
+		"pingpong":
+			right=Vector3(0.29+sin(clock*2.6)*0.18,0.98,-0.40-maxf(0,beat)*0.20)
+			lounge_paddle.position=right+Vector3(0,0.17,0)
+			lounge_paddle.rotation.y=sin(clock*2.6)*0.5
+		"read":
+			head.rotation.x=0.23
+			left=Vector3(-0.18,1.05,-0.38)
+			right=Vector3(0.18,1.05,-0.38)
+		"music":
+			head.rotation.x=sin(clock*2.6)*0.11
+			rotation.z=sin(clock*1.3)*0.035
+		"fish":
+			head.rotation.y=sin(clock*0.33)*0.22
+		"snack":
+			right=Vector3(0.29,1.14,-0.32)
+			lounge_snack.position=right
+		"floor":
+			position.y-=0.50
+			head.rotation.x=-0.08
+	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
+	P.align_line(arms[1],Vector3(0.3,1.2,0),right)

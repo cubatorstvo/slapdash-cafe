@@ -1,10 +1,13 @@
 extends Node3D
-## End-of-shift celebration plus deterministic rest spots. Rest affects only the next day.
+## Evening leisure preview: one stable activity per worker and day, neutral rest multiplier.
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Props=preload("res://scripts/props.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
+const Lounge=preload("res://scripts/lounge_layout.gd")
 var game: Node3D
 var performers := {}
+var plan_stamp := ""
+var cached_plan: Array = []
 
 func setup(owner_game: Node3D) -> void:
 	game=owner_game
@@ -32,49 +35,52 @@ func rest_spot(index: int) -> Dictionary:
 
 func plan() -> Array:
 	var entries:=workers()
-	var result: Array=[]
-	if entries.is_empty(): return result
-	for spot_index in range(entries.size()):
-		var worker_index:=posmod(spot_index+game.service.progress.day,entries.size())
-		result.append({"worker":entries[worker_index],"spot":rest_spot(spot_index)})
-	return result
+	var stamp: String=str(game.service.progress.day)
+	for worker in entries: stamp+=":%d:%s"%[worker.id,str(worker.home)]
+	if stamp==plan_stamp: return cached_plan
+	plan_stamp=stamp
+	cached_plan=[]
+	var slots:=Lounge.activity_slots()
+	for index in range(entries.size()):
+		var slot_index:=posmod(index+game.service.progress.day*7,slots.size())
+		var spot: Dictionary=slots[slot_index].duplicate(true) if index<slots.size() else Lounge.overflow_slot(index-slots.size())
+		var worker: Dictionary=entries[index]
+		var route:=route_for(worker,spot.approach)
+		cached_plan.append({"worker":worker,"spot":spot,"route":route})
+	return cached_plan
 
 func apply_rest() -> void:
 	var summary: Array=[]
 	for assignment in plan():
 		var worker: Dictionary=game.service.clone_data(int(assignment.worker.id))
 		if worker.is_empty(): continue
-		worker.rest=clampf(float(assignment.spot.quality),0.9,1.1)
+		worker.rest=1.0
 		summary.append({"id":assignment.worker.id,"rest":worker.rest})
 	game.service.progress.revision+=1
 	game.service.trace("rest_applied",{"day":game.service.progress.day+1,"workers":summary})
 
 func settle(actor: Node3D, spot: Dictionary, identity: int) -> void:
-	actor.position=spot.position
-	actor.book.set_reading(false)
-	actor.notebook.hide()
-	actor.rotation=Vector3.ZERO
-	actor.head.rotation=Vector3.ZERO
-	for leg in actor.legs: leg.rotation.x=0
-	match str(spot.pose):
-		"bed": actor.rotation.z=PI/2; actor.rotation.y=PI if identity%2==0 else 0.0
-		"bench": actor.rotation.z=0.35; actor.rotation.y=PI/2
-		"table": actor.rotation.z=1.18; actor.rotation.y=-PI/2
-		"floor": actor.rotation.z=PI/2; actor.rotation.y=identity*0.7
-		"stack": actor.rotation.z=PI/2; actor.rotation.y=PI if identity%2==0 else 0.0
-		"stand": actor.rotation.y=PI; actor.head.rotation.x=0.38
+	actor.lounge_pose(spot,float(game.service.progress.night_elapsed),identity)
 
 func route_for(info: Dictionary, target: Vector3) -> Array:
 	var home: Vector3=info.home
+	var route: Array
 	if bool(info.get("from_lab",false)):
-		return [home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
-	return [home,Vector3(home.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM,target]
+		route=[home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+	else:
+		route=[home,Vector3(home.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+	var inside_route:=Lounge.approach_path(target)
+	for point in inside_route:
+		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
+	return route
 
 func _process(_delta: float) -> void:
 	if game==null: return
 	if game.service.progress.shift!="night":
 		for entry in performers.values(): entry.actor.queue_free(); entry.hat.queue_free()
 		performers.clear()
+		plan_stamp=""
+		cached_plan.clear()
 		return
 	var assignments:=plan()
 	var current_ids: Array=[]
@@ -96,8 +102,7 @@ func _process(_delta: float) -> void:
 		var t:=maxf(0,game.service.progress.night_elapsed-index*0.18)
 		var variant:=id%3
 		var home: Vector3=info.home
-		var target:=Vector3(spot.position.x,0,spot.position.z)
-		var route:=route_for(info,target)
+		var route: Array=assignments[index].route
 		var speed: float=[3.6,4.6,2.9][variant]
 		var distance:=maxf(0,t-0.85)*speed
 		var point:=home
@@ -110,14 +115,19 @@ func _process(_delta: float) -> void:
 			if i==route.size()-1: done=true
 		var station=info.station
 		var training: bool = station!=null and station.training.active()
+		entry.settled=done and not training
+		entry.item=str(spot.item)
 		actor.visible=not training
 		if done:
 			settle(actor,spot,id)
-			actor.caption.text=str(info.name)+"\nОтдых %d%%"%roundi(float(spot.quality)*100)
+			actor.caption.text=str(info.name)+"\n"+str(spot.activity)
+			actor.caption.pixel_size=0.0038
+			actor.caption.visible=game.camera.global_position.distance_squared_to(actor.global_position)<25.0
 		else:
 			actor.position=point
 			actor.rotation.y=atan2(-direction.x,-direction.z)
 			actor.caption.text=str(info.name)+" · смена закончилась!"
+			actor.caption.visible=true
 			actor.celebrate(t,variant,t<0.85)
 		actor.hat.visible=not done and t<0.42
 		hat.visible=t>=0.42 and not training
