@@ -116,6 +116,11 @@ func rebuild() -> void:
 func show_station(station: Node3D) -> void:
 	selected_station = station.station_id
 	rebuild()
+	if station.state=="serving":
+		_label(training_box,"Гость забирает заказ",22)
+		_button(training_box,"Вернуться",close)
+		panel.show(); Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+		return
 	if not station.ready_crew():
 		_label(training_box,"Сотрудник на перекалибровке в лаборатории" if game.laboratory.reserves_station(station.station_id) else "Нет бригады: %d/%d. Создай клонов в лаборатории."%[station.staffed,station.role_count()],22)
 		_button(training_box,"Вернуться",close)

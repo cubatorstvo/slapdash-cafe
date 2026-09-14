@@ -4,6 +4,7 @@ const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
+var evening: Node3D
 var laboratory: Node3D
 var shop: Node3D
 var telemetry: Node
@@ -87,6 +88,9 @@ func _ready() -> void:
 	laboratory = preload("res://scripts/clone_laboratory.gd").new()
 	add_child(laboratory)
 	laboratory.setup(self)
+	evening=preload("res://scripts/staff_evening.gd").new()
+	add_child(evening)
+	evening.setup(self)
 	telemetry = preload("res://scripts/playtest_log.gd").new()
 	add_child(telemetry)
 	telemetry.begin(self)

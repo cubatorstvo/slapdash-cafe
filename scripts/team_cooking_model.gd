@@ -378,3 +378,21 @@ func feed(role: int) -> bool:
 	guest_roles[role].chew=0.8
 	hands[role]=""; owners[item]=-1; using[role]=false
 	return true
+
+func take_serving() -> Array:
+	var result: Array=[]
+	if meat_state=="plate" and "steak" not in hands:
+		result.append({"kind":"steak","from":Vector3(positions.steak.x,BASE_Y+heights.steak,positions.steak.y)})
+		guest_roles[0].steak={"sides":meat_sides.duplicate(),"salt":meat_salt,"location":"у гостя"}
+		meat_state="eaten"
+	if served_pasta>0:
+		result.append({"kind":"pasta","from":Vector3(PASTA_PLATE.x,BASE_Y+0.08,PASTA_PLATE.y)})
+		guest_roles[1].pasta={"amount":served_pasta,"cooked":served_cooked,"salt":served_salt,"stirred":served_stirred,"location":"у гостя"}
+		served_pasta=0
+	for role in range(2):
+		var p: Vector2=PLATE if role==0 else PASTA_PLATE
+		if ("meat_kit" if role==0 else "pasta_kit") in equipment and "serving_plate" not in guest_roles[role].swallowed:
+			result.append({"kind":"plate","from":Vector3(p.x,BASE_Y+0.03,p.y)})
+			guest_roles[role].swallowed.append("serving_plate")
+		guest_roles[role].chew=0.8
+	return result

@@ -736,3 +736,33 @@ func ramp_landing() -> Vector2:
 		point+=velocity/60.0
 		if speed>0 and height<=BASE_Y+0.035: break
 	return point.clamp(-BOUNDS,BOUNDS)
+
+# Transfer everything resting on the serving tray after the order has been evaluated.
+# Recorded snapshots remain untouched; this belongs to customer service, not the recipe.
+func take_serving() -> Array:
+	_store_food("potato"); _store_food("sausage")
+	var result: Array=[]
+	for kind in ["potato","sausage"]:
+		var stock: Array=potatoes if kind=="potato" else sausages
+		for i in range(stock.size()):
+			if not food_is_served(kind,i): continue
+			var p: Vector2=stock[i][kind]
+			result.append({"kind":kind,"from":Vector3(p.x,BASE_Y+stock[i].elevation+0.08,p.y)})
+			guest_serving.eaten.append(food_candidate(kind,i,"у гостя",str(stock[i][kind+"_state"]).begins_with("plate_")))
+			stock[i][kind+"_state"]="eaten"
+	for item in ["plate_0","plate_1","plate_2","cup","jug","rag","tomato"]:
+		if not item_available(item) or held==item: continue
+		var p: Vector2=plates[int(item.get_slice("_",1))].point if item.begins_with("plate_") else get(item)
+		var height: float=BASE_Y+float(elevations.get(item,0))
+		if not Layout.on_tray(p,0.15) or absf(height-Layout.TRAY_Y)>0.18: continue
+		result.append({"kind":"plate" if item.begins_with("plate_") else item,"from":Vector3(p.x,height,p.y),"ml":filled if item=="cup" else wine if item=="jug" else 0})
+		guest_serving.swallowed.append(item)
+		if item=="cup": guest_serving.drunk+=filled; filled=0
+		elif item=="jug": guest_serving.drunk+=wine; wine=0
+		elif item=="rag": guest_serving.drunk+=soaked; soaked=0
+	if tray_wine>0:
+		result.append({"kind":"wine","from":Vector3(Layout.TRAY.x,Layout.TRAY_Y,Layout.TRAY.y),"ml":tray_wine})
+		guest_serving.drunk+=tray_wine; tray_wine=0
+	_load_food("potato",potato_index); _load_food("sausage",sausage_index)
+	guest_serving.chew=0.8
+	return result

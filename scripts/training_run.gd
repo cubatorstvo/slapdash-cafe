@@ -181,9 +181,10 @@ func close() -> void:
 	events.clear()
 	lead = 0
 	revision += 1
-	station.state = "idle"
-	station.finish_taster(false)
-	station.reset_model()
+	if station.state!="serving":
+		station.state = "idle"
+		station.finish_taster(false)
+		station.reset_model()
 
 static func duration_ticks(value: Array) -> int:
 	var longest := 0

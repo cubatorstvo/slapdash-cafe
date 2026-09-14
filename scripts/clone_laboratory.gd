@@ -13,13 +13,15 @@ var caption: Label3D
 var little_clone: Node3D
 var pulse_seen := 0
 var revision_seen := -1
+var burst_sound: AudioStreamPlayer3D
+var burst_parts: Array = []
 var progress_bar: MeshInstance3D
 var result_label: Label3D
 var selector_label: Label3D
 var upgrade_nodes := {}
 
 static func fresh_state() -> Dictionary:
-	return {"phase":"idle","owner":0,"selected":0,"clone_id":0,"station":0,"level":0.0,"needle":0.0,"age":0.0,"revision":0,"notice":"","pulse":0,"balanced":0.0,"exposure":0.0,"integral":0.0,"armed":false,"fill_quality":0.0,"needle_quality":0.0,"tempo":0.7,"low":0.7,"high":1.0,"valve":false,"damper":false}
+	return {"phase":"idle","cost":0,"owner":0,"selected":0,"clone_id":0,"station":0,"level":0.0,"needle":0.0,"age":0.0,"revision":0,"notice":"","pulse":0,"balanced":0.0,"exposure":0.0,"integral":0.0,"armed":false,"fill_quality":0.0,"needle_quality":0.0,"tempo":0.7,"low":0.7,"high":1.0,"valve":false,"damper":false}
 
 static func zone_quality(value: float, vertical := false) -> float:
 	if vertical:
@@ -36,11 +38,20 @@ func tempo_range() -> Vector2:
 	return Vector2(1.4,2.0) if "lab_power_2" in upgrades else Vector2(1.0,1.5) if "lab_power" in upgrades else Vector2(0.7,1.0)
 
 func reserves_station(id: int) -> bool:
-	return state.phase not in ["idle","done"] and int(state.station)==id
+	return state.phase not in ["idle","done","failed"] and int(state.station)==id
 
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
+	burst_sound=AudioStreamPlayer3D.new(); add_child(burst_sound)
+	burst_sound.position=Vector3(-0.94,1.4,7.96); burst_sound.max_distance=9; burst_sound.volume_db=-12
+	var pcm:=PackedByteArray(); pcm.resize(6615*2)
+	for n in range(6615):
+		var t:=float(n)/22050.0
+		var noise:=sin(n*127.1+cos(n*311.7))*0.4
+		pcm.encode_s16(n*2,int(clampf((sin(t*TAU*(130-t*240))+noise)*exp(-t*15)*0.55,-1,1)*32767))
+	var sound:=AudioStreamWAV.new(); sound.format=AudioStreamWAV.FORMAT_16_BITS; sound.mix_rate=22050; sound.data=pcm
+	burst_sound.stream=sound
 	apparatus = Node3D.new()
 	add_child(apparatus)
 	# Front faces look toward the laboratory doorway (-Z).
@@ -85,6 +96,9 @@ func setup(owner_game: Node3D) -> void:
 		Props.box(little_clone,Vector3(0.095,0.18,0.12),Vector3(x,0.1,0),Color("344e48"))
 	for x in [-0.21,0.21]: Props.box(little_clone,Vector3(0.09,0.32,0.09),Vector3(x,0.36,0),Color("79b8a2"))
 	little_clone.hide()
+	for i in range(10):
+		var drop:=Props.ball(apparatus,0.05,Vector3(-0.94,1.4,7.96),Color("c4bc61"))
+		drop.hide(); burst_parts.append(drop)
 	for side in [-1,1]:
 		Props.box(apparatus,Vector3(0.19,0.08,0.21),Vector3(side*0.42,1.12,7.76),Color("b49c75"))
 		var arrow:=Props.text(apparatus,"‹" if side<0 else "›",Vector3(side*0.42,1.28,7.76),24,Color("f3dfb8")); arrow.billboard=BaseMaterial3D.BILLBOARD_ENABLED; arrow.pixel_size=0.004
@@ -119,7 +133,7 @@ func selected_clone() -> Dictionary:
 func selection_action(peer: int, data: Dictionary) -> String:
 	if not inside(peer_position(peer)) or int(data.get("revision",-1))!=int(state.revision): return ""
 	if data.action=="lab_restart":
-		if int(state.owner)!=peer or state.phase in ["idle","done"]: return ""
+		if int(state.owner)!=peer or state.phase in ["idle","done","failed"]: return ""
 		reset(); game.service.assign_clones(); return ""
 	if state.phase!="idle": return "Сначала заверши текущий цикл."
 	var ids: Array=[0]
@@ -142,8 +156,8 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 	if state.phase=="idle":
 		for side in [-1,1]:
 			if game.shop.near_ray(camera,Vector3(side*0.42,1.12,7.76),0.15): return {"action":"lab_select","direction":side,"revision":state.revision,"hint":"(E) Выбрать клона / создание нового"}
-	elif int(state.owner)==peer and state.phase!="done" and game.shop.near_ray(camera,Vector3(-1.48,1.09,7.88),0.18):
-		return {"action":"lab_restart","revision":state.revision,"hint":"(E) Сбросить попытку · бесплатно"}
+	elif int(state.owner)==peer and state.phase not in ["done","failed"] and game.shop.near_ray(camera,Vector3(-1.48,1.09,7.88),0.18):
+		return {"action":"lab_restart","revision":state.revision,"hint":"(E) Прервать · ингредиенты потрачены"}
 	if not game.shop.near_ray(camera,Vector3(0,1.5,8) if state.phase!="idle" else BUTTON,1.3 if state.phase!="idle" else 0.25): return {}
 	var text := ""
 	if game.service.progress.lab_stage<3: text="Сначала собери лабораторию"
@@ -151,12 +165,13 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 	elif int(state.owner) not in [0,peer]: text="Аппарат занят напарником"
 	else:
 		match state.phase:
-			"idle": text="(E) Начать · 60" if selected_clone().is_empty() else "(E) Перекалибровать · 20 за улучшение"
+			"idle": text="(E) Начать · 60" if selected_clone().is_empty() else "(E) Перекалибровать · попытка 20"
 			"fill": text="Удерживай E / ЛКМ — уровень растёт; отпусти — падает"
 			"fill_ready": text="(E / ЛКМ) К стабилизатору"
 			"tune": text="(E / ЛКМ) Зафиксировать стрелку"
-			"ready": text="(E / ЛКМ) Сохранить результат" if int(state.clone_id)>0 else "(E / ЛКМ) Выпустить клона · 60"
+			"ready": text="(E / ЛКМ) Сохранить результат" if int(state.clone_id)>0 else "(E / ЛКМ) Выпустить клона · уже оплачено"
 			"done": text="Готово!"
+			"failed": text="Жидкость испорчена · нужна новая попытка"
 	return {"action":"lab_press","revision":state.revision,"observed_age":state.age,"hint":text}
 
 func press(peer: int, revision: int, observed_age := -1.0) -> String:
@@ -172,6 +187,9 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 				var station=game.service.by_id(selected.station)
 				if station.state!="idle" or station.training.active() or station.customer_id>=0: return "Дождись свободной станции или закрой кафе."
 			if game.service.progress.cash<(20 if not selected.is_empty() else 60): return "Не хватает денег на ингредиенты."
+			state.cost=20 if not selected.is_empty() else 60
+			game.service.progress.cash-=int(state.cost); game.service.progress.revision+=1
+			game.save_cafe()
 			state.owner=peer; state.phase="fill"; state.clone_id=selected.get("id",0); state.station=selected.get("station",0)
 			var limits:=tempo_range(); state.low=limits.x; state.high=limits.y
 			state.valve="lab_valve" in game.service.progress.lab_upgrades; state.damper="lab_damper" in game.service.progress.lab_upgrades
@@ -192,24 +210,23 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 				var worker: Dictionary=game.service.clone_data(int(state.clone_id))
 				if worker.is_empty(): reset(); return "Клон не найден."
 				if float(state.tempo)>float(worker.tempo):
-					if game.service.progress.cash<20: return "Для улучшения нужны 20."
-					game.service.progress.cash-=20; worker.tempo=state.tempo; state.notice="Перекалибровка сохранена"
-				else: state.notice="Прежний темп лучше — оставлен бесплатно"
+					worker.tempo=state.tempo; state.notice="Перекалибровка сохранена"
+				else: state.notice="Прежний темп лучше — оставлен"
 				game.service.progress.revision+=1
 				game.service.trace("clone_recalibrated",{"clone":state.clone_id,"attempt":state.tempo,"retained":worker.tempo})
 			else:
-				var error: String=game.service.create_clone(state.tempo)
+				var error: String=game.service.create_clone(state.tempo,true)
 				if not error.is_empty(): return error
 			state.phase="done"; state.age=0.0; state.pulse=int(state.pulse)+1
 			state.clone_id=0; state.station=0
 			game.service.assign_clones(); game.save_cafe()
-		"done": return ""
+		"done", "failed": return ""
 	state.revision=int(state.revision)+1
 	return ""
 
 func advance(delta: float) -> void:
 	if state.phase=="idle": return
-	if state.phase!="done" and (not inside(peer_position(int(state.owner))) or game.service.training_for(int(state.owner))!=null):
+	if state.phase not in ["done","failed"] and (not inside(peer_position(int(state.owner))) or game.service.training_for(int(state.owner))!=null):
 		game.service.trace("cloning_cancelled",{"reason":"left_apparatus"})
 		reset(); game.service.assign_clones(); return
 	state.age=float(state.age)+delta
@@ -221,7 +238,7 @@ func advance(delta: float) -> void:
 				held=pose.get("lab_hold",false) and Time.get_ticks_msec()-int(pose.get("received_at",0))<350
 			advance_balance(delta,held)
 		"tune": state.needle=pingpong(float(state.age)*(0.42 if state.damper else 1.2),1.0)
-		"done":
+		"done", "failed":
 			if float(state.age)>2.5: reset()
 
 func advance_balance(delta: float, held: bool) -> void:
@@ -229,12 +246,19 @@ func advance_balance(delta: float, held: bool) -> void:
 	if not state.armed:
 		if float(state.level)<0.15: return
 		state.armed=true
+	if state.armed and float(state.level)<0.15:
+		state.phase="failed"; state.age=0.0; state.level=0.0; state.revision=int(state.revision)+1
+		state.notice="Жидкость испорчена · −%d"%int(state.cost)
+		state.clone_id=0; state.station=0
+		game.service.assign_clones()
+		game.service.trace("cloning_failed",{"reason":"below_green","cost":state.cost})
+		return
 	var quality:=zone_quality(float(state.level),true)
-	var in_green:=quality>=0.999
-	var sample:=minf(delta,BALANCE_SECONDS-float(state.balanced)) if in_green else delta
+	var speed:=1.0 if quality>=0.999 else 0.55 if quality>=0.4 else 0.25
+	var sample:=minf(delta,(BALANCE_SECONDS-float(state.balanced))/speed)
 	state.integral=float(state.integral)+quality*sample
 	state.exposure=float(state.exposure)+sample
-	if in_green: state.balanced=float(state.balanced)+sample
+	state.balanced=float(state.balanced)+sample*speed
 	if float(state.balanced)>=BALANCE_SECONDS-0.00001:
 		state.fill_quality=clampf(float(state.integral)/maxf(0.001,float(state.exposure)),0,1)
 		state.phase="fill_ready"; state.revision=int(state.revision)+1
@@ -243,6 +267,10 @@ func _process(_delta: float) -> void:
 	if game == null: return
 	apparatus.visible = game.service.progress.lab_stage>=3
 	if not apparatus.visible: return
+	for i in range(burst_parts.size()):
+		var t:=float(state.age)
+		burst_parts[i].visible=state.phase=="failed" and t<0.85
+		burst_parts[i].position=Vector3(-0.94,1.4,7.96)+Vector3(sin(i*2.4)*t*0.9,1.6*t-2.5*t*t,cos(i*2.4)*t*0.6)
 	var level := maxf(0.006,float(state.level))
 	liquid.scale.y = level
 	liquid.position.y = 1.02+0.38*level
@@ -257,7 +285,7 @@ func _process(_delta: float) -> void:
 	var selected:=selected_clone()
 	selector_label.text="НОВЫЙ КЛОН" if selected.is_empty() else str(selected.name)+" · %d%%"%roundi(float(selected.tempo)*100)
 	var limits:=tempo_range()
-	var titles := {"idle":"ТЯП-КЛОН · %d–%d%%"%[roundi(limits.x*100),roundi(limits.y*100)],"fill":"1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ","fill_ready":"КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ","tune":"2 · ПОЙМАЙ СТРЕЛКУ","ready":"3 · РЕЗУЛЬТАТ ГОТОВ","done":"ЕЩЁ ОДИН Я!"}
+	var titles := {"idle":"ТЯП-КЛОН · %d–%d%%"%[roundi(limits.x*100),roundi(limits.y*100)],"fill":"1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ","fill_ready":"КОЛБА ГОТОВА · К СТАБИЛИЗАТОРУ","tune":"2 · ПОЙМАЙ СТРЕЛКУ","ready":"3 · РЕЗУЛЬТАТ ГОТОВ","done":"ЕЩЁ ОДИН Я!","failed":"ПШШШ! НЕ ПОЛУЧИЛОСЬ"}
 	var fill: float=float(state.integral)/maxf(0.001,float(state.exposure))
 	result_label.text=""
 	if state.phase!="idle": result_label.text="Колба: %d%%"%roundi(fill*100)
@@ -268,6 +296,7 @@ func _process(_delta: float) -> void:
 	if state.phase=="idle": titles.idle += " · свободно %d" % game.service.progress.free_clones
 	caption.text = str(titles[state.phase]) + ("\n"+str(state.notice) if not str(state.notice).is_empty() else "")
 	if int(state.revision)!=revision_seen:
+		if state.phase=="failed": burst_sound.play()
 		if revision_seen>=0 and state.phase not in ["done","idle"] and game.camera.global_position.distance_to(BUTTON)<5: game.feedback.play_ui("click")
 		revision_seen=int(state.revision)
 	if int(state.pulse)!=pulse_seen:

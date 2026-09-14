@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-tempo-15"
+const PROTOCOL := "slapdash-cafe-life-16"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -394,7 +394,7 @@ func advance(delta: float) -> void:
 		if is_instance_valid(station.taster) and not station.taster_real:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
-		customers.append({"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
+		customers.append({"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
 	var data := {"laboratory": game.laboratory.state.duplicate(true), "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
@@ -453,6 +453,8 @@ func _world(packet: PackedByteArray) -> void:
 			remote_customers[entry.id] = person
 		var person: Node3D = remote_customers[entry.id]
 		person.position = entry.position
+		if entry.has("meal") and not entry.meal.is_empty() and person.meal_items.is_empty(): person.begin_meal(entry.meal)
+		person.meal_age=float(entry.get("meal_age",person.meal_age))
 		person.rotation.y = entry.yaw
 		person.playback_speed = float(entry.get("playback_speed",1.0))
 		person.mouth_amount = float(entry.get("mouth_amount",0))

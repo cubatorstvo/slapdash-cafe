@@ -42,7 +42,7 @@ func run() -> void:
 	lab.press(1,lab.state.revision)
 	check(p.cash==920 and counter.crew_tempo()==1.0 and counter.ready_crew(),"Recalibration upgrades existing worker")
 	cycle(false,id); lab.press(1,lab.state.revision)
-	check(p.cash==920 and counter.crew_tempo()==1.0,"Worse recalibration preserves previous result without payment")
+	check(p.cash==900 and counter.crew_tempo()==1.0,"Worse recalibration preserves tempo but consumes attempt")
 	lab.reset(); p.stars=2
 	check(not game.shop.order("lab_power_2",0).is_empty(),"Turbo requires installed amplifier")
 	for item in ["lab_power","lab_damper"]:
@@ -84,7 +84,7 @@ func run() -> void:
 	lab.advance(0.1)
 	check(lab.state.level<raised,"Stale hold input releases valve")
 	check(not lab.press(1,lab.state.revision).is_empty(),"Another participant cannot interrupt")
-	game.session.members.erase(7); lab.advance(DT)
+	game.session.members.erase(7); lab.advance(3.0)
 	check(lab.state.phase=="idle","Disconnect releases laboratory")
 	game._shutdown_tree(game); game.free()
 	print("PASS: balance scoring, individual tempo, calibration, upgrades, persistence and ownership" if not failed else "FAILED")

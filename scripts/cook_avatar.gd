@@ -1,5 +1,6 @@
 extends Node3D
 const P = preload("res://scripts/props.gd")
+var hat: MeshInstance3D
 var book: Node3D
 var caption: Label3D
 var head: Node3D
@@ -26,7 +27,7 @@ func _ready() -> void:
 	head.position.y = 1.51
 	P.ball(head, 0.24, Vector3.ZERO, Color("e8b893"))
 	for side in [-1, 1]: P.ball(head, 0.027, Vector3(side * 0.08, 0.04, -0.22), Color("203c40"))
-	P.cylinder(head, 0.26, 0.22, Vector3(0, 0.27, 0), Color("fff0cb"))
+	hat=P.cylinder(head, 0.26, 0.22, Vector3(0, 0.27, 0), Color("fff0cb"))
 	notebook = Node3D.new()
 	add_child(notebook)
 	notebook.position = Vector3(0, 1.02, -0.35)
@@ -116,3 +117,16 @@ func idle(home: Vector3, delta: float, clock: float, identity: int, aisle: float
 		right = right.lerp(Vector3(0.16, 1.08, -0.35), gesture)
 	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), left)
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), right)
+
+func celebrate(clock: float, variant: int, throwing: bool) -> void:
+	notebook.hide(); book.set_reading(false)
+	var beat:=clock*(13 if variant==1 else 9)
+	position.y+=absf(sin(beat))*0.16 if variant==0 or throwing else sin(beat)*0.025
+	rotation.z=sin(beat*0.6)*0.12 if variant==2 else 0.0
+	if variant==2 and not throwing: rotation.y+=sin(beat*0.35)*0.6
+	for i in range(legs.size()): legs[i].rotation.x=sin(beat+i*PI)*(0.75 if variant==1 else 0.45)
+	head.rotation=Vector3(-0.12,sin(beat*0.35)*0.2,0)
+	for i in range(arms.size()):
+		var side: float=-1 if i==0 else 1
+		var high: bool=throwing or variant!=1
+		P.align_line(arms[i],Vector3(side*0.3,1.2,0),Vector3(side*(0.6 if high else 0.35),1.8+sin(beat+i)*0.12 if high else 0.9,-0.2+sin(beat+i*PI)*0.24))

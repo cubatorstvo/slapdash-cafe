@@ -4,6 +4,7 @@ const P = preload("res://scripts/props.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 var spill_meshes: Array = []
 var equipment_nodes := {"meat_kit":[],"pasta_kit":[]}
+var serving_plates: Array = []
 var items := {}
 var actors: Array = []
 var streams: Array = []
@@ -24,7 +25,7 @@ func build(production := false) -> void:
 		P.box(self, Vector3(1.08, 0.06, 0.9), Vector3(point.x, 1.02, point.y), Color("303d42"))
 		P.cylinder(self, 0.37, 0.035, Vector3(point.x, 1.07, point.y), Color("da7846"))
 	for n in range(7): P.box(self, Vector3(0.85, 0.035, 0.035), Vector3(M.GRILL.x, 1.1, M.GRILL.y - 0.3 + n * 0.1), Color("384046"))
-	for plate in [M.PLATE, M.PASTA_PLATE]: P.cylinder(self, 0.44, 0.025, Vector3(plate.x, 1.03, plate.y), Color("fff0d4"))
+	for plate in [M.PLATE, M.PASTA_PLATE]: serving_plates.append(P.cylinder(self, 0.44, 0.025, Vector3(plate.x, 1.03, plate.y), Color("fff0d4")))
 	var new_nodes := get_children().slice(before)
 	equipment_nodes.meat_kit = new_nodes.slice(0,2)+new_nodes.slice(4,11)+[new_nodes[11]]
 	equipment_nodes.pasta_kit = new_nodes.slice(2,4)+[new_nodes[12]]
@@ -113,6 +114,7 @@ func update_view(model, _time := 0.0, _resting := false) -> void:
 	noodles.visible = model.pasta > 0
 	noodles.position.y = liquid.position.y
 	plated.visible = model.served_pasta > 0
+	for role in range(2): serving_plates[role].visible=("meat_kit" if role==0 else "pasta_kit") in model.equipment and "serving_plate" not in model.guest_roles[role].swallowed
 	for role in range(2):
 		var item: String = model.hands[role]
 		var target: Vector3 = Vector3.ZERO if item.is_empty() else items[item].position + Vector3(0, 0.12, 0)

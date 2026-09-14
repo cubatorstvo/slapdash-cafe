@@ -261,6 +261,13 @@ func refresh(local_peer: int, delta: float) -> void:
 				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
 	if get_parent().game != null and is_instance_valid(get_parent().game.laboratory) and get_parent().game.laboratory.reserves_station(station_id): view.station_label.text="СТАНЦИЯ %d · ПЕРЕКАЛИБРОВКА"%station_id
 	if is_instance_valid(taster): direct_attention(taster)
+	if get_parent().progress.shift=="night" and not training.active() and not manual_station:
+		for student in students: student.hide()
+		if type_id=="counter":
+			for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+		else:
+			for actor in view.actors: actor.hide()
+		view.station_label.text="СТАНЦИЯ %d · ПОВАРА ОТДЫХАЮТ"%station_id
 
 func direct_attention(person: Node3D) -> void:
 	person.watching = true

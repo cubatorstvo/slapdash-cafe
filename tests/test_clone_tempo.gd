@@ -10,6 +10,8 @@ func run() -> void:
 	game.set_physics_process(false)
 	var service=game.service
 	service.progress.stars=2; service.open_for_business=false
+	service.by_id(1).manual_station=false
+	service.by_id(1).staffed=0
 	var station=service.add_station("counter",1)
 	var m=station.model
 	m.reset("wine")
@@ -38,6 +40,7 @@ func run() -> void:
 			if station.state=="cooking": check(person.playback_speed==tempo,"Guest animation shares replay tempo")
 		check(absi(ticks-ceili(61.0/tempo))<=1,"Order duration follows tempo")
 		check(person.caption.text.begins_with("S · +25"),"Final frame and price preserved at every speed")
+		for _i in range(80): service.advance(DT)
 		check(person.playback_speed==1,"Departure uses normal speed")
 		check(hash(var_to_bytes(station.recipes.wine))==record_hash,"Replay never mutates recorded snapshots")
 	check(service.served==4,"Every speed serves exactly once")

@@ -291,6 +291,7 @@ func update_view(model, animation_time := 0.0, resting := false) -> void:
 		plates[i].rotation.z = -float(model.plates[i].tilt)
 	tray_liquid.visible = model.tray_wine > 0.01
 	tray_liquid.scale = Vector3(clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0), 1, clampf(sqrt(model.tray_wine / 225.0), 0.08, 1.0))
+	tomato.visible = model.item_available("tomato")
 	tomato.position = item_point(model.tomato) + Vector3.UP * model.elevations.tomato
 	tomato.visible = not model.tomato_hit and model.item_available("tomato")
 	kitchen.update_view(model)

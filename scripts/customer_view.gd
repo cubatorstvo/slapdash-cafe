@@ -1,5 +1,10 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+var meal_items: Array = []
+var meal_age := 0.0
+var meal_root: Node3D
+var meal_hand: MeshInstance3D
+var meal_arm: MeshInstance3D
 var playback_speed := 1.0
 var mouth_amount := 0.0
 var drinking := false
@@ -110,3 +115,46 @@ func _process(delta: float) -> void:
 			var beat := fposmod(personality + 2.0, 17.0)
 			if beat < 2.8: gesture = -0.55 * sin(beat / 2.8 * PI)
 		shoulders[index].rotation.x = lerpf(shoulders[index].rotation.x, gesture, blend)
+	animate_meal()
+
+func begin_meal(items: Array) -> void:
+	if not meal_items.is_empty(): return
+	meal_items=items.duplicate(true)
+	meal_age=0.0
+	meal_root=Node3D.new(); add_child(meal_root)
+	for entry in meal_items:
+		var node:=Node3D.new(); meal_root.add_child(node)
+		match str(entry.kind):
+			"plate": Props.cylinder(node,0.32,0.035,Vector3.ZERO,Color("ecdfb5"))
+			"cup", "jug":
+				var big: bool=entry.kind=="jug"
+				Props.cylinder(node,0.28 if big else 0.22,0.5 if big else 0.4,Vector3(0,0.2,0),Color("c78251") if big else Color("a9d2cd"))
+				if float(entry.get("ml",0))>0: Props.cylinder(node,0.2,0.03,Vector3(0,0.39,0),Color("b44761"))
+			"rag": Props.box(node,Vector3(0.25,0.06,0.18),Vector3.ZERO,Color("d1b26a"))
+			"wine": Props.ball(node,0.16,Vector3.ZERO,Color("b44761")).scale=Vector3(1.3,0.18,1)
+			"pasta":
+				for i in range(10): Props.cylinder(node,0.023,0.17,Vector3(sin(i)*0.13,0.025*(i%3),cos(i)*0.13),Color("dfbd65")).rotation.z=PI/2
+			_:
+				var food:=Props.ball(node,0.18,Vector3.ZERO,{"potato":Color("c79c55"),"sausage":Color("c78561"),"steak":Color("a96b4e"),"tomato":Color("da6250")}.get(entry.kind,Color("d0ac74")))
+				food.scale=Vector3(0.6,0.6,2.4) if entry.kind=="sausage" else Vector3(1.25,0.4,1.0) if entry.kind=="steak" else Vector3(0.85,1,1.25)
+	meal_hand=Props.ball(self,0.1,Vector3.ZERO,Color("e8b893"))
+	meal_arm=Props.line(self,Vector3(0.36,1.16,0),Vector3(0.36,0.7,-0.2),0.065,color)
+
+func animate_meal() -> void:
+	if meal_items.is_empty() or not is_instance_valid(meal_root): return
+	var t:=clampf(meal_age/0.85,0,1)
+	var mouth:=head.global_position-global_basis.z*0.28
+	mouth_shape.scale=Vector3(1.12,1.1,0.2) if t<1 else Vector3(0.5,0.35+absf(sin(meal_age*24))*0.2,0.15)
+	for i in range(meal_items.size()):
+		var node: Node3D=meal_root.get_child(i)
+		var origin: Vector3=meal_items[i].from
+		node.global_position=origin.lerp(mouth,smoothstep(0,1,t))+Vector3.UP*sin(t*PI)*0.22
+		node.scale=Vector3.ONE*(1.0-smoothstep(0.75,1.0,t))
+		node.visible=t<1
+	var hand_at: Vector3=meal_items[0].from.lerp(mouth,t)
+	meal_hand.global_position=hand_at
+	Props.align_line(meal_arm,Vector3(0.36,1.16,0),to_local(hand_at))
+	meal_hand.visible=meal_age<1.1; meal_arm.visible=meal_age<1.1
+	if meal_age>=1.1:
+		for entry in meal_items: drunk_ml+=float(entry.get("ml",0))
+		meal_items.clear(); meal_root.queue_free(); meal_hand.queue_free(); meal_arm.queue_free()

@@ -71,7 +71,7 @@ func request_training(station: Node3D, dish: String, peer: int) -> bool:
 	if station == null or not station.ready_crew() or station.manual_station or not dish in station.dishes() or progress.busy(): return false
 	if station.training.active(): return station.training.lead == peer
 	if training_for(peer) != null or station.pending_teacher > 0: return false
-	if station.state == "cooking":
+	if station.state in ["cooking","serving"]:
 		station.pending_teacher = peer
 		station.pending_dish = dish
 		return true
@@ -82,7 +82,7 @@ func request_training(station: Node3D, dish: String, peer: int) -> bool:
 
 func _attach_customer(station: Node3D) -> void:
 	for customer in customers:
-		if customer.id == station.customer_id and customer.dish == station.training.dish:
+		if customer.id == station.customer_id and customer.dish == station.training.dish and customer.state not in ["queued","eating","leaving"]:
 			station.taster = customer.view
 			station.taster_real = true
 			customer.state = "training"
@@ -104,6 +104,7 @@ func advance(delta: float) -> void:
 		if spawn_clock <= 0:
 			spawn_customer()
 			spawn_clock = progress.arrival_interval()
+	advance_queue()
 	for station in stations:
 		station.training.advance(delta)
 		if station.state != "cooking": continue
@@ -115,12 +116,24 @@ func advance(delta: float) -> void:
 				if customer.id == station.customer_id: customer.view.react(station.model.customer_reaction)
 		if station.order_tick >= station.Run.duration_ticks(record.tracks):
 			finish_customer(station.customer_id, true)
-			if station.pending_teacher > 0:
+			if station.pending_teacher > 0 and station.state!="serving":
 				var teacher: int = station.pending_teacher
 				station.pending_teacher = 0
 				station.training.open(station.pending_dish, teacher)
 	for index in range(customers.size() - 1, -1, -1):
 		var customer: Dictionary = customers[index]
+		if customer.state=="eating":
+			customer.eat_age+=delta
+			customer.view.meal_age=customer.eat_age
+			if customer.eat_age>=1.2:
+				customer.state="leaving"; customer.path=[Vector3(17.4,0,1.65)]
+				var table: Node3D=by_id(customer.station)
+				if table!=null and table.customer_id==customer.id:
+					table.customer_id=-1; table.state="idle"
+					if table.pending_teacher>0:
+						var teacher: int=table.pending_teacher; table.pending_teacher=0
+						table.training.open(table.pending_dish,teacher)
+			continue
 		if not customer.path.is_empty():
 			if customer.view.walk_to(customer.path[0], delta): customer.path.pop_front()
 			continue
@@ -148,7 +161,6 @@ func advance(delta: float) -> void:
 
 func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool:
 	if customers.size() >= 18: return false
-	if progress.stars == 0 and not banquet and by_id(1) != null and by_id(1).manual_station and by_id(1).state != "idle": return false
 	if recipe.is_empty():
 		var pool: Array = progress.available_dishes()
 		if progress.stars == 0 and by_id(1) != null and "jug" not in by_id(1).equipment: pool.erase("wine")
@@ -169,10 +181,13 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool
 			else: untrained.append(station)
 	if candidates.is_empty() and not banquet:
 		var personal := by_id(1)
-		if personal != null and personal.manual_station and personal.state == "idle" and recipe in personal.dishes(): candidates.append(personal)
+		if personal != null and personal.manual_station and chef_queue().size()<3 and recipe in personal.dishes(): candidates.append(personal)
 		else: candidates = untrained
+	# Some ordinary guests deliberately choose the chef even when automation is available.
+	if not banquet and next_customer_id%3==0 and by_id(1)!=null and by_id(1).manual_station and recipe in by_id(1).dishes() and chef_queue().size()<3:
+		candidates=[by_id(1)]
 	if chef_guest:
-		candidates = [by_id(1)] if by_id(1)!=null and by_id(1).state=="idle" else []
+		candidates = [by_id(1)] if by_id(1)!=null and chef_queue().size()<3 else []
 	var station: Node3D = null if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
 	var person := Person.new()
 	person.color = Color("d6b56b") if banquet else [Color("ae7381"), Color("839fbb"), Color("c6a66b"), Color("91aa78")][next_customer_id % 4]
@@ -188,11 +203,12 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool
 		progress.record_demand(recipe, "busy" if offered else "untrained")
 		if banquet: progress.banquet_finished += 1
 	else:
-		data.path = [station.to_global(Vector3(0, 0, -1.85))]
-		station.customer_order = preload("res://scripts/chef_orders.gd").choose(recipe,station.equipment,maxi(3,progress.manual_served) if chef_guest else progress.manual_served,rng) if station.manual_station else {}
-		station.order_dish = recipe
-		station.customer_id = next_customer_id
-		station.state = "waiting"
+		data.order = preload("res://scripts/chef_orders.gd").choose(recipe,station.equipment,maxi(3,progress.manual_served) if chef_guest else progress.manual_served,rng) if station.manual_station else {}
+		if station.manual_station and (station.state!="idle" or station.customer_id>=0 or not chef_queue().is_empty()):
+			data.state="queued"
+			data.path=[queue_point(chef_queue().size())]
+			person.caption.text=Definition.DISHES[recipe]+"\nОчередь к шефу"
+		else: assign_customer(station,data)
 	trace("customer_arrived",{"dish":recipe,"station":data.station,"order":station.customer_order if station != null else {}})
 	customers.append(data)
 	next_customer_id += 1
@@ -200,7 +216,8 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool
 
 func finish_customer(id: int, accepted: bool) -> void:
 	for customer in customers:
-		if customer.id != id or customer.state == "leaving": continue
+		if customer.id != id or customer.state in ["leaving","eating"]: continue
+		if customer.state=="queued": dismiss_queue(customer); return
 		var station: Node3D = by_id(customer.station)
 		var report: Dictionary = station.model.quality()
 		var paid := accepted and bool(report.get("present", false))
@@ -214,6 +231,13 @@ func finish_customer(id: int, accepted: bool) -> void:
 		customer.path = [Vector3(17.4, 0, 1.65)]
 		station.customer_id = -1
 		if not station.training.active(): station.state = "idle"
+		if accepted:
+			var payload: Array=station.model.take_serving()
+			if not payload.is_empty():
+				for item in payload: item.from=station.to_global(item.from)
+				customer.state="eating"; customer.eat_age=0.0; customer.path=[]
+				customer.view.begin_meal(payload)
+				station.state="serving"; station.customer_id=customer.id
 		if paid:
 			served += 1
 			if station.manual_station:
@@ -305,7 +329,7 @@ func advance_event(delta: float) -> void:
 				# Delegation waits outside until a trained station is free. Service has a shared deadline.
 				var dish: String = progress.orders[progress.banquet_spawned]
 				var chef_guest: bool = progress.banquet_spawned in [0,3,6]
-				var available: bool = by_id(1).state=="idle" if chef_guest else false
+				var available: bool = chef_queue().size()<3 if chef_guest else false
 				if not chef_guest:
 					for station in stations:
 						if station.ready_crew() and not station.manual_station and station.state=="idle" and station.recipes.has(dish): available=true
@@ -479,11 +503,11 @@ func matches_schema(value: Variant, schema: Variant) -> bool:
 func manual_order(station: Node3D) -> String:
 	if game != null and game.session.is_guest() and station.customer_id >= 0: return station.order_dish
 	for customer in customers:
-		if customer.station == station.station_id and customer.state != "leaving": return customer.dish
+		if customer.id == station.customer_id and customer.state not in ["leaving","eating","queued"]: return customer.dish
 	return ""
 
 func request_manual(station: Node3D, dish: String, peer: int) -> bool:
-	if station == null or not station.manual_station or station.training.active() or training_for(peer) != null or (progress.busy() and progress.phase!="service"): return false
+	if station == null or station.state=="serving" or not station.manual_station or station.training.active() or training_for(peer) != null or (progress.busy() and progress.phase!="service"): return false
 	var ordered := manual_order(station)
 	if progress.phase=="service" and ordered.is_empty(): return false
 	if not ordered.is_empty(): dish = ordered
@@ -555,11 +579,13 @@ func end_shift() -> void:
 	open_for_business = false
 	progress.shift = "closing"
 	for customer in customers:
+		if customer.state=="queued": dismiss_queue(customer); continue
 		var station: Node3D = by_id(customer.station)
 		if station != null and station.manual_station and not station.training.active() and customer.state != "leaving": finish_customer(customer.id, false)
 	progress.revision += 1
 
 func advance_shift(delta: float) -> void:
+	if progress.shift=="night": progress.night_elapsed+=delta
 	if progress.busy(): return
 	if open_for_business and progress.shift == "open":
 		progress.shift_elapsed += delta
@@ -568,6 +594,7 @@ func advance_shift(delta: float) -> void:
 		for station in stations:
 			if station.state != "idle" or station.pending_teacher > 0: return
 		progress.shift = "night"
+		progress.night_elapsed=0.0
 		progress.revision += 1
 		announce("Кафе закрыто до утра. Можно заняться лабораторией и обустройством или отдохнуть.")
 		if game != null: game.save_cafe()
@@ -576,7 +603,9 @@ func next_day() -> String:
 	if progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."
 	trace("next_day", {"day":progress.day+1})
 	progress.day += 1
-	progress.shift = "morning"
+	progress.shift = "open"
+	open_for_business = true
+	spawn_clock = 2.0
 	progress.shift_elapsed = 0
 	progress.revision += 1
 	return ""
@@ -641,10 +670,10 @@ func clone_data(id: int) -> Dictionary:
 		if int(worker.id)==id: return worker
 	return {}
 
-func create_clone(tempo := 1.0) -> String:
+func create_clone(tempo := 1.0, prepaid := false) -> String:
 	if progress.stars<1 or progress.lab_stage<3: return "Нужны готовая лаборатория и первая звезда."
-	if progress.cash<60: return "Ингредиенты клона стоят 60."
-	progress.cash-=60
+	if not prepaid and progress.cash<60: return "Ингредиенты клона стоят 60."
+	if not prepaid: progress.cash-=60
 	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0)})
 	progress.next_clone_id+=1
 	progress.free_clones=progress.free_workers.size()
@@ -653,3 +682,35 @@ func create_clone(tempo := 1.0) -> String:
 	trace("clone_created",{"free":progress.free_clones,"tempo":tempo})
 	announce("Клон создан · темп %d%% · свободно %d"%[roundi(tempo*100),progress.free_clones])
 	return ""
+
+func chef_queue() -> Array:
+	return customers.filter(func(c): return c.state=="queued")
+
+func queue_point(index: int) -> Vector3:
+	var first: Node3D=by_id(1)
+	return first.to_global(Vector3(0,0,-3.0-index*0.95))
+
+func assign_customer(station: Node3D, customer: Dictionary) -> void:
+	customer.state="walking"
+	customer.path=[station.to_global(Vector3(0,0,-1.85))]
+	station.customer_order=customer.get("order",{}).duplicate(true)
+	station.order_dish=customer.dish
+	station.customer_id=customer.id
+	station.state="waiting"
+
+func advance_queue() -> void:
+	var line:=chef_queue()
+	var first: Node3D=by_id(1)
+	if first==null: return
+	if not line.is_empty() and first.state=="idle" and first.customer_id<0 and not first.training.active() and progress.shift not in ["closing","night"]:
+		assign_customer(first,line.pop_front())
+	for i in range(line.size()):
+		var goal:=queue_point(i)
+		if line[i].view.position.distance_to(goal)>0.05: line[i].path=[goal]
+		line[i].view.caption.text=Definition.DISHES[line[i].dish]+"\nК шефу · %d в очереди"%(i+1)
+
+func dismiss_queue(customer: Dictionary) -> void:
+	customer.state="leaving"
+	customer.path=[Vector3(-8.8,0,4.8),Vector3(17.4,0,1.65)]
+	customer.view.caption.text="До завтра!"
+	if customer.get("banquet",false): progress.banquet_finished+=1
