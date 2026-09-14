@@ -629,11 +629,11 @@ func trace(kind: String, data := {}) -> void:
 
 func normalize_workers() -> void:
 	while progress.free_workers.size() < progress.free_clones:
-		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":progress.rest_multiplier})
+		progress.free_workers.append({"id":progress.next_clone_id,"tempo":1.0,"rest":1.0})
 		progress.next_clone_id+=1
 	for worker in progress.free_workers:
 		worker.tempo=clampf(float(worker.get("tempo",1.0)),0.7,10.0)
-		worker.rest=progress.rest_multiplier
+		worker.rest=1.0
 	for station in stations:
 		if station.manual_station: continue
 		for role in range(station.role_count() if station.staffed<0 else station.staffed):
@@ -685,7 +685,7 @@ func create_clone(tempo := 1.0, prepaid := false) -> String:
 	if progress.stars<1 or progress.lab_stage<3: return "Нужны готовая лаборатория и первая звезда."
 	if not prepaid and progress.cash<60: return "Ингредиенты клона стоят 60."
 	if not prepaid: progress.cash-=60
-	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":progress.rest_multiplier})
+	progress.free_workers.append({"id":progress.next_clone_id,"tempo":clampf(tempo,0.7,10.0),"rest":1.0})
 	progress.next_clone_id+=1
 	progress.free_clones=progress.free_workers.size()
 	assign_clones()

@@ -340,7 +340,7 @@ func _process(_delta: float) -> void:
 	var limits:=tempo_range()
 	var title := ""
 	match state.phase:
-		"idle": title="ТЯП-КЛОН · %d–%d%% · свободно %d"%[roundi(limits.x*100),roundi(limits.y*100),game.service.progress.free_clones]
+		"idle": title="ТЯП-КЛОН · %d–%d%%\nСВОБОДНЫХ КЛОНОВ: %d"%[roundi(limits.x*100),roundi(limits.y*100),game.service.progress.free_clones]
 		"fill": title="1 · УДЕРЖИВАЙ УРОВЕНЬ В ЗЕЛЁНОЙ ЗОНЕ"
 		"grow_blank": title="РАСТУТ НОГИ · %s · ИДИ РАБОТАЙ"%countdown(GROW_PREP_SECONDS)
 		"stage2_ready": title="НОГИ ГОТОВЫ · НУЖЕН СТАБИЛИЗАТОР"

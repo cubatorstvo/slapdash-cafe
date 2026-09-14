@@ -121,6 +121,50 @@ func idle(home: Vector3, delta: float, clock: float, identity: int, aisle: float
 	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), left)
 	P.align_line(arms[1], Vector3(0.3, 1.2, 0), right)
 
+func finished_role_activity(home: Vector3, partner: Vector3, delta: float, clock: float, identity: int) -> void:
+	reset_lounge_accessories()
+	hat.show()
+	notebook.hide()
+	var cycle: float=fposmod(clock+identity*1.91,16.0)
+	var mode: int=int(cycle/4.0)
+	var destination:=home
+	if mode==2:
+		destination+=Vector3(0.52 if fposmod(cycle,2.0)<1.0 else -0.52,0,0.12)
+	elif mode==3:
+		destination+=Vector3(-0.38 if home.x>0 else 0.38,0,-0.42)
+	var walking:=not walk_to(destination,delta)
+	book.set_reading(false)
+	var left:=Vector3(-0.35,0.80,-0.14)
+	var right:=Vector3(0.35,0.80,-0.14)
+	if walking:
+		left.z+=sin(phase)*0.18
+		right.z-=sin(phase)*0.18
+	else:
+		var offset: Vector3=partner-position
+		if offset.length()>0.05: rotation.y=lerp_angle(rotation.y,atan2(-offset.x,-offset.z),1.0-exp(-delta*5.0))
+		var local_partner: Vector3=to_local(partner+Vector3.UP*1.45)
+		head.rotation.y=clampf(atan2(-local_partner.x,-local_partner.z),-1.05,1.05)
+		head.rotation.x=-0.06+sin(clock*2.1+identity)*0.05
+		match mode:
+			0:
+				var explain:=0.5+0.5*sin(clock*3.4+identity)
+				right=right.lerp(Vector3(0.62,1.38,-0.26),explain)
+				left=left.lerp(Vector3(-0.18,1.02,-0.34),1.0-explain*0.4)
+			1:
+				book.pose_for_gaze(0.22,true,head.position.y)
+				book.set_reading(true,"meal")
+				head.rotation.x=0.24
+				left=to_local(book.cover_grip(-1))
+				right=to_local(book.cover_grip(1))
+			2:
+				head.rotation.y+=sin(clock*5.0)*0.16
+			3:
+				var fuss:=0.5+0.5*sin(clock*5.6+identity)
+				left=left.lerp(Vector3(-0.55,1.18,-0.10),fuss)
+				right=right.lerp(Vector3(0.55,1.18,-0.10),1.0-fuss)
+	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
+	P.align_line(arms[1],Vector3(0.3,1.2,0),right)
+
 func celebrate(clock: float, variant: int, throwing: bool) -> void:
 	notebook.hide(); book.set_reading(false)
 	var beat:=clock*(13 if variant==1 else 9)
@@ -196,7 +240,7 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 			head.rotation.y=sin(clock*0.25+identity)*0.09
 		"chat":
 			var talk:=fposmod(clock+identity*1.37,6.4)
-			var side: float=-1.0 if str(spot.id)=="sofa_right" else 1.0 if str(spot.id)=="sofa_left" else sin(clock*0.43+identity)
+			var side: float=1.0 if str(spot.id)=="sofa_right" else -1.0 if str(spot.id)=="sofa_left" else sin(clock*0.43+identity)
 			head.rotation.y=side*(0.52+sin(clock*0.8+identity)*0.16)
 			head.rotation.x=sin(clock*2.4+identity)*0.06
 			if talk<2.35:
@@ -325,17 +369,26 @@ func sleep_pose(spot: Dictionary, clock: float, identity: int) -> void:
 	notebook.hide()
 	book.set_reading(false)
 	position=spot.position
+	var kind:=str(spot.sleep_kind)
 	rotation=spot.sleep_rotation
-	var seated: bool=str(spot.sleep_kind)=="seated"
-	if seated:
+	var seated: bool=kind=="seated"
+	if kind=="back":
+		# Local body axis lies along the sofa; the face normal points straight up.
+		basis=Basis(Vector3(0,0,-1),Vector3(1,0,0),Vector3(0,-1,0))
+	elif kind=="headstand":
+		rotation=Vector3(0,0,PI)
+		for i in range(legs.size()): legs[i].rotation.z=(-0.78 if i==0 else 0.78)
+	elif seated:
 		if not is_instance_valid(lounge_legs): build_lounge_accessories(); reset_lounge_accessories()
 		lounge_legs.show()
 		for leg in legs: leg.hide()
 		rotation.y=float(spot.get("yaw",0))
-	head.rotation=Vector3(0.26 if seated else 0.08,0,sin(clock*1.3+identity)*0.025)
+	head.rotation=Vector3(0.26 if seated else 0.02 if kind in ["back","headstand"] else 0.08,0,sin(clock*1.3+identity)*0.025)
 	position.y+=sin(clock*1.3+identity)*0.008
 	for i in range(arms.size()):
 		var side: float=-1.0 if i==0 else 1.0
 		var hand:=Vector3(side*0.18,0.92,-0.26)
-		if identity%3==1: hand=Vector3(side*0.38,1.52,0.08)
+		if kind=="back": hand=Vector3(side*0.42,0.86,-0.04)
+		elif kind=="headstand": hand=Vector3(side*0.48,1.43,-0.04)
+		elif identity%3==1: hand=Vector3(side*0.38,1.52,0.08)
 		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)

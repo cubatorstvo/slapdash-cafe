@@ -26,11 +26,6 @@ func workers() -> Array:
 			if id<=0: continue
 			var home: Vector3=station.to_global(Vector3((-1.35 if role==0 else 1.35) if station.role_count()==2 else 0,0,1.85))
 			result.append({"id":id,"name":str(member.name),"home":home,"station":station,"from_lab":false})
-	for worker in game.service.progress.free_workers:
-		var id:=int(worker.get("id",0))
-		if id>0:
-			var home:=Annex.lab_world(Vector3(0.98,0,7.98))
-			result.append({"id":id,"name":"Свободный клон №%d"%id,"home":home,"station":null,"from_lab":true})
 	result.sort_custom(func(a,b): return int(a.id)<int(b.id))
 	return result
 

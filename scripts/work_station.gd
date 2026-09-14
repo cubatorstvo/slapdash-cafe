@@ -220,6 +220,15 @@ func refresh(local_peer: int, delta: float) -> void:
 			view.actors[role].visible = (not active and not resting) or (performing and not role in training.live_roles)
 			view.actors[role].caption.text = crew_name(role) + (" · дубль" if active else "")
 	view.update_view(model, age, state != "cooking")
+	if type_id == "kitchen" and state=="cooking" and recipes.has(order_dish):
+		var production_tracks: Array=recipes[order_dish].get("tracks",[])
+		for role in range(mini(role_count(),production_tracks.size())):
+			var track: Dictionary=production_tracks[role]
+			if track.is_empty() or track.get("frames",[]).is_empty() or order_tick<float(track.frames.size()): continue
+			var home:=Vector3(-1.35 if role==0 else 1.35,0,1.85)
+			var partner: Vector3=view.actors[1-role].position if role_count()==2 else Vector3.ZERO
+			view.actors[role].finished_role_activity(home,partner,delta,age,station_id*7+role)
+			view.actors[role].caption.text=crew_name(role)+"\nЗакончил · теперь подсказывает"
 	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
 		var student: Node3D = students[role]

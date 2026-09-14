@@ -30,6 +30,9 @@ func run() -> void:
 	var station=game.service.add_station("counter",1,false,true)
 	game.service.progress.stars=1; game.service.progress.lab_stage=3
 	game.service.create_clone(1.0,true)
+	game.service.create_clone(1.0,true)
+	check(game.service.progress.free_workers.size()==1,"Extra clone remains dormant in laboratory inventory")
+	check(game.evening.workers().size()==1,"Dormant free clone does not join lounge life")
 	game.service.progress.shift="night"; game.service.progress.night_elapsed=25.0
 	game.evening._process(1.0/60.0)
 	check(game.evening.performers.size()==1,"Night worker gets a rear rest route")
@@ -66,6 +69,11 @@ func run() -> void:
 	game.session.advance(0.1)
 	check(not game.session.sleep_scene_active() and game.session.sleeping_peers.is_empty(),"Unanimous morning skip completes the cinematic and clears sleepers")
 	check(game.service.open_for_business,"Morning automatically opens cafe")
+	var sofa_slots:=Lounge.activity_slots(0,["sofa"]).filter(func(spot): return spot.item=="sofa")
+	check(sofa_slots.size()==2,"Starter sofa has exactly two leisure seats")
+	check(Lounge.sleep_spot(sofa_slots[0],1,0).sleep_kind=="back" and Lounge.sleep_spot(sofa_slots[1],6,0).sleep_kind=="back","Both sofa sleepers lie face-up in the stack")
+	var comic_sleep:=Lounge.sleep_spot(Lounge.overflow_slot(0,2,[]),2,2)
+	check(comic_sleep.sleep_kind=="headstand","Some clones use the upside-down comic sleep pose")
 	var floor_a:=Lounge.overflow_slot(0,2,[])
 	var floor_b:=Lounge.overflow_slot(1,2,[])
 	check(absf(float(floor_a.yaw)-float(floor_b.yaw))>0.05,"Floor lounge spots face different directions around social groups")

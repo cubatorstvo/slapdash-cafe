@@ -42,7 +42,7 @@ static func item_position(id: String, tier: int) -> Vector3:
 
 static func _base_catalogue() -> Array:
 	return [
-		{"id":"sofa","title":"Диван на троих","stage":"small","position":Vector3(6.5,0,14.7),"yaw":0.0},
+		{"id":"sofa","title":"Диван на двоих","stage":"small","position":Vector3(6.5,0,14.7),"yaw":0.0},
 		{"id":"television","title":"Телевизор с тумбой","stage":"small","position":Vector3(6.5,0,11.3),"yaw":PI},
 		{"id":"rocking_chair","title":"Кресло-качалка","stage":"small","position":Vector3(4.55,0,18.5),"yaw":-PI/2},
 		{"id":"foosball","title":"Настольный футбол","stage":"medium","position":Vector3(14.0,0,13.9),"yaw":0.0},
@@ -78,7 +78,7 @@ static func activity_slots(tier := 2, owned: Array = []) -> Array:
 static func _base_slots() -> Array:
 	# Interleave areas so even a small crew makes several corners feel inhabited.
 	return [
-		slot("sofa_left","sofa",Vector3(5.62,-0.10,14.45),Vector3(5.62,0,13.65),0,"chat","Болтает на диване"),
+		slot("sofa_left","sofa",Vector3(5.95,-0.10,14.45),Vector3(5.95,0,13.65),0,"chat","Болтает на диване"),
 		slot("football_left","foosball",Vector3(12.85,0,13.9),Vector3(12.85,0,13.9),-PI/2,"foosball","Играет в настольный футбол"),
 		slot("football_right","foosball",Vector3(15.15,0,13.9),Vector3(15.15,0,13.9),PI/2,"foosball","Играет в настольный футбол"),
 		slot("rocker","rocking_chair",Vector3(4.55,-0.10,18.5),Vector3(5.6,0,18.5),-PI/2,"rock","Качается в кресле"),
@@ -88,13 +88,12 @@ static func _base_slots() -> Array:
 		slot("board_right","board_games",Vector3(7.9,-0.14,21.0),Vector3(8.65,0,21.0),PI/2,"board","Обдумывает ход"),
 		slot("ping_front","table_tennis",Vector3(14,0,16.82),Vector3(14,0,16.82),PI,"pingpong","Играет в пинг-понг"),
 		slot("ping_back","table_tennis",Vector3(14,0,20.78),Vector3(14,0,20.78),0,"pingpong","Играет в пинг-понг"),
-		slot("sofa_middle","sofa",Vector3(6.5,-0.10,14.45),Vector3(6.5,0,13.65),0,"chat","Рассказывает историю"),
 		slot("beanbag_seat","beanbag",Vector3(8.2,-0.10,18.6),Vector3(8.2,0,19.5),PI,"relax","Отдыхает в кресле-мешке"),
 		slot("aquarium_viewer","aquarium",Vector3(4.65,0,16.6),Vector3(4.65,0,16.6),PI/2,"fish","Наблюдает за рыбками"),
 		slot("book_reader","bookcase",Vector3(4.25,0,22.3),Vector3(4.25,0,22.3),PI/2,"read","Листает книгу"),
 		slot("music_listener","jukebox",Vector3(16,0,16.2),Vector3(16,0,16.2),-PI/2,"music","Слушает музыку"),
 		slot("tea_right","tea_station",Vector3(14.2,0.10,21.55),Vector3(14.2,0,20.95),PI,"tea","Пьёт чай"),
-		slot("sofa_right","sofa",Vector3(7.38,-0.10,14.45),Vector3(7.38,0,13.65),0,"chat","Смеётся с соседями"),
+		slot("sofa_right","sofa",Vector3(7.05,-0.10,14.45),Vector3(7.05,0,13.65),0,"chat","Смеётся с соседом"),
 		slot("board_front","board_games",Vector3(6.7,-0.14,19.8),Vector3(6.7,0,19.1),PI,"board","Играет в настолку"),
 		slot("board_back","board_games",Vector3(6.7,-0.14,22.2),Vector3(6.7,0,22.9),0,"board","Обдумывает ход"),
 		slot("snack_break","snack_fridge",Vector3(16.8,0,21.5),Vector3(16.8,0,21.5),PI,"snack","Выбирает перекус")
@@ -103,7 +102,7 @@ static func _base_slots() -> Array:
 static func obstacles(tier := 2, owned: Array = []) -> Array:
 	# Footprints also generate the furniture collision proxies.
 	var result: Array = [
-		Rect2(4.87,14.10,3.26,1.22), Rect2(5.12,10.92,2.76,0.74),
+		Rect2(5.25,14.10,2.50,1.22), Rect2(5.12,10.92,2.76,0.74),
 		Rect2(5.60,12.35,1.80,0.80), Rect2(4.00,17.94,1.10,1.12),
 		Rect2(13.46,12.95,1.08,1.90), Rect2(16.12,11.33,0.96,0.94),
 		Rect2(13.24,17.43,1.52,2.74), Rect2(6.12,20.42,1.16,1.16),
@@ -249,13 +248,17 @@ static func sleep_spot(leisure: Dictionary, identity: int, tier: int) -> Diction
 	spot.sleep_rotation=Vector3.ZERO
 	spot.sleep_kind="standing"
 	spot.activity="Спит стоя"
+	if str(leisure.item)!="sofa" and posmod(identity,5)==2:
+		spot.position=Vector3(leisure.approach)+Vector3(0,1.72,0)
+		spot.sleep_kind="headstand"
+		spot.activity="Спит на голове"
+		return spot
 	match str(leisure.item):
 		"sofa":
-			var layer: int=["sofa_left","sofa_middle","sofa_right"].find(leisure.id)
-			spot.position=item_position("sofa",tier)+Vector3(-1.05,0.68+maxi(0,layer)*0.32,-0.1)
-			spot.sleep_rotation=Vector3(0,0,-PI/2)
-			spot.sleep_kind="lying"
-			spot.activity="Спит поперёк дивана"
+			var layer: int=["sofa_left","sofa_right"].find(leisure.id)
+			spot.position=item_position("sofa",tier)+Vector3(-0.86,0.72+maxi(0,layer)*0.31,-0.10)
+			spot.sleep_kind="back"
+			spot.activity="Спит на спине поверх соседа" if layer>0 else "Спит на спине на диване"
 		"board_games", "tea_station":
 			var layer: int=0
 			for other in _base_slots():

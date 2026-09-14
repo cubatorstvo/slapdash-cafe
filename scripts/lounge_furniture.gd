@@ -96,18 +96,18 @@ func stool(parent: Node3D, point: Vector3, high := false) -> void:
 	P.cylinder(root,0.29,0.12,Vector3(0,height,0),GOLD)
 
 func build_sofa(parent: Node3D) -> void:
-	legs(parent,2.65,0.7,0.18)
-	box(parent,Vector3(3.15,0.34,1.12),Vector3(0,0.34,0),TEAL)
-	box(parent,Vector3(3.2,0.72,0.23),Vector3(0,0.85,0.46),Color("3f756e"))
-	for x in [-1.50,1.50]:
+	legs(parent,1.90,0.7,0.18)
+	box(parent,Vector3(2.40,0.34,1.12),Vector3(0,0.34,0),TEAL)
+	box(parent,Vector3(2.45,0.72,0.23),Vector3(0,0.85,0.46),Color("3f756e"))
+	for x in [-1.12,1.12]:
 		box(parent,Vector3(0.24,0.57,1.12),Vector3(x,0.68,0),TEAL)
-	for x in [-0.88,0.0,0.88]:
-		box(parent,Vector3(0.83,0.18,0.91),Vector3(x,0.56,-0.12),Color("6eaa96"))
-		box(parent,Vector3(0.82,0.51,0.17),Vector3(x,0.89,0.29),Color("68a18f"))
-	for x in [-1.05,1.05]:
-		var cushion:=box(parent,Vector3(0.35,0.33,0.13),Vector3(x,0.83,0.10),GOLD if x<0 else Color("bf8071"))
+	for x in [-0.55,0.55]:
+		box(parent,Vector3(0.98,0.18,0.91),Vector3(x,0.56,-0.12),Color("6eaa96"))
+		box(parent,Vector3(0.97,0.51,0.17),Vector3(x,0.89,0.29),Color("68a18f"))
+	for x in [-0.72,0.72]:
+		var cushion:=box(parent,Vector3(0.32,0.31,0.13),Vector3(x,0.83,0.10),GOLD if x<0 else Color("bf8071"))
 		cushion.rotation.z=x*0.20
-	box(parent,Vector3(0.48,0.035,0.78),Vector3(1.0,0.67,-0.14),Color("e3caa0"))
+	box(parent,Vector3(0.42,0.035,0.72),Vector3(0.70,0.67,-0.14),Color("e3caa0"))
 	var table:=Node3D.new()
 	parent.add_child(table)
 	table.position=Vector3(0,0,-1.95)

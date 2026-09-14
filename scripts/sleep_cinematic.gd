@@ -10,7 +10,10 @@ var shade: ColorRect
 var title: Label
 var hint: Label
 var self_avatar: Node3D
+var always_skip_checkbox: CheckBox
+var auto_vote_key := ""
 var showing := false
+const SETTINGS_PATH := "user://cinematic_settings.cfg"
 
 func setup(owner_game: Node3D) -> void:
 	game=owner_game
@@ -52,7 +55,42 @@ func setup(owner_game: Node3D) -> void:
 	surface.add_child(shade)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	always_skip_checkbox=CheckBox.new()
+	surface.add_child(always_skip_checkbox)
+	always_skip_checkbox.text="Всегда пропускать"
+	always_skip_checkbox.anchor_left=1.0
+	always_skip_checkbox.anchor_right=1.0
+	always_skip_checkbox.anchor_top=1.0
+	always_skip_checkbox.anchor_bottom=1.0
+	always_skip_checkbox.offset_left=-245
+	always_skip_checkbox.offset_right=-22
+	always_skip_checkbox.offset_top=-67
+	always_skip_checkbox.offset_bottom=-25
+	always_skip_checkbox.add_theme_font_size_override("font_size",18)
+	always_skip_checkbox.z_index=5
+	always_skip_checkbox.button_pressed=_load_always_skip()
+	always_skip_checkbox.toggled.connect(_set_always_skip)
 	overlay.hide()
+
+func _load_always_skip() -> bool:
+	var config:=ConfigFile.new()
+	return config.load(SETTINGS_PATH)==OK and bool(config.get_value("cinematics","always_skip",false))
+
+func _set_always_skip(value: bool) -> void:
+	var config:=ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("cinematics","always_skip",value)
+	config.save(SETTINGS_PATH)
+	auto_vote_key=""
+
+func _auto_skip_vote() -> bool:
+	if not is_instance_valid(always_skip_checkbox) or not always_skip_checkbox.button_pressed or not game.session.sleep_scene_active(): return false
+	var scene: Dictionary=game.session.sleep_scene
+	var key: String="%s:%s"%[str(scene.get("serial",0)),game.session.sleep_scene_phase()]
+	if key==auto_vote_key: return false
+	auto_vote_key=key
+	game.session.request_action({"action":"skip_sleep"})
+	return true
 
 func begin() -> void:
 	showing=true
@@ -62,7 +100,7 @@ func begin() -> void:
 	game.session_paused=false
 	game.hud.pause_panel.hide()
 	game.hud.hide()
-	Input.mouse_mode=Input.MOUSE_MODE_CAPTURED
+	Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
 	var back: float=Layout.back_z(game.service.progress.lounge_tier)
 	shot.global_position=Vector3(3.55,4.02,11.05)
 	shot.look_at(Vector3(10.6,1.05,(10.6+back)*0.5+1.4),Vector3.UP)
@@ -87,7 +125,9 @@ func _process(_delta: float) -> void:
 	if active and not showing: begin()
 	if not active:
 		if showing: finish()
+		auto_vote_key=""
 		return
+	if _auto_skip_vote(): return
 	var age: float=game.session.sleep_scene_age()
 	var scene: Dictionary=game.session.sleep_scene
 	var phase: String=game.session.sleep_scene_phase()

@@ -8,7 +8,7 @@ const STAGES := [
 	{"name":"Большая комната","price":420,"star":2}
 ]
 const GOODS := {
-	"sofa":{"name":"Диван на троих","price":100,"tier":0,"quality":0.08},
+	"sofa":{"name":"Диван на двоих","price":100,"tier":0,"quality":0.08},
 	"television":{"name":"Телевизор · +4% к качеству дивана","price":90,"tier":0,"quality":0.0},
 	"rocking_chair":{"name":"Кресло-качалка","price":60,"tier":0,"quality":0.12},
 	"beanbag":{"name":"Кресло-мешок","price":35,"tier":0,"quality":0.10},
