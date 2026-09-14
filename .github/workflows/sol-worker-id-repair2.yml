@@ -1,0 +1,46 @@
+name: Sol worker identity repair 2
+on:
+  push:
+    branches:
+      - sol/worker-id-repair2
+    paths:
+      - .github/workflows/sol-worker-id-repair2.yml
+permissions:
+  contents: write
+jobs:
+  repair-test-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/worker-id-repair2
+          fetch-depth: 0
+      - name: Apply repair patch
+        run: |
+          python .github/patch_worker_id.py
+          git diff -- scripts/cafe_service.gd tests/test_worker_identity.gd > /tmp/worker-id.patch
+          test -s /tmp/worker-id.patch
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Parse and import
+        run: |
+          set -o pipefail
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/godot-parse.log
+          if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:" /tmp/godot-parse.log; then exit 1; fi
+      - name: Focused tests
+        run: |
+          set -e
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_worker_identity.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+      - name: Publish final branch
+        run: |
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/cafe_service.gd tests/test_worker_identity.gd
+          git commit -m "Repair clone identities across saved stations"
+          git branch -f sol/worker-id-repair-final HEAD
+          git push -f origin sol/worker-id-repair-final
