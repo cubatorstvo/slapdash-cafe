@@ -18,6 +18,8 @@ const BANQUET_GUESTS := 9
 const BANQUET_SERVED := 8
 const BANQUET_GOOD := 6
 const SHIFT_SECONDS := 480.0
+const CHEF_ORDER_INTERVALS := [Vector2(25.0,35.0),Vector2(45.0,60.0),Vector2(75.0,95.0),Vector2(105.0,130.0),Vector2(140.0,175.0),Vector2(180.0,220.0)]
+const CHEF_ORDER_PREMIUM := [1.0,1.5,2.2,3.0,3.8,4.8]
 const LAB_PRICES := [40, 60, 80]
 var free_clones := 0
 var free_workers: Array = []
@@ -65,6 +67,11 @@ var revision := 0
 
 func busy() -> bool: return phase in ["preparing", "showcase", "service", "tasting"]
 func arrival_interval() -> float: return maxf(8.0, 18.0 - popularity * 0.20)
+func chef_order_stage() -> int: return clampi(stars,0,5)
+func chef_order_delay(rng: RandomNumberGenerator) -> float:
+	var window: Vector2=CHEF_ORDER_INTERVALS[chef_order_stage()]
+	return rng.randf_range(window.x,window.y)
+func chef_order_premium() -> float: return float(CHEF_ORDER_PREMIUM[chef_order_stage()])
 func available_dishes() -> Array: return DISHES + (["meal"] if stars >= 2 else [])
 func paid_decoration(id: String) -> String:
 	if not DECOR.has(id): return "Украшение не найдено."

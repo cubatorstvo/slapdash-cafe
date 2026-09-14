@@ -12,12 +12,12 @@ func run() -> void:
 	var p=service.progress
 	var chef=service.by_id(1)
 	p.shift="open"; p.manual_served=4
-	check(service.spawn_customer("sausage"),"First customer takes chef station")
+	check(service.spawn_customer("sausage",false,true),"First customer takes chef station")
 	var first_id: int=chef.customer_id
 	var first_order: Dictionary=chef.customer_order.duplicate(true)
-	for dish in ["potato","wine","sausage"]: check(service.spawn_customer(dish),"Guest joins chef queue")
+	for dish in ["potato","wine","sausage"]: check(service.spawn_customer(dish,false,true),"Guest joins chef queue")
 	check(service.chef_queue().size()==3,"Three waiting customers visible")
-	check(not service.spawn_customer("potato"),"Full queue declines additional arrivals")
+	check(not service.spawn_customer("potato",false,true),"Full queue declines additional arrivals")
 	check(chef.customer_id==first_id and chef.customer_order==first_order,"Queue does not overwrite active order")
 	check(service.manual_order(chef)=="sausage","Active dish stays assigned")
 	chef.equipment=["rag","plates","cup","jug","pan","sauce"]; chef.apply_equipment()
