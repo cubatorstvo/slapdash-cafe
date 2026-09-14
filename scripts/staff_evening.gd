@@ -119,7 +119,7 @@ func _process(_delta: float) -> void:
 			distance-=segment.length(); point=route[i]
 			if i==route.size()-1: done=true
 		var station=info.station
-		var training:=station!=null and station.training.active()
+		var training: bool = station!=null and station.training.active()
 		actor.visible=not training
 		if done:
 			settle(actor,spot,id)

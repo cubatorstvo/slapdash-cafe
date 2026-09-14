@@ -245,7 +245,7 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 func advance(delta: float) -> void:
 	if state.phase=="idle": return
 	var owner := int(state.owner)
-	var autonomous := state.phase in ["grow_blank","stage2_ready","grow_finish","ready"]
+	var autonomous: bool = state.phase in ["grow_blank","stage2_ready","grow_finish","ready"]
 	if state.phase not in ["done","failed"]:
 		if owner>1 and not game.session.members.has(owner):
 			game.service.trace("cloning_cancelled",{"reason":"owner_disconnected"})
