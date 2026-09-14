@@ -47,3 +47,4 @@ jobs:
           git add scripts/cafe_annex.gd scripts/fps_player.gd scripts/staff_evening.gd scripts/cafe.gd scripts/cafe_development_view.gd scripts/cafe_service.gd scripts/coop_session.gd tests/test_cafe_annex.gd docs/LABORATORY_AND_RECIPE_BOOK.md
           git commit -m "Move annex behind cafe and add multiplayer bed sleep"
           git push --force-with-lease origin HEAD:sol/back-annex-sleep-vote-final
+# retry 2: explicit annex dynamic-call type
