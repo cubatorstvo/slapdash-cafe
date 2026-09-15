@@ -1,0 +1,59 @@
+name: Lounge plan debug
+on:
+  push:
+    branches: [work/lounge-plan-debug]
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/lounge-plan-debug
+          fetch-depth: 0
+      - name: Apply candidate
+        run: |
+          git fetch origin work/placement-beacon-lounge-flow:refs/remotes/origin/work/placement-beacon-lounge-flow
+          git show origin/work/placement-beacon-lounge-flow:.github/workflows/placement-beacon-lounge-flow.yml > /tmp/source.yml
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/source.yml').read_text().splitlines(); marker='      - name: Apply implementation'; start=lines.index(marker)+1
+          while lines[start] != '        run: |': start+=1
+          start+=1; end=start
+          while end<len(lines) and not lines[end].startswith('      - name: '): end+=1
+          Path('/tmp/apply.sh').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start:end])+'\n')
+          PY
+          git checkout --detach origin/main
+          bash /tmp/apply.sh
+          cat > tests/_debug_lounge_plan.gd <<'GD'
+          extends SceneTree
+          func _initialize(): run.call_deferred()
+          func run():
+              var game=preload("res://scenes/cafe.tscn").instantiate(); root.add_child(game); await process_frame; game.set_physics_process(false)
+              game.service.clear_world(); game.service.initial_stations(true)
+              var p=game.service.progress; p.stars=1; p.lab_stage=3; p.lounge_tier=1; p.lounge_items=["sofa"]; p.shift="night"; p.night_elapsed=90.0
+              print("create=",game.service.create_clone(1.0,true))
+              game.evening._process(0.016)
+              var id:int=int(game.evening.performers.keys()[0]); var entry:Dictionary=game.evening.performers[id]
+              print("BEFORE items=",p.lounge_items," plan=",game.evening.plan()[0].spot.id," spot_id=",entry.get("spot_id","?")," actor=",entry.actor.global_position)
+              var delivery_id:int=p.next_delivery_id; p.next_delivery_id+=1
+              p.deliveries.append({"id":delivery_id,"item":"rest_arcade","station":0,"remaining":0.0,"owner":1,"position":[0.0,0.3,0.0]})
+              game.player.global_position=game.shop.installation_position(game.shop.parcel_by_id(delivery_id))
+              print("install=",game.shop.action(1,{"action":"install_parcel","id":delivery_id}))
+              print("AFTER_INSTALL items=",p.lounge_items," slots=",preload("res://scripts/lounge_progression.gd").slots(p).map(func(x):return [x.id,x.quality])," plan=",game.evening.plan()[0].spot.id)
+              game.annex.refresh_shell()
+              print("AFTER_REFRESH items=",p.lounge_items," plan=",game.evening.plan()[0].spot.id)
+              game.evening._process(0.016); entry=game.evening.performers[id]
+              print("AFTER_PROCESS spot=",entry.get("spot_id","?")," active=",entry.get("reroute_active",false)," route=",entry.get("reroute_route",[]))
+              for i in range(120):
+                  p.night_elapsed+=0.1; game.evening._process(0.016)
+                  if i in [1,5,10,20,40,80,119]:
+                      entry=game.evening.performers[id]; print("T",i," items=",p.lounge_items," plan=",game.evening.plan()[0].spot.id," spot=",entry.get("spot_id","?")," active=",entry.get("reroute_active",false)," pos=",entry.actor.global_position)
+              game._shutdown_tree(game); game.free(); quit()
+          GD
+      - name: Download and import
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit >/dev/null 2>&1
+      - name: Debug
+        run: timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/_debug_lounge_plan.gd -- --fresh-cafe
