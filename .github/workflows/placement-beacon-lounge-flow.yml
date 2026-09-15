@@ -1,0 +1,93 @@
+name: Placement beacon and lounge flow
+on:
+  push:
+    branches:
+      - work/placement-beacon-lounge-flow
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply implementation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path)
+              s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'missing target in {path}: {old[:140]!r}')
+              p.write_text(s.replace(old,new,1))
+
+          # Bright world-space install beacon: exact hologram + tall pulsing beam + readable label.
+          replace_once('scripts/cafe_shop.gd',
+          '''var boxes := {}\nvar local_ghost: MeshInstance3D\nvar garland_reels := {}\n''',
+          '''var boxes := {}\nvar local_ghost: MeshInstance3D\nvar placement_beacon: MeshInstance3D\nvar placement_label: Label3D\nvar placement_clock := 0.0\nvar garland_reels := {}\n''')
+
+          replace_once('scripts/cafe_shop.gd',
+          '''\tlocal_ghost = Props.box(self,Vector3(0.55,0.2,0.45),Vector3.ZERO,Color("83ceab"))\n\tlocal_ghost.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA\n\tlocal_ghost.material_override.albedo_color.a = 0.35\n\tlocal_ghost.hide()\n''',
+          '''\tlocal_ghost = Props.box(self,Vector3(1.15,0.08,1.15),Vector3.ZERO,Color("72efb3"))\n\tlocal_ghost.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA\n\tlocal_ghost.material_override.albedo_color.a = 0.42\n\tlocal_ghost.material_override.emission_enabled = true\n\tlocal_ghost.material_override.emission = Color("72efb3")\n\tlocal_ghost.material_override.emission_energy_multiplier = 1.6\n\tlocal_ghost.hide()\n\tplacement_beacon = Props.cylinder(self,0.075,5.2,Vector3.ZERO,Color("72efb3"))\n\tplacement_beacon.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA\n\tplacement_beacon.material_override.albedo_color.a = 0.24\n\tplacement_beacon.material_override.emission_enabled = true\n\tplacement_beacon.material_override.emission = Color("72efb3")\n\tplacement_beacon.material_override.emission_energy_multiplier = 2.0\n\tplacement_beacon.hide()\n\tplacement_label = Props.text(self,"▼  УСТАНОВИТЬ СЮДА",Vector3.ZERO,30,Color("e8ffd1"))\n\tplacement_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED\n\tplacement_label.pixel_size = 0.0045\n\tplacement_label.outline_size = 10\n\tplacement_label.hide()\n''')
+
+          replace_once('scripts/cafe_shop.gd',
+          '''\t\tif near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}\n\t\treturn {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}\n''',
+          '''\t\tif near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}\n\t\treturn {"action":"drop_parcel","id":id,"hint":"Неси коробку к яркому маяку · "+parcel_name(parcel)+" · (E) поставить здесь"}\n''')
+
+          replace_once('scripts/cafe_shop.gd',
+          '''\tlocal_ghost.hide()\n\tvar held := carried(game.session.local_id())\n\tif held>=0:\n\t\tvar held_parcel:=parcel_by_id(held)\n\t\tif not held_parcel.is_empty() and ITEMS[held_parcel.item].kind!="garland":\n\t\t\tlocal_ghost.show(); local_ghost.global_position=installation_position(held_parcel)\n''',
+          '''\tplacement_clock += delta\n\tlocal_ghost.hide()\n\tplacement_beacon.hide()\n\tplacement_label.hide()\n\tvar held := carried(game.session.local_id())\n\tif held>=0:\n\t\tvar held_parcel:=parcel_by_id(held)\n\t\tif not held_parcel.is_empty() and ITEMS[held_parcel.item].kind!="garland":\n\t\t\tvar install_target: Vector3=installation_position(held_parcel)\n\t\t\tif install_target.is_finite():\n\t\t\t\tvar pulse: float=0.5+0.5*sin(placement_clock*5.2)\n\t\t\t\tlocal_ghost.show(); local_ghost.global_position=install_target\n\t\t\t\tlocal_ghost.scale=Vector3.ONE*(0.92+0.13*pulse)\n\t\t\t\tplacement_beacon.show(); placement_beacon.global_position=install_target+Vector3.UP*2.6\n\t\t\t\tplacement_beacon.material_override.albedo_color.a=0.16+0.16*pulse\n\t\t\t\tplacement_label.show(); placement_label.global_position=install_target+Vector3.UP*(5.35+0.13*pulse)\n\t\t\t\tplacement_label.text="▼  УСТАНОВИТЬ СЮДА\\n%s\\n%d м"%[parcel_name(held_parcel),roundi(game.player.global_position.distance_to(install_target))]\n''')
+
+          # Installing lounge furniture never relocates the player to the room entrance.
+          replace_once('scripts/cafe_annex.gd',
+          '''\t# Move an awake player out of a newly installed footprint or a smaller restored room.\n\tvar point: Vector3=game.player.global_position\n\tif point.x>REST_X_MIN and point.x<REST_X_MAX and point.z>CAFE_BACK_Z and not game.session.local_sleeping():\n\t\tif not LoungeLayout.walkable(point,LoungeLayout.obstacles(p.lounge_tier,p.lounge_items),p.lounge_tier):\n\t\t\tgame.player.global_position=REST_DOOR_ROOM\n\t\t\tgame.player.velocity=Vector3.ZERO\n\n\tif point.x<REST_X_MIN and point.z>CAFE_BACK_Z and not game.session.local_sleeping():\n''',
+          '''\t# Furniture appears around an awake player without moving them; they can simply walk out of the new footprint.\n\tvar point: Vector3=game.player.global_position\n\tif point.x<REST_X_MIN and point.z>CAFE_BACK_Z and not game.session.local_sleeping():\n''')
+
+          # General room pathfinder so an already-resting clone can reroute from its current position.
+          old='''static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:\n\tvar blockers := obstacles(tier,owned)\n\tvar start := nearest_cell(ENTRANCE,blockers,tier)\n\tvar goal := nearest_cell(target,blockers,tier)\n\tvar frontier: Array[Vector2i] = [start]\n\tvar previous := {start:start}\n\tvar cursor := 0\n\twhile cursor<frontier.size() and not previous.has(goal):\n\t\tvar cell: Vector2i=frontier[cursor]\n\t\tcursor+=1\n\t\tfor offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:\n\t\t\tvar next: Vector2i=cell+offset\n\t\t\tif next.x<0 or next.x>=35 or next.y<0 or next.y>=39 or previous.has(next): continue\n\t\t\tif not walkable(grid_point(next),blockers,tier): continue\n\t\t\tprevious[next]=cell\n\t\t\tfrontier.append(next)\n\tif not previous.has(goal): return []\n\tvar reverse_path: Array = [target]\n\tvar cell := goal\n\twhile cell!=start:\n\t\treverse_path.append(grid_point(cell))\n\t\tcell=previous[cell]\n\treverse_path.append(grid_point(start))\n\treverse_path.reverse()\n\t# Keep corners; avoid a turn at every grid sample.\n\tvar result: Array = [ENTRANCE]\n\tfor i in range(reverse_path.size()):\n\t\tif i==0 or i==reverse_path.size()-1:\n\t\t\tresult.append(reverse_path[i])\n\t\telse:\n\t\t\tvar before: Vector3=reverse_path[i]-reverse_path[i-1]\n\t\t\tvar after: Vector3=reverse_path[i+1]-reverse_path[i]\n\t\t\tif before.normalized().dot(after.normalized())<0.999: result.append(reverse_path[i])\n\treturn result\n'''
+          new='''static func path_between(start_point: Vector3, target: Vector3, tier := 2, owned: Array = []) -> Array:\n\tvar blockers := obstacles(tier,owned)\n\tvar start := nearest_cell(start_point,blockers,tier)\n\tvar goal := nearest_cell(target,blockers,tier)\n\tif start.x<0 or goal.x<0: return []\n\tvar frontier: Array[Vector2i] = [start]\n\tvar previous := {start:start}\n\tvar cursor := 0\n\twhile cursor<frontier.size() and not previous.has(goal):\n\t\tvar cell: Vector2i=frontier[cursor]\n\t\tcursor+=1\n\t\tfor offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:\n\t\t\tvar next: Vector2i=cell+offset\n\t\t\tif next.x<0 or next.x>=35 or next.y<0 or next.y>=39 or previous.has(next): continue\n\t\t\tif not walkable(grid_point(next),blockers,tier): continue\n\t\t\tprevious[next]=cell\n\t\t\tfrontier.append(next)\n\tif not previous.has(goal): return []\n\tvar reverse_path: Array = [target]\n\tvar cell := goal\n\twhile cell!=start:\n\t\treverse_path.append(grid_point(cell))\n\t\tcell=previous[cell]\n\treverse_path.append(grid_point(start))\n\treverse_path.reverse()\n\t# Keep corners; avoid a turn at every grid sample.\n\tvar result: Array = [start_point]\n\tfor i in range(reverse_path.size()):\n\t\tif Vector3(result.back()).distance_to(reverse_path[i])<0.01: continue\n\t\tif i==0 or i==reverse_path.size()-1:\n\t\t\tresult.append(reverse_path[i])\n\t\telse:\n\t\t\tvar before: Vector3=reverse_path[i]-reverse_path[i-1]\n\t\t\tvar after: Vector3=reverse_path[i+1]-reverse_path[i]\n\t\t\tif before.normalized().dot(after.normalized())<0.999: result.append(reverse_path[i])\n\treturn result\n\nstatic func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:\n\treturn path_between(ENTRANCE,target,tier,owned)\n'''
+          replace_once('scripts/lounge_layout.gd',old,new)
+
+          # Replan existing lounge performers from their current world position with a fresh clock.
+          replace_once('scripts/staff_evening.gd',
+          '''func _sample_route(route: Array, distance: float) -> Dictionary:\n''',
+          '''func reroute_from(current: Vector3, target: Vector3) -> Array:\n\tvar p=game.service.progress\n\tif current.x>Annex.REST_X_MIN and current.x<Annex.REST_X_MAX and current.z>Annex.CAFE_BACK_Z:\n\t\treturn Lounge.path_between(current,target,p.lounge_tier,p.lounge_items)\n\tvar route: Array=[current,Vector3(current.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]\n\tvar inside_route:=Lounge.approach_path(target,p.lounge_tier,p.lounge_items)\n\tfor point in inside_route:\n\t\tif Vector3(route.back()).distance_to(point)>0.01: route.append(point)\n\treturn route\n\nfunc _sample_route(route: Array, distance: float) -> Dictionary:\n''')
+
+          replace_once('scripts/staff_evening.gd',
+          '''\t\tvar entry: Dictionary=performers[id]\n\t\tvar actor: Node3D=entry.actor\n\t\tvar hat: Node3D=entry.hat\n\t\tentry.sleepy.hide()\n''',
+          '''\t\tvar entry: Dictionary=performers[id]\n\t\tvar actor: Node3D=entry.actor\n\t\tvar hat: Node3D=entry.hat\n\t\tentry.sleepy.hide()\n\t\tvar new_spot_id: String=str(spot.id)\n\t\tvar previous_spot_id: String=str(entry.get("spot_id",""))\n\t\tif not previous_spot_id.is_empty() and previous_spot_id!=new_spot_id and not wake_scene and not cinematic:\n\t\t\tentry.reroute_route=reroute_from(actor.global_position,spot.approach)\n\t\t\tentry.reroute_started=float(game.service.progress.night_elapsed)\n\t\t\tentry.reroute_active=entry.reroute_route.size()>1\n\t\tentry.spot_id=new_spot_id\n''')
+
+          replace_once('scripts/staff_evening.gd',
+          '''\t\tvar route: Array=assignments[index].route\n\t\tvar speed: float=[3.6,4.6,2.9][variant]\n\t\tvar sample: Dictionary=_sample_route(route,maxf(0,t-0.85)*speed)\n''',
+          '''\t\tvar route: Array=assignments[index].route\n\t\tvar speed: float=[3.6,4.6,2.9][variant]\n\t\tif bool(entry.get("reroute_active",false)):\n\t\t\tvar reroute_clock: float=maxf(0.0,clock-float(entry.get("reroute_started",clock)))\n\t\t\tvar reroute_sample: Dictionary=_sample_route(entry.reroute_route,reroute_clock*(speed+1.25))\n\t\t\tactor.position=reroute_sample.position\n\t\t\tvar reroute_direction: Vector3=reroute_sample.direction\n\t\t\tactor.rotation.y=atan2(-reroute_direction.x,-reroute_direction.z)\n\t\t\tentry.settled=false\n\t\t\tentry.item=str(spot.item)\n\t\t\tif not reroute_sample.done:\n\t\t\t\tactor.morning_run(reroute_clock,id%5)\n\t\t\t\tactor.hat.hide()\n\t\t\t\tactor.caption.text=str(info.name)+" · бежит смотреть новинку!"\n\t\t\t\tactor.caption.visible=game.camera.global_position.distance_squared_to(actor.global_position)<36.0\n\t\t\t\tcontinue\n\t\t\tentry.reroute_active=false\n\t\tvar sample: Dictionary=_sample_route(route,maxf(0,t-0.85)*speed)\n''')
+
+          Path('tests/test_placement_lounge_flow.gd').write_text('''extends SceneTree\nconst Layout=preload("res://scripts/lounge_layout.gd")\nvar failures:=0\nfunc _initialize() -> void: run.call_deferred()\nfunc check(ok: bool, message: String) -> void:\n\tif not ok: failures+=1; printerr("FAIL: ",message)\nfunc run() -> void:\n\tvar game=preload("res://scenes/cafe.tscn").instantiate()\n\troot.add_child(game)\n\tawait process_frame\n\tgame.set_physics_process(false)\n\tgame.service.clear_world(); game.service.initial_stations(true)\n\tvar p=game.service.progress\n\tp.lounge_tier=1; p.lounge_items=["sofa"]; p.lounge_upgrades=[]; p.shift="night"; p.night_elapsed=90.0\n\tcheck(game.service.create_clone(1.0,true).is_empty(),"Create lounge worker")\n\tgame.evening._process(0.016)\n\tcheck(not game.evening.performers.is_empty(),"Worker is visible in lounge")\n\tvar id: int=int(game.evening.performers.keys()[0])\n\tvar entry: Dictionary=game.evening.performers[id]\n\tvar actor: Node3D=entry.actor\n\tvar old_actor_position: Vector3=actor.global_position\n\tcheck(bool(entry.get("settled",false)),"Worker is settled before furniture arrives")\n\n\tvar delivery_id: int=p.next_delivery_id; p.next_delivery_id+=1\n\tvar parcel={"id":delivery_id,"item":"rest_arcade","station":0,"remaining":0.0,"owner":1,"position":[0.0,0.3,0.0]}\n\tp.deliveries.append(parcel)\n\tvar target: Vector3=game.shop.installation_position(parcel)\n\tgame.player.global_position=Vector3(target.x,0.02,target.z)\n\tvar player_before: Vector3=game.player.global_position\n\tgame.shop._process(0.016)\n\tcheck(game.shop.local_ghost.visible and game.shop.placement_beacon.visible and game.shop.placement_label.visible,"Held box shows hologram, beam and label")\n\tcheck(game.shop.local_ghost.global_position.distance_to(target)<0.01,"Placement hologram marks the exact installation point")\n\tcheck(game.shop.placement_label.text.contains("УСТАНОВИТЬ СЮДА") and game.shop.placement_label.text.contains("Аркадный автомат"),"Beacon names the destination")\n\tvar error: String=game.shop.action(1,{"action":"install_parcel","id":delivery_id})\n\tcheck(error.is_empty() and "arcade" in p.lounge_items,"Lounge item installs from carried box")\n\tgame.annex.refresh_shell()\n\tcheck(game.player.global_position.distance_to(player_before)<0.001,"Installing lounge furniture preserves player position")\n\n\tgame.evening._process(0.016)\n\tentry=game.evening.performers[id]; actor=entry.actor\n\tcheck(bool(entry.get("reroute_active",false)),"Worker chooses a fresh better activity without teleporting")\n\tcheck(actor.global_position.distance_to(old_actor_position)<0.03,"Replan starts exactly from the worker's current position")\n\tp.night_elapsed+=0.25; game.evening._process(0.016)\n\tvar moved: float=actor.global_position.distance_to(old_actor_position)\n\tcheck(moved>0.02 and moved<2.0,"Worker runs smoothly toward the new item")\n\tfor _i in range(80):\n\t\tp.night_elapsed+=0.10\n\t\tgame.evening._process(0.016)\n\tentry=game.evening.performers[id]\n\tcheck(not bool(entry.get("reroute_active",false)) and str(entry.get("spot_id",""))=="arcade_player","Worker reaches the new activity normally")\n\tgame._shutdown_tree(game); game.free()\n\tprint("PASS: placement beacon, stable player position and smooth lounge reroute" if failures==0 else "FAILURES: %d"%failures)\n\tquit(0 if failures==0 else 1)\n''')
+          PY
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Verify
+        run: |
+          set -euo pipefail
+          G=/tmp/godot/Godot_v4.7-stable_linux.x86_64
+          timeout 90s $G --headless --path . --editor --quit 2>&1 | tee /tmp/parse.log
+          ! grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:" /tmp/parse.log
+          timeout 90s $G --headless --path . --script tests/test_placement_lounge_flow.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_staff_lounge.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_shop_feeding.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+      - name: Publish clean implementation branch
+        run: |
+          set -euo pipefail
+          git config user.name "ChatGPT"
+          git config user.email "noreply@openai.com"
+          git checkout -B sol/placement-beacon-lounge-flow-final origin/main
+          git add scripts/cafe_shop.gd scripts/cafe_annex.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_placement_lounge_flow.gd
+          git commit -m "Clarify delivery placement and smooth lounge reactions"
+          git push --force origin HEAD:sol/placement-beacon-lounge-flow-final
