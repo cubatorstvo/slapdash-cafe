@@ -164,6 +164,51 @@ func build_tool(parent: Node3D, type: String) -> void:
 			P.box(parent,Vector3(0.18,0.22,0.12),Vector3(0,0.1,0),Color("d8bd76"))
 			P.ball(parent,0.055,Vector3(0,0.26,0),Color("739968"))
 
+func _attention_position(peer: int) -> Vector3:
+	if peer==game.session.local_id(): return game.player.global_position+Vector3(0,1.2,0)
+	var point: Vector3=game.laboratory.peer_position(peer)
+	return point+Vector3(0,1.2,0) if point!=Vector3.INF else Vector3.INF
+
+func _begging_target(pot_point: Vector3) -> Dictionary:
+	var best_point: Vector3=Vector3.INF
+	var best_distance: float=7.0
+	for peer in nursery.hands:
+		if nursery.tool(int(peer))!="fertilizer": continue
+		var point: Vector3=_attention_position(int(peer))
+		if point==Vector3.INF: continue
+		var distance: float=pot_point.distance_to(point)
+		if distance<best_distance:
+			best_distance=distance; best_point=point
+	if best_point!=Vector3.INF: return {"point":best_point,"distance":best_distance,"fertilizer":true}
+	var local_point: Vector3=game.player.global_position+Vector3(0,1.2,0)
+	best_distance=pot_point.distance_to(local_point)
+	best_point=local_point if best_distance<5.5 else Vector3.INF
+	for peer in game.session.members:
+		if int(peer)==game.session.local_id(): continue
+		var point: Vector3=_attention_position(int(peer))
+		if point==Vector3.INF: continue
+		var distance: float=pot_point.distance_to(point)
+		if distance<best_distance and distance<5.5:
+			best_distance=distance; best_point=point
+	return {} if best_point==Vector3.INF else {"point":best_point,"distance":best_distance,"fertilizer":false}
+
+func _apply_begging(actor: Node3D, mouth: Node3D, id: int) -> void:
+	var attention: Dictionary=_begging_target(Layout.pot_point(id))
+	if attention.is_empty():
+		mouth.scale.y=0.5
+		return
+	var point: Vector3=attention.point
+	var delta: Vector3=point-actor.global_position
+	var distance: float=float(attention.distance)
+	var reach: float=7.0 if bool(attention.fertilizer) else 5.5
+	var strength: float=clampf(1.0-(distance-0.8)/(reach-0.8),0.0,1.0)
+	actor.rotation.y=lerp_angle(actor.rotation.y,atan2(-delta.x,-delta.z),0.38)
+	var chirp: float=0.5+0.5*sin(clock*8.5+id*1.7)
+	mouth.scale.y=0.5+strength*(1.0+chirp*0.65)
+	actor.head.rotation.x=-0.18-strength*(0.08+0.05*sin(clock*10.0+id))
+	actor.head.rotation.z+=sin(clock*6.0+id*1.4)*0.12*strength
+	actor.position.y+=maxf(0.0,sin(clock*7.0+id))*0.035*strength
+
 func _process(delta: float) -> void:
 	if game==null: return
 	var paused: bool=game.session_paused and not game.session.online()
@@ -194,7 +239,8 @@ func _process(delta: float) -> void:
 			actor.position.y=lerpf(0.58,0.18,growth)
 		actor.head.rotation.z=sin(clock*2.0+id)*0.045
 		if is_instance_valid(actor.lounge_legs): actor.lounge_legs.rotation.x=sin(clock*3.8+id)*0.09 if value.phase=="ready" else 0.0
-		entry.mouth.scale.y=1.5+sin(clock*4)*0.2 if value.phase=="feed" else 0.5
+		if value.phase=="feed": _apply_begging(actor,entry.mouth,id)
+		else: entry.mouth.scale.y=0.5
 		if entry.pellet.visible:
 			var raw: Array=value.feed_from
 			var from:=Vector3(raw[0],raw[1],raw[2])-Layout.pot_point(id)

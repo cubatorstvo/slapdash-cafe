@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-biolab-22"
+const PROTOCOL := "slapdash-cafe-biolab-23"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -353,7 +353,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		return
 	if sleep_scene_active(): return
 	if sleeping_peers.has(sender) and action!="wake": return
-	if action in ["take_parcel","drop_parcel","install_parcel","garland_take","garland_remove","garland_anchor","garland_put"]:
+	if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor"]:
 		var error: String = game.shop.action(sender,value)
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
@@ -402,9 +402,11 @@ func execute_action(sender: int, value: Dictionary) -> void:
 	if game.service.is_showcase(station) and action == "cancel":
 		if sender == run.lead: game.service.finish_banquet(false, "Личный показ прерван.")
 		return
-	if action in ["manual","open","pass"] and (game.laboratory.hands_busy(sender) or game.laboratory.researching(sender) or game.laboratory.calibrator.manual_owner()==sender):
-		message_to(sender,"Сначала положи коробку или катушку.")
-		return
+	if action in ["manual","open","pass"]:
+		game.laboratory.nursery.discard_infinite_tool(sender)
+		if game.laboratory.hands_busy(sender) or game.laboratory.researching(sender) or game.laboratory.calibrator.manual_owner()==sender:
+			message_to(sender,"Сначала освободи руки или заверши текущее действие.")
+			return
 	if action == "manual":
 		if near_peer(sender, station, 5.0): game.service.request_manual(station, str(value.get("dish", "wine")), sender)
 		return

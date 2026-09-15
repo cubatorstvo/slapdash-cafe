@@ -22,7 +22,6 @@ func toggle() -> void:
 	var station: Node3D = game.local_station()
 	if station != null and station.training.phase == "recording":
 		recipe = station.training.dish
-		game.session.send_input(station, {}, {"drop": true})
 	else: recipe = "index"
 	opened = true
 	game.taught.book = true

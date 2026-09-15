@@ -115,7 +115,7 @@ func order(item: String, station_id: int) -> String:
 		if item in p.decorations: return "Уже установлено."
 	elif spec.kind == "garland":
 		station_id = 0
-		if p.garland_owned: return "Катушка уже куплена. Возьми её на верстаке."
+		if p.garland_owned: return "Гирлянда уже куплена."
 	if pending(item,station_id): return "Доставка уже заказана."
 	if p.cash < spec.price: return "Не хватает денег."
 	p.cash -= spec.price
@@ -137,8 +137,6 @@ func parcel_by_id(id: int) -> Dictionary:
 	return {}
 
 func lab_position(index: int) -> Vector3: return Annex.lab_world(Vector3(-0.85+index*0.85,1.05,8.6))
-func garland_reel_position() -> Vector3: return Annex.lab_world(Vector3(1.48,1.1,8.15))
-
 func installation_position(parcel: Dictionary) -> Vector3:
 	var spec: Dictionary = ITEMS[parcel.item]
 	if spec.kind == "lounge":
@@ -151,7 +149,7 @@ func installation_position(parcel: Dictionary) -> Vector3:
 		return station.to_global(places[parcel.item])
 	if spec.kind == "lab_upgrade": return game.laboratory.upgrade_position(parcel.item)
 	if spec.kind == "lab": return lab_position(int(str(parcel.item).get_slice("_",1)))
-	if spec.kind == "garland": return garland_reel_position()
+	if spec.kind == "garland": return Vector3.INF
 	return Vector3(-9.2,1.7,-7.1) if parcel.item == "sign" else Vector3(-7.5,0.7,8.8)
 
 func near_ray(camera: Camera3D, point: Vector3, radius: float) -> bool:
@@ -163,6 +161,7 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 	var id := carried(peer)
 	if id >= 0:
 		var parcel := parcel_by_id(id)
+		if not parcel.is_empty() and ITEMS[parcel.item].kind=="garland": return {"action":"unpack_garland","id":id,"hint":"(E) Достать гирлянду из коробки"}
 		var point := installation_position(parcel)
 		if near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}
 		return {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}
@@ -177,8 +176,7 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 	if p.garland_owned:
 		for index in range(p.garland_points.size()):
 			var raw: Array = p.garland_points[index]
-			if near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.16): return {"action":"garland_remove","index":index,"hint":"(E) Снять гирлянду и перевесить"}
-		if near_ray(camera,garland_reel_position(),0.3): return {"action":"garland_put" if p.garland_builder==peer else "garland_take","hint":"(E) Положить катушку" if p.garland_builder==peer else "(E) Взять гирлянду"}
+			if near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.24): return {"action":"garland_remove","index":index,"hint":"(E) Снять"}
 	if p.garland_builder == peer:
 		for z in [-7.35,10.35]:
 			var dir := -camera.global_basis.z
@@ -196,15 +194,12 @@ func action(peer: int, data: Dictionary) -> String:
 		var raw: Array = game.session.player_poses.get(peer,{}).get("position",[])
 		if raw.size()==3: position=Vector3(raw[0],raw[1],raw[2])
 	if game.service.training_for(peer) != null: return "Сначала заверши готовку."
-	if game.laboratory.nursery.holding(peer) or game.laboratory.nursery.pulling(peer) or game.laboratory.researching(peer) or game.laboratory.calibrator.manual_owner()==peer: return "Сначала положи инструмент лаборатории или заверши опыт."
+	game.laboratory.nursery.discard_infinite_tool(peer)
+	if game.laboratory.nursery.holding(peer) or game.laboratory.nursery.pulling(peer) or game.laboratory.researching(peer) or game.laboratory.calibrator.manual_owner()==peer: return "Сначала освободи руки или заверши текущее действие."
 	if action_name.begins_with("garland_"):
-		if not p.garland_owned: return "Сначала закажи и распакуй гирлянду."
-		if carried(peer)>=0: return "Освободи руки."
-		if p.garland_builder>0 and p.garland_builder!=peer and game.session.members.has(p.garland_builder): return "Катушка у напарника."
-		if action_name == "garland_put":
-			if p.garland_builder!=peer or position.distance_to(Vector3(1.48,1.1,8.15))>4.5: return "Подойди к верстаку."
-			p.garland_builder=0; p.revision+=1
-			return ""
+		if not p.garland_owned: return "Сначала закажи гирлянду."
+		if carried(peer)>=0: return "Сначала освободи руки."
+		if p.garland_builder>0 and p.garland_builder!=peer and game.session.members.has(p.garland_builder): return "Гирлянда у напарника."
 		if action_name == "garland_anchor":
 			var raw = data.get("point",[])
 			if not game.service.Station.TeamModel.numbers(raw,3): return "Выбери стену."
@@ -216,16 +211,15 @@ func action(peer: int, data: Dictionary) -> String:
 				if distance<0.65 or distance>4: return "Между креплениями нужно 0.65–4 м."
 			p.garland_points.append(raw.duplicate())
 			if p.garland_points.size()==4: p.garland_complete=true; p.garland_builder=0; p.popularity+=15; p.decorations.append("lights")
-		else:
-			var at := Vector3(1.48,1.1,8.15)
-			if action_name == "garland_remove":
-				var i := int(data.get("index",-1))
-				if i<0 or i>=p.garland_points.size(): return "Крепление не найдено."
-				var raw: Array = p.garland_points[i]; at=Vector3(raw[0],raw[1],raw[2])
+		elif action_name == "garland_remove":
+			var i := int(data.get("index",-1))
+			if i<0 or i>=p.garland_points.size(): return "Крепление не найдено."
+			var raw: Array = p.garland_points[i]
+			var at:=Vector3(raw[0],raw[1],raw[2])
 			if position.distance_to(at)>4.5: return "Подойди к гирлянде."
 			if p.garland_complete: p.popularity=maxi(0,p.popularity-15); p.decorations.erase("lights")
-			if action_name == "garland_remove" or p.garland_complete: p.garland_points.clear()
-			p.garland_complete=false; p.garland_builder=peer
+			p.garland_points.clear(); p.garland_complete=false; p.garland_builder=peer
+		else: return "Действие гирлянды не найдено."
 		p.revision+=1
 		log_event(action_name)
 		return ""
@@ -235,7 +229,14 @@ func action(peer: int, data: Dictionary) -> String:
 		if parcel.remaining>0 or parcel.owner!=0 or carried(peer)>=0 or p.garland_builder==peer: return "Освободи руки или дождись доставки."
 		var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
 		if position.distance_to(at)>4.5: return "Подойди к коробке."
+		if ITEMS[parcel.item].kind=="garland":
+			p.garland_owned=true; p.garland_builder=peer; p.deliveries.erase(parcel); p.revision+=1
+			log_event("garland_unpacked",{"item":parcel.item}); return ""
 		parcel.owner=peer
+	elif action_name == "unpack_garland":
+		if parcel.owner!=peer or ITEMS[parcel.item].kind!="garland": return "Гирлянда не в руках."
+		p.garland_owned=true; p.garland_builder=peer; p.deliveries.erase(parcel); p.revision+=1
+		log_event("garland_unpacked",{"item":parcel.item}); return ""
 	elif action_name == "drop_parcel":
 		if parcel.owner!=peer: return "Коробка не у тебя."
 		parcel.owner=0
@@ -312,7 +313,9 @@ func _process(delta: float) -> void:
 	local_ghost.hide()
 	var held := carried(game.session.local_id())
 	if held>=0:
-		local_ghost.show(); local_ghost.global_position=installation_position(parcel_by_id(held))
+		var held_parcel:=parcel_by_id(held)
+		if not held_parcel.is_empty() and ITEMS[held_parcel.item].kind!="garland":
+			local_ghost.show(); local_ghost.global_position=installation_position(held_parcel)
 	if p.garland_builder>0:
 		if not garland_reels.has(p.garland_builder):
 			var reel := Node3D.new(); add_child(reel)

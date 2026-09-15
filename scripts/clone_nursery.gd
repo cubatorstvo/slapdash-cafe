@@ -34,6 +34,11 @@ func pot(id: int) -> Dictionary:
 
 func tool(peer: int) -> String: return str(hands.get(peer,""))
 func holding(peer: int) -> bool: return not tool(peer).is_empty()
+func discard_infinite_tool(peer: int) -> bool:
+	var current: String=tool(peer)
+	if current not in TOOLS: return false
+	hands.erase(peer)
+	return true
 func pulling(peer: int) -> bool:
 	for pull in pulls.values():
 		if int(pull.owner)==peer: return true
