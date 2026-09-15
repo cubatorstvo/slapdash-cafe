@@ -1,13 +1,11 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
+const LabPolicy = preload("res://scripts/laboratory_progression.gd")
+const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
 var ITEMS := {
-	"lab_power": {"name":"Усилитель · темп 100–150%","price":180,"kind":"lab_upgrade","star":2},
-	"lab_power_2": {"name":"Турбоблок · темп 140–200%","price":320,"kind":"lab_upgrade","star":2},
-	"lab_valve": {"name":"Клапан · плавнее менять уровень","price":90,"kind":"lab_upgrade","star":1},
-	"lab_damper": {"name":"Демпфер · замедлить стрелку","price":120,"kind":"lab_upgrade","star":1},
 	"meat_kit": {"name":"Гриль, тарелка и приборы для мяса","price":120,"kind":"equipment","star":2},
 	"pasta_kit": {"name":"Плита, кастрюля и приборы для макарон","price":120,"kind":"equipment","star":2},
 	"sauce": {"name":"Миска соуса","price":24,"kind":"equipment"},
@@ -38,6 +36,7 @@ var saved_status := ""
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
 	ITEMS.merge(LoungeProgress.shop_items())
+	ITEMS.merge(LabPolicy.catalogue(),true)
 	local_ghost = Props.box(self,Vector3(0.55,0.2,0.45),Vector3.ZERO,Color("83ceab"))
 	local_ghost.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	local_ghost.material_override.albedo_color.a = 0.35
@@ -106,9 +105,8 @@ func order(item: String, station_id: int) -> String:
 		if station_id == 0 or game.service.by_id(station_id) != null: return "Свободных мест нет."
 	elif spec.kind == "lab_upgrade":
 		station_id=0
-		if p.lab_stage<3: return "Сначала собери лабораторию."
-		if item in p.lab_upgrades: return "Прибор уже установлен."
-		if item=="lab_power_2" and "lab_power" not in p.lab_upgrades: return "Сначала установи усилитель."
+		var error:=LabPolicy.error(p,item)
+		if not error.is_empty(): return error
 	elif spec.kind == "lab":
 		station_id = 0
 		if int(item.get_slice("_",1)) < p.lab_stage: return "Деталь уже установлена."
@@ -198,6 +196,7 @@ func action(peer: int, data: Dictionary) -> String:
 		var raw: Array = game.session.player_poses.get(peer,{}).get("position",[])
 		if raw.size()==3: position=Vector3(raw[0],raw[1],raw[2])
 	if game.service.training_for(peer) != null: return "Сначала заверши готовку."
+	if game.laboratory.nursery.holding(peer) or game.laboratory.nursery.pulling(peer) or game.laboratory.researching(peer) or game.laboratory.calibrator.manual_owner()==peer: return "Сначала положи инструмент лаборатории или заверши опыт."
 	if action_name.begins_with("garland_"):
 		if not p.garland_owned: return "Сначала закажи и распакуй гирлянду."
 		if carried(peer)>=0: return "Освободи руки."
@@ -240,7 +239,7 @@ func action(peer: int, data: Dictionary) -> String:
 	elif action_name == "drop_parcel":
 		if parcel.owner!=peer: return "Коробка не у тебя."
 		parcel.owner=0
-		var back: float=Layout.back_z(p.lounge_tier)-0.8 if position.x>Annex.DIVIDER_X else Annex.LAB_BACK_Z-0.8 if position.x>Annex.LAB_X_MIN else 9.7
+		var back: float=Layout.back_z(p.lounge_tier)-0.8 if position.x>Annex.DIVIDER_X else LabLayout.back(p.lab_tier)-0.8 if position.x>LabLayout.left(p.lab_tier) else 9.7
 		parcel.position=[clampf(position.x,-11.1,17.1),0.3,clampf(position.z,-6.8,back)]
 	elif action_name == "install_parcel":
 		if parcel.owner!=peer or position.distance_to(installation_position(parcel))>4.5: return "Поднеси коробку к отмеченному месту."
@@ -260,8 +259,10 @@ func action(peer: int, data: Dictionary) -> String:
 			station.apply_equipment(); station.apply_upgrades()
 		elif spec.kind == "station": game.service.add_station(parcel.item,parcel.station-1,false,true)
 		elif spec.kind == "lab_upgrade":
-			if game.laboratory.state.phase!="idle": return "Сначала заверши цикл лаборатории."
-			if parcel.item not in p.lab_upgrades: p.lab_upgrades.append(parcel.item)
+			if game.laboratory.blocks_sleep() or game.laboratory.calibrator.busy(): return "Сначала заверши работу с приборами."
+			var error:=LabPolicy.error(p,str(parcel.item))
+			if not error.is_empty(): return error
+			p.lab_upgrades.append(parcel.item)
 		elif spec.kind == "lab":
 			var index := int(str(parcel.item).get_slice("_",1))
 			if index!=p.lab_stage: return "Сначала установи предыдущую деталь лаборатории."

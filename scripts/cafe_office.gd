@@ -1,5 +1,6 @@
 extends CanvasLayer
 ## Shared cafe ledger, accessed from the physical cafe computer.
+const LabPolicy = preload("res://scripts/laboratory_progression.gd")
 const Lounge = preload("res://scripts/lounge_progression.gd")
 const P = preload("res://scripts/cafe_progression.gd")
 const Style = preload("res://scripts/cafe_theme.gd")
@@ -15,6 +16,10 @@ var tab := "overview"
 var stamp := ""
 var selections := {}
 var confirm_reset := false
+var lab_branch := "formula"
+var lab_target := 2
+var lab_reserve := 150
+var lab_live_status: Label
 
 func _ready() -> void:
 	layer = 17
@@ -40,7 +45,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
+	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -75,6 +80,8 @@ func button(parent: Node, text: String, callback: Callable, enabled := true) -> 
 func opened() -> bool: return panel.visible
 func open(page := "overview") -> void:
 	tab = page
+	lab_target=int(game.service.progress.lab_production.target)
+	lab_reserve=int(game.service.progress.lab_production.reserve)
 	game.menu.close()
 	game.cookbook.close()
 	game.session.suspend_input()
@@ -98,6 +105,13 @@ func _process(_delta: float) -> void:
 	var progress = game.service.progress
 	status.text = "Деньги: %d    Популярность: %d    Звёзды: %d / 5    Гости: %s" % [progress.cash, progress.popularity, progress.stars, "приходят" if game.service.open_for_business else "приём закрыт"]
 	timer.text = "%s · %d:%02d" % ["Личный показ" if progress.phase == "showcase" else "Банкет", ceili(progress.remaining) / 60, ceili(progress.remaining) % 60] if progress.phase in ["showcase", "service"] else ""
+	if tab=="laboratory" and is_instance_valid(lab_live_status):
+		var nursery=game.laboratory.nursery
+		var calibration=game.laboratory.calibrator
+		var occupied:=0
+		for pot in progress.lab_pots:
+			if pot.phase!="empty": occupied+=1
+		lab_live_status.text="Занято горшков: %d/%d · свободных клонов: %d\n%s"%[occupied,LabPolicy.pot_count(progress),progress.free_clones,"Кресло: "+str(calibration.state.get("notice","")) if calibration.busy() else "Кресло свободно"]
 	var next := "%s:%d:%d:%s:%s" % [tab, progress.revision, game.service.served, str(game.service.open_for_business), str(game.service.any_training())]
 	if stamp != next:
 		stamp = next
@@ -138,9 +152,11 @@ func rebuild() -> void:
 			shop_button("kitchen",0,service.by_id(4)!=null)
 			label(content,"ЛАБОРАТОРИЯ",20)
 			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
-			for item in ["lab_power","lab_power_2","lab_valve","lab_damper"]: shop_button(item,0,item in progress.lab_upgrades)
+			button(content,"Формулы, выращивание и рекалибровка →",func():tab="laboratory";stamp="";rebuild())
 			label(content,"ОБУСТРОЙСТВО",20)
 			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
+		"laboratory":
+			laboratory_page()
 		"lounge":
 			lounge_page()
 		"deliveries":
@@ -165,7 +181,7 @@ func shop_button(item: String, station_id: int, installed := false) -> void:
 	var spec: Dictionary = game.shop.ITEMS[item]
 	var waiting: bool = game.shop.pending(item,station_id)
 	var gate: int = int(spec.get("star",0))
-	var prerequisite: bool = spec.kind!="lab_upgrade" or (p.lab_stage>=3 and (item!="lab_power_2" or "lab_power" in p.lab_upgrades))
+	var prerequisite: bool = spec.kind!="lab_upgrade" or LabPolicy.error(p,item).is_empty()
 	var suffix := " · установлено" if installed else " · доставка заказана" if waiting else " · звезда %d"%gate if p.stars<gate else " · %d"%spec.price
 	if not prerequisite: suffix=" · сначала лаборатория / усилитель"
 	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id}),not game.session.is_guest() and not installed and not waiting and prerequisite and p.stars>=gate and p.cash>=spec.price and not p.busy())
@@ -214,3 +230,50 @@ func lounge_button(item: String, spec: Dictionary, installed: bool) -> void:
 	var waiting: bool=game.shop.pending(item,0)
 	var suffix: String=" · установлено" if installed else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
 	button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0}),not game.session.is_guest() and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
+
+func laboratory_page() -> void:
+	var p=game.service.progress
+	var host: bool=not game.session.is_guest()
+	label(content,"БИОЛАБОРАТОРИЯ · "+str(LabPolicy.STAGES[p.lab_tier].name),23)
+	label(content,"Рабочая формула: %d%% · версия %d · предел оборудования: %d%%"%[roundi(p.lab_formula_tempo*100),p.lab_formula_version,roundi(LabPolicy.formula_range(p).y*100)],20)
+	lab_live_status=label(content,"")
+	if p.lab_tier<2:
+		var next: Dictionary=LabPolicy.STAGES[p.lab_tier+1]
+		button(content,"Расширить: "+str(next.name)+" · %d · звезда %d"%[next.price,next.star],func():send({"action":"buy","kind":"lab_expansion"}),host and p.cash>=int(next.price) and p.stars>=int(next.star) and not p.busy() and game.session.sleeping_peers.is_empty())
+	var branches:=HBoxContainer.new(); content.add_child(branches)
+	for entry in [["formula","Формула"],["growing","Выращивание"],["calibration","Рекалибровка"]]:
+		var key: String=entry[0]
+		button(branches,str(entry[1]),func():lab_branch=key;rebuild())
+	match lab_branch:
+		"formula":
+			label(content,"Собери стол, создай раствор и отнеси образец в микроскоп. Лучшая формула сохраняется сразу. Эксперимент — 20; риск порчи действует при падении ниже зелёной зоны.",16)
+			for i in range(3): shop_button("lab_%d"%i,0,i<p.lab_stage)
+		"growing":
+			label(content,"Земля → капля (60) → вода → рост → удобрение в рот → рост → извлечение. Готовые этапы спокойно ждут. Темп фиксируется при добавлении капли.",16)
+			label(content,"Горшков: %d · скорость выращивания: %d%% · по %d с на каждый этап"%[LabPolicy.pot_count(p),roundi(LabPolicy.growth_speed(p)*100),ceili(75.0/LabPolicy.growth_speed(p))],18)
+		"calibration":
+			label(content,"Кресло открывается с первой звездой. Нажимай в ритм шести импульсов: хорошее прохождение даёт весь изученный предел, слабое сохраняет прежний темп. Попытка — 10.",16)
+			label(content,"Автоматика берёт отстающих по одному после завершения заказа, постепенно повышает темп и возвращает на прежнюю станцию. Приготовление на этой станции ждёт сотрудника.",16)
+	for id in LabPolicy.ITEMS:
+		if LabPolicy.ITEMS[id].branch!=lab_branch: continue
+		var spec: Dictionary=game.shop.ITEMS[id]
+		var error:=LabPolicy.error(p,id)
+		var waiting: bool=game.shop.pending(id,0)
+		var suffix: String=" · установлено" if id in p.lab_upgrades else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
+		var item: String=id
+		button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0}),host and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
+	if "lab_production" in p.lab_upgrades or "lab_cal_auto" in p.lab_upgrades:
+		label(content,"АВТОМАТИКА И ОБЩИЙ ДЕНЕЖНЫЙ РЕЗЕРВ",20)
+		var row:=HBoxContainer.new(); content.add_child(row)
+		label(row,"Свободных клонов:")
+		var target_spin:=SpinBox.new(); row.add_child(target_spin); target_spin.min_value=0; target_spin.max_value=20; target_spin.value=lab_target; target_spin.editable=host
+		target_spin.value_changed.connect(func(value):lab_target=int(value))
+		label(row,"Оставлять денег:")
+		var reserve_spin:=SpinBox.new(); row.add_child(reserve_spin); reserve_spin.min_value=0; reserve_spin.max_value=100000; reserve_spin.step=10; reserve_spin.value=lab_reserve; reserve_spin.editable=host
+		reserve_spin.value_changed.connect(func(value):lab_reserve=int(value))
+		button(content,"Сохранить запас и резерв",func():send({"action":"lab_production_config","enabled":p.lab_production.enabled,"target":lab_target,"reserve":lab_reserve}),host)
+		if "lab_production" in p.lab_upgrades:
+			button(content,"Выключить автовыпуск" if p.lab_production.enabled else "Включить автовыпуск",func():send({"action":"lab_production_config","enabled":not p.lab_production.enabled,"target":lab_target,"reserve":lab_reserve}),host)
+		if "lab_cal_auto" in p.lab_upgrades:
+			button(content,"Выключить авторекалибровку" if p.lab_auto_calibration else "Включить авторекалибровку",func():send({"action":"lab_cal_auto","enabled":not p.lab_auto_calibration}),host)
+		label(content,"Выпуск учитывает свободные места на станциях, запас и уже посаженных клонов. Резерв ограничивает расходы автовыпуска и автоматического кресла. Автокресло работает днём; растения продолжают расти вечером.",15)

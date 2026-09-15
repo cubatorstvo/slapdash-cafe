@@ -112,7 +112,7 @@ func _ready() -> void:
 	sync_mouse_mode()
 
 func input_blocked() -> bool:
-	return (is_instance_valid(session) and session.sleep_scene_active()) or (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
+	return (is_instance_valid(laboratory) and is_instance_valid(laboratory.ui) and laboratory.ui.opened()) or (is_instance_valid(session) and session.sleep_scene_active()) or (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)
 
 func awaiting_serving_confirmation() -> bool:
 	if not is_instance_valid(service) or not is_instance_valid(session): return false
@@ -149,6 +149,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode==KEY_SPACE:
 			session.request_action({"action":"skip_sleep"})
 		return
+	if is_instance_valid(laboratory) and laboratory.ui.handle_input(event): return
 	if is_instance_valid(session) and session.local_sleeping():
 		if event is InputEventKey and event.pressed and not event.echo and event.physical_keycode == KEY_E:
 			session.request_action({"action":"wake"})
@@ -183,9 +184,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			sync_mouse_mode()
 			return
 	if input_blocked(): return
-	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed and laboratory.state.phase not in ["idle","fill","done"] and int(laboratory.state.owner)==session.local_id():
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
 		var action: Dictionary=laboratory.target(camera,session.local_id())
-		if not action.is_empty(): session.request_action(action); return
+		if action.get("action","")=="lab_pull" or (action.get("action","")=="lab_press" and laboratory.researching(session.local_id()) and laboratory.state.phase!="fill"):
+			session.request_action(action)
+			return
 	var station := local_station()
 	var recording: bool = station != null and station.training.phase == "recording" and local_role >= 0
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -369,7 +372,7 @@ func _physics_process(delta: float) -> void:
 	feedback.update(delta)
 	if menu.opened() or cookbook.opened or office.opened(): hud.recipe_panel.hide()
 	hud.bottom.visible = false
-	hud.crosshair.visible = not cookbook.opened and not menu.opened() and not office.opened() and not session.local_sleeping()
+	hud.crosshair.visible = not laboratory.ui.opened() and not cookbook.opened and not menu.opened() and not office.opened() and not session.local_sleeping()
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
 func refresh_hud() -> void:
@@ -386,7 +389,12 @@ func refresh_hud() -> void:
 		hud.goal.text = "Сон · ожидание остальных игроков"
 		hud.prompt.text = session.sleep_status_text() + " · E встать"
 		return
-	if not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
+	if laboratory.nursery.pulling(session.local_id()):
+		hud.prompt.text="Удерживай E / ЛКМ и тяни назад · отпусти, чтобы перехватить"
+		return
+	if laboratory.nursery.holding(session.local_id()):
+		hud.prompt.text="В руках: "+str(laboratory.nursery.TOOLS.get(laboratory.nursery.tool(session.local_id()),"Образец жидкости"))+" · верни на полку или используй"
+	elif not taught.book and not cookbook.opened: hud.prompt.text = "B · Книга"
 	var station := local_station()
 	if station == null:
 		var night: Dictionary = interaction_target()
@@ -522,6 +530,7 @@ func new_cafe() -> void:
 	service.revenue = 0
 	service.open_for_business = false
 	service.initial_stations()
+	laboratory.recover()
 	service.spawn_clock = 3.0
 	bound_revision = -1
 	last_menu_revision = ""

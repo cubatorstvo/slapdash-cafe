@@ -25,6 +25,15 @@ var free_clones := 0
 var free_workers: Array = []
 var next_clone_id := 1
 var lab_upgrades: Array = []
+var lab_tier := 0
+var lab_formula_tempo := 0.70
+var lab_formula_version := 0
+var lab_sample := {}
+var lab_sample_serial := 0
+var lab_pots: Array = []
+var lab_production := {"enabled":false,"target":2,"reserve":150}
+var lab_calibration := preload("res://scripts/laboratory_progression.gd").blank_calibration()
+var lab_auto_calibration := false
 var starter_reward := false
 var deliveries: Array = []
 var next_delivery_id := 1
@@ -136,12 +145,14 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
 	for key in snapshot():
 		if data.has(key): set(key, data[key])
+	lab_tier=clampi(lab_tier,0,2)
+	lab_formula_tempo=clampf(lab_formula_tempo,0.70,10.0)
 	lounge_tier=clampi(lounge_tier,0,2)
 	rest_multiplier=clampf(rest_multiplier,1.0,1.30)
 	if busy() and not resume_event:
