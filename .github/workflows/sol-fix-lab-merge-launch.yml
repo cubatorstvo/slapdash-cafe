@@ -53,3 +53,23 @@ jobs:
           code=${code:-0}
           if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:\|Invalid call\|Invalid access" /tmp/godot-launch.log; then exit 1; fi
           if [ "$code" != "0" ] && [ "$code" != "124" ]; then exit "$code"; fi
+      - name: Focused tests
+        run: |
+          set -e
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_clone_laboratory.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_chef_orders.gd -- --fresh-cafe
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd -- --fresh-cafe
+      - name: Publish clean fix branch
+        run: |
+          git diff origin/main -- scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd > /tmp/launch-fix.patch
+          test -s /tmp/launch-fix.patch
+          git reset --hard origin/main
+          git apply /tmp/launch-fix.patch
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd
+          git commit -m "Fix Godot 4.7 launch after laboratory merge"
+          git branch -f sol/fix-lab-merge-launch-final HEAD
+          git push -f origin sol/fix-lab-merge-launch-final
