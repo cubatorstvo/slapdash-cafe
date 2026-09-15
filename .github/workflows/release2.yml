@@ -1,0 +1,76 @@
+name: Final placement and lounge verification
+on:
+  push:
+    branches: [work/placement-lounge-release2]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/placement-lounge-release2
+          fetch-depth: 0
+      - name: Materialize candidate
+        run: |
+          set -euo pipefail
+          git fetch origin work/placement-lounge-release:refs/remotes/origin/work/placement-lounge-release
+          git show origin/work/placement-lounge-release:.github/workflows/release.yml > /tmp/release.yml
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/release.yml').read_text().splitlines()
+          start=lines.index('      - name: Materialize candidate')+1
+          while lines[start] != '        run: |': start+=1
+          start+=1; end=start
+          while end<len(lines) and not lines[end].startswith('      - name: '): end+=1
+          script='\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start:end])+'\n'
+          # Avoid recursive checkout/fetch portion from the old materialization step: extract its generated source by running only after git checkout line is not practical.
+          Path('/tmp/source_step.sh').write_text(script)
+          PY
+          # Reuse the canonical implementation patch from the original reviewed workflow.
+          git fetch origin work/placement-beacon-lounge-flow:refs/remotes/origin/work/placement-beacon-lounge-flow
+          git show origin/work/placement-beacon-lounge-flow:.github/workflows/placement-beacon-lounge-flow.yml > /tmp/source.yml
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('/tmp/source.yml').read_text().splitlines(); marker='      - name: Apply implementation'; start=lines.index(marker)+1
+          while lines[start] != '        run: |': start+=1
+          start+=1; end=start
+          while end<len(lines) and not lines[end].startswith('      - name: '): end+=1
+          Path('/tmp/apply.sh').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start:end])+'\n')
+          PY
+          git checkout --detach origin/main
+          bash /tmp/apply.sh
+          # Replace the early focused test with the validated multi-worker version.
+          python - <<'PY'
+          from pathlib import Path
+          release=Path('/tmp/release.yml').read_text().splitlines()
+          # Pull the here-doc body used by the validated release workflow.
+          begin=next(i for i,l in enumerate(release) if l.strip()=="cat > tests/test_placement_lounge_flow.gd <<'GD'")+1
+          end=next(i for i in range(begin,len(release)) if release[i].strip()=='GD')
+          body='\n'.join(line[10:] if line.startswith('          ') else line for line in release[begin:end])+'\n'
+          Path('tests/test_placement_lounge_flow.gd').write_text(body)
+          PY
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Verify focused behavior and compatible regressions
+        run: |
+          set -euo pipefail
+          G=/tmp/godot/Godot_v4.7-stable_linux.x86_64
+          timeout 90s $G --headless --path . --editor --quit 2>&1 | tee /tmp/parse.log
+          ! grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:" /tmp/parse.log
+          timeout 90s $G --headless --path . --script tests/test_placement_lounge_flow.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cafe_annex.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+      - name: Publish clean implementation
+        run: |
+          set -euo pipefail
+          git config user.name "ChatGPT"
+          git config user.email "noreply@openai.com"
+          git checkout -B sol/placement-beacon-lounge-flow-final origin/main
+          git add scripts/cafe_shop.gd scripts/cafe_annex.gd scripts/lounge_layout.gd scripts/staff_evening.gd tests/test_placement_lounge_flow.gd
+          git commit -m "Clarify delivery placement and smooth lounge reactions"
+          git push --force origin HEAD:sol/placement-beacon-lounge-flow-final
