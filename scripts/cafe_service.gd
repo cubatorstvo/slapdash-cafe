@@ -297,6 +297,9 @@ func finish_customer(id: int, accepted: bool) -> void:
 
 func purchase(kind: String, id: String, station_id := 0) -> String:
 	if progress.busy(): return "Сначала заверши проверку."
+	if kind == "lab_expansion":
+		if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
+		return preload("res://scripts/laboratory_progression.gd").expand(progress)
 	if kind == "lounge_expansion":
 		if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
 		var error: String=preload("res://scripts/lounge_progression.gd").expand(progress)
@@ -430,7 +433,7 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 9, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
+	return {"format": "station-cafe", "version": 10, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
 
 func clear_world() -> void:
 	for station in stations:
@@ -449,7 +452,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -502,8 +505,13 @@ func load_data(data: Dictionary) -> bool:
 		progress.cash += 12
 		if items.is_empty(): progress.deliveries.erase(parcel)
 		else: parcel.item = items[0]; parcel.items = items
-	if game != null and is_instance_valid(game.laboratory): game.laboratory.reset()
 	normalize_workers()
+	if not data.get("progression",{}).has("lab_formula_tempo"):
+		var known:=0.70
+		for option in clone_options(): known=maxf(known,float(option.tempo))
+		progress.lab_formula_tempo=known
+		progress.lab_formula_version=1 if not clone_options().is_empty() else 0
+	if game != null and is_instance_valid(game.laboratory): game.laboratory.recover()
 	assign_clones()
 	spawn_clock = progress.arrival_interval()
 	chef_order_clock=float(data.get("chef_order_clock",progress.chef_order_delay(rng)))
@@ -722,7 +730,7 @@ func assign_clones() -> void:
 		while station.staffed<station.role_count():
 			var available := -1
 			for i in range(progress.free_workers.size()):
-				if game==null or not is_instance_valid(game.laboratory) or int(game.laboratory.state.get("clone_id",0))!=int(progress.free_workers[i].id): available=i; break
+				if game==null or not is_instance_valid(game.laboratory) or game.laboratory.reserved_clone_id()!=int(progress.free_workers[i].id): available=i; break
 			if available<0: break
 			var worker: Dictionary=progress.free_workers.pop_at(available)
 			station.crew[station.staffed].clone_id=worker.id

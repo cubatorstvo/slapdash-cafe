@@ -244,4 +244,3 @@ func _process(_delta: float) -> void:
 		if is_instance_valid(lounge_ball): lounge_ball.hide()
 	else:
 		_animate_floor_ball(game.service.progress.night_elapsed)
-

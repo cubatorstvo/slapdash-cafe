@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-wake-21"
+const PROTOCOL := "slapdash-cafe-biolab-22"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -104,6 +104,7 @@ func leave(message: String) -> void:
 		if is_instance_valid(game.cookbook): game.cookbook.close()
 		game.menu.close()
 		if is_instance_valid(game.office): game.office.close()
+		if is_instance_valid(game.laboratory): game.laboratory.recover()
 	if not message.is_empty(): _status(message)
 
 func _status(value: String) -> void:
@@ -124,6 +125,7 @@ func _peer_left(id: int) -> void:
 		player_avatars[id].queue_free()
 		player_avatars.erase(id)
 	if not guest:
+		game.laboratory.nursery.release_peer(id)
 		for parcel in game.service.progress.deliveries:
 			if parcel.owner == id: parcel.owner = 0
 		if game.service.progress.garland_builder == id: game.service.progress.garland_builder = 0
@@ -227,11 +229,12 @@ func _sleep_state(value: Dictionary, scene: Dictionary, revision: int) -> void:
 func _try_finish_sleep() -> bool:
 	if guest or sleep_scene_active() or game.service.progress.shift!="night": return false
 	if game.service.any_training(): return false
-	if str(game.laboratory.state.get("phase","idle")) not in ["idle","done"]: return false
+	if game.laboratory.blocks_sleep(): return false
 	var participants:=sleep_participants()
 	if participants.is_empty(): return false
 	for id in participants:
 		if not sleeping_peers.has(id): return false
+	game.laboratory.prepare_sleep()
 	sleep_scene={"active":true,"phase":"sleep","age":0.0,"serial":sleep_revision+1,"participants":participants,"skips":[],"night_start":game.service.progress.night_elapsed}
 	_broadcast_sleep_state()
 	return true
@@ -285,8 +288,8 @@ func _sleep_action(sender: int, value: Dictionary) -> String:
 		return ""
 	if game.service.progress.shift != "night": return "Спать можно после окончания смены."
 	if game.service.any_training(): return "Сначала заверши все показы."
-	if game.shop.carried(sender) >= 0 or game.service.progress.garland_builder == sender: return "Сначала освободи руки."
-	if str(game.laboratory.state.get("phase","idle")) not in ["idle","done"]: return "Сначала заверши цикл лаборатории."
+	if game.laboratory.hands_busy(sender): return "Сначала освободи руки."
+	if game.laboratory.blocks_sleep(): return "Сначала заверши опыт, ручную рекалибровку или извлечение клона."
 	var bed := int(value.get("bed",-1))
 	if bed < 0 or bed >= game.annex.PLAYER_BED_COUNT: return "Кровать не найдена."
 	var center: Vector3 = game.annex.player_bed_center(bed,game.service.progress.lounge_tier)
@@ -300,11 +303,11 @@ func _sleep_action(sender: int, value: Dictionary) -> String:
 
 func capture_player() -> Dictionary:
 	var p: Vector3 = game.player.global_position
-	return {"lab_hold": game.laboratory.local_holding(), "position": [p.x, p.y, p.z], "yaw": game.player.rotation.y, "pitch": game.camera.rotation.x, "presentation": {"book": game.cookbook.opened, "page": game.cookbook.recipe}}
+	return {"lab_pull":game.laboratory.local_pull_holding(), "lab_hold": game.laboratory.local_holding(), "position": [p.x, p.y, p.z], "yaw": game.player.rotation.y, "pitch": game.camera.rotation.x, "presentation": {"book": game.cookbook.opened, "page": game.cookbook.recipe}}
 
 func clean_pose(pose: Dictionary) -> Dictionary:
 	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
-	return {"lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], -20, 20), clampf(pose.position[1], 0, 4), clampf(pose.position[2], -20, 28)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
+	return {"lab_pull":pose.get("lab_pull",false)==true, "lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], -20, 20), clampf(pose.position[1], 0, 4), clampf(pose.position[2], -20, 28)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 3)
 func _presence(pose: Dictionary) -> void:
@@ -359,13 +362,10 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error: String = _sleep_action(sender,value)
 		if not error.is_empty(): message_to(sender,error)
 		return
-	if action in ["lab_select","lab_restart"]:
-		var error: String=game.laboratory.selection_action(sender,value)
+	if action.begins_with("lab_"):
+		var error: String=game.laboratory.action(sender,value)
 		if not error.is_empty(): message_to(sender,error)
-		return
-	if action == "lab_press":
-		var error: String = game.laboratory.press(sender, int(value.get("revision", -1)), float(value.get("observed_age",-1.0)))
-		if not error.is_empty(): message_to(sender,error)
+		elif action in ["lab_pot","lab_scan","lab_press","lab_restart","lab_production_config","lab_cal_auto","lab_cal_start"]: game.save_cafe()
 		return
 	if action in ["buy_bundle", "buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
@@ -402,7 +402,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 	if game.service.is_showcase(station) and action == "cancel":
 		if sender == run.lead: game.service.finish_banquet(false, "Личный показ прерван.")
 		return
-	if action in ["manual","open","pass"] and (game.shop.carried(sender)>=0 or game.service.progress.garland_builder==sender):
+	if action in ["manual","open","pass"] and (game.laboratory.hands_busy(sender) or game.laboratory.researching(sender) or game.laboratory.calibrator.manual_owner()==sender):
 		message_to(sender,"Сначала положи коробку или катушку.")
 		return
 	if action == "manual":
@@ -548,7 +548,7 @@ func advance(delta: float) -> void:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"laboratory": game.laboratory.state.duplicate(true), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
+	var data := {"laboratory": game.laboratory.snapshot(), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -597,7 +597,7 @@ func _world(packet: PackedByteArray) -> void:
 	for key in ["served", "revenue", "missed"]: game.service.set(key, data[key])
 	game.service.open_for_business = data.open
 	game.service.progress.restore(data.progression, true)
-	game.laboratory.state = data.laboratory.duplicate(true)
+	game.laboratory.restore(data.laboratory)
 	ids.clear()
 	for entry in data.customers:
 		ids.append(entry.id)
@@ -663,3 +663,12 @@ func _draw_players(delta: float) -> void:
 			avatar.book.set_live(station.model)
 		else:
 			avatar.book.set_live(null)
+
+func lab_result(peer: int, value: Dictionary) -> void:
+	if peer==local_id(): _lab_result(value)
+	elif connected and members.has(peer): _lab_result.rpc_id(peer,value)
+
+@rpc("authority","call_remote","reliable",0)
+func _lab_result(value: Dictionary) -> void:
+	if value.get("kind","")=="controls": game.office.open("laboratory")
+	else: game.laboratory.ui.open(value)

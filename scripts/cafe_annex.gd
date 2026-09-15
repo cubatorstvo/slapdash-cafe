@@ -2,6 +2,7 @@ extends Node3D
 ## Laboratory and expanded rest room live behind the cafe, opposite the cooking stations.
 const Props = preload("res://scripts/props.gd")
 const LoungeLayout = preload("res://scripts/lounge_layout.gd")
+const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeFurniture = preload("res://scripts/lounge_furniture.gd")
 
 const CAFE_X_MIN := -11.8
@@ -68,18 +69,21 @@ static func build_shell(owner_game: Node3D) -> void:
 	var tier: int=int(p.lounge_tier) if p!=null else 0
 	var rest_back:=LoungeLayout.back_z(tier)
 	var wall_color := Color("2e5355")
-	var lab_width := LAB_X_MAX-LAB_X_MIN
-	var lab_depth := LAB_BACK_Z-CAFE_BACK_Z
+	var lab_tier: int=int(p.lab_tier) if p!=null else 0
+	var lab_left:=LabLayout.left(lab_tier)
+	var lab_back:=LabLayout.back(lab_tier)
+	var lab_width:=LAB_X_MAX-lab_left
+	var lab_depth:=lab_back-CAFE_BACK_Z
 	var rest_width := REST_X_MAX-REST_X_MIN
 	var rest_depth := rest_back-CAFE_BACK_Z
-	Props.box(parent,Vector3(lab_width,0.09,lab_depth),Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+LAB_BACK_Z)*0.5),Color("60756f"))
+	Props.box(parent,Vector3(lab_width,0.09,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+lab_back)*0.5),Color("60756f"))
 	Props.box(parent,Vector3(rest_width,0.09,rest_depth),Vector3((REST_X_MIN+REST_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+rest_back)*0.5),Color("776f60"))
-	Props.collision_box(parent,Vector3(lab_width,0.2,lab_depth),Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+LAB_BACK_Z)*0.5))
+	Props.collision_box(parent,Vector3(lab_width,0.2,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+lab_back)*0.5))
 	Props.collision_box(parent,Vector3(rest_width,0.2,rest_depth),Vector3((REST_X_MIN+REST_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+rest_back)*0.5))
 	_build_cafe_back_wall(parent,wall_color)
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(LAB_X_MIN,WALL_Y,(CAFE_BACK_Z+LAB_BACK_Z)*0.5),wall_color)
-	Props.solid_box(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,WALL_Y,LAB_BACK_Z),wall_color)
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,rest_back-CAFE_BACK_Z),Vector3(DIVIDER_X,WALL_Y,(CAFE_BACK_Z+rest_back)*0.5),wall_color)
+	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5),wall_color)
+	Props.solid_box(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back),wall_color)
+	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,maxf(lab_back,rest_back)-CAFE_BACK_Z),Vector3(DIVIDER_X,WALL_Y,(CAFE_BACK_Z+maxf(lab_back,rest_back))*0.5),wall_color)
 	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,rest_depth),Vector3(REST_X_MAX,WALL_Y,(CAFE_BACK_Z+rest_back)*0.5),wall_color)
 	Props.solid_box(parent,Vector3(rest_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((REST_X_MIN+REST_X_MAX)*0.5,WALL_Y,rest_back),wall_color)
 	var lab_sign := Props.text(parent,"ЛАБОРАТОРИЯ",Vector3(LAB_DOOR_X,3.12,CAFE_BACK_Z-0.24),24,Color("edd09d"))
@@ -89,7 +93,7 @@ static func build_shell(owner_game: Node3D) -> void:
 	rest_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	rest_sign.pixel_size = 0.005
 	_build_rest_furniture(parent,owner_game,tier,p)
-	for spec in [[Vector3((LAB_X_MIN+LAB_X_MAX)*0.5,3.25,13.35),Color("b7e0cb")]]:
+	for spec in [[Vector3((lab_left+LAB_X_MAX)*0.5,3.25,13.35),Color("b7e0cb")]]:
 		var light := OmniLight3D.new()
 		parent.add_child(light)
 		light.position = Vector3(spec[0])
@@ -126,7 +130,7 @@ static func _build_rest_furniture(parent: Node3D, owner_game: Node3D, tier: int,
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
-	layout_stamp=LoungeProgress.stamp(game.service.progress)
+	layout_stamp=LoungeProgress.stamp(game.service.progress)+":"+LabLayout.stamp(game.service.progress)
 	_build_door("lab",LAB_DOOR_X,Color("87a99f"))
 	_build_door("rest",REST_DOOR_X,Color("8bb0a4"))
 
@@ -151,7 +155,7 @@ func _build_door(id: String, door_x: float, color: Color) -> void:
 
 func _physics_process(delta: float) -> void:
 	if game==null: return
-	if LoungeProgress.stamp(game.service.progress)!=layout_stamp and not refresh_pending:
+	if LoungeProgress.stamp(game.service.progress)+":"+LabLayout.stamp(game.service.progress)!=layout_stamp and not refresh_pending:
 		refresh_pending=true
 		refresh_shell.call_deferred()
 	advance_doors(delta)
@@ -160,7 +164,7 @@ func refresh_shell() -> void:
 	refresh_pending=false
 	if game==null: return
 	var p=game.service.progress
-	layout_stamp=LoungeProgress.stamp(p)
+	layout_stamp=LoungeProgress.stamp(p)+":"+LabLayout.stamp(p)
 	var shell:=game.get_node_or_null("CafeAnnexShell")
 	if shell!=null: shell.free()
 	build_shell(game)
@@ -169,6 +173,11 @@ func refresh_shell() -> void:
 	if point.x>REST_X_MIN and point.x<REST_X_MAX and point.z>CAFE_BACK_Z and not game.session.local_sleeping():
 		if not LoungeLayout.walkable(point,LoungeLayout.obstacles(p.lounge_tier,p.lounge_items),p.lounge_tier):
 			game.player.global_position=REST_DOOR_ROOM
+			game.player.velocity=Vector3.ZERO
+
+	if point.x<REST_X_MIN and point.z>CAFE_BACK_Z and not game.session.local_sleeping():
+		if not LabLayout.walkable(point,p):
+			game.player.global_position=LAB_DOOR_ROOM
 			game.player.velocity=Vector3.ZERO
 
 func advance_doors(delta: float) -> void:

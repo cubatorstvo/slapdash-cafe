@@ -274,7 +274,14 @@ func refresh(local_peer: int, delta: float) -> void:
 			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
 			if type_id=="counter":
 				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
-	if get_parent().game != null and is_instance_valid(get_parent().game.laboratory) and get_parent().game.laboratory.reserves_station(station_id): view.station_label.text="СТАНЦИЯ %d · ПЕРЕКАЛИБРОВКА"%station_id
+	if get_parent().game != null and is_instance_valid(get_parent().game.laboratory) and get_parent().game.laboratory.reserves_station(station_id): view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,"ПЕРЕКАЛИБРОВКА" if get_parent().game.laboratory.calibrator.reserves_station(station_id) else "СОТРУДНИК ИДЁТ К СТАНЦИИ"]
+	if get_parent().game!=null and is_instance_valid(get_parent().game.laboratory):
+		for role in range(role_count()):
+			if get_parent().game.laboratory.presenting_clone(int(crew[role].get("clone_id",0))):
+				students[role].hide()
+				if type_id=="kitchen": view.actors[role].hide()
+				else:
+					for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
 	if is_instance_valid(taster): direct_attention(taster)
 	if get_parent().progress.shift=="night" and not training.active() and not manual_station:
 		for student in students: student.hide()
