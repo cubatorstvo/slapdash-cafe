@@ -1,0 +1,81 @@
+name: Sol laboratory QoL finalize
+on:
+  push:
+    branches:
+      - sol/lab-qol-garland-book
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/lab-qol-garland-book
+          fetch-depth: 0
+      - name: Materialize source changes and focused test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('.github/workflows/sol-lab-qol.yml').read_text().splitlines()
+          def script(name):
+              start=lines.index(f'      - name: {name}')+1
+              while lines[start] != '        run: |': start+=1
+              start+=1; end=start
+              while end<len(lines) and not lines[end].startswith('      - name: '): end+=1
+              return '\n'.join(x[10:] if x.startswith('          ') else x for x in lines[start:end])+'\n'
+          Path('/tmp/apply.sh').write_text(script('Apply changes'))
+          Path('/tmp/test.sh').write_text(script('Add focused regression test'))
+          PY
+          bash /tmp/apply.sh
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/nursery_view.gd'); s=p.read_text()
+          fixes=[
+            ('\tvar best_point:=Vector3.INF\n','\tvar best_point: Vector3=Vector3.INF\n'),
+            ('\tvar best_distance:=7.0\n','\tvar best_distance: float=7.0\n'),
+            ('\t\tvar point:=_attention_position(int(peer))\n','\t\tvar point: Vector3=_attention_position(int(peer))\n'),
+            ('\t\tvar distance:=pot_point.distance_to(point)\n','\t\tvar distance: float=pot_point.distance_to(point)\n'),
+            ('\tvar local_point:=game.player.global_position+Vector3(0,1.2,0)\n','\tvar local_point: Vector3=game.player.global_position+Vector3(0,1.2,0)\n'),
+            ('\tvar attention:=_begging_target(Layout.pot_point(id))\n','\tvar attention: Dictionary=_begging_target(Layout.pot_point(id))\n'),
+            ('\tvar strength:=clampf(1.0-(distance-0.8)/(reach-0.8),0.0,1.0)\n','\tvar strength: float=clampf(1.0-(distance-0.8)/(reach-0.8),0.0,1.0)\n'),
+            ('\tvar chirp:=0.5+0.5*sin(clock*8.5+id*1.7)\n','\tvar chirp: float=0.5+0.5*sin(clock*8.5+id*1.7)\n')]
+          for old,new in fixes:
+              if old not in s: raise SystemExit('missing '+repr(old))
+              s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          bash /tmp/test.sh
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Verify project and requested behavior
+        run: |
+          set -e
+          G=/tmp/godot/Godot_v4.7-stable_linux.x86_64
+          set -o pipefail
+          timeout 90s $G --headless --path . --editor --quit 2>&1 | tee /tmp/parse.log
+          if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:" /tmp/parse.log; then exit 1; fi
+          timeout 12s $G --headless --path . 2>&1 | tee /tmp/launch.log || code=$?
+          code=${code:-0}
+          if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:\|Invalid call\|Invalid access" /tmp/launch.log; then exit 1; fi
+          if [ "$code" != "0" ] && [ "$code" != "124" ]; then exit "$code"; fi
+          timeout 90s $G --headless --path . --script tests/_tmp_lab_qol.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_clone_laboratory.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_input.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+      - name: Publish clean implementation branch
+        run: |
+          rm tests/_tmp_lab_qol.gd
+          git diff origin/main -- scripts/clone_nursery.gd scripts/nursery_view.gd scripts/cookbook.gd scripts/cafe_shop.gd scripts/coop_session.gd > /tmp/qol.patch
+          test -s /tmp/qol.patch
+          git reset --hard origin/main
+          git apply /tmp/qol.patch
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/clone_nursery.gd scripts/nursery_view.gd scripts/cookbook.gd scripts/cafe_shop.gd scripts/coop_session.gd
+          git commit -m "Polish laboratory tools, garland and cookbook flow"
+          git branch -f sol/lab-qol-garland-book-final HEAD
+          git push -f origin sol/lab-qol-garland-book-final
