@@ -1,0 +1,40 @@
+name: Placement lounge reroute diagnose
+on:
+  push:
+    branches:
+      - work/placement-beacon-lounge-flow
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/placement-beacon-lounge-flow
+      - name: Materialize and instrument
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          lines=Path('.github/workflows/placement-beacon-lounge-flow.yml').read_text().splitlines()
+          marker='      - name: Apply implementation'
+          start=lines.index(marker)+1
+          while lines[start] != '        run: |': start+=1
+          start+=1; end=start
+          while end<len(lines) and not lines[end].startswith('      - name: '): end+=1
+          Path('/tmp/apply.sh').write_text('\n'.join(line[10:] if line.startswith('          ') else line for line in lines[start:end])+'\n')
+          PY
+          git checkout --detach origin/main
+          bash /tmp/apply.sh
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/test_placement_lounge_flow.gd'); s=p.read_text()
+          s=s.replace('p.lounge_tier=1; p.lounge_items=["sofa"]; p.lounge_upgrades=[]; p.shift="night"; p.night_elapsed=90.0', 'p.stars=1; p.lab_stage=3; p.lounge_tier=1; p.lounge_items=["sofa"]; p.lounge_upgrades=[]; p.shift="night"; p.night_elapsed=90.0')
+          s=s.replace('for _i in range(80):', 'for _i in range(1000):')
+          s=s.replace('check(not bool(entry.get("reroute_active",false)) and str(entry.get("spot_id",""))=="arcade_player","Worker reaches the new activity normally")', 'print("DIAG final reroute=",entry.get("reroute_active",false)," spot=",entry.get("spot_id","")," actor=",entry.actor.global_position," route_size=",entry.get("reroute_route",[]).size()," night=",p.night_elapsed); check(not bool(entry.get("reroute_active",false)),"Worker reroute eventually completes")')
+          p.write_text(s)
+          PY
+      - name: Download Godot
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+      - name: Run focused diagnostic
+        run: timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_placement_lounge_flow.gd -- --fresh-cafe
