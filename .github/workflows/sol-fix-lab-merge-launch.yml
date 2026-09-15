@@ -35,6 +35,12 @@ jobs:
           replace('scripts/laboratory_instrument_ui.gd', '\t\tvar age:=shown_age/calibration.scale_time() if state.phase=="manual" else 0.0\n', '\t\tvar age: float=float(shown_age)/float(calibration.scale_time()) if state.phase=="manual" else 0.0\n')
           replace('scripts/nursery_view.gd', '\t\t\tvar growth:=1.0-float(value.remaining)/nursery.STAGE_SECONDS\n', '\t\t\tvar growth: float=1.0-float(value.remaining)/float(nursery.STAGE_SECONDS)\n')
           replace('scripts/nursery_view.gd', '\t\t\tvar start:=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)\n', '\t\t\tvar start: Vector3=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)\n')
+          p=Path('tests/test_cafe_life.gd')
+          s=p.read_text()
+          s=s.replace('check(p.cash==440,"Attempt charged once at start")','check(p.cash==480,"Attempt charged once at start")')
+          s=s.replace('check(lab.state.phase=="failed" and p.cash==440,"Dropping below green spoils prepaid attempt")','check(lab.state.phase=="failed" and p.cash==480,"Dropping below green spoils prepaid attempt")')
+          s=s.replace('check(p.cash==440 and p.free_clones==0,"Failure cannot emit or recharge a clone")','check(p.cash==480 and p.free_clones==0,"Failure cannot emit or recharge a clone")')
+          p.write_text(s)
           PY
       - name: Download Godot 4.7
         run: |
@@ -63,13 +69,13 @@ jobs:
           timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --script tests/test_input.gd -- --fresh-cafe
       - name: Publish clean fix branch
         run: |
-          git diff origin/main -- scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd > /tmp/launch-fix.patch
+          git diff origin/main -- scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd tests/test_cafe_life.gd > /tmp/launch-fix.patch
           test -s /tmp/launch-fix.patch
           git reset --hard origin/main
           git apply /tmp/launch-fix.patch
           git config user.name ChatGPT
           git config user.email noreply@openai.com
-          git add scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd
+          git add scripts/clone_laboratory.gd scripts/clone_nursery.gd scripts/laboratory_instrument_ui.gd scripts/nursery_view.gd tests/test_cafe_life.gd
           git commit -m "Fix Godot 4.7 launch after laboratory merge"
           git branch -f sol/fix-lab-merge-launch-final HEAD
           git push -f origin sol/fix-lab-merge-launch-final
