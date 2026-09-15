@@ -33,6 +33,8 @@ jobs:
           s=s.replace('\tvar error:=seed(value,reserve)\n','\tvar error: String=seed_pot(value,reserve)\n')
           p.write_text(s)
           replace('scripts/laboratory_instrument_ui.gd', '\t\tvar age:=shown_age/calibration.scale_time() if state.phase=="manual" else 0.0\n', '\t\tvar age: float=float(shown_age)/float(calibration.scale_time()) if state.phase=="manual" else 0.0\n')
+          replace('scripts/nursery_view.gd', '\t\t\tvar growth:=1.0-float(value.remaining)/nursery.STAGE_SECONDS\n', '\t\t\tvar growth: float=1.0-float(value.remaining)/float(nursery.STAGE_SECONDS)\n')
+          replace('scripts/nursery_view.gd', '\t\t\tvar start:=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)\n', '\t\t\tvar start: Vector3=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)\n')
           PY
       - name: Download Godot 4.7
         run: |
