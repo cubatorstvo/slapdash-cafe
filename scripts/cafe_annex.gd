@@ -168,13 +168,8 @@ func refresh_shell() -> void:
 	var shell:=game.get_node_or_null("CafeAnnexShell")
 	if shell!=null: shell.free()
 	build_shell(game)
-	# Move an awake player out of a newly installed footprint or a smaller restored room.
+	# Furniture appears around an awake player without moving them; they can simply walk out of the new footprint.
 	var point: Vector3=game.player.global_position
-	if point.x>REST_X_MIN and point.x<REST_X_MAX and point.z>CAFE_BACK_Z and not game.session.local_sleeping():
-		if not LoungeLayout.walkable(point,LoungeLayout.obstacles(p.lounge_tier,p.lounge_items),p.lounge_tier):
-			game.player.global_position=REST_DOOR_ROOM
-			game.player.velocity=Vector3.ZERO
-
 	if point.x<REST_X_MIN and point.z>CAFE_BACK_Z and not game.session.local_sleeping():
 		if not LabLayout.walkable(point,p):
 			game.player.global_position=LAB_DOOR_ROOM

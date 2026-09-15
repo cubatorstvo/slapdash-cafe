@@ -80,6 +80,16 @@ func route_for(info: Dictionary, target: Vector3) -> Array:
 		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
 	return route
 
+func reroute_from(current: Vector3, target: Vector3) -> Array:
+	var p=game.service.progress
+	if current.x>Annex.REST_X_MIN and current.x<Annex.REST_X_MAX and current.z>Annex.CAFE_BACK_Z:
+		return Lounge.path_between(current,target,p.lounge_tier,p.lounge_items)
+	var route: Array=[current,Vector3(current.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+	var inside_route:=Lounge.approach_path(target,p.lounge_tier,p.lounge_items)
+	for point in inside_route:
+		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
+	return route
+
 func _sample_route(route: Array, distance: float) -> Dictionary:
 	var point: Vector3=route[0]
 	var direction:=Vector3.BACK
@@ -151,6 +161,13 @@ func _process(_delta: float) -> void:
 		var actor: Node3D=entry.actor
 		var hat: Node3D=entry.hat
 		entry.sleepy.hide()
+		var new_spot_id: String=str(spot.id)
+		var previous_spot_id: String=str(entry.get("spot_id",""))
+		if not previous_spot_id.is_empty() and previous_spot_id!=new_spot_id and not wake_scene and not cinematic:
+			entry.reroute_route=reroute_from(actor.global_position,spot.approach)
+			entry.reroute_started=float(game.service.progress.night_elapsed)
+			entry.reroute_active=entry.reroute_route.size()>1
+		entry.spot_id=new_spot_id
 		var station=info.station
 		var training: bool=station!=null and station.training.active()
 		actor.visible=not training
@@ -197,6 +214,21 @@ func _process(_delta: float) -> void:
 		var home: Vector3=info.home
 		var route: Array=assignments[index].route
 		var speed: float=[3.6,4.6,2.9][variant]
+		if bool(entry.get("reroute_active",false)):
+			var reroute_clock: float=maxf(0.0,clock-float(entry.get("reroute_started",clock)))
+			var reroute_sample: Dictionary=_sample_route(entry.reroute_route,reroute_clock*(speed+1.25))
+			actor.position=reroute_sample.position
+			var reroute_direction: Vector3=reroute_sample.direction
+			actor.rotation.y=atan2(-reroute_direction.x,-reroute_direction.z)
+			entry.settled=false
+			entry.item=str(spot.item)
+			if not reroute_sample.done:
+				actor.morning_run(reroute_clock,id%5)
+				actor.hat.hide()
+				actor.caption.text=str(info.name)+" · бежит смотреть новинку!"
+				actor.caption.visible=game.camera.global_position.distance_squared_to(actor.global_position)<36.0
+				continue
+			entry.reroute_active=false
 		var sample: Dictionary=_sample_route(route,maxf(0,t-0.85)*speed)
 		var point: Vector3=sample.position
 		var direction: Vector3=sample.direction

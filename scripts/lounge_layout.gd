@@ -172,10 +172,11 @@ static func nearest_cell(point: Vector3, blockers: Array, tier := 2) -> Vector2i
 				distance=next_distance
 	return best
 
-static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:
+static func path_between(start_point: Vector3, target: Vector3, tier := 2, owned: Array = []) -> Array:
 	var blockers := obstacles(tier,owned)
-	var start := nearest_cell(ENTRANCE,blockers,tier)
+	var start := nearest_cell(start_point,blockers,tier)
 	var goal := nearest_cell(target,blockers,tier)
+	if start.x<0 or goal.x<0: return []
 	var frontier: Array[Vector2i] = [start]
 	var previous := {start:start}
 	var cursor := 0
@@ -197,8 +198,9 @@ static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Arra
 	reverse_path.append(grid_point(start))
 	reverse_path.reverse()
 	# Keep corners; avoid a turn at every grid sample.
-	var result: Array = [ENTRANCE]
+	var result: Array = [start_point]
 	for i in range(reverse_path.size()):
+		if Vector3(result.back()).distance_to(reverse_path[i])<0.01: continue
 		if i==0 or i==reverse_path.size()-1:
 			result.append(reverse_path[i])
 		else:
@@ -206,6 +208,9 @@ static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Arra
 			var after: Vector3=reverse_path[i+1]-reverse_path[i]
 			if before.normalized().dot(after.normalized())<0.999: result.append(reverse_path[i])
 	return result
+
+static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:
+	return path_between(ENTRANCE,target,tier,owned)
 
 static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionary:
 	var blockers:=obstacles(tier,owned)

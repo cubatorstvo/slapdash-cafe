@@ -26,6 +26,9 @@ var ITEMS := {
 var game: Node3D
 var boxes := {}
 var local_ghost: MeshInstance3D
+var placement_beacon: MeshInstance3D
+var placement_label: Label3D
+var placement_clock := 0.0
 var garland_reels := {}
 var guide_nodes: Array = []
 var computer: Node3D
@@ -37,10 +40,25 @@ func setup(owner_game: Node3D) -> void:
 	game = owner_game
 	ITEMS.merge(LoungeProgress.shop_items())
 	ITEMS.merge(LabPolicy.catalogue(),true)
-	local_ghost = Props.box(self,Vector3(0.55,0.2,0.45),Vector3.ZERO,Color("83ceab"))
+	local_ghost = Props.box(self,Vector3(1.15,0.08,1.15),Vector3.ZERO,Color("72efb3"))
 	local_ghost.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	local_ghost.material_override.albedo_color.a = 0.35
+	local_ghost.material_override.albedo_color.a = 0.42
+	local_ghost.material_override.emission_enabled = true
+	local_ghost.material_override.emission = Color("72efb3")
+	local_ghost.material_override.emission_energy_multiplier = 1.6
 	local_ghost.hide()
+	placement_beacon = Props.cylinder(self,0.075,5.2,Vector3.ZERO,Color("72efb3"))
+	placement_beacon.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	placement_beacon.material_override.albedo_color.a = 0.24
+	placement_beacon.material_override.emission_enabled = true
+	placement_beacon.material_override.emission = Color("72efb3")
+	placement_beacon.material_override.emission_energy_multiplier = 2.0
+	placement_beacon.hide()
+	placement_label = Props.text(self,"▼  УСТАНОВИТЬ СЮДА",Vector3.ZERO,30,Color("e8ffd1"))
+	placement_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	placement_label.pixel_size = 0.0045
+	placement_label.outline_size = 10
+	placement_label.hide()
 	# A visible computer replaces the abstract cafe board.
 	computer = Node3D.new()
 	add_child(computer)
@@ -164,7 +182,7 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		if not parcel.is_empty() and ITEMS[parcel.item].kind=="garland": return {"action":"unpack_garland","id":id,"hint":"(E) Достать гирлянду из коробки"}
 		var point := installation_position(parcel)
 		if near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}
-		return {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}
+		return {"action":"drop_parcel","id":id,"hint":"Неси коробку к яркому маяку · "+parcel_name(parcel)+" · (E) поставить здесь"}
 	if is_instance_valid(game.laboratory):
 		var lab_target: Dictionary = game.laboratory.target(camera, peer)
 		if not lab_target.is_empty(): return lab_target
@@ -310,12 +328,23 @@ func _process(delta: float) -> void:
 			if pose.has("position"): node.global_position=Vector3(pose.position[0],pose.position[1]+1.15,pose.position[2])+Vector3(0,0,-0.7).rotated(Vector3.UP,float(pose.get("yaw",0)))
 	for id in boxes.keys():
 		if id not in ids: boxes[id].queue_free(); boxes.erase(id)
+	placement_clock += delta
 	local_ghost.hide()
+	placement_beacon.hide()
+	placement_label.hide()
 	var held := carried(game.session.local_id())
 	if held>=0:
 		var held_parcel:=parcel_by_id(held)
 		if not held_parcel.is_empty() and ITEMS[held_parcel.item].kind!="garland":
-			local_ghost.show(); local_ghost.global_position=installation_position(held_parcel)
+			var install_target: Vector3=installation_position(held_parcel)
+			if install_target.is_finite():
+				var pulse: float=0.5+0.5*sin(placement_clock*5.2)
+				local_ghost.show(); local_ghost.global_position=install_target
+				local_ghost.scale=Vector3.ONE*(0.92+0.13*pulse)
+				placement_beacon.show(); placement_beacon.global_position=install_target+Vector3.UP*2.6
+				placement_beacon.material_override.albedo_color.a=0.16+0.16*pulse
+				placement_label.show(); placement_label.global_position=install_target+Vector3.UP*(5.35+0.13*pulse)
+				placement_label.text="▼  УСТАНОВИТЬ СЮДА\n%s\n%d м"%[parcel_name(held_parcel),roundi(game.player.global_position.distance_to(install_target))]
 	if p.garland_builder>0:
 		if not garland_reels.has(p.garland_builder):
 			var reel := Node3D.new(); add_child(reel)
