@@ -1,0 +1,167 @@
+name: Sol laboratory QoL
+on:
+  push:
+    branches:
+      - sol/lab-qol-garland-book
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: sol/lab-qol-garland-book
+          fetch-depth: 0
+      - name: Apply changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p=Path(path)
+              s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'target not found in {path}: {old[:120]!r}')
+              p.write_text(s.replace(old,new,count))
+
+          replace('scripts/clone_nursery.gd',
+              'func holding(peer: int) -> bool: return not tool(peer).is_empty()\nfunc pulling(peer: int) -> bool:\n',
+              'func holding(peer: int) -> bool: return not tool(peer).is_empty()\nfunc discard_infinite_tool(peer: int) -> bool:\n\tvar current: String=tool(peer)\n\tif current not in TOOLS: return false\n\thands.erase(peer)\n\treturn true\nfunc pulling(peer: int) -> bool:\n')
+
+          marker='func _process(delta: float) -> void:\n'
+          helper='''func _attention_position(peer: int) -> Vector3:\n\tif peer==game.session.local_id(): return game.player.global_position+Vector3(0,1.2,0)\n\tvar point: Vector3=game.laboratory.peer_position(peer)\n\treturn point+Vector3(0,1.2,0) if point!=Vector3.INF else Vector3.INF\n\nfunc _begging_target(pot_point: Vector3) -> Dictionary:\n\tvar best_point:=Vector3.INF\n\tvar best_distance:=7.0\n\tfor peer in nursery.hands:\n\t\tif nursery.tool(int(peer))!="fertilizer": continue\n\t\tvar point:=_attention_position(int(peer))\n\t\tif point==Vector3.INF: continue\n\t\tvar distance:=pot_point.distance_to(point)\n\t\tif distance<best_distance:\n\t\t\tbest_distance=distance; best_point=point\n\tif best_point!=Vector3.INF: return {"point":best_point,"distance":best_distance,"fertilizer":true}\n\tvar local_point:=game.player.global_position+Vector3(0,1.2,0)\n\tbest_distance=pot_point.distance_to(local_point)\n\tbest_point=local_point if best_distance<5.5 else Vector3.INF\n\tfor peer in game.session.members:\n\t\tif int(peer)==game.session.local_id(): continue\n\t\tvar point:=_attention_position(int(peer))\n\t\tif point==Vector3.INF: continue\n\t\tvar distance:=pot_point.distance_to(point)\n\t\tif distance<best_distance and distance<5.5:\n\t\t\tbest_distance=distance; best_point=point\n\treturn {} if best_point==Vector3.INF else {"point":best_point,"distance":best_distance,"fertilizer":false}\n\nfunc _apply_begging(actor: Node3D, mouth: Node3D, id: int) -> void:\n\tvar attention:=_begging_target(Layout.pot_point(id))\n\tif attention.is_empty():\n\t\tmouth.scale.y=0.5\n\t\treturn\n\tvar point: Vector3=attention.point\n\tvar delta: Vector3=point-actor.global_position\n\tvar distance: float=float(attention.distance)\n\tvar reach: float=7.0 if bool(attention.fertilizer) else 5.5\n\tvar strength:=clampf(1.0-(distance-0.8)/(reach-0.8),0.0,1.0)\n\tactor.rotation.y=lerp_angle(actor.rotation.y,atan2(-delta.x,-delta.z),0.38)\n\tvar chirp:=0.5+0.5*sin(clock*8.5+id*1.7)\n\tmouth.scale.y=0.5+strength*(1.0+chirp*0.65)\n\tactor.head.rotation.x=-0.18-strength*(0.08+0.05*sin(clock*10.0+id))\n\tactor.head.rotation.z+=sin(clock*6.0+id*1.4)*0.12*strength\n\tactor.position.y+=maxf(0.0,sin(clock*7.0+id))*0.035*strength\n\n'''
+          replace('scripts/nursery_view.gd', marker, helper+marker)
+          replace('scripts/nursery_view.gd',
+              '\t\tentry.mouth.scale.y=1.5+sin(clock*4)*0.2 if value.phase=="feed" else 0.5\n',
+              '\t\tif value.phase=="feed": _apply_begging(actor,entry.mouth,id)\n\t\telse: entry.mouth.scale.y=0.5\n')
+
+          replace('scripts/cookbook.gd',
+              '\tif station != null and station.training.phase == "recording":\n\t\trecipe = station.training.dish\n\t\tgame.session.send_input(station, {}, {"drop": true})\n\telse: recipe = "index"\n',
+              '\tif station != null and station.training.phase == "recording":\n\t\trecipe = station.training.dish\n\telse: recipe = "index"\n')
+
+          replace('scripts/cafe_shop.gd',
+              '\telif spec.kind == "garland":\n\t\tstation_id = 0\n\t\tif p.garland_owned: return "Катушка уже куплена. Возьми её на верстаке."\n',
+              '\telif spec.kind == "garland":\n\t\tstation_id = 0\n\t\tif p.garland_owned: return "Гирлянда уже куплена."\n')
+          replace('scripts/cafe_shop.gd','func garland_reel_position() -> Vector3: return Annex.lab_world(Vector3(1.48,1.1,8.15))\n\n','')
+          replace('scripts/cafe_shop.gd','\tif spec.kind == "garland": return garland_reel_position()\n','\tif spec.kind == "garland": return Vector3.INF\n')
+          replace('scripts/cafe_shop.gd',
+              '\tif id >= 0:\n\t\tvar parcel := parcel_by_id(id)\n\t\tvar point := installation_position(parcel)\n\t\tif near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}\n\t\treturn {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}\n',
+              '\tif id >= 0:\n\t\tvar parcel := parcel_by_id(id)\n\t\tif not parcel.is_empty() and ITEMS[parcel.item].kind=="garland": return {"action":"unpack_garland","id":id,"hint":"(E) Достать гирлянду из коробки"}\n\t\tvar point := installation_position(parcel)\n\t\tif near_ray(camera,point,0.85): return {"action":"install_parcel","id":id,"hint":"(E) Установить: "+parcel_name(parcel)}\n\t\treturn {"action":"drop_parcel","id":id,"hint":"В руках: "+parcel_name(parcel)+" · (E) Поставить коробку"}\n')
+          replace('scripts/cafe_shop.gd',
+              '\tif p.garland_owned:\n\t\tfor index in range(p.garland_points.size()):\n\t\t\tvar raw: Array = p.garland_points[index]\n\t\t\tif near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.16): return {"action":"garland_remove","index":index,"hint":"(E) Снять гирлянду и перевесить"}\n\t\tif near_ray(camera,garland_reel_position(),0.3): return {"action":"garland_put" if p.garland_builder==peer else "garland_take","hint":"(E) Положить катушку" if p.garland_builder==peer else "(E) Взять гирлянду"}\n',
+              '\tif p.garland_owned:\n\t\tfor index in range(p.garland_points.size()):\n\t\t\tvar raw: Array = p.garland_points[index]\n\t\t\tif near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.24): return {"action":"garland_remove","index":index,"hint":"(E) Снять"}\n')
+          old='''\tif game.service.training_for(peer) != null: return "Сначала заверши готовку."\n\tif game.laboratory.nursery.holding(peer) or game.laboratory.nursery.pulling(peer) or game.laboratory.researching(peer) or game.laboratory.calibrator.manual_owner()==peer: return "Сначала положи инструмент лаборатории или заверши опыт."\n\tif action_name.begins_with("garland_"):\n\t\tif not p.garland_owned: return "Сначала закажи и распакуй гирлянду."\n\t\tif carried(peer)>=0: return "Освободи руки."\n\t\tif p.garland_builder>0 and p.garland_builder!=peer and game.session.members.has(p.garland_builder): return "Катушка у напарника."\n\t\tif action_name == "garland_put":\n\t\t\tif p.garland_builder!=peer or position.distance_to(Vector3(1.48,1.1,8.15))>4.5: return "Подойди к верстаку."\n\t\t\tp.garland_builder=0; p.revision+=1\n\t\t\treturn ""\n\t\tif action_name == "garland_anchor":\n\t\t\tvar raw = data.get("point",[])\n\t\t\tif not game.service.Station.TeamModel.numbers(raw,3): return "Выбери стену."\n\t\t\tvar point := Vector3(raw[0],raw[1],raw[2])\n\t\t\tif p.garland_builder!=peer or not game.service.valid_wall_point(point) or position.distance_to(point)>4.5: return "Подойди к креплению."\n\t\t\tif not p.garland_points.is_empty():\n\t\t\t\tvar last: Array = p.garland_points.back()\n\t\t\t\tvar distance := point.distance_to(Vector3(last[0],last[1],last[2]))\n\t\t\t\tif distance<0.65 or distance>4: return "Между креплениями нужно 0.65–4 м."\n\t\t\tp.garland_points.append(raw.duplicate())\n\t\t\tif p.garland_points.size()==4: p.garland_complete=true; p.garland_builder=0; p.popularity+=15; p.decorations.append("lights")\n\t\telse:\n\t\t\tvar at := Vector3(1.48,1.1,8.15)\n\t\t\tif action_name == "garland_remove":\n\t\t\t\tvar i := int(data.get("index",-1))\n\t\t\t\tif i<0 or i>=p.garland_points.size(): return "Крепление не найдено."\n\t\t\t\tvar raw: Array = p.garland_points[i]; at=Vector3(raw[0],raw[1],raw[2])\n\t\t\tif position.distance_to(at)>4.5: return "Подойди к гирлянде."\n\t\t\tif p.garland_complete: p.popularity=maxi(0,p.popularity-15); p.decorations.erase("lights")\n\t\t\tif action_name == "garland_remove" or p.garland_complete: p.garland_points.clear()\n\t\t\tp.garland_complete=false; p.garland_builder=peer\n\t\tp.revision+=1\n\t\tlog_event(action_name)\n\t\treturn ""\n'''
+          new='''\tif game.service.training_for(peer) != null: return "Сначала заверши готовку."\n\tgame.laboratory.nursery.discard_infinite_tool(peer)\n\tif game.laboratory.nursery.holding(peer) or game.laboratory.nursery.pulling(peer) or game.laboratory.researching(peer) or game.laboratory.calibrator.manual_owner()==peer: return "Сначала освободи руки или заверши текущее действие."\n\tif action_name.begins_with("garland_"):\n\t\tif not p.garland_owned: return "Сначала закажи гирлянду."\n\t\tif carried(peer)>=0: return "Сначала освободи руки."\n\t\tif p.garland_builder>0 and p.garland_builder!=peer and game.session.members.has(p.garland_builder): return "Гирлянда у напарника."\n\t\tif action_name == "garland_anchor":\n\t\t\tvar raw = data.get("point",[])\n\t\t\tif not game.service.Station.TeamModel.numbers(raw,3): return "Выбери стену."\n\t\t\tvar point := Vector3(raw[0],raw[1],raw[2])\n\t\t\tif p.garland_builder!=peer or not game.service.valid_wall_point(point) or position.distance_to(point)>4.5: return "Подойди к креплению."\n\t\t\tif not p.garland_points.is_empty():\n\t\t\t\tvar last: Array = p.garland_points.back()\n\t\t\t\tvar distance := point.distance_to(Vector3(last[0],last[1],last[2]))\n\t\t\t\tif distance<0.65 or distance>4: return "Между креплениями нужно 0.65–4 м."\n\t\t\tp.garland_points.append(raw.duplicate())\n\t\t\tif p.garland_points.size()==4: p.garland_complete=true; p.garland_builder=0; p.popularity+=15; p.decorations.append("lights")\n\t\telif action_name == "garland_remove":\n\t\t\tvar i := int(data.get("index",-1))\n\t\t\tif i<0 or i>=p.garland_points.size(): return "Крепление не найдено."\n\t\t\tvar raw: Array = p.garland_points[i]\n\t\t\tvar at:=Vector3(raw[0],raw[1],raw[2])\n\t\t\tif position.distance_to(at)>4.5: return "Подойди к гирлянде."\n\t\t\tif p.garland_complete: p.popularity=maxi(0,p.popularity-15); p.decorations.erase("lights")\n\t\t\tp.garland_points.clear(); p.garland_complete=false; p.garland_builder=peer\n\t\telse: return "Действие гирлянды не найдено."\n\t\tp.revision+=1\n\t\tlog_event(action_name)\n\t\treturn ""\n'''
+          replace('scripts/cafe_shop.gd',old,new)
+
+          replace('scripts/cafe_shop.gd',
+              '\tif action_name == "take_parcel":\n\t\tif parcel.remaining>0 or parcel.owner!=0 or carried(peer)>=0 or p.garland_builder==peer: return "Освободи руки или дождись доставки."\n\t\tvar at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])\n\t\tif position.distance_to(at)>4.5: return "Подойди к коробке."\n\t\tparcel.owner=peer\n\telif action_name == "drop_parcel":\n',
+              '\tif action_name == "take_parcel":\n\t\tif parcel.remaining>0 or parcel.owner!=0 or carried(peer)>=0 or p.garland_builder==peer: return "Освободи руки или дождись доставки."\n\t\tvar at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])\n\t\tif position.distance_to(at)>4.5: return "Подойди к коробке."\n\t\tif ITEMS[parcel.item].kind=="garland":\n\t\t\tp.garland_owned=true; p.garland_builder=peer; p.deliveries.erase(parcel); p.revision+=1\n\t\t\tlog_event("garland_unpacked",{"item":parcel.item}); return ""\n\t\tparcel.owner=peer\n\telif action_name == "unpack_garland":\n\t\tif parcel.owner!=peer or ITEMS[parcel.item].kind!="garland": return "Гирлянда не в руках."\n\t\tp.garland_owned=true; p.garland_builder=peer; p.deliveries.erase(parcel); p.revision+=1\n\t\tlog_event("garland_unpacked",{"item":parcel.item}); return ""\n\telif action_name == "drop_parcel":\n')
+          replace('scripts/cafe_shop.gd',
+              '\tvar held := carried(game.session.local_id())\n\tif held>=0:\n\t\tlocal_ghost.show(); local_ghost.global_position=installation_position(parcel_by_id(held))\n',
+              '\tvar held := carried(game.session.local_id())\n\tif held>=0:\n\t\tvar held_parcel:=parcel_by_id(held)\n\t\tif not held_parcel.is_empty() and ITEMS[held_parcel.item].kind!="garland":\n\t\t\tlocal_ghost.show(); local_ghost.global_position=installation_position(held_parcel)\n')
+
+          replace('scripts/coop_session.gd','const PROTOCOL := "slapdash-cafe-biolab-22"','const PROTOCOL := "slapdash-cafe-biolab-23"')
+          replace('scripts/coop_session.gd',
+              'if action in ["take_parcel","drop_parcel","install_parcel","garland_take","garland_remove","garland_anchor","garland_put"]:',
+              'if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor"]:')
+          replace('scripts/coop_session.gd',
+              '\tif action in ["manual","open","pass"] and (game.laboratory.hands_busy(sender) or game.laboratory.researching(sender) or game.laboratory.calibrator.manual_owner()==sender):\n\t\tmessage_to(sender,"Сначала положи коробку или катушку.")\n\t\treturn\n',
+              '\tif action in ["manual","open","pass"]:\n\t\tgame.laboratory.nursery.discard_infinite_tool(sender)\n\t\tif game.laboratory.hands_busy(sender) or game.laboratory.researching(sender) or game.laboratory.calibrator.manual_owner()==sender:\n\t\t\tmessage_to(sender,"Сначала освободи руки или заверши текущее действие.")\n\t\t\treturn\n')
+          PY
+      - name: Add focused regression test
+        run: |
+          cat > tests/_tmp_lab_qol.gd <<'GD'
+          extends SceneTree
+          var failed:=false
+          func _initialize() -> void: run.call_deferred()
+          func check(ok: bool, message: String) -> void:
+              if not ok: failed=true; printerr("FAIL: ",message)
+          func run() -> void:
+              var game=preload("res://scenes/cafe.tscn").instantiate()
+              root.add_child(game)
+              await process_frame
+              game.set_physics_process(false)
+              game.service.clear_world(); game.service.initial_stations(true)
+              var p=game.service.progress
+              p.stars=2; p.lab_stage=3; p.cash=1000
+              game.laboratory.nursery.ensure_pots()
+              var nursery=game.laboratory.nursery
+              nursery.hands[1]="fertilizer"
+              var station=game.service.by_id(1)
+              game.player.global_position=station.global_position+Vector3(0,0,1.5)
+              game.session.execute_action(1,{"action":"manual","station":1,"dish":"wine"})
+              check(not nursery.holding(1),"Starting cooking silently returns an infinite lab tool")
+              station.training.close(); station.state="idle"
+              nursery.hands[1]="sample"
+              game.session.execute_action(1,{"action":"manual","station":1,"dish":"wine"})
+              check(nursery.tool(1)=="sample" and not station.training.active(),"Finite liquid sample is not silently discarded")
+              nursery.hands.erase(1)
+              p.garland_owned=false; p.garland_builder=0; p.garland_points=[]; p.garland_complete=false
+              var id:int=p.next_delivery_id; p.next_delivery_id+=1
+              p.deliveries.append({"id":id,"item":"lights","station":0,"remaining":0.0,"owner":0,"position":[game.player.global_position.x,0.3,game.player.global_position.z]})
+              var error:String=game.shop.action(1,{"action":"take_parcel","id":id})
+              check(error.is_empty() and p.garland_owned and p.garland_builder==1 and game.shop.parcel_by_id(id).is_empty(),"Delivered garland goes directly from box to hand")
+              p.garland_points=[[game.player.global_position.x,1.5,game.player.global_position.z]]; p.garland_complete=true; p.garland_builder=0; p.decorations.append("lights"); p.popularity=20
+              error=game.shop.action(1,{"action":"garland_remove","index":0})
+              check(error.is_empty() and p.garland_builder==1 and p.garland_points.is_empty() and not p.garland_complete,"Hung garland can be removed back into the hand")
+              p.garland_builder=0
+              var pot:Dictionary=p.lab_pots[0]; pot.phase="feed"; pot.remaining=0.0
+              game.player.global_position=preload("res://scripts/laboratory_layout.gd").pot_point(0)+Vector3(2.0,0,1.0)
+              nursery.view._process(0.1)
+              var entry:Dictionary=nursery.view.pot_views[0]
+              check(float(entry.mouth.scale.y)>0.55,"Hungry clone opens its mouth when player approaches")
+              nursery.hands[1]="fertilizer"; nursery.view._process(0.1)
+              check(float(entry.mouth.scale.y)>0.55,"Hungry clone reacts to nearby fertilizer")
+              nursery.hands.erase(1)
+              game.player.global_position=Vector3(-15,0,-15); nursery.view._process(0.1)
+              check(absf(float(entry.mouth.scale.y)-0.5)<0.001,"Hungry clone closes its mouth when nobody is nearby")
+              station.training.close(); station.state="idle"
+              game.service.request_training(station,"potato",1); station.training.start_pass([1]); game.bind_training(); game.menu.close()
+              station.model.pick_up("pan")
+              check(station.model.held=="pan","Pan is held before cookbook regression")
+              game.cookbook.toggle(); station.training.advance(1.0/60.0)
+              check(station.model.held=="pan","Opening cookbook does not drop current cooking item")
+              game.cookbook.close(); game.hush_audio()
+              for _i in range(4): await process_frame
+              game.free()
+              print("PASS: lab QoL, garland handoff, chick begging and cookbook continuity" if not failed else "FAILED")
+              quit(1 if failed else 0)
+          GD
+      - name: Download Godot 4.7
+        run: |
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7-stable_linux.x86_64
+      - name: Parse and launch
+        run: |
+          set -euo pipefail
+          timeout 90s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . --editor --quit 2>&1 | tee /tmp/parse.log
+          ! grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:" /tmp/parse.log
+          timeout 12s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . 2>&1 | tee /tmp/launch.log || code=$?
+          code=${code:-0}
+          ! grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:\|Invalid call\|Invalid access" /tmp/launch.log
+          if [ "$code" != "0" ] && [ "$code" != "124" ]; then exit "$code"; fi
+      - name: Tests
+        run: |
+          set -e
+          G=/tmp/godot/Godot_v4.7-stable_linux.x86_64
+          timeout 90s $G --headless --path . --script tests/_tmp_lab_qol.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_clone_laboratory.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cookbook.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_input.gd -- --fresh-cafe
+          timeout 90s $G --headless --path . --script tests/test_cafe_life.gd -- --fresh-cafe
+      - name: Publish clean branch
+        run: |
+          rm tests/_tmp_lab_qol.gd
+          git diff origin/main -- scripts/clone_nursery.gd scripts/nursery_view.gd scripts/cookbook.gd scripts/cafe_shop.gd scripts/coop_session.gd > /tmp/qol.patch
+          test -s /tmp/qol.patch
+          git reset --hard origin/main
+          git apply /tmp/qol.patch
+          git config user.name ChatGPT
+          git config user.email noreply@openai.com
+          git add scripts/clone_nursery.gd scripts/nursery_view.gd scripts/cookbook.gd scripts/cafe_shop.gd scripts/coop_session.gd
+          git commit -m "Polish laboratory tools, garland and cookbook flow"
+          git branch -f sol/lab-qol-garland-book-final HEAD
+          git push -f origin sol/lab-qol-garland-book-final
