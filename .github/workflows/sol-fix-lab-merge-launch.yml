@@ -17,13 +17,22 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          p=Path('scripts/clone_laboratory.gd')
+
+          def replace(path, old, new):
+              p=Path(path)
+              s=p.read_text()
+              if old not in s:
+                  raise SystemExit(f'target not found in {path}: {old!r}')
+              p.write_text(s.replace(old,new,1))
+
+          replace('scripts/clone_laboratory.gd', '\tvar before:=p.lab_formula_tempo\n', '\tvar before: float=float(p.lab_formula_tempo)\n')
+          p=Path('scripts/clone_nursery.gd')
           s=p.read_text()
-          old='\tvar before:=p.lab_formula_tempo\n'
-          new='\tvar before: float=float(p.lab_formula_tempo)\n'
-          if old not in s:
-              raise SystemExit('target line not found')
-          p.write_text(s.replace(old,new,1))
+          s=s.replace('\t\t\tvar error:=seed(value)\n','\t\t\tvar error: String=seed_pot(value)\n')
+          s=s.replace('func seed(value: Dictionary, reserve := 0) -> String:\n','func seed_pot(value: Dictionary, reserve := 0) -> String:\n')
+          s=s.replace('\tvar error:=seed(value,reserve)\n','\tvar error: String=seed_pot(value,reserve)\n')
+          p.write_text(s)
+          replace('scripts/laboratory_instrument_ui.gd', '\t\tvar age:=shown_age/calibration.scale_time() if state.phase=="manual" else 0.0\n', '\t\tvar age: float=float(shown_age)/float(calibration.scale_time()) if state.phase=="manual" else 0.0\n')
           PY
       - name: Download Godot 4.7
         run: |
