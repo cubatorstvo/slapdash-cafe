@@ -105,7 +105,7 @@ func action(peer: int, data: Dictionary) -> String:
 			value.phase="soil"
 		"soil":
 			if tool(peer)!="liquid": return "Возьми пипетку с формулой."
-			var error:=seed(value)
+			var error: String=seed_pot(value)
 			if not error.is_empty(): return error
 		"seeded":
 			if tool(peer)!="water": return "Возьми лейку."
@@ -124,7 +124,7 @@ func add_effect(type: String, id: int, from: Vector3, peer := 0, delay := 0.0) -
 	effect_serial+=1
 	effects.append({"id":effect_serial,"kind":type,"pot":id,"from":from,"age":-delay,"duration":0.65,"peer":peer})
 
-func seed(value: Dictionary, reserve := 0) -> String:
+func seed_pot(value: Dictionary, reserve := 0) -> String:
 	var p=game.service.progress
 	if p.lab_formula_version<=0: return "Сначала исследуй каплю в микроскопе."
 	if p.cash-Policy.CLONE_PRICE<reserve: return "Не хватает денег с учётом резерва."
@@ -137,7 +137,7 @@ func seed(value: Dictionary, reserve := 0) -> String:
 
 func plant(value: Dictionary, reserve := 0) -> String:
 	if value.phase!="empty": return "Горшок занят."
-	var error:=seed(value,reserve)
+	var error: String=seed_pot(value,reserve)
 	if not error.is_empty(): return error
 	value.phase="growing_sprout"; value.remaining=STAGE_SECONDS
 	var point:=Layout.pot_point(int(value.id))

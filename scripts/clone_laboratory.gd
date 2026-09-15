@@ -245,7 +245,7 @@ func sample_action(peer: int, data: Dictionary) -> String:
 		game.session.lab_result(peer,{"kind":"microscope","tempo":p.lab_formula_tempo,"best":p.lab_formula_tempo,"version":p.lab_formula_version,"improved":false})
 		return ""
 	if p.lab_sample.is_empty() or int(p.lab_sample.carrier)!=peer or int(p.lab_sample.serial)!=int(data.get("sample",-1)): return ""
-	var before:=p.lab_formula_tempo
+	var before: float=float(p.lab_formula_tempo)
 	var attempt:=float(p.lab_sample.tempo)
 	var improved: bool=p.lab_formula_version<=0 or attempt>before
 	if improved:

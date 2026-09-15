@@ -189,7 +189,7 @@ func _process(delta: float) -> void:
 			actor.position.y=0.58
 			actor.head.rotation.x=-0.18
 		elif value.phase=="growing_clone":
-			var growth:=1.0-float(value.remaining)/nursery.STAGE_SECONDS
+			var growth: float=1.0-float(value.remaining)/float(nursery.STAGE_SECONDS)
 			actor.scale=Vector3.ONE*lerpf(0.38,1.0,growth)
 			actor.position.y=lerpf(0.58,0.18,growth)
 		actor.head.rotation.z=sin(clock*2.0+id)*0.045
@@ -257,7 +257,7 @@ func draw_tools() -> void:
 		var growing: Node3D=pot_views[int(id)].actor
 		var point: Vector3=growing.head.global_position if pull.grip=="head" else growing.to_global(Vector3(0.29 if pull.grip=="shoulder" else 0,1.20,0))
 		for i in range(2):
-			var start:=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)
+			var start: Vector3=game.laboratory.peer_position(peer)+Vector3(-0.3 if i==0 else 0.3,1.2,0)
 			if peer==game.session.local_id(): start=game.camera.global_position+game.camera.global_basis*Vector3(-0.27 if i==0 else 0.27,-0.30,-0.15)
 			P.align_line(arm_views[peer][i],start,point+Vector3(-0.07 if i==0 else 0.07,0,0))
 

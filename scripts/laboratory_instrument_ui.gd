@@ -116,7 +116,7 @@ func draw_instrument() -> void:
 		for i in range(3):
 			surface.draw_line(Vector2(size.x*0.15,y+(i-1)*70),Vector2(size.x*0.86,y+(i-1)*70),Color("31594d"),3)
 		surface.draw_line(Vector2(x,y-125),Vector2(x,y+125),Color("f0e4bd"),4)
-		var age:=shown_age/calibration.scale_time() if state.phase=="manual" else 0.0
+		var age: float=float(shown_age)/float(calibration.scale_time()) if state.phase=="manual" else 0.0
 		for i in range(calibration.BEATS.size()):
 			var delta: float=float(calibration.BEATS[i])-age
 			var at:=Vector2(x+delta*size.x*0.19,y+(i%3-1)*70)

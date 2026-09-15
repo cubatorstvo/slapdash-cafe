@@ -50,15 +50,15 @@ func run() -> void:
 	var lab=game.laboratory
 	game.player.global_position=lab.operator_position()
 	lab.reset(); lab.state.selected=0; lab.press(1,lab.state.revision)
-	check(p.cash==440,"Attempt charged once at start")
+	check(p.cash==480,"Attempt charged once at start")
 	lab.advance_balance(0.1,true)
 	check(lab.state.phase=="fill" and not lab.state.armed,"Initial empty flask is safe")
 	lab.advance_balance(0.2,true)
 	check(lab.state.armed,"Crossing lower green boundary arms failure")
 	lab.advance_balance(0.3,false)
-	check(lab.state.phase=="failed" and p.cash==440,"Dropping below green spoils prepaid attempt")
+	check(lab.state.phase=="failed" and p.cash==480,"Dropping below green spoils prepaid attempt")
 	lab.press(1,lab.state.revision)
-	check(p.cash==440 and p.free_clones==0,"Failure cannot emit or recharge a clone")
+	check(p.cash==480 and p.free_clones==0,"Failure cannot emit or recharge a clone")
 	lab.advance(3); lab.press(1,lab.state.revision)
 	lab.state.level=0.65; lab.state.armed=true
 	lab.advance_balance(0.01,true)
