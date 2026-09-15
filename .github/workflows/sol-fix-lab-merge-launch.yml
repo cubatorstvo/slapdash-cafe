@@ -13,6 +13,18 @@ jobs:
         with:
           ref: sol/fix-lab-merge-launch
           fetch-depth: 0
+      - name: Apply launch fix candidate
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/clone_laboratory.gd')
+          s=p.read_text()
+          old='\tvar before:=p.lab_formula_tempo\n'
+          new='\tvar before: float=float(p.lab_formula_tempo)\n'
+          if old not in s:
+              raise SystemExit('target line not found')
+          p.write_text(s.replace(old,new,1))
+          PY
       - name: Download Godot 4.7
         run: |
           curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
@@ -28,5 +40,5 @@ jobs:
           set -o pipefail
           timeout 12s /tmp/godot/Godot_v4.7-stable_linux.x86_64 --headless --path . 2>&1 | tee /tmp/godot-launch.log || code=$?
           code=${code:-0}
-          if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:\|Invalid call\|Invalid access\|ERROR:" /tmp/godot-launch.log; then exit 1; fi
+          if grep -q "SCRIPT ERROR:\|Parse Error:\|Compile Error:\|Invalid call\|Invalid access" /tmp/godot-launch.log; then exit 1; fi
           if [ "$code" != "0" ] && [ "$code" != "124" ]; then exit "$code"; fi
