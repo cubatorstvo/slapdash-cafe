@@ -51,7 +51,7 @@ func update_view(model,_time:=0.0,_resting:=false) -> void:
 	bun_top.material_override.albedo_color=Color("e0ae62").lerp(Color("95643a"),model.bun_toast)
 	griddle.material_override.albedo_color=Color("714b42") if model.griddle_conflict else Color("2f3437")
 	for role in range(2):
-		var item:String=model.hands[role]; var target:=Vector3.ZERO if item.is_empty() else items[item].position+Vector3(0,0.12,0); actors[role].perform(model.poses[role],target,not item.is_empty())
+		var item:String=model.hands[role]; var target: Vector3 = Vector3.ZERO if item.is_empty() else items[item].position+Vector3(0,0.12,0); actors[role].perform(model.poses[role],target,not item.is_empty())
 		var appearance:Dictionary=model.poses[role].get("presentation",{}) if model.poses[role].get("presentation",{}) is Dictionary else {}; actors[role].book.set_live(model if appearance.get("book",false) and str(appearance.get("page",""))==model.dish else null)
 	status.text="ОБЩАЯ ПЛИТА: %s\nКОТЛЕТА %d%% / %d%% · приправа %s\nБУЛКА %d%% · соус %s%s"%["КОНФЛИКТ — ОБА ЖДУТ" if model.griddle_conflict else "одна поверхность",roundi(model.patty_sides[0]*100),roundi(model.patty_sides[1]*100),"✓" if model.patty_season>=1 else "—",roundi(model.bun_toast*100),"✓" if model.sauce_amount>=1 else "—",(" · сыр "+("✓" if model.cheese_applied else "—")) if model.dish=="cheeseburger" else (" · острый "+("✓" if model.chili_amount>=1 else "—")) if model.dish=="spicy_burger" else ""]
 
