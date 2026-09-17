@@ -180,13 +180,22 @@ func rebuild() -> void:
 				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
 				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
 		"star":
-			label(content,"ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · банкет",23)
+			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ТРИ ЗВЕЗДЫ ПОЛУЧЕНЫ"
+			label(content,star_title,23)
 			if not progress.result.is_empty(): label(content,progress.result)
-			if progress.stars>=2: label(content,"Две звезды получены. Доступны расширение и парная кухня.")
+			if progress.stars>=3:
+				label(content,"Этап масштабирования завершён. Следующая крупная глава добавит специализированную кухню с взаимозависимыми ролями.")
 			else:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
-				label(content,"Один дегустатор, три стандартных блюда B или лучше. Ошибку можно повторить бесплатно. Перед проверкой установи сковороду, соус, бокал и кувшин." if progress.stars==0 else "Девять гостей за четыре минуты: трое требуют личного заказа шефа. Нужно 8 подач и 6 оценок B или выше.")
-				button(content,"Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию",func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
+				if progress.stars==0:
+					label(content,"Один дегустатор, три стандартных блюда B или лучше. Ошибку можно повторить бесплатно. Перед проверкой установи сковороду, соус, бокал и кувшин.")
+				elif progress.stars==1:
+					label(content,"Девять гостей за четыре минуты: трое требуют личного заказа шефа. Нужно 8 подач и 6 оценок B или выше.")
+				else:
+					label(content,"Большой обед: 14 гостей за четыре минуты. Три заказа готовит шеф, остальной поток идёт к трём производственным станциям. Нужно 11 подач и 8 оценок B или выше.")
+					label(content,"Мощность можно получить разными путями: короткими записями, более быстрыми клонами, хорошим отдыхом или просто стабильной работой всех трёх линий.",15)
+				var invite_text := "Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию" if progress.stars==1 else "Начать Большой обед"
+				button(content,invite_text,func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
 	scroll.scroll_vertical = offset
 
