@@ -156,7 +156,7 @@ func rebuild() -> void:
 			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
 			for station in service.stations:
 				label(content,"ТВОЯ СТОЙКА" if station.manual_station else "СТАНЦИЯ %d" % station.station_id,20)
-				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id == "counter" else ["meat_kit","pasta_kit"]
+				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id=="counter" else ["grill_kit","assembly_kit"] if station.type_id=="grill_kitchen" else ["meat_kit","pasta_kit"]
 				if progress.stars<1:
 					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
 				else: bundle_controls(station,catalog)
@@ -164,6 +164,9 @@ func rebuild() -> void:
 			shop_button("counter",0,service.by_id(2)!=null and service.by_id(3)!=null)
 			button(content,"Расширение зала · 180",func():send({"action":"buy","kind":"expansion"}),host and progress.stars>=2 and not progress.expanded and progress.cash>=180)
 			shop_button("kitchen",0,service.by_id(4)!=null)
+			label(content,"СПЕЦИАЛИЗАЦИЯ",20)
+			button(content,"Открыть специализированный сектор · %d"%progress.SPECIALTY_EXPANSION_PRICE,func():send({"action":"buy","kind":"specialty_expansion"}),host and progress.stars>=3 and not progress.specialized_expanded and progress.cash>=progress.SPECIALTY_EXPANSION_PRICE)
+			shop_button("grill_kitchen",0,service.by_id(5)!=null)
 			label(content,"ЛАБОРАТОРИЯ",20)
 			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
 			button(content,"Формулы, выращивание и рекалибровка →",func():tab="laboratory";stamp="";rebuild())
@@ -180,21 +183,24 @@ func rebuild() -> void:
 				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
 				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
 		"star":
-			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ТРИ ЗВЕЗДЫ ПОЛУЧЕНЫ"
+			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ЧЕТЫРЕ ЗВЕЗДЫ ПОЛУЧЕНЫ"
 			label(content,star_title,23)
 			if not progress.result.is_empty(): label(content,progress.result)
-			if progress.stars>=3:
-				label(content,"Этап масштабирования завершён. Следующая крупная глава добавит специализированную кухню с взаимозависимыми ролями.")
+			if progress.stars>=4:
+				label(content,"Этап специализации завершён. Следующая крупная глава добавит кухню на три роли.")
 			else:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
 				if progress.stars==0:
 					label(content,"Один дегустатор, три стандартных блюда B или лучше. Ошибку можно повторить бесплатно. Перед проверкой установи сковороду, соус, бокал и кувшин.")
 				elif progress.stars==1:
 					label(content,"Девять гостей за четыре минуты: трое требуют личного заказа шефа. Нужно 8 подач и 6 оценок B или выше.")
-				else:
+				elif progress.stars==2:
 					label(content,"Большой обед: 14 гостей за четыре минуты. Три заказа готовит шеф, остальной поток идёт к трём производственным станциям. Нужно 11 подач и 8 оценок B или выше.")
 					label(content,"Мощность можно получить разными путями: короткими записями, более быстрыми клонами, хорошим отдыхом или просто стабильной работой всех трёх линий.",15)
-				var invite_text := "Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию" if progress.stars==1 else "Начать Большой обед"
+				else:
+					label(content,"Три волны: 18 гостей за пять минут. Смешанный поток → бургерный пик → общий финал. Три заказа остаются шефу; нужно 15 подач и 11 оценок B или выше.")
+					label(content,"Главное новое узкое место — одна жарочная поверхность на котлету и булку. Хорошая запись распределяет её между двумя ролями без конфликтов.",15)
+				var invite_text := "Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию" if progress.stars==1 else "Начать Большой обед" if progress.stars==2 else "Начать испытание «Три волны»"
 				button(content,invite_text,func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
 	scroll.scroll_vertical = offset
