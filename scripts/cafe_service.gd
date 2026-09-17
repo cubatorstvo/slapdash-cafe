@@ -296,6 +296,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 			elif customer.get("automatic_serving",false):
 				progress.journey_auto_served+=1
 				if customer.dish=="meal": progress.journey_meals_served+=1
+				if progress.stars==2: progress.third_star_auto_served+=1
 				if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
 			revenue += payment
 			progress.cash += payment
@@ -349,7 +350,7 @@ func start_banquet(peer: int) -> String:
 	progress.banquet_served = 0
 	progress.banquet_good = 0
 	progress.showcase_grade = ""
-	progress.orders = ["wine", "potato", "sausage", "sausage", "wine", "potato", "potato", "sausage", "wine"]
+	progress.orders = progress.inspection_orders()
 	progress.revision += 1
 	return ""
 
@@ -380,44 +381,56 @@ func advance_event(delta: float) -> void:
 			start_tasting_dish()
 			return
 		progress.phase = "service"
-		progress.remaining = Progression.BANQUET_SECONDS
+		progress.remaining = progress.inspection_seconds()
 		banquet_clock = 1
 		progress.revision += 1
-		announce("Делегация идёт! Трое гостей хотят личный заказ шефа.")
+		announce("Большой обед начинается! Три заказа остаются за шефом, остальной поток должен выдержать автоматизированный зал." if progress.stars==2 else "Делегация идёт! Трое гостей хотят личный заказ шефа.")
 	elif progress.phase in ["showcase", "service"]:
 		progress.remaining = maxf(0.0, progress.remaining - delta)
 		if progress.phase == "service":
 			banquet_clock -= delta
 			if banquet_clock <= 0 and progress.banquet_spawned < progress.orders.size():
-				# Delegation waits outside until a trained station is free. Service has a shared deadline.
+				# Guests wait outside for a compatible trained station; the shared deadline keeps throughput meaningful.
 				var dish: String = progress.orders[progress.banquet_spawned]
-				var chef_guest: bool = progress.banquet_spawned in [0,3,6]
+				var chef_guest: bool = progress.banquet_spawned in progress.inspection_chef_indices()
 				var available: bool = chef_queue().size()<3 if chef_guest else false
 				if not chef_guest:
 					for station in stations:
 						if station.ready_crew() and not station.manual_station and station.state=="idle" and station.recipes.has(dish): available=true
 				if available and spawn_customer(dish,true,chef_guest):
 					progress.banquet_spawned += 1
-					banquet_clock = 8.0
-			if progress.banquet_finished >= Progression.BANQUET_GUESTS:
-				finish_banquet(progress.banquet_served >= Progression.BANQUET_SERVED and progress.banquet_good >= Progression.BANQUET_GOOD)
+					banquet_clock = progress.inspection_spawn_interval()
+			if progress.banquet_finished >= progress.inspection_guest_count():
+				finish_banquet(progress.banquet_served >= progress.inspection_served_target() and progress.banquet_good >= progress.inspection_good_target())
 				return
 		if progress.remaining <= 0:
-			finish_banquet(progress.phase == "service" and progress.banquet_served >= Progression.BANQUET_SERVED and progress.banquet_good >= Progression.BANQUET_GOOD, "Время проверки вышло.")
+			finish_banquet(progress.phase == "service" and progress.banquet_served >= progress.inspection_served_target() and progress.banquet_good >= progress.inspection_good_target(), "Время проверки вышло.")
 
 func finish_banquet(won: bool, reason := "") -> void:
 	if not progress.busy(): return
+	var attempted_from_star: int = progress.stars
+	var served_target: int = progress.inspection_served_target()
+	var good_target: int = progress.inspection_good_target()
+	var event_name: String = progress.inspection_name()
 	# A timed-out order cannot pay or contribute after the result is frozen.
 	for customer in customers:
 		if customer.get("banquet", false) and customer.state != "leaving": finish_customer(customer.id, false)
 	for station in stations:
 		if station.training.active(): station.training.close()
 	progress.phase = "won" if won else "lost"
-	progress.result = "Вторая звезда! +200. Открыты расширение зала и кухня «Мясо и макароны»." if won else (reason + " Обслужено %d/8, довольны %d/6. Подготовься и попробуй снова бесплатно." % [progress.banquet_served, progress.banquet_good])
-	if not won and progress.stars == 0: progress.result = reason + " Можно пригласить дегустатора снова бесплатно."
-	if won:
+	if won and attempted_from_star == 1:
 		progress.stars = 2
 		progress.cash += 200
+		progress.third_star_auto_served = 0
+		progress.result = "Вторая звезда! +200. Открыты расширение зала и кухня «Мясо и макароны»."
+	elif won and attempted_from_star == 2:
+		progress.stars = 3
+		progress.cash += Progression.BIG_LUNCH_REWARD
+		progress.result = "Третья звезда! +%d. Кафе выдержало большой поток — следующий этап откроет специализированную кухню." % Progression.BIG_LUNCH_REWARD
+	elif not won and attempted_from_star == 0:
+		progress.result = reason + " Можно пригласить дегустатора снова бесплатно."
+	else:
+		progress.result = "%s %s: обслужено %d/%d, B или выше %d/%d. Подготовься и попробуй снова бесплатно." % [reason, event_name, progress.banquet_served, served_target, progress.banquet_good, good_target]
 	open_for_business = progress.return_open
 	spawn_clock = progress.arrival_interval()
 	chef_order_clock = progress.chef_order_delay(rng)
