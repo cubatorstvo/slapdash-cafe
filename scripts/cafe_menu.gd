@@ -122,7 +122,7 @@ func show_station(station: Node3D) -> void:
 		panel.show(); Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
 		return
 	if not station.ready_crew():
-		_label(training_box,"Сотрудник на перекалибровке в лаборатории" if game.laboratory.reserves_station(station.station_id) else "Нет бригады: %d/%d. Создай клонов в лаборатории."%[station.staffed,station.role_count()],22)
+		_label(training_box,("Сотрудник на перекалибровке в лаборатории" if game.laboratory.calibrator.reserves_station(station.station_id) else "Новый работник идёт к станции") if game.laboratory.reserves_station(station.station_id) else "Нет бригады: %d/%d. Создай клонов в лаборатории."%[station.staffed,station.role_count()],22)
 		_button(training_box,"Вернуться",close)
 		panel.show(); Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
 		return
