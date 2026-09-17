@@ -1,7 +1,7 @@
 extends RefCounted
 const Definition = preload("res://scripts/station_definition.gd")
-const ICONS := {"wine": preload("res://assets/ui/wine.svg"), "potato": preload("res://assets/ui/potato.svg"), "sausage": preload("res://assets/ui/sausage.svg"), "meal": preload("res://assets/ui/meal.svg")}
-const ORDER := ["wine", "potato", "sausage", "meal"]
+const ICONS := {"wine": preload("res://assets/ui/wine.svg"), "potato": preload("res://assets/ui/potato.svg"), "sausage": preload("res://assets/ui/sausage.svg"), "meal": preload("res://assets/ui/meal.svg"), "burger": preload("res://assets/ui/meal.svg"), "cheeseburger": preload("res://assets/ui/meal.svg"), "spicy_burger": preload("res://assets/ui/meal.svg")}
+const ORDER := ["wine", "potato", "sausage", "meal", "burger", "cheeseburger", "spicy_burger"]
 const RECIPES := {
 	"wine": {
 		"title": "Бокал вина",
@@ -42,6 +42,19 @@ const RECIPES := {
 			}
 		]
 	},
+	"burger": {"title":"Бургер","components":[
+		{"id":"patty","name":"Котлета","role":0,"lines":[
+			{"id":"patty_sides","label":"Две стороны 100%","detail":"Котлета занимает общую жарочную поверхность. Переверни её лопаткой и доведи обе стороны до 100%."},
+			{"id":"patty_season","label":"Приправа","detail":"Приправь котлету до передачи в сборку."}]},
+		{"id":"assembly","name":"Сборка","role":1,"lines":[
+			{"id":"bun_toast","label":"Поджаренная булка","detail":"Булка использует ту же жарочную поверхность, что и котлета: распредели время между ролями."},
+			{"id":"sauce","label":"Соус","detail":"Добавь соус после передачи котлеты на площадку сборки."}]}]},
+	"cheeseburger": {"title":"Чизбургер","components":[
+		{"id":"patty","name":"Котлета","role":0,"lines":[{"id":"patty_sides","label":"Две стороны 100%","detail":"Котлета и булка не могут эффективно жариться одновременно."},{"id":"patty_season","label":"Приправа","detail":"Приправь котлету."}]},
+		{"id":"assembly","name":"Сборка","role":1,"lines":[{"id":"bun_toast","label":"Поджаренная булка","detail":"Найди свободное окно общей жарочной поверхности."},{"id":"sauce","label":"Соус","detail":"Добавь соус на сборке."},{"id":"cheese","label":"Сыр","detail":"Добавь сыр на переданную котлету."}]}]},
+	"spicy_burger": {"title":"Острый бургер","components":[
+		{"id":"patty","name":"Котлета","role":0,"lines":[{"id":"patty_sides","label":"Две стороны 100%","detail":"Котлета и булка делят одну жарочную поверхность."},{"id":"patty_season","label":"Приправа","detail":"Приправь котлету."}]},
+		{"id":"assembly","name":"Сборка","role":1,"lines":[{"id":"bun_toast","label":"Поджаренная булка","detail":"Поджарь булку в свободное окно."},{"id":"sauce","label":"Соус","detail":"Добавь обычный соус."},{"id":"chili","label":"Острый соус","detail":"Добавь острый соус на сборке."}]}]},
 	"meal": {
 		"title": "Стейк с макаронами",
 		"components": [
