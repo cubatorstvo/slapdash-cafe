@@ -24,7 +24,7 @@ class Station:
 	var training=Run.new()
 	var state := "idle"
 	var pending_teacher := 0
-	func role_count() -> int: return 2 if type_id=="kitchen" else 1
+	func role_count() -> int: return 2 if type_id in ["kitchen","grill_kitchen"] else 1
 	func ready_crew() -> bool: return staffed==role_count()
 
 class Game:
@@ -106,7 +106,15 @@ func _initialize() -> void:
 	p.popularity=40
 	check(Journey.current(p,service.stations,15,true).key=="third_star","Existing scaling preparations unlock the Big Lunch")
 	p.stars=3
-	check(Journey.current(p,service.stations,15,true).chapter=="МАСШТАБИРОВАНИЕ ПРОЙДЕНО","Third star is the explicit end of the current implemented chapter")
+	check(Journey.current(p,service.stations,15,true).key=="specialty_expand","Third star opens the specialization chapter")
+	p.specialized_expanded=true
+	var specialty=Station.new(); specialty.station_id=5; specialty.type_id="grill_kitchen"; specialty.staffed=2; specialty.equipment=["grill_kit","assembly_kit"]
+	for dish in p.SPECIALTY_DISHES: specialty.recipes[dish]={"quality":{"present":true,"grade":"B"}}
+	service.stations.append(specialty)
+	p.fourth_star_specialty_served=6
+	p.fourth_star_auto_served=14
+	p.popularity=55
+	check(Journey.current(p,service.stations,15,true).key=="fourth_star","Existing specialization preparations unlock the three-wave test")
 
 	print("2/3: optional visits, cooldown and persisted single rewards")
 	p.journey_auto_served=3; p.shift="open"; p.shift_elapsed=0
