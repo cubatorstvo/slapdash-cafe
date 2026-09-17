@@ -24,8 +24,8 @@ class Station:
 	var training=Run.new()
 	var state := "idle"
 	var pending_teacher := 0
-	func role_count() -> int: return 1
-	func ready_crew() -> bool: return staffed==1
+	func role_count() -> int: return 2 if type_id=="kitchen" else 1
+	func ready_crew() -> bool: return staffed==role_count()
 
 class Game:
 	extends RefCounted
@@ -96,7 +96,17 @@ func _initialize() -> void:
 	p.popularity=30
 	check(Journey.current(p,service.stations,15,true).key=="second_star","Existing preparations are credited")
 	p.stars=2
-	check(Journey.current(p,service.stations,15,true).chapter=="СВОБОДНОЕ РАЗВИТИЕ","Current campaign has an explicit end")
+	check(Journey.current(p,service.stations,15,true).key=="third_expand","Third-star chapter starts with the pair-kitchen expansion")
+	p.expanded=true
+	var kitchen=Station.new(); kitchen.station_id=4; kitchen.type_id="kitchen"; kitchen.staffed=2; kitchen.equipment=["meat_kit","pasta_kit"]
+	kitchen.recipes={"meal":{"quality":{"present":true,"grade":"B"}}}
+	service.stations.append(kitchen)
+	p.journey_meals_served=3
+	p.third_star_auto_served=10
+	p.popularity=40
+	check(Journey.current(p,service.stations,15,true).key=="third_star","Existing scaling preparations unlock the Big Lunch")
+	p.stars=3
+	check(Journey.current(p,service.stations,15,true).chapter=="МАСШТАБИРОВАНИЕ ПРОЙДЕНО","Third star is the explicit end of the current implemented chapter")
 
 	print("2/3: optional visits, cooldown and persisted single rewards")
 	p.journey_auto_served=3; p.shift="open"; p.shift_elapsed=0
