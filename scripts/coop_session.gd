@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-scale-25"
+const PROTOCOL := "slapdash-cafe-scale-26"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -597,7 +597,7 @@ func _world(packet: PackedByteArray) -> void:
 		station.apply_equipment()
 		station.training.apply_summary(entry.training)
 		station.remote_summary = entry.training
-		if station.type_id == "kitchen": station.model.live_roles = entry.training.live_roles
+		if station.role_count() > 1: station.model.live_roles = entry.training.live_roles
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	for i in range(game.service.stations.size() - 1, -1, -1):
 		var station: Node3D = game.service.stations[i]
