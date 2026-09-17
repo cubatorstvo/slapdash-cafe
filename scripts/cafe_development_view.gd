@@ -7,6 +7,7 @@ var board: Node3D
 var decor := {}
 var slots: Array = []
 var ribbon: Node3D
+var specialty_ribbon: Node3D
 var star_label: Label3D
 
 func build(root_game: Node3D) -> void:
@@ -21,7 +22,7 @@ func build(root_game: Node3D) -> void:
 	star_label = Props.text(board, "☆ ☆ ☆ ☆ ☆", Vector3(0, 0.95, 0.12), 30, Color("efcf91"))
 	star_label.pixel_size = 0.007
 	Props.solid_box(board, Vector3(0.9, 0.12, 0.7), Vector3(0, 0.08, 0), Color("775e43"))
-	for i in range(4):
+	for i in range(5):
 		var marker := Node3D.new()
 		add_child(marker)
 		marker.position = game.service.slot_position(i)
@@ -33,6 +34,9 @@ func build(root_game: Node3D) -> void:
 	ribbon = Node3D.new()
 	add_child(ribbon)
 	Props.box(ribbon, Vector3(6.0, 0.11, 0.04), Vector3(13.8, 1.0, 0.65), Color("bfa565"))
+	specialty_ribbon=Node3D.new(); add_child(specialty_ribbon)
+	Props.box(specialty_ribbon,Vector3(6.2,0.13,0.08),Vector3(10.2,1.0,2.0),Color("c7a65e"))
+	var specialty_sign:=Props.text(specialty_ribbon,"СПЕЦИАЛИЗИРОВАННЫЙ СЕКТОР\nТРЕТЬЯ ЗВЕЗДА",Vector3(10.2,1.55,2.0),23,Color("f0d28f")); specialty_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	var sign := Node3D.new()
 	add_child(sign)
 	decor.sign = sign
@@ -70,9 +74,12 @@ func refresh() -> void:
 		slots[i].node.visible = game.service.by_id(i + 1) == null
 		if i < 3:
 			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[E] Компьютер · 120"
-		else:
+		elif i == 3:
 			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[E] Компьютер · 250"
+		else:
+			slots[i].label.text = "СПЕЦИАЛИЗАЦИЯ\nТретья звезда" if not progress.specialized_expanded else "ОБЩАЯ ЖАРОЧНАЯ\n[E] Компьютер · 380"
 	ribbon.visible = not progress.expanded
+	specialty_ribbon.visible = not progress.specialized_expanded
 	var stars_text := PackedStringArray()
 	for i in range(5): stars_text.append("★" if i < progress.stars else "☆")
 	star_label.text = " ".join(stars_text)
