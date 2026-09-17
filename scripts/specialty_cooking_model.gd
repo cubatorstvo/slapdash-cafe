@@ -106,8 +106,8 @@ func step(commands: Array, delta: float) -> void:
 	flip_time=maxf(0.0,flip_time-delta); elapsed+=delta
 
 func _update_griddle(delta: float) -> void:
-	var patty_on:=hands.find("patty")<0 and positions.patty.distance_to(GRIDDLE)<0.52
-	var bun_on:=hands.find("bun")<0 and positions.bun.distance_to(GRIDDLE)<0.52
+	var patty_on: bool = hands.find("patty")<0 and positions.patty.distance_to(GRIDDLE)<0.52
+	var bun_on: bool = hands.find("bun")<0 and positions.bun.distance_to(GRIDDLE)<0.52
 	griddle_conflict=patty_on and bun_on
 	if griddle_conflict: griddle_wait+=delta; return
 	if patty_on:
@@ -134,7 +134,7 @@ func _use(role: int, item: String, pressed: bool, delta: float) -> void:
 
 func _assembly_ready(require_bun := true) -> bool:
 	var patty_here:=patty_state=="assembly" and hands.find("patty")<0
-	var bun_here:=positions.bun.distance_to(ASSEMBLY)<0.46 and hands.find("bun")<0
+	var bun_here: bool = positions.bun.distance_to(ASSEMBLY)<0.46 and hands.find("bun")<0
 	return patty_here and (bun_here if require_bun else true)
 
 func quality() -> Dictionary:
