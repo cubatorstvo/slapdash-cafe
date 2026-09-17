@@ -515,7 +515,7 @@ func apply_input(sender: int, packet: Dictionary) -> void:
 			run.queue_event(role,{"feed":true})
 			game.service.trace("feed_attempt",{"station":station.station_id,"peer":sender})
 		elif event.get("drop", false) == true: run.queue_event(role, {"drop": true})
-		elif event.get("grab", "") in (game.ITEM_NAMES.keys() + ["potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] if station.type_id == "counter" else M.ITEMS): run.queue_event(role, {"grab": event.grab})
+		elif event.get("grab", "") in (game.ITEM_NAMES.keys() + ["potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] if station.type_id == "counter" else station.model.ITEMS): run.queue_event(role, {"grab": event.grab})
 
 func suspend_input() -> void:
 	var station: Node3D = game.local_station()
