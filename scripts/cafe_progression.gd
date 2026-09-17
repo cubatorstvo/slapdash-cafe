@@ -17,12 +17,21 @@ const BANQUET_SECONDS := 240.0
 const BANQUET_GUESTS := 9
 const BANQUET_SERVED := 8
 const BANQUET_GOOD := 6
+const THIRD_STAR_POPULARITY := 40
+const THIRD_STAR_AUTO_SERVED := 10
+const THIRD_STAR_MEALS := 3
+const BIG_LUNCH_SECONDS := 240.0
+const BIG_LUNCH_GUESTS := 14
+const BIG_LUNCH_SERVED := 11
+const BIG_LUNCH_GOOD := 8
+const BIG_LUNCH_REWARD := 300
 const SHIFT_SECONDS := 480.0
 const CHEF_ORDER_INTERVALS := [Vector2(25.0,35.0),Vector2(45.0,60.0),Vector2(75.0,95.0),Vector2(105.0,130.0),Vector2(140.0,175.0),Vector2(180.0,220.0)]
 const CHEF_ORDER_PREMIUM := [1.0,1.5,2.2,3.0,3.8,4.8]
 const LAB_PRICES := [40, 60, 80]
 var journey_auto_served := 0
 var journey_meals_served := 0
+var third_star_auto_served := 0
 var visit: Dictionary = {}
 var visit_serial := 0
 var visit_next_day := 0
@@ -103,35 +112,83 @@ func record_demand(dish: String, reason: String) -> void:
 	demand[dish][reason] = int(demand[dish].get(reason, 0)) + 1
 	revision += 1
 
+func _dish_ready(stations: Array, dish: String) -> bool:
+	for station in stations:
+		var report: Dictionary = station.recipes.get(dish, {}).get("quality", {})
+		if report.get("present", false) and report.get("grade", "D") in ["B", "A", "S"]: return true
+	return false
+
+func _ready_dish_count(stations: Array, dishes: Array) -> int:
+	var count := 0
+	for dish in dishes:
+		if _dish_ready(stations, str(dish)): count += 1
+	return count
+
+func _ready_automatic_count(stations: Array) -> int:
+	return stations.filter(func(s): return not s.manual_station and s.ready_crew()).size()
+
 func star_requirements(stations: Array, served: int) -> Array:
 	if stars == 0:
 		return [{"text": "Лаборатория: %d / 3" % lab_stage, "done": lab_stage >= 3}, {"text": "Лично обслужено: %d / 15" % manual_served, "done": manual_served >= 15}]
-	var ready: Array = []
-	for dish in DISHES:
-		for station in stations:
-			var report: Dictionary = station.recipes.get(dish, {}).get("quality", {})
-			if report.get("present", false) and report.get("grade", "D") in ["B", "A", "S"]:
-				ready.append(dish)
-				break
-	return [
-		{"text": "Популярность: %d / %d" % [popularity, STAR_POPULARITY], "done": popularity >= STAR_POPULARITY},
-		{"text": "Обслужено гостей: %d / %d" % [served, REQUIRED_SERVED], "done": served >= REQUIRED_SERVED},
-		{"text": "Две бригады: %d / 2" % mini(stations.filter(func(s): return not s.manual_station and s.ready_crew()).size(), 2), "done": stations.filter(func(s): return not s.manual_station and s.ready_crew()).size() >= 2},
-		{"text": "Три блюда с записью B или лучше: %d / 3" % ready.size(), "done": ready.size() == 3}
-	]
+	if stars == 1:
+		var ready: int = _ready_dish_count(stations, DISHES)
+		var crews: int = _ready_automatic_count(stations)
+		return [
+			{"text": "Популярность: %d / %d" % [popularity, STAR_POPULARITY], "done": popularity >= STAR_POPULARITY},
+			{"text": "Обслужено гостей: %d / %d" % [served, REQUIRED_SERVED], "done": served >= REQUIRED_SERVED},
+			{"text": "Две бригады: %d / 2" % [mini(crews, 2)], "done": crews >= 2},
+			{"text": "Три блюда с записью B или лучше: %d / 3" % ready, "done": ready == 3}
+		]
+	if stars == 2:
+		var all_ready: int = _ready_dish_count(stations, DISHES + ["meal"])
+		var production: int = _ready_automatic_count(stations)
+		return [
+			{"text": "Три работающие станции: %d / 3" % mini(production, 3), "done": production >= 3},
+			{"text": "Четыре блюда с записью B или лучше: %d / 4" % all_ready, "done": all_ready == 4},
+			{"text": "Автоподачи после второй звезды: %d / %d" % [mini(third_star_auto_served, THIRD_STAR_AUTO_SERVED), THIRD_STAR_AUTO_SERVED], "done": third_star_auto_served >= THIRD_STAR_AUTO_SERVED},
+			{"text": "Парная кухня обслужила: %d / %d" % [mini(journey_meals_served, THIRD_STAR_MEALS), THIRD_STAR_MEALS], "done": journey_meals_served >= THIRD_STAR_MEALS},
+			{"text": "Популярность: %d / %d" % [popularity, THIRD_STAR_POPULARITY], "done": popularity >= THIRD_STAR_POPULARITY}
+		]
+	return []
 
 func can_attempt(stations: Array, served: int) -> bool:
-	if stars >= 2 or busy() or shift not in ["morning", "open"]: return false
+	if stars >= 3 or busy() or shift not in ["morning", "open"]: return false
 	for requirement in star_requirements(stations, served):
 		if not requirement.done: return false
 	return true
+
+func inspection_orders() -> Array:
+	if stars == 2:
+		return ["meal", "wine", "potato", "sausage", "meal", "wine", "potato", "sausage", "meal", "potato", "wine", "sausage", "meal", "potato"]
+	return ["wine", "potato", "sausage", "sausage", "wine", "potato", "potato", "sausage", "wine"]
+
+func inspection_chef_indices() -> Array:
+	return [1, 6, 11] if stars == 2 else [0, 3, 6]
+
+func inspection_seconds() -> float:
+	return BIG_LUNCH_SECONDS if stars == 2 else BANQUET_SECONDS
+
+func inspection_guest_count() -> int:
+	return BIG_LUNCH_GUESTS if stars == 2 else BANQUET_GUESTS
+
+func inspection_served_target() -> int:
+	return BIG_LUNCH_SERVED if stars == 2 else BANQUET_SERVED
+
+func inspection_good_target() -> int:
+	return BIG_LUNCH_GOOD if stars == 2 else BANQUET_GOOD
+
+func inspection_spawn_interval() -> float:
+	return 4.0 if stars == 2 else 8.0
+
+func inspection_name() -> String:
+	return "Большой обед" if stars == 2 else "Делегация"
 
 func objective(stations: Array, served: int, opened: bool) -> String:
 	return str(preload("res://scripts/cafe_journey.gd").current(self,stations,served,opened).title)
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["journey_auto_served", "journey_meals_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
