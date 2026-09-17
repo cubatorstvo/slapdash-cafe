@@ -1,19 +1,68 @@
-name: ChatGPT Project Snapshot
+name: ChatGPT Delta Snapshot
 on:
   push:
     branches:
       - chatgpt-sync-snapshot
 jobs:
-  snapshot:
+  delta:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Pack repository
+        with:
+          fetch-depth: 0
+      - name: Pack changed files
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
         run: |
-          zip -qr slapdash-cafe-snapshot.zip . -x '.git/*' 'slapdash-cafe-snapshot.zip'
+          python - <<'PY'
+          import os
+          import pathlib
+          import subprocess
+          import zipfile
+
+          before = os.environ["BEFORE"]
+          after = os.environ["AFTER"]
+          raw = subprocess.check_output(["git", "diff", "--name-status", "-z", "-M", before, after])
+          parts = raw.split(b"\0")
+          excluded = {".github/workflows/chatgpt-sync-snapshot.yml"}
+          rows = []
+          i = 0
+          while i < len(parts) and parts[i]:
+              status = parts[i].decode("utf-8")
+              i += 1
+              if status.startswith("R"):
+                  old = parts[i].decode("utf-8")
+                  new = parts[i + 1].decode("utf-8")
+                  i += 2
+                  if old not in excluded and new not in excluded:
+                      rows.append((status, old, new))
+              else:
+                  path = parts[i].decode("utf-8")
+                  i += 1
+                  if path not in excluded:
+                      rows.append((status, path))
+
+          with zipfile.ZipFile("slapdash-cafe-delta.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+              manifest = []
+              for row in rows:
+                  status = row[0]
+                  if status.startswith("R"):
+                      old, new = row[1], row[2]
+                      manifest.append("\t".join((status, old, new)))
+                      if pathlib.Path(new).is_file():
+                          archive.write(new, new)
+                  else:
+                      path = row[1]
+                      manifest.append("\t".join((status, path)))
+                      if not status.startswith("D") and pathlib.Path(path).is_file():
+                          archive.write(path, path)
+              archive.writestr(".sync/delta-manifest.tsv", "\n".join(manifest) + ("\n" if manifest else ""))
+              archive.writestr(".sync/sync-branch-sha.txt", after + "\n")
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: slapdash-cafe-snapshot
-          path: slapdash-cafe-snapshot.zip
+          name: slapdash-cafe-delta
+          path: slapdash-cafe-delta.zip
           if-no-files-found: error
           retention-days: 1
