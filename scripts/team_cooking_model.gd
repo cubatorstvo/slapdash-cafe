@@ -50,7 +50,7 @@ var elapsed := 0.0
 
 func _init() -> void: reset()
 
-func reset() -> void:
+func reset(_dish := "meal") -> void:
 	guest_active = false
 	guest_roles = [{"steak":{},"pasta":{},"drunk":0.0,"swallowed":[],"chew":0.0},{"steak":{},"pasta":{},"drunk":0.0,"swallowed":[],"chew":0.0}]
 	positions = {"steak": Vector2(-2.25, 0.45), "pot": STOVE, "water": Vector2(2.3, 0.45), "pasta_bag": Vector2(2.25, -0.55), "salt": Vector2(-0.48, -0.48), "spatula": Vector2(-0.45, 0.02), "pasta_salt_tool": Vector2(0.48, -0.48), "pasta_spatula": Vector2(0.45, 0.02)}

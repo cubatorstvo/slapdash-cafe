@@ -32,7 +32,7 @@ func open(recipe: String, peer: int, mode := "lesson") -> void:
 	tracks = station.drafts.get(dish, station.recipes.get(dish, {}).get("tracks", [])).duplicate(true)
 	while tracks.size() < station.role_count(): tracks.append({})
 	participants.fill(0)
-	station.model.reset(dish) if station.type_id == "counter" else station.model.reset()
+	station.model.reset(dish)
 	station.state = "training"
 	if purpose != "manual" or station.customer_id >= 0: station.ensure_taster()
 	configure_order()
@@ -60,8 +60,8 @@ func start_pass(assignments: Array) -> bool:
 	for track in tracks:
 		if not track.is_empty(): group_serial = maxi(group_serial, int(track.group) + 1)
 	for role in live_roles: pending_tracks[role] = {"group": group_serial, "frames": []}
-	station.model.reset(dish) if station.type_id == "counter" else station.model.reset()
-	if station.type_id == "kitchen": station.model.live_roles = live_roles.duplicate()
+	station.model.reset(dish)
+	if station.role_count() > 1: station.model.live_roles = live_roles.duplicate()
 	configure_order()
 	phase = "recording"
 	tick = 0
@@ -111,7 +111,8 @@ func _restore_inactive(at_tick: int) -> void:
 		if not track.is_empty() and not track.frames.is_empty():
 			station.model.restore_zone(role, track.frames[mini(at_tick, track.frames.size() - 1)])
 		else:
-			var empty = station.TeamModel.new()
+			var empty = station.fresh_model()
+			empty.reset(dish)
 			station.model.restore_zone(role, empty.zone_snapshot(role))
 
 func finish_pass(confirmed := false) -> void:

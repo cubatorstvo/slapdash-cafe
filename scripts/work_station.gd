@@ -2,6 +2,7 @@ extends Node3D
 const Definition = preload("res://scripts/station_definition.gd")
 const Model = preload("res://scripts/cooking_model.gd")
 const TeamModel = preload("res://scripts/team_cooking_model.gd")
+const SpecialtyModel = preload("res://scripts/specialty_cooking_model.gd")
 const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
@@ -70,6 +71,16 @@ func crew_name(role: int) -> String:
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
+func is_team_station() -> bool: return role_count() > 1
+static func model_for_type(value: String):
+	if value == "counter": return Model.new()
+	if value == "grill_kitchen": return SpecialtyModel.new()
+	return TeamModel.new()
+func fresh_model(): return model_for_type(type_id)
+func view_for_type():
+	if type_id == "counter": return preload("res://scripts/station_view.gd").new()
+	if type_id == "grill_kitchen": return preload("res://scripts/specialty_station_view.gd").new()
+	return preload("res://scripts/team_station_view.gd").new()
 
 func training_zone_min() -> Vector2:
 	return Vector2(-SLOT_WIDTH / 2.0, TRAINING_ZONE_CENTER_Z - SLOT_DEPTH / 2.0)
@@ -79,8 +90,8 @@ func training_zone_max() -> Vector2:
 
 func _ready() -> void:
 	if crew.is_empty(): crew = Definition.crew(type_id, station_id)
-	model = Model.new() if type_id == "counter" else TeamModel.new()
-	view = preload("res://scripts/station_view.gd").new() if type_id == "counter" else preload("res://scripts/team_station_view.gd").new()
+	model = model_for_type(type_id)
+	view = view_for_type()
 	add_child(view)
 	view.build(true)
 	view.station_label.text = "СТАНЦИЯ %d · [E] ПОКАЖИ КАК" % station_id
@@ -135,7 +146,7 @@ func apply_equipment() -> void:
 	model.equipment = equipment.duplicate()
 
 func reset_model() -> void:
-	model.reset(dishes()[0]) if type_id == "counter" else model.reset()
+	model.reset(dishes()[0])
 
 func apply_single(command: Dictionary, delta: float) -> void:
 	if command.get("feed", false): model.feed()
@@ -220,7 +231,7 @@ func refresh(local_peer: int, delta: float) -> void:
 			view.actors[role].visible = (not active and not resting) or (performing and not role in training.live_roles)
 			view.actors[role].caption.text = crew_name(role) + (" · дубль" if active else "")
 	view.update_view(model, age, state != "cooking")
-	if type_id == "kitchen" and state=="cooking" and recipes.has(order_dish):
+	if is_team_station() and state=="cooking" and recipes.has(order_dish):
 		var production_tracks: Array=recipes[order_dish].get("tracks",[])
 		for role in range(mini(role_count(),production_tracks.size())):
 			var track: Dictionary=production_tracks[role]
@@ -269,7 +280,7 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(role_count()):
 			if role>=staffed:
 				students[role].hide()
-				if type_id=="kitchen": view.actors[role].hide()
+				if is_team_station(): view.actors[role].hide()
 		if not ready_crew():
 			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
 			if type_id=="counter":
@@ -279,7 +290,7 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(role_count()):
 			if get_parent().game.laboratory.presenting_clone(int(crew[role].get("clone_id",0))):
 				students[role].hide()
-				if type_id=="kitchen": view.actors[role].hide()
+				if is_team_station(): view.actors[role].hide()
 				else:
 					for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
 	if is_instance_valid(taster): direct_attention(taster)
