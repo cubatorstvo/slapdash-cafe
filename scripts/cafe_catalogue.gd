@@ -3,6 +3,8 @@ extends RefCounted
 const ITEMS := {
 	"meat_kit": {"name":"Гриль, тарелка и приборы для мяса","price":120,"kind":"equipment","star":2},
 	"pasta_kit": {"name":"Плита, кастрюля и приборы для макарон","price":120,"kind":"equipment","star":2},
+	"grill_kit": {"name":"Общая жарочная поверхность и мясной комплект","price":140,"kind":"equipment","star":3},
+	"assembly_kit": {"name":"Стол сборки, булки и соусы","price":140,"kind":"equipment","star":3},
 	"sauce": {"name":"Миска соуса","price":24,"kind":"equipment"},
 	"plates": {"name":"Три тарелки","price":30,"kind":"equipment"},
 	"cup": {"name":"Бокал 300 мл","price":30,"kind":"equipment"},
@@ -11,6 +13,7 @@ const ITEMS := {
 	"sauce_ramp": {"name":"Соусный трамплин","price":75,"kind":"equipment","star":1},
 	"counter": {"name":"Стол и шкафчик","price":120,"kind":"station","star":1},
 	"kitchen": {"name":"Парная кухня","price":250,"kind":"station","star":2},
+	"grill_kitchen": {"name":"Специализированная бургерная кухня","price":380,"kind":"station","star":3},
 	"lab_0": {"name":"Лабораторная колба","price":40,"kind":"lab"},
 	"lab_1": {"name":"Блок питания лаборатории","price":60,"kind":"lab"},
 	"lab_2": {"name":"Стабилизатор клонирования","price":80,"kind":"lab"},
