@@ -143,8 +143,8 @@ func quality() -> Dictionary:
 	elif dish=="spicy_burger": criteria.append({"label":"Острый соус","value":minf(1.0,chili_amount)})
 	var report:=Quality.result(criteria,present,[])
 	report.components=[
-		{"id":"patty","name":"Котлета","role":0,"served":patty_state=="assembly" or served,"location":"в бургере" if present else "в работе","lines":["Две стороны: %d%% / %d%%"%[roundi(patty_sides[0]*100),roundi(patty_sides[1]*100)],"Приправа: "+("✓" if patty_season>=1 else "×")],"details":[]},
-		{"id":"assembly","name":"Сборка","role":1,"served":present,"location":"на подаче" if present else "в работе","lines":["Булка: %d%%"%roundi(bun_toast*100),"Соус: "+("✓" if sauce_amount>=1 else "×"),("Сыр: "+("✓" if cheese_applied else "—")) if dish=="cheeseburger" else ("Острый соус: "+("✓" if chili_amount>=1 else "×")) if dish=="spicy_burger" else "Сборка: бургер"],"details":[]}
+		{"id":"patty","name":"Котлета","role":0,"served":patty_state=="assembly" or served,"location":"в бургере" if present else "в работе","lines":["Две стороны: %d%% / %d%%"%[roundi(patty_sides[0]*100),roundi(patty_sides[1]*100)],"Приправа: "+("✓" if patty_season>=1 else "×")],"details":["Обе стороны котлеты должны дойти до 100%.","Приправь котлету до сборки."]},
+		{"id":"assembly","name":"Сборка","role":1,"served":present,"location":"на подаче" if present else "в работе","lines":["Булка: %d%%"%roundi(bun_toast*100),"Соус: "+("✓" if sauce_amount>=1 else "×"),("Сыр: "+("✓" if cheese_applied else "—")) if dish=="cheeseburger" else ("Острый соус: "+("✓" if chili_amount>=1 else "×")) if dish=="spicy_burger" else "Сборка: бургер"],"details":["Поджарь булку на общей поверхности.","Добавь соус после передачи котлеты.","Добавь нужную добавку и собери бургер."]}
 	]
 	return report
 
