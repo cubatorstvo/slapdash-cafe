@@ -1,4 +1,5 @@
 extends Node3D
+const Visits = preload("res://scripts/cafe_visits.gd")
 const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Person = preload("res://scripts/customer_view.gd")
@@ -97,6 +98,7 @@ func advance(delta: float) -> void:
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
+	Visits.advance(self,delta)
 	autosave_clock += delta
 	if autosave_clock >= 30.0 and not progress.busy() and not any_training():
 		autosave_clock = 0.0
@@ -155,6 +157,7 @@ func advance(delta: float) -> void:
 				station.order_tempo = station.crew_tempo()
 				station.reset_model()
 				customer.state = "cooking"
+				customer.automatic_serving=true
 			elif station.manual_station:
 				var request_text: String=preload("res://scripts/chef_orders.gd").special_request(station.customer_order)
 				if request_text.is_empty(): request_text=Definition.DISHES[customer.dish]
@@ -189,6 +192,7 @@ func spawn_chef_customer() -> bool:
 	return spawn_customer(recipe,false,true)
 
 func advance_chef_orders(delta: float) -> void:
+	if Visits.chef_reserved(progress): return
 	chef_order_clock-=delta
 	if chef_order_clock>0: return
 	if chef_queue().size()<CHEF_QUEUE_LIMIT: spawn_chef_customer()
@@ -196,7 +200,7 @@ func advance_chef_orders(delta: float) -> void:
 	# so serving one customer never causes an immediate replacement to appear.
 	chef_order_clock=progress.chef_order_delay(rng)
 
-func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool:
+func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_data: Dictionary = {}) -> bool:
 	if customers.size() >= 18: return false
 	if recipe.is_empty():
 		var pool: Array = progress.available_dishes()
@@ -216,17 +220,22 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool
 		if station.state == "idle" and station.pending_teacher == 0:
 			if station.recipes.has(recipe): candidates.append(station)
 			else: untrained.append(station)
-	if candidates.is_empty() and not banquet and not chef_guest: candidates=untrained
+	if candidates.is_empty() and not banquet and not chef_guest and visit_data.is_empty(): candidates=untrained
 	if chef_guest:
 		var personal:=by_id(1)
 		candidates=[personal] if personal!=null and personal.manual_station and recipe in personal.dishes() and chef_queue().size()<CHEF_QUEUE_LIMIT else []
 	var station: Node3D = null if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
+	if station==null and not visit_data.is_empty(): return false
 	var person := Person.new()
 	person.color = Color("d6b56b") if banquet else [Color("ae7381"), Color("839fbb"), Color("c6a66b"), Color("91aa78")][next_customer_id % 4]
 	add_child(person)
 	person.position = Vector3(-11.4, 0, 1.65)
 	person.caption.text = Definition.DISHES[recipe]
 	var data := {"id": next_customer_id, "view": person, "station": station.station_id if station != null else -1, "dish": recipe, "state": "walking", "wait": 0.0, "path": [], "banquet": banquet, "chef_order": chef_guest and not banquet}
+	if not visit_data.is_empty():
+		data.visit_id=int(visit_data.id); data.visit_slot=int(visit_data.slot); data.visit_kind=str(visit_data.kind)
+		data.chef_order=false
+		Visits.badge(person,str(visit_data.kind))
 	if station == null:
 		data.state = "leaving"
 		data.path = [Vector3(-9.6, 0, 2.6), Vector3(17.4, 0, 1.65)]
@@ -243,6 +252,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false) -> bool
 				data.order.chef_bonus=chef_bonus
 				data.order.premium=float(data.order.get("premium",1.0))*chef_bonus
 		else: data.order={}
+		if not visit_data.is_empty() and station.manual_station: data.order=preload("res://scripts/chef_orders.gd").standard(recipe)
 		if station.manual_station and (station.state!="idle" or station.customer_id>=0 or not chef_queue().is_empty()):
 			data.state="queued"
 			data.path=[queue_point(chef_queue().size())]
@@ -283,6 +293,10 @@ func finish_customer(id: int, accepted: bool) -> void:
 				progress.manual_served += 1
 				if not progress.starter_reward: game.shop.reward_sauce()
 				if not customer.dish in progress.tutorial_served: progress.tutorial_served.append(customer.dish)
+			elif customer.get("automatic_serving",false):
+				progress.journey_auto_served+=1
+				if customer.dish=="meal": progress.journey_meals_served+=1
+				if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
 			revenue += payment
 			progress.cash += payment
 			progress.record_demand(customer.dish, "served")
@@ -293,6 +307,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 			progress.banquet_finished += 1
 			if paid: progress.banquet_served += 1
 			if paid and report.grade in ["B", "A", "S"]: progress.banquet_good += 1
+		Visits.settled(self,customer,paid,str(report.grade))
 		return
 
 func purchase(kind: String, id: String, station_id := 0) -> String:
@@ -318,6 +333,7 @@ func purchase(kind: String, id: String, station_id := 0) -> String:
 	return game.shop.order(item, station_id)
 
 func start_banquet(peer: int) -> String:
+	if Visits.busy(progress): return "Сначала заверши или отмени добровольный визит в компьютере."
 	if not progress.can_attempt(stations, served): return "Подготовь кафе по списку во вкладке «Звёзды»."
 	if any_training(): return "Сначала закончи текущие показы."
 	progress.return_open = open_for_business
@@ -433,7 +449,7 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 10, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
+	return {"format": "station-cafe", "version": 11, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
 
 func clear_world() -> void:
 	for station in stations:
@@ -452,7 +468,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -497,6 +513,10 @@ func load_data(data: Dictionary) -> bool:
 		if version<8: progress.starter_reward=progress.manual_served>0
 		progress.recover_deliveries()
 		if data.progression.get("phase", "none") in ["preparing", "showcase", "service", "tasting"]: open_for_business = progress.return_open
+	if not data.get("progression",{}).has("journey_auto_served"):
+		progress.journey_auto_served=maxi(0,served-progress.manual_served)
+	# Unfinished visit guests are re-created by slot; paid slots stay settled.
+	if Visits.busy(progress): progress.visit.spawn_clock=0.0
 	# A rag now belongs to every counter. Refund outstanding old rag deliveries.
 	for parcel in progress.deliveries.duplicate():
 		var items: Array = parcel.get("items", [parcel.item]).duplicate()
@@ -597,7 +617,7 @@ func finish_manual(station: Node3D, report: Dictionary) -> void:
 			progress.stars = 1
 			progress.cash += 120
 			progress.phase = "won"
-			progress.result = "Первая звезда! +120. Лаборатория готова: теперь можно покупать станции с клонами. Твоя стойка остаётся за тобой."
+			progress.result = "Первая звезда! +120. Лаборатория готова: теперь исследуй формулу и вырасти первого работника. Стол, оборудование и клон приобретаются отдельно."
 			progress.revision += 1
 			open_for_business = progress.return_open
 			announce(progress.result)
@@ -630,6 +650,7 @@ func toggle_business() -> void:
 	progress.revision += 1
 
 func end_shift() -> void:
+	Visits.close_shift(self)
 	trace("shift_closed", {"day":progress.day,"elapsed":progress.shift_elapsed})
 	open_for_business = false
 	progress.shift = "closing"
@@ -800,7 +821,9 @@ func advance_queue() -> void:
 		line[i].view.caption.text=Definition.DISHES[line[i].dish]+"\nК шефу%s · %d в очереди"%[bonus_text,i+1]
 
 func dismiss_queue(customer: Dictionary) -> void:
+	if customer.state=="leaving": return
 	customer.state="leaving"
 	customer.path=[Vector3(-8.8,0,4.8),Vector3(17.4,0,1.65)]
 	customer.view.caption.text="До завтра!"
 	if customer.get("banquet",false): progress.banquet_finished+=1
+	Visits.settled(self,customer,false,"D")

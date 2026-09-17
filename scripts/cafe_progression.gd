@@ -21,6 +21,12 @@ const SHIFT_SECONDS := 480.0
 const CHEF_ORDER_INTERVALS := [Vector2(25.0,35.0),Vector2(45.0,60.0),Vector2(75.0,95.0),Vector2(105.0,130.0),Vector2(140.0,175.0),Vector2(180.0,220.0)]
 const CHEF_ORDER_PREMIUM := [1.0,1.5,2.2,3.0,3.8,4.8]
 const LAB_PRICES := [40, 60, 80]
+var journey_auto_served := 0
+var journey_meals_served := 0
+var visit: Dictionary = {}
+var visit_serial := 0
+var visit_next_day := 0
+var visit_next_kind := "critics"
 var free_clones := 0
 var free_workers: Array = []
 var next_clone_id := 1
@@ -121,31 +127,11 @@ func can_attempt(stations: Array, served: int) -> bool:
 	return true
 
 func objective(stations: Array, served: int, opened: bool) -> String:
-	if phase == "tasting": return "Дегустатор · блюдо %d/3 на B или лучше" % (tasting_done.size() + 1)
-	if shift == "night": return "Ночь · отдых и покупки · для нового дня всем в Шеф-кровать"
-	if shift == "closing": return "Заканчиваем последние заказы · затем ночной перерыв"
-	if stars == 0:
-		if not starter_reward: return "Первый гость → соус в подарок · открой кафе у компьютера"
-		if can_attempt(stations, served): return "Всё готово · пригласи дегустатора у компьютера"
-		return "Открой кафе · покупки у компьютера" if not opened else "Гости %d/15 · лаборатория %d/3 · оборудование в компьютере" % [manual_served, lab_stage]
-
-	if phase == "preparing": return "Банкет · завершаем обычные заказы"
-	if phase == "showcase": return "Инспектор · приготовь картофель на B или лучше"
-	if phase == "service": return "Банкет · %d/%d гостей · %d/%d довольны" % [banquet_served, BANQUET_SERVED, banquet_good, BANQUET_GOOD]
-	if stars >= 2: return "Две звезды · парная кухня и усилители лаборатории доступны в магазине"
-	var known := 0
-	for station in stations: known += station.recipes.size()
-	if stations.size() == 1: return "Первая звезда · купи стойку с клонами за 120"
-	if known == 0: return "Первый показ · выбери блюдо и обучи бригаду"
-	if not opened: return "Кафе закрыто · открой двери в меню кафе"
-	if stations.size() < 2: return "Следующая цель · вторая стойка с бригадой — 120"
-	if popularity < STAR_POPULARITY: return "Укрась кафе · популярность %d/%d для второй звезды" % [popularity, STAR_POPULARITY]
-	if can_attempt(stations, served): return "Всё готово · пригласи инспектора второй звезды"
-	return "Подготовь три блюда на B и обслужи 12 гостей"
+	return str(preload("res://scripts/cafe_journey.gd").current(self,stations,served,opened).title)
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["journey_auto_served", "journey_meals_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:

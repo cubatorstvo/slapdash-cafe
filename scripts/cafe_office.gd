@@ -19,6 +19,7 @@ var confirm_reset := false
 var lab_branch := "formula"
 var lab_target := 2
 var lab_reserve := 150
+var visit_live_status: Label
 var lab_live_status: Label
 
 func _ready() -> void:
@@ -28,7 +29,7 @@ func _ready() -> void:
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	panel.offset_left = 100
 	panel.offset_right = -100
-	panel.offset_top = 112
+	panel.offset_top = 164
 	panel.offset_bottom = -40
 	panel.theme = Style.make()
 	panel.add_theme_stylebox_override("panel", Style.box(Color("203b3c"), 20, 22))
@@ -112,6 +113,7 @@ func _process(_delta: float) -> void:
 		for pot in progress.lab_pots:
 			if pot.phase!="empty": occupied+=1
 		lab_live_status.text="Занято горшков: %d/%d · свободных клонов: %d\n%s"%[occupied,LabPolicy.pot_count(progress),progress.free_clones,"Кресло: "+str(calibration.state.get("notice","")) if calibration.busy() else "Кресло свободно"]
+	if tab=="overview" and is_instance_valid(visit_live_status): visit_live_status.text=game.service.Visits.status(progress)
 	var next := "%s:%d:%d:%s:%s" % [tab, progress.revision, game.service.served, str(game.service.open_for_business), str(game.service.any_training())]
 	if stamp != next:
 		stamp = next
@@ -126,11 +128,23 @@ func rebuild() -> void:
 	if not host: label(content,"Покупки подтверждает хозяин кафе. Коробки можно распаковывать вместе.",15)
 	match tab:
 		"overview":
-			label(content,progress.objective(service.stations,service.served,service.open_for_business),22)
+			var goal: Dictionary=preload("res://scripts/cafe_journey.gd").current(progress,service.stations,service.served,service.open_for_business)
+			label(content,str(goal.chapter),16)
+			label(content,str(goal.title),22)
+			label(content,str(goal.detail),17)
+			var marker_toggle:=CheckBox.new(); content.add_child(marker_toggle)
+			marker_toggle.text="Показывать ориентир следующего шага"
+			marker_toggle.button_pressed=game.journey_markers
+			marker_toggle.toggled.connect(func(on):game.journey_markers=on)
 			button(content,"Закончить смену" if service.open_for_business else "Открыть кафе",func():send({"action":"business"},true),host and not progress.busy() and progress.shift in ["morning","open"])
 			label(content,"Личная стойка — твои заказы. Купленное оборудование приедет ко входу: забери коробку и установи на отмеченное место.")
-			label(content,"Свободных клонов: %d. Создание в лаборатории — 60.\nЛаборатория: закажи колбу, питание и стабилизатор. Установи на верстаке в лаборатории. Клоны откроются после первой звезды."%progress.free_clones)
+			label(content,"Свободных клонов: %d. Стол, оборудование и работник приобретаются отдельно.\nПосле первой звезды: эксперимент — 20, микроскоп сохраняет формулу, посадка — 60. Вырасти клона, прими запись блюда и дождись его первого заказа."%progress.free_clones)
 			label(content,"Ночью посетителей нет. Все игроки ложатся в общую Шеф-кровать, чтобы начать новый день. Доставки и обустройство доступны днём тоже.")
+			if progress.journey_auto_served>0:
+				label(content,"Другие пути развития: повысить формулу в лаборатории или улучшить прогноз отдыха. Выбирай то, что сейчас полезнее твоему кафе.",15)
+				button(content,"Формулы и выращивание",func():tab="laboratory";stamp="";rebuild())
+				button(content,"Комната отдыха и прогноз бонуса",func():tab="lounge";stamp="";rebuild())
+			visit_card()
 			button(content,"Сохранить кафе",func():send({"action":"save"}),host)
 			button(content,"Папка плейтеста",func():OS.shell_open(ProjectSettings.globalize_path(game.telemetry.folder)))
 			label(content,"Отметки для плейтеста: F8 — скучно, F9 — непонятно, F10 — прикольно. События пишутся локально.",15)
@@ -172,7 +186,7 @@ func rebuild() -> void:
 			else:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
 				label(content,"Один дегустатор, три стандартных блюда B или лучше. Ошибку можно повторить бесплатно. Перед проверкой установи сковороду, соус, бокал и кувшин." if progress.stars==0 else "Девять гостей за четыре минуты: трое требуют личного заказа шефа. Нужно 8 подач и 6 оценок B или выше.")
-				button(content,"Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию",func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training())
+				button(content,"Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию",func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
 	scroll.scroll_vertical = offset
 
@@ -277,3 +291,26 @@ func laboratory_page() -> void:
 		if "lab_cal_auto" in p.lab_upgrades:
 			button(content,"Выключить авторекалибровку" if p.lab_auto_calibration else "Включить авторекалибровку",func():send({"action":"lab_cal_auto","enabled":not p.lab_auto_calibration}),host)
 		label(content,"Выпуск учитывает свободные места на станциях, запас и уже посаженных клонов. Резерв ограничивает расходы автовыпуска и автоматического кресла. Автокресло работает днём; растения продолжают расти вечером.",15)
+
+func visit_card() -> void:
+	var service=game.service
+	var p=service.progress
+	var phase:=str(p.visit.get("phase",""))
+	if phase.is_empty() or phase=="declined": return
+	var host: bool=not game.session.is_guest()
+	var data: Dictionary=service.Visits.spec(p)
+	label(content,"ДОБРОВОЛЬНЫЙ ВИЗИТ",20)
+	visit_live_status=label(content,service.Visits.status(p),17)
+	if phase=="offered":
+		label(content,"Четыре стандартных заказа лично шефу, все на A или S." if p.visit.kind=="critics" else "Шесть заказов выполняют клоны по принятым записям; минимум пять оценок B или лучше. Личные показы в зачёт не входят.",16)
+		label(content,"После принятия: минута на подготовку и четыре минуты на обслуживание. Бонус: %d денег и %d популярности, плюс обычная оплата блюд."%[data.cash,data.popularity],16)
+		label(content,"Предложение ждёт без срока. Если сегодня осталось меньше пяти минут, визит назначится на завтра. При неудаче бонуса нет; деньги за поданные блюда сохраняются.",15)
+		var id: int=p.visit.id
+		button(content,"Принять визит",func():send({"action":"visit_accept","id":id}),host and not p.busy() and p.shift in ["morning","open"] and service.Visits.eligible(service,str(p.visit.kind)))
+		button(content,"Пропустить предложение",func():send({"action":"visit_decline","id":id}),host)
+	elif service.Visits.busy(p):
+		label(content,"Проверку на звезду можно начать после завершения или отмены визита. Закрытие смены завершает начавшийся визит.",15)
+		var id: int=p.visit.id
+		button(content,"Отменить визит",func():send({"action":"visit_cancel","id":id}),host)
+	else:
+		label(content,"Следующее предложение появится не раньше дня %d. Можно продолжать развитие кафе."%p.visit_next_day,15)

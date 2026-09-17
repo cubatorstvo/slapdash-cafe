@@ -27,6 +27,8 @@ var hud: CanvasLayer
 var menu: CanvasLayer
 var session: Node
 var steam: Node
+var journey_markers := true
+var journey_marker: Node3D
 var session_paused := false
 var bound_station := 0
 var bound_revision := -1
@@ -99,6 +101,8 @@ func _ready() -> void:
 	annex=Annex.new()
 	add_child(annex)
 	annex.setup(self)
+	journey_marker=preload("res://scripts/journey_marker.gd").new()
+	add_child(journey_marker); journey_marker.game=self
 	sleep_cinematic=preload("res://scripts/sleep_cinematic.gd").new()
 	add_child(sleep_cinematic)
 	sleep_cinematic.setup(self)
@@ -157,7 +161,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode in [KEY_F8,KEY_F9,KEY_F10]:
 			var label: String = {KEY_F8:"скучно",KEY_F9:"непонятно",KEY_F10:"прикольно"}[event.physical_keycode]
-			telemetry.event("player_mark",{"label":label,"day":service.progress.day,"activity":telemetry.activity})
+			telemetry.event("player_mark",{"label":label,"day":service.progress.day,"activity":telemetry.activity,"journey":preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business).key,"visit":service.progress.visit.get("phase","")})
 			hud.show_toast("В плейтест записано: "+label)
 			return
 		if event.physical_keycode == KEY_B and not office.opened() and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
@@ -380,13 +384,17 @@ func refresh_hud() -> void:
 	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"
-	hud.goal.text = service.progress.objective(service.stations, service.served, service.open_for_business)
+	var next: Dictionary=preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business)
+	hud.goal.text=str(next.title)
+	hud.journey.text=str(next.detail)
+	hud.visit_status.text=service.Visits.status(service.progress) if service.progress.visit.get("phase","") in ["offered","scheduled","active"] else ""
 	if service.progress.rest_multiplier>1.0: hud.goal.text+=" · отдых +%d%%"%roundi((service.progress.rest_multiplier-1.0)*100)
 	hud.progress.value = 0
 	hud.prompt.text = ""
 	hud.recipe_panel.hide()
 	if session.local_sleeping():
 		hud.goal.text = "Сон · ожидание остальных игроков"
+		hud.journey.text = "Утром вернёмся к следующей цели кафе."
 		hud.prompt.text = session.sleep_status_text() + " · E встать"
 		return
 	if laboratory.nursery.pulling(session.local_id()):
@@ -412,6 +420,7 @@ func refresh_hud() -> void:
 		return
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
+	hud.journey.text = str(next.title)+". "+str(next.detail) if station.training.purpose=="lesson" else "Цель кафе: "+str(next.title)
 	if station.manual_station and not service.manual_order(station).is_empty(): hud.show_chef_request(station.customer_order)
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	if service.progress.shift == "open" and not service.progress.busy():

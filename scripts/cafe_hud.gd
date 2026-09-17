@@ -9,6 +9,8 @@ var recipe_content: VBoxContainer
 var recipe_scroll: ScrollContainer
 var recipe_stamp := ""
 var bottom: PanelContainer
+var journey: Label
+var visit_status: Label
 var goal: Label
 var clock: Label
 var clone_status: Label
@@ -33,7 +35,7 @@ func _ready() -> void:
 	top.offset_left = 26
 	top.offset_right = -26
 	top.offset_top = 22
-	top.offset_bottom = 92
+	top.offset_bottom = 150
 	var row := HBoxContainer.new()
 	top.add_child(row)
 	row.add_theme_constant_override("separation", 24)
@@ -46,6 +48,9 @@ func _ready() -> void:
 	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	goal = _label(order,"",20)
 	clone_status = _label(order,"",14,CafeStyle.MINT)
+	journey = _label(order,"",15,CafeStyle.CREAM)
+	journey.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	journey.max_lines_visible = 2
 	clock = _label(row,"",18,CafeStyle.GOLD)
 	var office_button := Button.new()
 	row.add_child(office_button)
@@ -59,8 +64,8 @@ func _ready() -> void:
 	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	recipe_panel.offset_left = -346
 	recipe_panel.offset_right = -26
-	recipe_panel.offset_top = 110
-	recipe_panel.offset_bottom = 110
+	recipe_panel.offset_top = 164
+	recipe_panel.offset_bottom = 164
 	recipe_panel.custom_minimum_size = Vector2(320, 0)
 	recipe_scroll = ScrollContainer.new()
 	recipe_panel.add_child(recipe_scroll)
@@ -102,6 +107,11 @@ func _ready() -> void:
 	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	prompt.add_theme_constant_override("outline_size",5)
 	prompt.add_theme_color_override("font_outline_color",CafeStyle.INK)
+	visit_status = _label(root,"",15,CafeStyle.MINT)
+	visit_status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	visit_status.offset_left=130; visit_status.offset_right=-130
+	visit_status.offset_top=-122; visit_status.offset_bottom=-96
+	visit_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
 	toast = _label(root,"",24,CafeStyle.GOLD)
 	toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	toast.offset_left = -390
