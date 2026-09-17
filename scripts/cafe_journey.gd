@@ -155,26 +155,60 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 		if p.popularity<30: return step("popularity","Подними популярность · %d/30"%p.popularity,"Выбери украшения: вывеска +10, гирлянда +15, зелёный уголок +20. Покупки — в компьютере.")
 		if p.can_attempt(stations,served): return step("second_star","Пригласи делегацию второй звезды","Компьютер → Звёзды. За 4 минуты: 8 подач, 6 оценок B; три гостя заказывают лично шефу.")
 		return step("ready_crews","Дождись готовности двух бригад","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Звёзды.")
-	# The available campaign is complete; later purchases remain a voluntary playground.
-	if not p.expanded: return step("sandbox_expansion","Две звезды получены · можно освоить парную кухню","Основной этап завершён. Для нового блюда расширь зал за 180; дальнейшее развитие свободное.")
-	if kitchen==null: return buy(p,"kitchen",4,"Необязательная следующая цель: освоить кухню с двумя ролями.")
-	if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
-	var kitchen_equipment:=equip(p,kitchen,"meal")
-	if not kitchen_equipment.is_empty(): return kitchen_equipment
-	if not kitchen.recipes.has("meal"): return teach(kitchen,"meal")
-	if p.journey_meals_served<1: return step("first_meal","Получи первый доход от парной кухни","Открой кафе: оба клона повторят совместный рецепт на реальном заказе.","station",kitchen.station_id)
-	return step("complete","Текущий этап пройден · свободное развитие","Первые две звезды получены. Осваивай визиты и улучшения; лаборатория и отдых рассчитаны также на будущие 4–5 звёзд.")
+	if p.stars==2:
+		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Третья звезда проверит уже не сам факт автоматизации, а мощность всего кафе.")
+		if kitchen==null: return buy(p,"kitchen",4,"Парная кухня нужна как третья производственная линия перед Большим обедом.")
+		if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
+		var kitchen_equipment:=equip(p,kitchen,"meal")
+		if not kitchen_equipment.is_empty(): return kitchen_equipment
+		var meal_report: Dictionary=kitchen.recipes.get("meal",{}).get("quality",{})
+		if not meal_report.get("present",false) or not meal_report.get("grade","D") in ["B","A","S"]: return teach(kitchen,"meal",true)
+		if p.journey_meals_served<1: return step("first_meal","Получи первый доход от парной кухни","Открой кафе: оба клона повторят совместный рецепт на реальном заказе.","station",kitchen.station_id)
+		for station in counters:
+			if crew_count(station)<station.role_count(): return grow(p,stations)
+		for dish in ["sausage","potato","wine"]:
+			var ready:=false
+			for station in counters:
+				var report: Dictionary=station.recipes.get(dish,{}).get("quality",{})
+				if report.get("present",false) and report.get("grade","D") in ["B","A","S"]: ready=true
+			if not ready:
+				var selected=counters[0]
+				for station in counters:
+					if equipped(station,dish): selected=station; break
+				return teach(selected,dish,true)
+		if p.journey_meals_served<p.THIRD_STAR_MEALS:
+			return step("meal_capacity","Дай парной кухне поработать · %d/%d"%[p.journey_meals_served,p.THIRD_STAR_MEALS],"Пусть новая бригада несколько раз выполнит реальный заказ. Это покажет, что двухролевой процесс стабильно работает.","station",kitchen.station_id)
+		if p.third_star_auto_served<p.THIRD_STAR_AUTO_SERVED:
+			return step("scale_service","Проверь мощность кафе · %d/%d автоподач"%[p.third_star_auto_served,p.THIRD_STAR_AUTO_SERVED],"Оставь кафе работать и наблюдай за узкими местами. Если поток копится, можно сократить запись, улучшить темп клонов или отдых — конкретный способ не обязателен.","station",kitchen.station_id)
+		if p.popularity<p.THIRD_STAR_POPULARITY:
+			return step("third_popularity","Подними популярность · %d/%d"%[p.popularity,p.THIRD_STAR_POPULARITY],"Большому обеду нужен заметный поток. Украшения и добровольные визиты повышают популярность; выбери удобный путь.")
+		if p.can_attempt(stations,served): return step("third_star","Пригласи гостей на Большой обед","Компьютер → Звёзды. За 4 минуты придут 14 гостей: нужно 11 подач и 8 оценок B или выше. Три заказа остаются за шефом.")
+		return step("third_ready","Подготовь три производственные линии","Заверши обучение или рекалибровку. Компьютер → Звёзды показывает, чего не хватает перед Большим обедом.")
+	return step("complete","Третья звезда получена · этап масштабирования пройден","Кафе выдерживает плотный поток. Следующий крупный этап добавит специализированную кухню с взаимозависимыми ролями.")
 
 static func current(p, stations: Array, served: int, opened: bool) -> Dictionary:
 	var result:=next_step(p,stations,served,opened)
-	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "СВОБОДНОЕ РАЗВИТИЕ"
+	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "МАСШТАБИРОВАНИЕ ПРОЙДЕНО"
 	if p.busy():
-		result=step("inspection","Дегустация · %d/3"%mini(3,p.tasting_done.size()+1) if p.phase=="tasting" else "Делегация · %d/8 подач · %d/6 довольны"%[p.banquet_served,p.banquet_good],"Приготовь каждое блюдо на B или лучше. Неудачное можно повторить." if p.phase=="tasting" else "Шеф обслуживает личные заказы, бригады повторяют записи. Следи за общим временем.","station",1)
+		var inspection_title: String
+		var inspection_detail: String
+		if p.phase=="tasting":
+			inspection_title="Дегустация · %d/3"%mini(3,p.tasting_done.size()+1)
+			inspection_detail="Приготовь каждое блюдо на B или лучше. Неудачное можно повторить."
+		elif p.stars==2:
+			inspection_title="Большой обед · %d/%d подач · %d/%d B+"%[p.banquet_served,p.inspection_served_target(),p.banquet_good,p.inspection_good_target()]
+			inspection_detail="Три личных заказа остаются за шефом. Остальной поток должен выдержать автоматизированный зал."
+		else:
+			inspection_title="Делегация · %d/%d подач · %d/%d довольны"%[p.banquet_served,p.inspection_served_target(),p.banquet_good,p.inspection_good_target()]
+			inspection_detail="Шеф обслуживает личные заказы, бригады повторяют записи. Следи за общим временем."
+		result=step("inspection",inspection_title,inspection_detail,"station",1)
 		result.chapter="ПРОВЕРКА НА ЗВЕЗДУ"
-		if p.phase=="preparing": result.title="Завершаем заказы перед проверкой"; result.detail="Делегация начнётся после освобождения станций."
-	elif p.shift not in ["night","closing"] and result.key in ["first_star","second_star"] and p.visit.get("phase","") in ["scheduled","active"]:
+		if p.phase=="preparing":
+			result.title="Завершаем заказы перед проверкой"
+			result.detail=("Большой обед" if p.stars==2 else "Делегация")+" начнётся после освобождения станций."
+	elif p.shift not in ["night","closing"] and result.key in ["first_star","second_star","third_star"] and p.visit.get("phase","") in ["scheduled","active"]:
 		result.title="К проверке на звезду всё готово"
-		result.detail="Сначала заверши или отмени добровольный визит в компьютере, затем пригласи делегацию."
+		result.detail="Сначала заверши или отмени добровольный визит в компьютере, затем пригласи проверку."
 	elif p.shift in ["night","closing"]:
 		result.detail="После отдыха: "+result.title+". "+result.detail
 		result.title="Смена завершена · всем в Шеф-кровать" if p.shift=="night" else "Завершаем последние заказы"
