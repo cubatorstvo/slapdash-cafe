@@ -73,7 +73,9 @@ func refresh() -> void:
 		else:
 			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[E] Компьютер · 250"
 	ribbon.visible = not progress.expanded
-	star_label.text = "★ ★ ☆ ☆ ☆" if progress.stars >= 2 else "★ ☆ ☆ ☆ ☆" if progress.stars == 1 else "☆ ☆ ☆ ☆ ☆"
+	var stars_text := PackedStringArray()
+	for i in range(5): stars_text.append("★" if i < progress.stars else "☆")
+	star_label.text = " ".join(stars_text)
 	decor.lights.hide()
 	refresh_night()
 
