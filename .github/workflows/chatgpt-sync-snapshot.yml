@@ -1,0 +1,19 @@
+name: ChatGPT Project Snapshot
+on:
+  push:
+    branches:
+      - chatgpt-sync-snapshot
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack repository
+        run: |
+          zip -qr slapdash-cafe-snapshot.zip . -x '.git/*' 'slapdash-cafe-snapshot.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slapdash-cafe-snapshot
+          path: slapdash-cafe-snapshot.zip
+          if-no-files-found: error
+          retention-days: 1
