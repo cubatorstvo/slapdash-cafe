@@ -8,6 +8,7 @@ const GRIDDLE := Vector2(0.0, -0.28)
 const ASSEMBLY := Vector2(0.0, 0.72)
 const GUEST_MOUTH := Vector3(0, 1.5, -1.61)
 const ITEMS := ["patty", "patty_spatula", "seasoning", "bun", "cheese", "sauce_bottle", "chili_bottle"]
+const NAMES := {"patty":"котлета","patty_spatula":"лопатка","seasoning":"приправа","bun":"булка","cheese":"сыр","sauce_bottle":"соус","chili_bottle":"острый соус"}
 const ZONE_ITEMS := [["patty", "patty_spatula", "seasoning"],["bun", "cheese", "sauce_bottle", "chili_bottle"]]
 const ZONE_VALUES := [["patty_sides", "patty_face", "patty_state", "patty_season", "flip_time"],["bun_toast", "cheese_applied", "sauce_amount", "chili_amount", "served"]]
 var equipment: Array = ["grill_kit", "assembly_kit"]
