@@ -16,11 +16,13 @@ jobs:
           fetch-depth: 0
       - name: Apply verified patch to main
         run: |
-          if [ ! -f .sync/apply-main.patch.gz.b64 ]; then
-            echo "No main patch in this revision."
+          shopt -s nullglob
+          parts=(.sync/patch-part-*)
+          if [ ${#parts[@]} -eq 0 ]; then
+            echo "No main patch chunks in this revision."
             exit 0
           fi
-          cp .sync/apply-main.patch.gz.b64 /tmp/apply-main.patch.gz.b64
+          cat "${parts[@]}" > /tmp/apply-main.patch.gz.b64
           base64 -d /tmp/apply-main.patch.gz.b64 | gzip -d > /tmp/apply-main.patch
           git fetch origin main
           git checkout -B main origin/main
