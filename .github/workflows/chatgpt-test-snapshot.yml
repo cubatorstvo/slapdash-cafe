@@ -1,0 +1,17 @@
+name: ChatGPT Test Snapshot
+on:
+  push:
+    branches:
+      - chatgpt-test-snapshot
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack repository
+        run: zip -qr slapdash-cafe-current.zip . -x '.git/*' 'slapdash-cafe-current.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slapdash-cafe-current
+          path: slapdash-cafe-current.zip
+          retention-days: 1
