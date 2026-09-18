@@ -7,6 +7,17 @@ const TYPES := {
 	"solyanka_kitchen": {"title": "Солянка", "roles": ["Огонь", "Мешалка", "Соль"], "dishes": ["solyanka"], "width": 6.1}
 }
 const DISHES := {"wine": "Бокал вина", "potato": "Жареный картофель", "sausage": "Сосиска в соусе", "meal": "Стейк с макаронами", "burger":"Бургер", "cheeseburger":"Чизбургер", "spicy_burger":"Острый бургер", "solyanka":"Солянка"}
+const DISH_ORDER := ["wine","potato","sausage","meal","burger","cheeseburger","spicy_burger","solyanka"]
+const DISH_EQUIPMENT := {
+	"wine":["jug","cup"],
+	"potato":["pan","plates"],
+	"sausage":["sauce","plates"],
+	"meal":["meat_kit","pasta_kit"],
+	"burger":["grill_kit","assembly_kit"],
+	"cheeseburger":["grill_kit","assembly_kit"],
+	"spicy_burger":["grill_kit","assembly_kit"],
+	"solyanka":["fire_kit","stir_kit","salt_kit"]
+}
 const REQUIREMENTS := {
 	"wine": "Вино: 200–250 мл, кружка 300 мл, бережливость ≤5 мл вне посуды и подноса.",
 	"potato": "Картофель: 6 сторон, порция на подносе; тарелка улучшает оценку.",
@@ -23,4 +34,15 @@ static func crew(type_id: String, station_id: int) -> Array:
 	var names := ["Боря", "Жора", "Лёва", "Сёма", "Кеша", "Веня", "Федя", "Толя"]
 	for role in range(TYPES[type_id].roles.size()):
 		result.append({"name": "%s №%d.%d" % [names[(station_id + role - 1) % names.size()], station_id, role + 1]})
+	return result
+
+static func type_for_dish(dish: String) -> String:
+	for type_id in TYPES:
+		if dish in TYPES[type_id].dishes: return type_id
+	return ""
+
+static func missing_equipment(dish: String, equipment: Array) -> Array:
+	var result: Array=[]
+	for item in DISH_EQUIPMENT.get(dish,[]):
+		if item not in equipment: result.append(item)
 	return result

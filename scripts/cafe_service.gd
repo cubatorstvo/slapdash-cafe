@@ -2,6 +2,7 @@ extends Node3D
 const Visits = preload("res://scripts/cafe_visits.gd")
 const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
+const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
@@ -24,6 +25,11 @@ var spawn_clock := 3.0
 var chef_order_clock := 3.0
 var game: Node3D
 var rng := RandomNumberGenerator.new()
+var masterclasses: Array=[]
+var next_masterclass_id := 1
+var masterclass_pending: Dictionary={}
+var masterclass_station: Node3D
+var chef_station_backup: Node3D
 
 func _ready() -> void:
 	rng.randomize()
@@ -71,7 +77,164 @@ func training_for(peer: int) -> Node3D:
 func any_training() -> bool:
 	for station in stations:
 		if station.training.active() or station.pending_teacher > 0: return true
-	return false
+	return not masterclass_pending.is_empty()
+
+func masterclass_active() -> bool: return is_instance_valid(masterclass_station)
+func masterclass_locked() -> bool: return masterclass_active() or not masterclass_pending.is_empty()
+
+func stable_chef() -> Node3D:
+	return chef_station_backup if is_instance_valid(chef_station_backup) else by_id(1)
+
+func _masterclass_source(dish: String) -> Node3D:
+	var type_id: String=Definition.type_for_dish(dish)
+	if type_id=="counter": return stable_chef()
+	for station in stations:
+		if station==masterclass_station or station.manual_station or station.type_id!=type_id: continue
+		if Definition.missing_equipment(dish,station.equipment).is_empty(): return station
+	return null
+
+func masterclass_access(dish: String) -> Dictionary:
+	if dish not in Definition.DISH_ORDER: return {"available":false,"reason":"Неизвестное блюдо."}
+	if progress.stars<1: return {"available":false,"reason":"Мастер-классы откроются после первой звезды."}
+	var type_id: String=Definition.type_for_dish(dish)
+	if type_id=="counter":
+		var chef:=stable_chef()
+		if chef==null: return {"available":false,"reason":"Шеф-станция недоступна."}
+		var missing: Array=Definition.missing_equipment(dish,chef.equipment)
+		return {"available":missing.is_empty(),"reason":"" if missing.is_empty() else "На шеф-станции не хватает: "+", ".join(missing),"source_type":type_id}
+	var candidates: Array=[]
+	for station in stations:
+		if station!=masterclass_station and not station.manual_station and station.type_id==type_id: candidates.append(station)
+	if candidates.is_empty(): return {"available":false,"reason":"Сначала открой и установи кухню «%s»."%Definition.TYPES[type_id].title,"source_type":type_id}
+	for station in candidates:
+		if Definition.missing_equipment(dish,station.equipment).is_empty(): return {"available":true,"reason":"","source_type":type_id,"source_station":station.station_id}
+	var missing: Array=Definition.missing_equipment(dish,candidates[0].equipment)
+	return {"available":false,"reason":"Оснасти кухню: "+", ".join(missing),"source_type":type_id}
+
+func masterclass_options() -> Array:
+	var result: Array=[]
+	for dish in Definition.DISH_ORDER:
+		var access:=masterclass_access(dish)
+		result.append({"dish":dish,"available":bool(access.available),"reason":str(access.reason)})
+	return result
+
+func request_masterclass(dish: String, peer: int) -> String:
+	if progress.busy(): return "Сначала заверши текущую проверку."
+	if progress.shift in ["night","closing"]: return "Мастер-класс проводится в рабочее время."
+	if masterclass_locked(): return "Мастер-класс уже готовится или идёт."
+	if training_for(peer)!=null: return "Сначала заверши текущий показ."
+	var access:=masterclass_access(dish)
+	if not bool(access.available): return str(access.reason)
+	masterclass_pending={"dish":dish,"peer":peer}
+	progress.revision+=1
+	trace("masterclass_requested",{"dish":dish,"peer":peer})
+	_try_begin_masterclass()
+	return ""
+
+func _try_begin_masterclass() -> void:
+	if masterclass_pending.is_empty() or masterclass_active(): return
+	var chef:=by_id(1)
+	if chef==null or not chef.manual_station or chef.training.active() or chef.state!="idle" or chef.customer_id>=0 or not chef_queue().is_empty(): return
+	var dish: String=str(masterclass_pending.dish)
+	var peer: int=int(masterclass_pending.peer)
+	var source:=_masterclass_source(dish)
+	if source==null:
+		masterclass_pending.clear()
+		progress.revision+=1
+		return
+	chef_station_backup=chef
+	stations.erase(chef)
+	remove_child(chef)
+	var stage:=Station.new()
+	stage.manual_station=true
+	stage.masterclass_station=true
+	stage.slot_index=0
+	stage.station_id=1
+	stage.type_id=Definition.type_for_dish(dish)
+	stage.equipment=source.equipment.duplicate()
+	stage.upgrades=source.upgrades.duplicate()
+	stage.position=slot_position(0)
+	stage.rotation.y=PI
+	add_child(stage)
+	stations.push_front(stage)
+	masterclass_station=stage
+	masterclass_pending.clear()
+	stage.training.open(dish,peer,"masterclass")
+	progress.revision+=1
+	trace("masterclass_started",{"dish":dish,"peer":peer,"type":stage.type_id})
+
+func finish_masterclass_layout(stage: Node3D) -> void:
+	if not masterclass_active() or stage!=masterclass_station: return
+	stations.erase(masterclass_station)
+	remove_child(masterclass_station)
+	masterclass_station.queue_free()
+	masterclass_station=null
+	if is_instance_valid(chef_station_backup):
+		add_child(chef_station_backup)
+		stations.push_front(chef_station_backup)
+	chef_station_backup=null
+	chef_order_clock=maxf(chef_order_clock,5.0)
+	progress.revision+=1
+
+func cancel_masterclass() -> void:
+	if not masterclass_active():
+		masterclass_pending.clear()
+		progress.revision+=1
+		return
+	var stage:=masterclass_station
+	if stage.training.active(): stage.training.close()
+	finish_masterclass_layout(stage)
+
+func save_masterclass_from_run(stage: Node3D, dish: String, tracks: Array) -> bool:
+	if not masterclass_active() or stage!=masterclass_station or tracks.size()!=stage.role_count(): return false
+	for track in tracks:
+		if track.is_empty() or track.get("frames",[]).is_empty(): return false
+	stage.show_tracks(tracks,stage.Run.duration_ticks(tracks)-1)
+	var quality: Dictionary=stage.model.quality()
+	var number:=1
+	for record in masterclasses:
+		if str(record.get("dish",""))==dish and not bool(record.get("archived",false)): number+=1
+	var record:=Masterclasses.make_record(next_masterclass_id,dish,stage.type_id,tracks,stage.Run.duration_ticks(tracks)/60.0,quality,Masterclasses.default_name(dish,number))
+	next_masterclass_id+=1
+	masterclasses.append(record)
+	progress.revision+=1
+	trace("masterclass_saved",{"id":record.id,"dish":dish,"seconds":record.duration,"grade":quality.grade})
+	return true
+
+func masterclass_by_id(id: int) -> Dictionary:
+	for record in masterclasses:
+		if int(record.get("id",0))==id: return record
+	return {}
+
+func rename_masterclass(id: int, value: String) -> String:
+	var record:=masterclass_by_id(id)
+	if record.is_empty(): return "Запись не найдена."
+	var name:=value.strip_edges().left(64)
+	if name.is_empty(): return "Название не может быть пустым."
+	record.name=name
+	progress.revision+=1
+	return ""
+
+func delete_masterclass(id: int) -> String:
+	for i in range(masterclasses.size()):
+		if int(masterclasses[i].get("id",0))==id:
+			masterclasses.remove_at(i)
+			progress.revision+=1
+			return ""
+	return "Запись не найдена."
+
+func masterclass_summaries() -> Array:
+	var result: Array=[]
+	for record in masterclasses: result.append(Masterclasses.summary(record))
+	return result
+
+func _archive_legacy_recipes() -> void:
+	for station in stations:
+		if station.manual_station: continue
+		for dish in station.recipes:
+			var recipe: Dictionary=station.recipes[dish]
+			masterclasses.append(Masterclasses.make_record(next_masterclass_id,str(dish),station.type_id,recipe.tracks,float(recipe.duration),recipe.get("quality",{}),Masterclasses.default_name(str(dish),1,true,station.station_id),true,station.station_id))
+			next_masterclass_id+=1
 
 func request_training(station: Node3D, dish: String, peer: int) -> bool:
 	if station == null or not station.ready_crew() or station.manual_station or not dish in station.dishes() or progress.busy(): return false
@@ -98,6 +261,7 @@ func _attach_customer(station: Node3D) -> void:
 
 func advance(delta: float) -> void:
 	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
+	_try_begin_masterclass()
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
@@ -189,13 +353,14 @@ func chef_order_recipe() -> String:
 	return str(pool[rng.randi_range(0,pool.size()-1)])
 
 func spawn_chef_customer() -> bool:
+	if masterclass_locked(): return false
 	if chef_queue().size()>=CHEF_QUEUE_LIMIT: return false
 	var recipe:=chef_order_recipe()
 	if recipe.is_empty(): return false
 	return spawn_customer(recipe,false,true)
 
 func advance_chef_orders(delta: float) -> void:
-	if Visits.chef_reserved(progress): return
+	if Visits.chef_reserved(progress) or masterclass_locked(): return
 	chef_order_clock-=delta
 	if chef_order_clock>0: return
 	if chef_queue().size()<CHEF_QUEUE_LIMIT: spawn_chef_customer()
@@ -499,7 +664,11 @@ func refresh_views(delta := 0.016) -> void:
 
 func save_data() -> Dictionary:
 	var entries: Array = []
-	for station in stations:
+	var stable_stations: Array=stations.duplicate()
+	if masterclass_active() and is_instance_valid(chef_station_backup):
+		stable_stations.erase(masterclass_station)
+		stable_stations.push_front(chef_station_backup)
+	for station in stable_stations:
 		var entry: Dictionary = station.save_entry()
 		entry.crew = entry.crew.duplicate(true)
 		entry.equipment = entry.equipment.duplicate()
@@ -507,9 +676,14 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 13, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
+	return {"format": "station-cafe", "version": 14, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id}
 
 func clear_world() -> void:
+	if is_instance_valid(chef_station_backup):
+		chef_station_backup.queue_free()
+		chef_station_backup=null
+	masterclass_station=null
+	masterclass_pending.clear()
 	for station in stations:
 		remove_child(station)
 		station.queue_free()
@@ -526,7 +700,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -548,6 +722,10 @@ func load_data(data: Dictionary) -> bool:
 					if not Station.TeamModel.finite(collection[dish].get("duration")): return false
 					for track in tracks:
 						if track.is_empty() or track.frames.is_empty(): return false
+	if version>=14:
+		if not data.get("masterclasses",[]) is Array: return false
+		for record in data.get("masterclasses",[]):
+			if not Masterclasses.valid(record): return false
 	clear_world()
 	for entry in data.stations:
 		var slot_index := _saved_slot(entry, version)
@@ -564,6 +742,10 @@ func load_data(data: Dictionary) -> bool:
 	served = int(data.get("served", 0))
 	revenue = int(data.get("revenue", 0))
 	missed = int(data.get("missed", 0))
+	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
+	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
+	if version<14: _archive_legacy_recipes()
+	for record in masterclasses: next_masterclass_id=maxi(next_masterclass_id,int(record.get("id",0))+1)
 	open_for_business = data.get("open", true)
 	progress = Progression.new()
 	if data.get("progression") is Dictionary:

@@ -22,6 +22,7 @@ func setup(owner_station: Node3D) -> void:
 	participants.fill(0)
 
 func active() -> bool: return phase != "idle"
+func records_method() -> bool: return purpose in ["lesson","masterclass"]
 func role_for(peer: int) -> int: return participants.find(peer) if active() and peer > 0 else -1
 
 func open(recipe: String, peer: int, mode := "lesson") -> void:
@@ -36,7 +37,7 @@ func open(recipe: String, peer: int, mode := "lesson") -> void:
 	station.state = "training"
 	if purpose != "manual" or station.customer_id >= 0: station.ensure_taster()
 	configure_order()
-	info = "Выбери роль и напарника. Без напарника — последовательная запись."
+	info = "Выбери роль и напарника. Без напарника — последовательная запись." if purpose!="masterclass" else "Мастер-класс: выбери исполнителей ролей. В соло записывай роли последовательными дублями."
 	revision += 1
 
 func start_pass(assignments: Array) -> bool:
@@ -69,7 +70,7 @@ func start_pass(assignments: Array) -> bool:
 	events.clear()
 	station.reset_taster()
 	revision += 1
-	info = "Закончил? Позвони в звонок на стойке." if purpose == "lesson" else "Заказ готовится лично. Подай блюдо звонком."
+	info = "Закончил? Позвони в звонок на стойке." if records_method() else "Заказ готовится лично. Подай блюдо звонком."
 	station.get_parent().trace("cooking_start", {"station":station.station_id,"dish":dish,"purpose":purpose,"order":station.customer_order})
 	return true
 
@@ -99,7 +100,7 @@ func advance(delta: float) -> void:
 		_restore_inactive(tick)
 		station.model.step(commands, delta)
 		_restore_inactive(tick)
-	if purpose == "lesson":
+	if records_method():
 		for role in live_roles:
 			pending_tracks[role].frames.append(station.model.snapshot() if station.type_id == "counter" else station.model.zone_snapshot(role))
 	tick += 1
@@ -127,7 +128,7 @@ func finish_pass(confirmed := false) -> void:
 	station.get_parent().trace("cooking_finish", {"station":station.station_id,"dish":dish,"purpose":purpose,"seconds":tick/60.0,"grade":station.model.quality().grade})
 	for role in live_roles:
 		station.model.put_down() if station.type_id == "counter" else station.model.drop(role)
-	if purpose != "lesson":
+	if not records_method():
 		station.get_parent().finish_manual(station, station.model.quality())
 		return
 	for role in live_roles:
@@ -136,7 +137,7 @@ func finish_pass(confirmed := false) -> void:
 		station.get_parent().finish_showcase(station.model.quality())
 		return
 	phase = "review"
-	info = "Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний."
+	info = "Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний." if purpose!="masterclass" else "Дубль готов. Сохрани роли или повтори попытку; мастер-класс появится в видеотеке после принятия всех ролей."
 
 func resume_pass() -> void:
 	if phase != "confirm_finish": return
@@ -166,6 +167,14 @@ func accept() -> bool:
 	if not can_accept():
 		info = "Запиши все роли. Подтверждённый неполный результат тоже можно сохранить."
 		return false
+	if purpose=="masterclass":
+		var service=station.get_parent()
+		var saved: bool=service.save_masterclass_from_run(station,dish,tracks)
+		if not saved: return false
+		station.finish_taster(true)
+		close()
+		service.finish_masterclass_layout(station)
+		return true
 	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
 	station.drafts.erase(dish)
 	station.get_parent().progress.revision += 1

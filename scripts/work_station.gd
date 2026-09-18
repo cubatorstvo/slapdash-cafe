@@ -19,6 +19,7 @@ var equipment: Array = ["jug","cup","plates","pan","sauce","rag","meat_kit","pas
 var customer_order := {}
 var staffed := -1
 var manual_station := false
+var masterclass_station := false
 var station_id := 1
 var slot_index := 0
 var type_id := "counter"
@@ -288,8 +289,9 @@ func refresh(local_peer: int, delta: float) -> void:
 	was_resting = resting
 	if manual_station:
 		for student in students: student.hide()
-		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
-		view.station_label.text = "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
+		if type_id=="counter":
+			for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
+		view.station_label.text = "ШЕФ-СТАНЦИЯ · МАСТЕР-КЛАСС" if masterclass_station else "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
 	if not manual_station: view.station_label.text="СТАНЦИЯ %d · [E] ПОКАЖИ КАК"%station_id
 	if not manual_station and staffed>=0:
 		for role in range(role_count()):
