@@ -16,6 +16,10 @@ jobs:
           fetch-depth: 0
       - name: Apply verified patch to main
         run: |
+          if [ ! -f .sync/patch-ready ]; then
+            echo "Patch chunks are still being staged."
+            exit 0
+          fi
           shopt -s nullglob
           parts=(.sync/patch-part-*)
           if [ ${#parts[@]} -eq 0 ]; then
