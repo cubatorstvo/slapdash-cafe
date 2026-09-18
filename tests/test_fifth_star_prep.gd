@@ -57,7 +57,7 @@ func run() -> void:
 	print("3/5: journey finishes on final-inspection handoff")
 	var goal: Dictionary = Journey.current(p,[kitchen],100,true)
 	check(goal.key=="fifth_star","Journey recognizes completed orchestration chapter and exposes the final day")
-	check(goal.title.contains("пятой звезде"),"Journey hands off explicitly to the final fifth-star step")
+	check(goal.title.contains("пяти звёзд"),"Journey hands off explicitly to the final fifth-star day")
 
 	print("4/5: real cafe buys and installs the sixth three-role station")
 	var game = preload("res://scenes/cafe.tscn").instantiate()

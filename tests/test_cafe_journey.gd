@@ -123,7 +123,7 @@ func _initialize() -> void:
 	service.stations.append(solyanka)
 	p.fifth_star_solyanka_served=p.FIFTH_STAR_SOLYANKA_SERVED
 	p.fifth_star_auto_served=p.FIFTH_STAR_AUTO_SERVED
-	check(Journey.current(p,service.stations,15,true).key=="fifth_prep_done","Three-role kitchen completes the current fifth-star preparation chapter")
+	check(Journey.current(p,service.stations,15,true).key=="fifth_star","Three-role kitchen completes preparation and unlocks the final day")
 
 	print("2/3: optional visits, cooldown and persisted single rewards")
 	p.journey_auto_served=3; p.shift="open"; p.shift_elapsed=0
