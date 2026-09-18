@@ -96,6 +96,10 @@ func run() -> void:
 	check(incomplete_quality.grade != "S","Missing fire, salt and stirring lowers the final grade")
 	check(incomplete.take_serving().size()==2,"Incomplete solyanka can still be served")
 	check(incomplete.take_serving().is_empty(),"The same cauldron cannot be served twice")
+	var awful = Model.new()
+	for item in ["potato","onion","tomato"]: awful.dumped[item] = true
+	check(awful.quality().grade in ["D","C"],"Breaking most recipe goals produces a low grade")
+	check(awful.take_serving().size()==2,"Recipe violations never block serving, even below 13 items")
 	var complete = Model.new()
 	for item in thirteen_foods: complete.dumped[item] = true
 	complete.fire_started = true
