@@ -9,6 +9,7 @@ class Station:
 	var manual_station := false
 	var staffed := 3
 	var type_id := "solyanka_kitchen"
+	var equipment: Array = ["fire_kit","stir_kit","salt_kit"]
 	var recipes := {"solyanka":{"quality":{"present":true,"grade":"B"}}}
 	func role_count() -> int: return 3
 	func ready_crew() -> bool: return staffed>=role_count()
@@ -27,6 +28,7 @@ func ready_progression():
 	p.shift="morning"
 	p.fifth_star_solyanka_served=p.FIFTH_STAR_SOLYANKA_SERVED
 	p.fifth_star_auto_served=p.FIFTH_STAR_AUTO_SERVED
+	p.orchestration_expanded=true
 	return p
 
 func run() -> void:
