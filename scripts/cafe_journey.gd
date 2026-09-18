@@ -213,7 +213,8 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 		if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return teach(solyanka,"solyanka",true)
 		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Открой кафе. Три клона одновременно повторяют свои записи; следи, чтобы котёл получил минимум 13 вещей, огонь, соль и перемешивание.","station",solyanka.station_id)
 		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к финалу проверяет, что трёхролевая кухня не вытеснила старые производственные линии.","station",solyanka.station_id)
-		return step("fifth_prep_done","Подготовка к пятой звезде завершена","Солянка и весь зал работают стабильно. Следующий пункт плана — финальное испытание, пятая звезда и концовка.","station",solyanka.station_id)
+		if p.can_attempt(stations,served): return step("fifth_star","Начни «День пяти звёзд»","Компьютер → Звёзды. Финальная смена идёт тремя фазами: общий наплыв → критики → общая кульминация. Провал можно повторить бесплатно.","computer")
+		return step("fifth_ready","Подготовь кафе к финальной смене","Полный список условий перед Днём пяти звёзд — Компьютер → Звёзды.","computer")
 	return step("complete","Пять звёзд получены","Кафе завершило основную кампанию.")
 
 static func current(p, stations: Array, served: int, opened: bool) -> Dictionary:
@@ -225,6 +226,9 @@ static func current(p, stations: Array, served: int, opened: bool) -> Dictionary
 		if p.phase=="tasting":
 			inspection_title="Дегустация · %d/3"%mini(3,p.tasting_done.size()+1)
 			inspection_detail="Приготовь каждое блюдо на B или лучше. Неудачное можно повторить."
+		elif p.stars==4:
+			inspection_title="День пяти звёзд · %s · %d/%d подач · %d/%d B+"%[p.inspection_phase_name(),p.banquet_served,p.inspection_served_target(),p.banquet_good,p.inspection_good_target()]
+			inspection_detail=p.inspection_phase_detail()
 		elif p.stars==3:
 			inspection_title="Три волны · %d/%d подач · %d/%d B+"%[p.banquet_served,p.inspection_served_target(),p.banquet_good,p.inspection_good_target()]
 			inspection_detail="Смешанный поток → бургерный пик → общий финал. Следи, чтобы общая жарочная не простаивала в конфликте."
@@ -238,8 +242,8 @@ static func current(p, stations: Array, served: int, opened: bool) -> Dictionary
 		result.chapter="ПРОВЕРКА НА ЗВЕЗДУ"
 		if p.phase=="preparing":
 			result.title="Завершаем заказы перед проверкой"
-			result.detail=("Три волны" if p.stars==3 else "Большой обед" if p.stars==2 else "Делегация")+" начнётся после освобождения станций."
-	elif p.shift not in ["night","closing"] and result.key in ["first_star","second_star","third_star","fourth_star"] and p.visit.get("phase","") in ["scheduled","active"]:
+			result.detail=p.inspection_name()+" начнётся после освобождения станций."
+	elif p.shift not in ["night","closing"] and result.key in ["first_star","second_star","third_star","fourth_star","fifth_star"] and p.visit.get("phase","") in ["scheduled","active"]:
 		result.title="К проверке на звезду всё готово"
 		result.detail="Сначала заверши или отмени добровольный визит в компьютере, затем пригласи проверку."
 	elif p.shift in ["night","closing"]:

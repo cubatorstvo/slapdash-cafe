@@ -41,6 +41,12 @@ const ORCHESTRATION_EXPANSION_PRICE := 340
 const SOLYANKA_KITCHEN_PRICE := 520
 const FIFTH_STAR_AUTO_SERVED := 16
 const FIFTH_STAR_SOLYANKA_SERVED := 6
+# Structural values for the final-day skeleton. Stage 2 replaces the pass/fail thresholds with the final score model.
+const FINAL_INSPECTION_SECONDS := 360.0
+const FINAL_INSPECTION_GUESTS := 24
+const FINAL_INSPECTION_SERVED := 18
+const FINAL_INSPECTION_GOOD := 12
+const FINAL_INSPECTION_PHASE_SIZE := 8
 const SHIFT_SECONDS := 480.0
 const CHEF_ORDER_INTERVALS := [Vector2(25.0,35.0),Vector2(45.0,60.0),Vector2(75.0,95.0),Vector2(105.0,130.0),Vector2(140.0,175.0),Vector2(180.0,220.0)]
 const CHEF_ORDER_PREMIUM := [1.0,1.5,2.2,3.0,3.8,4.8]
@@ -193,12 +199,14 @@ func star_requirements(stations: Array, served: int) -> Array:
 	return []
 
 func can_attempt(stations: Array, served: int) -> bool:
-	if stars >= 4 or busy() or shift not in ["morning", "open"]: return false
+	if stars >= 5 or busy() or shift not in ["morning", "open"]: return false
 	for requirement in star_requirements(stations, served):
 		if not requirement.done: return false
 	return true
 
 func inspection_orders() -> Array:
+	if stars == 4:
+		return ["wine","meal","potato","burger","sausage","cheeseburger","solyanka","spicy_burger","solyanka","potato","cheeseburger","meal","burger","solyanka","spicy_burger","wine","sausage","solyanka","burger","meal","cheeseburger","spicy_burger","potato","solyanka"]
 	if stars == 3:
 		return ["meal","wine","burger","potato","sausage","meal","burger","cheeseburger","spicy_burger","burger","cheeseburger","spicy_burger","meal","potato","cheeseburger","burger","sausage","spicy_burger"]
 	if stars == 2:
@@ -206,28 +214,44 @@ func inspection_orders() -> Array:
 	return ["wine", "potato", "sausage", "sausage", "wine", "potato", "potato", "sausage", "wine"]
 
 func inspection_chef_indices() -> Array:
-	return [1,13,16] if stars == 3 else [1, 6, 11] if stars == 2 else [0, 3, 6]
+	return [0,9,16,22] if stars == 4 else [1,13,16] if stars == 3 else [1, 6, 11] if stars == 2 else [0, 3, 6]
 
 func inspection_seconds() -> float:
-	return FOURTH_STAR_SECONDS if stars == 3 else BIG_LUNCH_SECONDS if stars == 2 else BANQUET_SECONDS
+	return FINAL_INSPECTION_SECONDS if stars == 4 else FOURTH_STAR_SECONDS if stars == 3 else BIG_LUNCH_SECONDS if stars == 2 else BANQUET_SECONDS
 
 func inspection_guest_count() -> int:
-	return FOURTH_STAR_GUESTS if stars == 3 else BIG_LUNCH_GUESTS if stars == 2 else BANQUET_GUESTS
+	return FINAL_INSPECTION_GUESTS if stars == 4 else FOURTH_STAR_GUESTS if stars == 3 else BIG_LUNCH_GUESTS if stars == 2 else BANQUET_GUESTS
 
 func inspection_served_target() -> int:
-	return FOURTH_STAR_SERVED if stars == 3 else BIG_LUNCH_SERVED if stars == 2 else BANQUET_SERVED
+	return FINAL_INSPECTION_SERVED if stars == 4 else FOURTH_STAR_SERVED if stars == 3 else BIG_LUNCH_SERVED if stars == 2 else BANQUET_SERVED
 
 func inspection_good_target() -> int:
-	return FOURTH_STAR_GOOD if stars == 3 else BIG_LUNCH_GOOD if stars == 2 else BANQUET_GOOD
+	return FINAL_INSPECTION_GOOD if stars == 4 else FOURTH_STAR_GOOD if stars == 3 else BIG_LUNCH_GOOD if stars == 2 else BANQUET_GOOD
 
 func inspection_spawn_interval(next_index := -1) -> float:
-	if stars == 3:
-		var index: int=banquet_spawned if int(next_index)<0 else int(next_index)
-		return 6.0 if index<6 else 3.0 if index<12 else 4.0
+	var index: int=banquet_spawned if int(next_index)<0 else int(next_index)
+	if stars == 4: return 6.0 if index<FINAL_INSPECTION_PHASE_SIZE else 4.0 if index<FINAL_INSPECTION_PHASE_SIZE*2 else 3.0
+	if stars == 3: return 6.0 if index<6 else 3.0 if index<12 else 4.0
 	return 4.0 if stars == 2 else 8.0
 
 func inspection_name() -> String:
-	return "Три волны" if stars == 3 else "Большой обед" if stars == 2 else "Делегация"
+	return "День пяти звёзд" if stars == 4 else "Три волны" if stars == 3 else "Большой обед" if stars == 2 else "Делегация"
+
+func inspection_phase_index() -> int:
+	if stars != 4: return 0
+	return clampi(int(banquet_spawned / FINAL_INSPECTION_PHASE_SIZE),0,2)
+
+func inspection_phase_name() -> String:
+	if stars != 4: return inspection_name()
+	return ["Наплыв","Критики","Общий финал"][inspection_phase_index()]
+
+func inspection_phase_detail() -> String:
+	if stars != 4: return ""
+	return [
+		"Плотный обычный поток проверяет, успевает ли весь зал работать вместе.",
+		"Требовательные гости смещают акцент на сложные блюда и качество записей.",
+		"Все линии и личные заказы шефа одновременно сходятся в последнем наплыве."
+	][inspection_phase_index()]
 
 func objective(stations: Array, served: int, opened: bool) -> String:
 	return str(preload("res://scripts/cafe_journey.gd").current(self,stations,served,opened).title)

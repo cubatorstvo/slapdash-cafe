@@ -412,7 +412,10 @@ func advance_event(delta: float) -> void:
 		progress.remaining = progress.inspection_seconds()
 		banquet_clock = 1
 		progress.revision += 1
-		announce("Три волны начинаются! Сначала смешанный поток, затем бургерный пик и финальная общая нагрузка." if progress.stars==3 else "Большой обед начинается! Три заказа остаются за шефом, остальной поток должен выдержать автоматизированный зал." if progress.stars==2 else "Делегация идёт! Трое гостей хотят личный заказ шефа.")
+		if progress.stars==4: announce("День пяти звёзд начинается! Сначала общий наплыв, затем критики, затем финальная нагрузка на всё кафе.")
+		elif progress.stars==3: announce("Три волны начинаются! Сначала смешанный поток, затем бургерный пик и финальная общая нагрузка.")
+		elif progress.stars==2: announce("Большой обед начинается! Три заказа остаются за шефом, остальной поток должен выдержать автоматизированный зал.")
+		else: announce("Делегация идёт! Трое гостей хотят личный заказ шефа.")
 	elif progress.phase in ["showcase", "service"]:
 		progress.remaining = maxf(0.0, progress.remaining - delta)
 		if progress.phase == "service":
@@ -427,6 +430,10 @@ func advance_event(delta: float) -> void:
 						if station.ready_crew() and not station.manual_station and station.state=="idle" and station.recipes.has(dish): available=true
 				if available and spawn_customer(dish,true,chef_guest):
 					progress.banquet_spawned += 1
+					if progress.stars==4 and progress.banquet_spawned==Progression.FINAL_INSPECTION_PHASE_SIZE:
+						announce("Фаза 2/3 · Критики. Теперь поток смещается к сложным блюдам и качеству.")
+					elif progress.stars==4 and progress.banquet_spawned==Progression.FINAL_INSPECTION_PHASE_SIZE*2:
+						announce("Фаза 3/3 · Общий финал. Все линии и личные заказы шефа работают одновременно.")
 					banquet_clock = progress.inspection_spawn_interval(progress.banquet_spawned)
 			if progress.banquet_finished >= progress.inspection_guest_count():
 				finish_banquet(progress.banquet_served >= progress.inspection_served_target() and progress.banquet_good >= progress.inspection_good_target())
@@ -463,6 +470,8 @@ func finish_banquet(won: bool, reason := "") -> void:
 		progress.fifth_star_auto_served = 0
 		progress.fifth_star_solyanka_served = 0
 		progress.result = "Четвёртая звезда! +%d. Открыт сектор оркестрации и кухня «Солянка» на три роли." % Progression.FOURTH_STAR_REWARD
+	elif won and attempted_from_star == 4:
+		progress.result = "День пяти звёзд завершён успешно. Каркас финальной смены работает; итоговая шкала и выдача 5★ подключаются следующим этапом."
 	elif not won and attempted_from_star == 0:
 		progress.result = reason + " Можно пригласить дегустатора снова бесплатно."
 	else:

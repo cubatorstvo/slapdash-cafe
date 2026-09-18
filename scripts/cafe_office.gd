@@ -105,7 +105,7 @@ func _process(_delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
 	var progress = game.service.progress
 	status.text = "Деньги: %d    Популярность: %d    Звёзды: %d / 5    Гости: %s" % [progress.cash, progress.popularity, progress.stars, "приходят" if game.service.open_for_business else "приём закрыт"]
-	timer.text = "%s · %d:%02d" % ["Личный показ" if progress.phase == "showcase" else "Банкет", ceili(progress.remaining) / 60, ceili(progress.remaining) % 60] if progress.phase in ["showcase", "service"] else ""
+	timer.text = "%s · %d:%02d" % ["Личный показ" if progress.phase == "showcase" else progress.inspection_name(), ceili(progress.remaining) / 60, ceili(progress.remaining) % 60] if progress.phase in ["showcase", "service"] else ""
 	if tab=="laboratory" and is_instance_valid(lab_live_status):
 		var nursery=game.laboratory.nursery
 		var calibration=game.laboratory.calibrator
@@ -185,12 +185,15 @@ func rebuild() -> void:
 				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
 				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
 		"star":
-			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · подготовка"
+			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · День пяти звёзд" if progress.stars==4 else "КАФЕ · 5★"
 			label(content,star_title,23)
 			if not progress.result.is_empty(): label(content,progress.result)
-			if progress.stars>=4:
+			if progress.stars==4:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
-				label(content,"Текущая глава готовит кафе к финальной проверке: трёхролевая Солянка и стабильная работа всего зала. Само финальное испытание — следующий этап.",15)
+				label(content,"Финальная смена: три последовательные фазы — общий наплыв, критики и общая кульминация. Все игроки используют один и тот же поток; кооператив отдельно не масштабируется.",15)
+				button(content,"Начать «День пяти звёзд»",func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
+			elif progress.stars>=5:
+				label(content,"Основная кампания завершена.")
 			else:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
 				if progress.stars==0:
