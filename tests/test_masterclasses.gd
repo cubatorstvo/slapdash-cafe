@@ -34,6 +34,9 @@ func run()->void:
 	var p=service.progress
 	p.stars=1
 	p.shift="morning"
+	var chef: Node3D=service.by_id(1)
+	chef.equipment=["jug","cup","plates","pan","sauce","rag"]
+	chef.apply_equipment()
 
 	print("1/6: access belongs to the single chef station and follows installed kitchens")
 	check(bool(service.masterclass_access("wine").available),"Starter masterclass uses learned chef equipment")
@@ -74,7 +77,7 @@ func run()->void:
 	check(service.rename_masterclass(second_id,"Быстрый обед").is_empty() and service.masterclass_by_id(second_id).name=="Быстрый обед","Masterclass can be renamed")
 	var first_id: int=int(service.masterclasses[0].id)
 	check(service.delete_masterclass(first_id).is_empty() and service.masterclasses.size()==1,"Masterclass can be deleted independently")
-	var chef: Node3D=service.by_id(1)
+	chef=service.by_id(1)
 	check(service.request_manual(chef,"wine",1),"Normal chef cooking still starts after masterclasses")
 	chef.training.close()
 
