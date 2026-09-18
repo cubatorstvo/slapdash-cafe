@@ -1,17 +1,27 @@
-name: ChatGPT Step4 Snapshot
+name: Push Step4 Regression Completion
 on:
   push:
     branches:
       - chatgpt-finalize-step4
+permissions:
+  contents: write
 jobs:
-  snapshot:
+  apply:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Pack repository
-        run: zip -qr slapdash-cafe-step4.zip . -x '.git/*' 'slapdash-cafe-step4.zip'
-      - uses: actions/upload-artifact@v4
         with:
-          name: slapdash-cafe-step4
-          path: slapdash-cafe-step4.zip
-          retention-days: 1
+          fetch-depth: 0
+      - name: Rebuild patch
+        run: |
+          base64 -d .step4-final/payload.b64 | xz -d > /tmp/step4.patch
+      - name: Apply to current main and push
+        run: |
+          git fetch origin main
+          git checkout -B deploy origin/main
+          patch -p1 --forward < /tmp/step4.patch
+          git add docs/CAMPAIGN.md docs/FULL_GAME_ROADMAP.md tests/test_four_to_five_handoff.gd tests/test_four_to_five_handoff.gd.uid tests/test_solyanka_training.gd tests/test_solyanka_training.gd.uid
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Close step 4 with orchestration regressions"
+          git push origin HEAD:main
