@@ -1,0 +1,17 @@
+name: ChatGPT Step4 Snapshot
+on:
+  push:
+    branches:
+      - chatgpt-finalize-step4
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pack repository
+        run: zip -qr slapdash-cafe-step4.zip . -x '.git/*' 'slapdash-cafe-step4.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slapdash-cafe-step4
+          path: slapdash-cafe-step4.zip
+          retention-days: 1
