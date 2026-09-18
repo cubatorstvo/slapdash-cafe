@@ -24,7 +24,7 @@ class Station:
 	var training=Run.new()
 	var state := "idle"
 	var pending_teacher := 0
-	func role_count() -> int: return 2 if type_id in ["kitchen","grill_kitchen"] else 1
+	func role_count() -> int: return 3 if type_id=="solyanka_kitchen" else 2 if type_id in ["kitchen","grill_kitchen"] else 1
 	func ready_crew() -> bool: return staffed==role_count()
 
 class Game:
@@ -115,6 +115,15 @@ func _initialize() -> void:
 	p.fourth_star_auto_served=14
 	p.popularity=55
 	check(Journey.current(p,service.stations,15,true).key=="fourth_star","Existing specialization preparations unlock the three-wave test")
+	p.stars=4
+	check(Journey.current(p,service.stations,15,true).key=="orchestration_expand","Fourth star opens the orchestration sector")
+	p.orchestration_expanded=true
+	var solyanka=Station.new(); solyanka.station_id=6; solyanka.type_id="solyanka_kitchen"; solyanka.staffed=3; solyanka.equipment=["fire_kit","stir_kit","salt_kit"]
+	solyanka.recipes={"solyanka":{"quality":{"present":true,"grade":"B"}}}
+	service.stations.append(solyanka)
+	p.fifth_star_solyanka_served=p.FIFTH_STAR_SOLYANKA_SERVED
+	p.fifth_star_auto_served=p.FIFTH_STAR_AUTO_SERVED
+	check(Journey.current(p,service.stations,15,true).key=="fifth_prep_done","Three-role kitchen completes the current fifth-star preparation chapter")
 
 	print("2/3: optional visits, cooldown and persisted single rewards")
 	p.journey_auto_served=3; p.shift="open"; p.shift_elapsed=0

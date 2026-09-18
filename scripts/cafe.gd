@@ -198,6 +198,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.physical_keycode:
 			KEY_E:
+				if recording and station.type_id == "solyanka_kitchen" and station.model.can_dump(local_role):
+					session.send_input(station,{}, {"dump":true})
+					return
 				if not recording:
 					var night: Dictionary = interaction_target()
 					if not night.is_empty():
@@ -282,9 +285,10 @@ func bind_training() -> void:
 			player.zone_min = station.training_zone_min()
 			player.zone_max = station.training_zone_max()
 			if station.role_count() > 1 and run.live_roles.size() == 1:
-				if local_role == 0: player.zone_max.x = 0
-				else: player.zone_min.x = 0
-			player.global_position = station.to_global(Vector3((-1.35 if local_role == 0 else 1.35) if station.role_count() > 1 else 0, 0.02, 1.85))
+				var role_zone: Vector2 = station.role_zone_x(local_role)
+				player.zone_min.x = role_zone.x
+				player.zone_max.x = role_zone.y
+			player.global_position = station.to_global(Vector3(station.role_home_x(local_role), 0.02, 1.85))
 			player.rotation.y = station.global_rotation.y
 			camera.rotation.x = -0.35
 			player.velocity = Vector3.ZERO
@@ -431,6 +435,9 @@ func refresh_hud() -> void:
 		hud.clock.text = "%d:%02d" % [ceili(service.progress.remaining) / 60, ceili(service.progress.remaining) % 60]
 	hud.progress.value = 100 if station.model.success() else 0
 	if local_role >= 0 and station.training.phase == "recording":
+		if station.type_id == "solyanka_kitchen" and station.model.can_dump(local_role):
+			hud.prompt.text = "(E) Булькнуть в котёл"
+			return
 		if feed_target(station):
 			hud.prompt.text = "(E) Скормить"
 			return

@@ -263,7 +263,7 @@ func exit_route(identity: int, origin: Vector3) -> Array:
 		var role:=0
 		for i in range(station.crew.size()):
 			if int(station.crew[i].get("clone_id",0))==identity: role=i
-		var home: Vector3=station.to_global(Vector3((-1.35 if role==0 else 1.35) if station.role_count()==2 else 0,0,1.85))
+		var home: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
 		route.append(Vector3(-1.1,0,9.75)); route.append(Vector3(-1.1,0,7.8))
 		route.append(Vector3(home.x,0,7.8)); route.append(home)
 		break

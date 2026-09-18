@@ -2,6 +2,7 @@ extends RefCounted
 ## Cafe progression is owned by the host; records remain owned by each station.
 const DISHES := ["wine", "potato", "sausage"]
 const SPECIALTY_DISHES := ["burger", "cheeseburger", "spicy_burger"]
+const ORCHESTRATION_DISHES := ["solyanka"]
 const DECOR := {
 	"sign": {"name": "Вывеска «Мы почти умеем»", "price": 45, "popularity": 10, "description": "Заметная вывеска у входа."},
 	"lights": {"name": "Гирлянда на честном слове", "price": 40, "popularity": 15, "description": "Четыре крепления на стене: развесь ночью."},
@@ -36,6 +37,10 @@ const FOURTH_STAR_GUESTS := 18
 const FOURTH_STAR_SERVED := 15
 const FOURTH_STAR_GOOD := 11
 const FOURTH_STAR_REWARD := 450
+const ORCHESTRATION_EXPANSION_PRICE := 340
+const SOLYANKA_KITCHEN_PRICE := 520
+const FIFTH_STAR_AUTO_SERVED := 16
+const FIFTH_STAR_SOLYANKA_SERVED := 6
 const SHIFT_SECONDS := 480.0
 const CHEF_ORDER_INTERVALS := [Vector2(25.0,35.0),Vector2(45.0,60.0),Vector2(75.0,95.0),Vector2(105.0,130.0),Vector2(140.0,175.0),Vector2(180.0,220.0)]
 const CHEF_ORDER_PREMIUM := [1.0,1.5,2.2,3.0,3.8,4.8]
@@ -45,6 +50,8 @@ var journey_meals_served := 0
 var third_star_auto_served := 0
 var fourth_star_auto_served := 0
 var fourth_star_specialty_served := 0
+var fifth_star_auto_served := 0
+var fifth_star_solyanka_served := 0
 var visit: Dictionary = {}
 var visit_serial := 0
 var visit_next_day := 0
@@ -89,6 +96,7 @@ var stars := 0
 var decorations: Array = []
 var expanded := false
 var specialized_expanded := false
+var orchestration_expanded := false
 var demand := {}
 var phase := "none"
 var remaining := 0.0
@@ -110,7 +118,7 @@ func chef_order_delay(rng: RandomNumberGenerator) -> float:
 	var window: Vector2=CHEF_ORDER_INTERVALS[chef_order_stage()]
 	return rng.randf_range(window.x,window.y)
 func chef_order_premium() -> float: return float(CHEF_ORDER_PREMIUM[chef_order_stage()])
-func available_dishes() -> Array: return DISHES + (["meal"] if stars >= 2 else []) + (SPECIALTY_DISHES if stars >= 3 else [])
+func available_dishes() -> Array: return DISHES + (["meal"] if stars >= 2 else []) + (SPECIALTY_DISHES if stars >= 3 else []) + (ORCHESTRATION_DISHES if stars >= 4 else [])
 func paid_decoration(id: String) -> String:
 	if not DECOR.has(id): return "Украшение не найдено."
 	if id in decorations: return "Это украшение уже установлено."
@@ -173,6 +181,15 @@ func star_requirements(stations: Array, served: int) -> Array:
 			{"text":"Автоподачи после третьей звезды: %d / %d"%[mini(fourth_star_auto_served,FOURTH_STAR_AUTO_SERVED),FOURTH_STAR_AUTO_SERVED],"done":fourth_star_auto_served>=FOURTH_STAR_AUTO_SERVED},
 			{"text":"Популярность: %d / %d"%[popularity,FOURTH_STAR_POPULARITY],"done":popularity>=FOURTH_STAR_POPULARITY}
 		]
+	if stars == 4:
+		var solyanka_ready: int = _ready_dish_count(stations, ORCHESTRATION_DISHES)
+		var solyanka_crews: int = stations.filter(func(s): return s.type_id=="solyanka_kitchen" and not s.manual_station and s.ready_crew()).size()
+		return [
+			{"text":"Трёхролевая кухня работает: %d / 1"%mini(solyanka_crews,1),"done":solyanka_crews>=1},
+			{"text":"Солянка с записью B или лучше: %d / 1"%solyanka_ready,"done":solyanka_ready==1},
+			{"text":"Солянка обслужила: %d / %d"%[mini(fifth_star_solyanka_served,FIFTH_STAR_SOLYANKA_SERVED),FIFTH_STAR_SOLYANKA_SERVED],"done":fifth_star_solyanka_served>=FIFTH_STAR_SOLYANKA_SERVED},
+			{"text":"Автоподачи после четвёртой звезды: %d / %d"%[mini(fifth_star_auto_served,FIFTH_STAR_AUTO_SERVED),FIFTH_STAR_AUTO_SERVED],"done":fifth_star_auto_served>=FIFTH_STAR_AUTO_SERVED}
+		]
 	return []
 
 func can_attempt(stations: Array, served: int) -> bool:
@@ -217,7 +234,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "fifth_star_auto_served", "fifth_star_solyanka_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "orchestration_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:

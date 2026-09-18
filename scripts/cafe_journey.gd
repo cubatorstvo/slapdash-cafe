@@ -1,9 +1,9 @@
 extends RefCounted
 ## Derive the next useful action from shared cafe facts, including work done ahead of time.
-const DISH_NAMES := {"sausage":"сосиска в соусе","potato":"картофель","wine":"вино","meal":"мясо с макаронами","burger":"бургер","cheeseburger":"чизбургер","spicy_burger":"острый бургер"}
-const GEAR := {"sausage":["sauce","plates"],"potato":["pan","plates"],"wine":["jug","cup"],"meal":["meat_kit","pasta_kit"],"burger":["grill_kit","assembly_kit"],"cheeseburger":["grill_kit","assembly_kit"],"spicy_burger":["grill_kit","assembly_kit"]}
+const DISH_NAMES := {"sausage":"сосиска в соусе","potato":"картофель","wine":"вино","meal":"мясо с макаронами","burger":"бургер","cheeseburger":"чизбургер","spicy_burger":"острый бургер","solyanka":"солянка"}
+const GEAR := {"sausage":["sauce","plates"],"potato":["pan","plates"],"wine":["jug","cup"],"meal":["meat_kit","pasta_kit"],"burger":["grill_kit","assembly_kit"],"cheeseburger":["grill_kit","assembly_kit"],"spicy_burger":["grill_kit","assembly_kit"],"solyanka":["fire_kit","stir_kit","salt_kit"]}
 const Catalogue=preload("res://scripts/cafe_catalogue.gd")
-const GOODS := {"sauce":"миску соуса","plates":"тарелки","pan":"сковороду","jug":"кувшин","cup":"бокал","meat_kit":"комплект для мяса","pasta_kit":"комплект для макарон","lab_0":"лабораторную колбу","lab_1":"блок питания","lab_2":"стабилизатор","counter":"стол и шкафчик","kitchen":"парную кухню","grill_kit":"общую жарочную поверхность","assembly_kit":"комплект сборки","grill_kitchen":"бургерную кухню"}
+const GOODS := {"sauce":"миску соуса","plates":"тарелки","pan":"сковороду","jug":"кувшин","cup":"бокал","meat_kit":"комплект для мяса","pasta_kit":"комплект для макарон","lab_0":"лабораторную колбу","lab_1":"блок питания","lab_2":"стабилизатор","counter":"стол и шкафчик","kitchen":"парную кухню","grill_kit":"общую жарочную поверхность","assembly_kit":"комплект сборки","grill_kitchen":"бургерную кухню","fire_kit":"набор огня и овощей","stir_kit":"мешалку и овощи","salt_kit":"соль и овощи","solyanka_kitchen":"кухню «Солянка»"}
 
 static func step(key: String, title: String, detail: String, place := "computer", station := 0, pot := -1) -> Dictionary:
 	return {"key":key,"title":title,"detail":detail,"place":place,"station":station,"pot":pot,"item":"","chapter":""}
@@ -97,7 +97,7 @@ static func grow(p, stations: Array) -> Dictionary:
 			if not stations.any(func(station):return station.station_id==slot):
 				return buy(p,"counter",slot,"Пока клон растёт, подготовь его рабочее место.")
 	else:
-		var equipment:=equip(p,destination,"meal" if destination.type_id=="kitchen" else "burger" if destination.type_id=="grill_kitchen" else "sausage")
+		var equipment:=equip(p,destination,"meal" if destination.type_id=="kitchen" else "burger" if destination.type_id=="grill_kitchen" else "solyanka" if destination.type_id=="solyanka_kitchen" else "sausage")
 		if not equipment.is_empty(): return equipment
 	return step("growing","Клон растёт · можно заняться кафе","Пока таймер идёт, обслуживай заказы или занимайся покупками. Готовый этап дождётся тебя без штрафа.","pot",0,id)
 
@@ -106,11 +106,13 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 	var counters: Array=[]
 	var kitchen
 	var specialty
+	var solyanka
 	for station in stations:
 		if station.manual_station: personal=station
 		elif station.type_id=="counter": counters.append(station)
 		elif station.type_id=="kitchen": kitchen=station
 		elif station.type_id=="grill_kitchen": specialty=station
+		elif station.type_id=="solyanka_kitchen": solyanka=station
 	counters.sort_custom(func(a,b):return a.station_id<b.station_id)
 	if p.stars==0:
 		if not p.starter_reward:
@@ -201,11 +203,22 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 		if p.popularity<p.FOURTH_STAR_POPULARITY: return step("fourth_popularity","Подними популярность · %d/%d"%[p.popularity,p.FOURTH_STAR_POPULARITY],"Для трёх волн нужен более заметный поток. Подойдут обустройство и добровольные визиты.")
 		if p.can_attempt(stations,served): return step("fourth_star","Начни испытание «Три волны»","Компьютер → Звёзды. Смешанный поток сменится бургерным пиком, затем придёт общий финал: 18 гостей, 15 подач, 11 B+.")
 		return step("fourth_ready","Подготовь специализированную линию","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Звёзды.")
-	return step("complete","Четвёртая звезда получена · специализация пройдена","Кафе переживает разные профили спроса. Следующий этап добавит кухню на три роли.")
+	if p.stars==4:
+		if not p.orchestration_expanded: return step("orchestration_expand","Открой сектор оркестрации · %d"%p.ORCHESTRATION_EXPANSION_PRICE,"Компьютер → Интернет-магазин. Здесь появится шестая станция на три роли.")
+		if solyanka==null: return buy(p,"solyanka_kitchen",6,"Солянка — первая кухня на три одновременные записи: огонь, мешалка и соль работают вокруг одного котла.")
+		if crew_count(solyanka)<solyanka.role_count(): return grow(p,stations)
+		var solyanka_gear:=equip(p,solyanka,"solyanka")
+		if not solyanka_gear.is_empty(): return solyanka_gear
+		var report:Dictionary=solyanka.recipes.get("solyanka",{}).get("quality",{})
+		if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return teach(solyanka,"solyanka",true)
+		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Открой кафе. Три клона одновременно повторяют свои записи; следи, чтобы котёл получил минимум 13 вещей, огонь, соль и перемешивание.","station",solyanka.station_id)
+		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к финалу проверяет, что трёхролевая кухня не вытеснила старые производственные линии.","station",solyanka.station_id)
+		return step("fifth_prep_done","Подготовка к пятой звезде завершена","Солянка и весь зал работают стабильно. Следующий пункт плана — финальное испытание, пятая звезда и концовка.","station",solyanka.station_id)
+	return step("complete","Пять звёзд получены","Кафе завершило основную кампанию.")
 
 static func current(p, stations: Array, served: int, opened: bool) -> Dictionary:
 	var result:=next_step(p,stations,served,opened)
-	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "СПЕЦИАЛИЗАЦИЯ ПРОЙДЕНА"
+	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
 	if p.busy():
 		var inspection_title: String
 		var inspection_detail: String

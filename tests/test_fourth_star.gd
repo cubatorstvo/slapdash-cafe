@@ -9,7 +9,7 @@ class Station:
 	var staffed:=1
 	var type_id:="counter"
 	var recipes:Dictionary={}
-	func role_count() -> int: return 2 if type_id in ["kitchen","grill_kitchen"] else 1
+	func role_count() -> int: return 3 if type_id=="solyanka_kitchen" else 2 if type_id in ["kitchen","grill_kitchen"] else 1
 	func ready_crew() -> bool: return manual_station or staffed>=role_count()
 
 func check(ok: bool, message: String) -> void:

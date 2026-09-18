@@ -24,7 +24,7 @@ func workers() -> Array:
 			var member: Dictionary=station.crew[role]
 			var id:=int(member.get("clone_id",0))
 			if id<=0: continue
-			var home: Vector3=station.to_global(Vector3((-1.35 if role==0 else 1.35) if station.role_count()==2 else 0,0,1.85))
+			var home: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
 			result.append({"id":id,"name":str(member.name),"home":home,"station":station,"from_lab":false})
 	result.sort_custom(func(a,b): return int(a.id)<int(b.id))
 	return result

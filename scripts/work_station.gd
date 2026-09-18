@@ -3,6 +3,7 @@ const Definition = preload("res://scripts/station_definition.gd")
 const Model = preload("res://scripts/cooking_model.gd")
 const TeamModel = preload("res://scripts/team_cooking_model.gd")
 const SpecialtyModel = preload("res://scripts/specialty_cooking_model.gd")
+const SolyankaModel = preload("res://scripts/solyanka_cooking_model.gd")
 const Run = preload("res://scripts/training_run.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
@@ -75,12 +76,26 @@ func is_team_station() -> bool: return role_count() > 1
 static func model_for_type(value: String):
 	if value == "counter": return Model.new()
 	if value == "grill_kitchen": return SpecialtyModel.new()
+	if value == "solyanka_kitchen": return SolyankaModel.new()
 	return TeamModel.new()
 func fresh_model(): return model_for_type(type_id)
 func view_for_type():
 	if type_id == "counter": return preload("res://scripts/station_view.gd").new()
 	if type_id == "grill_kitchen": return preload("res://scripts/specialty_station_view.gd").new()
+	if type_id == "solyanka_kitchen": return preload("res://scripts/solyanka_station_view.gd").new()
 	return preload("res://scripts/team_station_view.gd").new()
+
+
+func role_home_x(role: int) -> float:
+	if role_count() <= 1: return 0.0
+	if role_count() == 2: return -1.35 if role == 0 else 1.35
+	return [-1.85,0.0,1.85][clampi(role,0,2)]
+
+func role_zone_x(role: int) -> Vector2:
+	var zone_min := training_zone_min()
+	var zone_max := training_zone_max()
+	var width := (zone_max.x-zone_min.x)/role_count()
+	return Vector2(zone_min.x+width*role,zone_min.x+width*(role+1))
 
 func training_zone_min() -> Vector2:
 	return Vector2(-SLOT_WIDTH / 2.0, TRAINING_ZONE_CENTER_Z - SLOT_DEPTH / 2.0)
@@ -217,8 +232,8 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(role_count()):
 			var side := -1 if role == 0 else 1
 			var edge: float = side * (Definition.TYPES[type_id].width / 2 + 0.3)
-			students[role].position = Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0, 0, 1.85)
-			student_paths[role] = [Vector3(edge, 0, 1.65), Vector3(edge, 0, -1.6), Vector3(-1.4 + role * 2.8 if role_count() == 2 else 1.5, 0, -1.6)]
+			students[role].position = Vector3(role_home_x(role), 0, 1.85)
+			student_paths[role] = [Vector3(edge if role_count()==2 else role_home_x(role), 0, 1.65), Vector3(edge if role_count()==2 else role_home_x(role), 0, -1.6), Vector3(role_home_x(role), 0, -1.6)]
 	observing = active
 	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
@@ -236,14 +251,14 @@ func refresh(local_peer: int, delta: float) -> void:
 		for role in range(mini(role_count(),production_tracks.size())):
 			var track: Dictionary=production_tracks[role]
 			if track.is_empty() or track.get("frames",[]).is_empty() or order_tick<float(track.frames.size()): continue
-			var home:=Vector3(-1.35 if role==0 else 1.35,0,1.85)
+			var home:=Vector3(role_home_x(role),0,1.85)
 			var partner: Vector3=view.actors[1-role].position if role_count()==2 else Vector3.ZERO
 			view.actors[role].finished_role_activity(home,partner,delta,age,station_id*7+role)
 			view.actors[role].caption.text=crew_name(role)+"\nЗакончил · теперь подсказывает"
 	if type_id == "counter": view._update_worker(model, age, state != "cooking")
 	for role in range(role_count()):
 		var student: Node3D = students[role]
-		var home := Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0.0, 0, 1.85)
+		var home := Vector3(role_home_x(role), 0, 1.85)
 		if resting:
 			if not was_resting and not just_finished_training:
 				if type_id == "counter":
@@ -261,7 +276,7 @@ func refresh(local_peer: int, delta: float) -> void:
 			student.visible = active and (role in training.live_roles or training.phase == "ready")
 			student.caption.text = crew_name(role)
 		if student.visible and active:
-			var target := Vector3(-1.4 + role * 2.8 if role_count() == 2 else 1.5, 0, -1.5)
+			var target := Vector3(role_home_x(role), 0, -1.5)
 			if not student_paths[role].is_empty():
 				if student.walk_to(student_paths[role][0], delta): student_paths[role].pop_front()
 			else: student.rotation.y = PI
@@ -310,7 +325,7 @@ func direct_attention(person: Node3D) -> void:
 	person.drunk_ml = float(model.guest_serving.drunk) if type_id == "counter" else model.guest_drunk()
 	person.chewing = float(model.guest_serving.chew) if type_id == "counter" else model.guest_chewing()
 	var role := int(age / 5.0) % role_count()
-	person.cook_target = to_global(Vector3((-1.35 if role == 0 else 1.35) if role_count() == 2 else 0.0, 1.55, 1.85))
+	person.cook_target = to_global(Vector3(role_home_x(role), 1.55, 1.85))
 	var target := Vector3(0, 1.1, 0)
 	person.following_food = false
 	if type_id == "counter":
@@ -322,9 +337,13 @@ func direct_attention(person: Node3D) -> void:
 		target = Vector3(point.x, Model.BASE_Y + float(model.elevations.get(item, 0.0)) + 0.1, point.y)
 	else:
 		var item: String = model.hands[role]
-		if item.is_empty(): item = model.hands[1 - role]
+		if item.is_empty():
+			for other in range(role_count()):
+				if other != role and not model.hands[other].is_empty(): item = model.hands[other]; break
 		person.following_food = not item.is_empty()
-		if item.is_empty(): item = "steak" if role == 0 else "pot"
+		if item.is_empty():
+			for candidate in model.ITEMS:
+				if view.items.has(candidate) and model.item_available(candidate): item = candidate; break
 		if view.items.has(item): target = view.items[item].position + Vector3.UP * 0.1
 	person.food_target = to_global(target)
 

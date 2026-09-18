@@ -347,7 +347,7 @@ func route_to_chair(identity: int) -> Array:
 			var role:=0
 			for i in range(station.crew.size()):
 				if int(station.crew[i].get("clone_id",0))==identity: role=i
-			origin=station.to_global(Vector3((-1.35 if role==0 else 1.35) if station.role_count()==2 else 0,0,1.85))
+			origin=station.to_global(Vector3(station.role_home_x(role),0,1.85))
 			route=[origin,Vector3(origin.x,0,7.8),Vector3(-1.1,0,7.8),Vector3(-1.1,0,9.75),Layout.ENTRY]
 			break
 	var start: Vector3=Layout.ENTRY if not route.is_empty() else origin

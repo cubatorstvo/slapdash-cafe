@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-scale-26"
+const PROTOCOL := "slapdash-cafe-scale-27"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -514,6 +514,7 @@ func apply_input(sender: int, packet: Dictionary) -> void:
 		if event.get("feed",false) == true:
 			run.queue_event(role,{"feed":true})
 			game.service.trace("feed_attempt",{"station":station.station_id,"peer":sender})
+		elif event.get("dump", false) == true and station.type_id == "solyanka_kitchen": run.queue_event(role, {"dump": true})
 		elif event.get("drop", false) == true: run.queue_event(role, {"drop": true})
 		elif event.get("grab", "") in (game.ITEM_NAMES.keys() + ["potato_0", "potato_1", "potato_2", "sausage_0", "sausage_1", "sausage_2"] if station.type_id == "counter" else station.model.ITEMS): run.queue_event(role, {"grab": event.grab})
 

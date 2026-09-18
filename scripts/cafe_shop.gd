@@ -85,6 +85,7 @@ func equipment_allowed(type_id: String, item: String) -> bool:
 	if type_id=="counter": return item in ["sauce","plates","cup","pan","jug","rag","sauce_ramp"]
 	if type_id=="kitchen": return item in ["meat_kit","pasta_kit"]
 	if type_id=="grill_kitchen": return item in ["grill_kit","assembly_kit"]
+	if type_id=="solyanka_kitchen": return item in ["fire_kit","stir_kit","salt_kit"]
 	return false
 
 func order(item: String, station_id: int) -> String:
@@ -102,7 +103,10 @@ func order(item: String, station_id: int) -> String:
 		if station == null or not equipment_allowed(station.type_id,item): return "Это оборудование не подходит выбранной станции."
 		if item in station.equipment or item in station.upgrades: return "Уже установлено."
 	elif spec.kind == "station":
-		if item == "grill_kitchen":
+		if item == "solyanka_kitchen":
+			if not p.orchestration_expanded: return "Сначала открой сектор оркестрации."
+			station_id = 6
+		elif item == "grill_kitchen":
 			if not p.specialized_expanded: return "Сначала открой специализированный сектор."
 			station_id = 5
 		elif item == "kitchen":
@@ -155,7 +159,7 @@ func installation_position(parcel: Dictionary) -> Vector3:
 	if spec.kind == "equipment":
 		var station = game.service.by_id(parcel.station)
 		if station == null: return Vector3.INF
-		var places := {"meat_kit":Vector3(-1.4,1.1,-0.15),"pasta_kit":Vector3(1.4,1.1,-0.15),"grill_kit":Vector3(-1.35,1.1,-0.25),"assembly_kit":Vector3(1.35,1.1,0.45),"pan":Vector3(-1.05,1.2,-0.1),"sauce":Vector3(0.3,1.09,-0.7),"plates":Vector3(1.3,0.55,1.38),"cup":Vector3(1.93,0.7,1.38),"rag":Vector3(1.88,1.05,0.86),"jug":Vector3(-2.6,1.65,1.1),"sauce_ramp":Vector3(2.65,1.2,0)}
+		var places := {"meat_kit":Vector3(-1.4,1.1,-0.15),"pasta_kit":Vector3(1.4,1.1,-0.15),"grill_kit":Vector3(-1.35,1.1,-0.25),"assembly_kit":Vector3(1.35,1.1,0.45),"fire_kit":Vector3(-2.0,1.1,0.6),"stir_kit":Vector3(0,1.1,1.25),"salt_kit":Vector3(2.0,1.1,0.6),"pan":Vector3(-1.05,1.2,-0.1),"sauce":Vector3(0.3,1.09,-0.7),"plates":Vector3(1.3,0.55,1.38),"cup":Vector3(1.93,0.7,1.38),"rag":Vector3(1.88,1.05,0.86),"jug":Vector3(-2.6,1.65,1.1),"sauce_ramp":Vector3(2.65,1.2,0)}
 		return station.to_global(places[parcel.item])
 	if spec.kind == "lab_upgrade": return game.laboratory.upgrade_position(parcel.item)
 	if spec.kind == "lab": return lab_position(int(str(parcel.item).get_slice("_",1)))

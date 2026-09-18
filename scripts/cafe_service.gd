@@ -5,7 +5,7 @@ const Definition = preload("res://scripts/station_definition.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
-const SLOT_COUNT := 5
+const SLOT_COUNT := 6
 const SLOT_GAP := 0.6
 const SLOT_ROW_CENTER_X := 3.0
 const SLOT_Z := -1.4
@@ -30,6 +30,7 @@ func _ready() -> void:
 
 func slot_position(slot_index: int) -> Vector3:
 	if slot_index == 4: return Vector3(10.2, 0, 4.75)
+	if slot_index == 5: return Vector3(3.2, 0, 4.75)
 	var legacy_slots := 4
 	var row_width := Station.SLOT_WIDTH * legacy_slots + SLOT_GAP * (legacy_slots - 1)
 	var first_center := SLOT_ROW_CENTER_X - row_width / 2.0 + Station.SLOT_WIDTH / 2.0
@@ -273,7 +274,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 		var report: Dictionary = station.model.quality()
 		var paid := accepted and bool(report.get("present", false))
 		var premium: float = float(station.customer_order.get("premium",1.0)) if station.manual_station else 1.0
-		var base_price := 65 if customer.dish == "meal" else 80 if customer.dish in Progression.SPECIALTY_DISHES else 25
+		var base_price := 65 if customer.dish == "meal" else 95 if customer.dish in Progression.ORCHESTRATION_DISHES else 80 if customer.dish in Progression.SPECIALTY_DISHES else 25
 		var payment := roundi(base_price * report.price_factor * report.style_multiplier * premium) if paid else 0
 		trace("customer_finished",{"dish":customer.dish,"station":station.station_id,"grade":report.grade,"payment":payment,"accepted":paid})
 		customer.state = "leaving"
@@ -303,6 +304,9 @@ func finish_customer(id: int, accepted: bool) -> void:
 				if progress.stars==3:
 					progress.fourth_star_auto_served+=1
 					if customer.dish in Progression.SPECIALTY_DISHES: progress.fourth_star_specialty_served+=1
+				if progress.stars==4:
+					progress.fifth_star_auto_served+=1
+					if customer.dish in Progression.ORCHESTRATION_DISHES: progress.fifth_star_solyanka_served+=1
 				if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
 			revenue += payment
 			progress.cash += payment
@@ -327,6 +331,15 @@ func purchase(kind: String, id: String, station_id := 0) -> String:
 		var error: String=preload("res://scripts/lounge_progression.gd").expand(progress)
 		if error.is_empty(): trace("lounge_expanded",{"tier":progress.lounge_tier})
 		return error
+	if kind == "orchestration_expansion":
+		if progress.stars < 4: return "Нужна четвёртая звезда."
+		if progress.orchestration_expanded: return "Сектор оркестрации уже открыт."
+		if progress.cash < Progression.ORCHESTRATION_EXPANSION_PRICE: return "Не хватает денег."
+		progress.cash -= Progression.ORCHESTRATION_EXPANSION_PRICE
+		progress.orchestration_expanded = true
+		progress.revision += 1
+		trace("orchestration_expansion")
+		return ""
 	if kind == "specialty_expansion":
 		if progress.stars < 3: return "Нужна третья звезда."
 		if progress.specialized_expanded: return "Специализированный сектор уже открыт."
@@ -345,7 +358,7 @@ func purchase(kind: String, id: String, station_id := 0) -> String:
 		progress.revision += 1
 		trace("expansion")
 		return ""
-	var item := "sauce_ramp" if kind == "upgrade" else kind if kind in ["counter","kitchen","grill_kitchen"] else id
+	var item := "sauce_ramp" if kind == "upgrade" else kind if kind in ["counter","kitchen","grill_kitchen","solyanka_kitchen"] else id
 	return game.shop.order(item, station_id)
 
 func start_banquet(peer: int) -> String:
@@ -447,7 +460,9 @@ func finish_banquet(won: bool, reason := "") -> void:
 	elif won and attempted_from_star == 3:
 		progress.stars = 4
 		progress.cash += Progression.FOURTH_STAR_REWARD
-		progress.result = "Четвёртая звезда! +%d. Кафе выдержало три разных волны спроса; дальше — кухня на три роли." % Progression.FOURTH_STAR_REWARD
+		progress.fifth_star_auto_served = 0
+		progress.fifth_star_solyanka_served = 0
+		progress.result = "Четвёртая звезда! +%d. Открыт сектор оркестрации и кухня «Солянка» на три роли." % Progression.FOURTH_STAR_REWARD
 	elif not won and attempted_from_star == 0:
 		progress.result = reason + " Можно пригласить дегустатора снова бесплатно."
 	else:
@@ -483,7 +498,7 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 12, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
+	return {"format": "station-cafe", "version": 13, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock}
 
 func clear_world() -> void:
 	for station in stations:
@@ -502,7 +517,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -590,7 +605,8 @@ func valid_tracks(tracks: Variant, type_id: String) -> bool:
 			else:
 				if not frame.hand in sample.ITEMS + [""]: return false
 				for item in frame.owners:
-					if not frame.owners[item] in [-1, 0, 1]: return false
+					var owner_role := int(frame.owners[item])
+					if owner_role < -1 or owner_role >= tracks.size(): return false
 	return true
 
 func matches_schema(value: Variant, schema: Variant) -> bool:

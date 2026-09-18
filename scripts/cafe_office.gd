@@ -156,7 +156,7 @@ func rebuild() -> void:
 			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
 			for station in service.stations:
 				label(content,"ТВОЯ СТОЙКА" if station.manual_station else "СТАНЦИЯ %d" % station.station_id,20)
-				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id=="counter" else ["grill_kit","assembly_kit"] if station.type_id=="grill_kitchen" else ["meat_kit","pasta_kit"]
+				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id=="counter" else ["grill_kit","assembly_kit"] if station.type_id=="grill_kitchen" else ["fire_kit","stir_kit","salt_kit"] if station.type_id=="solyanka_kitchen" else ["meat_kit","pasta_kit"]
 				if progress.stars<1:
 					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
 				else: bundle_controls(station,catalog)
@@ -167,6 +167,8 @@ func rebuild() -> void:
 			label(content,"СПЕЦИАЛИЗАЦИЯ",20)
 			button(content,"Открыть специализированный сектор · %d"%progress.SPECIALTY_EXPANSION_PRICE,func():send({"action":"buy","kind":"specialty_expansion"}),host and progress.stars>=3 and not progress.specialized_expanded and progress.cash>=progress.SPECIALTY_EXPANSION_PRICE)
 			shop_button("grill_kitchen",0,service.by_id(5)!=null)
+			button(content,"Открыть сектор оркестрации · %d"%progress.ORCHESTRATION_EXPANSION_PRICE,func():send({"action":"buy","kind":"orchestration_expansion"}),host and progress.stars>=4 and not progress.orchestration_expanded and progress.cash>=progress.ORCHESTRATION_EXPANSION_PRICE)
+			shop_button("solyanka_kitchen",0,service.by_id(6)!=null)
 			label(content,"ЛАБОРАТОРИЯ",20)
 			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
 			button(content,"Формулы, выращивание и рекалибровка →",func():tab="laboratory";stamp="";rebuild())
@@ -183,11 +185,12 @@ func rebuild() -> void:
 				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
 				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
 		"star":
-			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ЧЕТЫРЕ ЗВЕЗДЫ ПОЛУЧЕНЫ"
+			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · подготовка"
 			label(content,star_title,23)
 			if not progress.result.is_empty(): label(content,progress.result)
 			if progress.stars>=4:
-				label(content,"Этап специализации завершён. Следующая крупная глава добавит кухню на три роли.")
+				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
+				label(content,"Текущая глава готовит кафе к финальной проверке: трёхролевая Солянка и стабильная работа всего зала. Само финальное испытание — следующий этап.",15)
 			else:
 				for requirement in progress.star_requirements(service.stations,service.served): label(content,("✓ " if requirement.done else "○ ")+requirement.text)
 				if progress.stars==0:

@@ -1,7 +1,7 @@
 extends RefCounted
 const Definition = preload("res://scripts/station_definition.gd")
-const ICONS := {"wine": preload("res://assets/ui/wine.svg"), "potato": preload("res://assets/ui/potato.svg"), "sausage": preload("res://assets/ui/sausage.svg"), "meal": preload("res://assets/ui/meal.svg"), "burger": preload("res://assets/ui/meal.svg"), "cheeseburger": preload("res://assets/ui/meal.svg"), "spicy_burger": preload("res://assets/ui/meal.svg")}
-const ORDER := ["wine", "potato", "sausage", "meal", "burger", "cheeseburger", "spicy_burger"]
+const ICONS := {"wine": preload("res://assets/ui/wine.svg"), "potato": preload("res://assets/ui/potato.svg"), "sausage": preload("res://assets/ui/sausage.svg"), "meal": preload("res://assets/ui/meal.svg"), "burger": preload("res://assets/ui/meal.svg"), "cheeseburger": preload("res://assets/ui/meal.svg"), "spicy_burger": preload("res://assets/ui/meal.svg"), "solyanka": preload("res://assets/ui/meal.svg")}
+const ORDER := ["wine", "potato", "sausage", "meal", "burger", "cheeseburger", "spicy_burger", "solyanka"]
 const RECIPES := {
 	"wine": {
 		"title": "Бокал вина",
@@ -55,6 +55,11 @@ const RECIPES := {
 	"spicy_burger": {"title":"Острый бургер","components":[
 		{"id":"patty","name":"Котлета","role":0,"lines":[{"id":"patty_sides","label":"Две стороны 100%","detail":"Котлета и булка делят одну жарочную поверхность."},{"id":"patty_season","label":"Приправа","detail":"Приправь котлету."}]},
 		{"id":"assembly","name":"Сборка","role":1,"lines":[{"id":"bun_toast","label":"Поджаренная булка","detail":"Поджарь булку в свободное окно."},{"id":"sauce","label":"Соус","detail":"Добавь обычный соус."},{"id":"chili","label":"Острый соус","detail":"Добавь острый соус на сборке."}]}]},
+	"solyanka": {"title":"Солянка","components":[
+		{"id":"fire","name":"Огонь","role":0,"lines":[{"id":"fire","label":"Разжечь котёл","detail":"Поднеси зажигалку к котлу и используй её."}]},
+		{"id":"stir","name":"Мешалка","role":1,"lines":[{"id":"stir","label":"Перемешать до 100%","detail":"Поднеси лопатку к котлу и мешай."}]},
+		{"id":"salt","name":"Соль","role":2,"lines":[{"id":"salt","label":"Посолить","detail":"Поднеси соль к котлу и используй её. Солонку можно и утопить целиком."}]},
+		{"id":"pot","name":"Общий котёл","role":-1,"lines":[{"id":"contents","label":"Минимум 13 ингредиентов","detail":"Еда и случайные предметы считаются. Поднеси вещь к котлу и нажми E — она булькнет внутрь."}]}]},
 	"meal": {
 		"title": "Стейк с макаронами",
 		"components": [
