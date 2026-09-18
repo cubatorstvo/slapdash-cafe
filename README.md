@@ -141,24 +141,21 @@ FPS-прототип для **Godot 4.7 stable**, GDScript, Compatibility render
 
 ## Проверки
 
+Основной набор запускается единым runner'ом. Каждый GDScript-тест получает отдельный `XDG_DATA_HOME`, поэтому сохранения и настройки одного сценария не влияют на следующий:
+
 ```bash
-godot --headless --path . --script tests/test_cafe_journey.gd
-godot --headless --path . --script tests/test_crew_bundles.gd -- --fresh-cafe
-godot --headless --path . --script tests/test_shop_feeding.gd -- --fresh-cafe
-godot --headless --path . --script tests/test_first_star.gd -- --fresh-cafe
-godot --headless --path . --script tests/test_input.gd
-godot --headless --path . --script tests/test_kitchen.gd
-godot --headless --path . --script tests/test_team.gd
-godot --headless --path . --script tests/test_stations.gd
-godot --headless --path . --script tests/test_steam.gd
-godot --headless --path . --script tests/test_cookbook.gd
-godot --headless --path . --script tests/test_quality.gd
+python tests/run_headless_suite.py --godot /path/to/godot
+```
+
+Сетевой сценарий с отдельными host / guest / observer процессами запускается отдельно:
+
+```bash
 python tests/run_online_cafe_test.py /path/to/godot
 ```
 
-`test_stations.gd` использует новое сохранение; запускайте тесты с отдельным `XDG_DATA_HOME` на Linux. Сетевой Python-сценарий изолирует сохранения автоматически.
+Runner автоматически включает все `tests/test_*.gd`, кроме многопроцессного `test_online_cafe.gd`. Для одиночного запуска конкретного теста тоже используйте отдельный `XDG_DATA_HOME`, если тест читает или пишет сохранение.
 
-Тесты покрывают реальные способы приготовления, независимость дорожек, защищённые зоны, подтверждение результата, заказы, сохранение, книгу, звонок и три сетевых процесса. `test_steam.gd` проверяет нативный API и сценарии приглашения с подставным backend. Реальный Steam-сеанс проверяется отдельно с другом на двух машинах.
+Тесты покрывают актуальный путь кампании, приготовление и качество блюд, независимость дорожек, защищённые зоны, подтверждение результата, магазин и доставку, отдых работников, заказы, сохранение, книгу, звонок и сетевые процессы. `test_steam.gd` проверяет нативный API и сценарии приглашения с подставным backend. Реальный Steam-сеанс проверяется отдельно с другом на двух машинах.
 
 Единая панель рецепта показывает прогресс каждого компонента и отметку подачи. Качество учитывает лучшие поданные и съеденные порции. Неполные блюда можно сохранить для бригады.
 

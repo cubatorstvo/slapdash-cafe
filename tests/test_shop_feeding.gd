@@ -29,6 +29,9 @@ func delivery(item: String, station := 0) -> void:
 	game.shop.advance(8)
 	game.player.position=Vector3(parcel.position[0],0,parcel.position[2])
 	check(game.shop.action(1,{"action":"take_parcel","id":parcel.id}).is_empty(),"Take arrived box")
+	if item == "lights":
+		check(game.service.progress.garland_owned and game.service.progress.garland_builder==1,"Garland is unpacked directly into the installer hands")
+		return
 	check(game.shop.carried(1)==parcel.id,"Carry ownership")
 	game.player.position=game.shop.installation_position(parcel)-Vector3.UP
 	check(game.shop.action(1,{"action":"install_parcel","id":parcel.id}).is_empty(),"Install " + item)
@@ -86,7 +89,7 @@ func run() -> void:
 	game=Scene.instantiate(); root.add_child(game); await process_frame
 	game.set_physics_process(false)
 	var first=game.service.by_id(1)
-	check(first.equipment.is_empty() and first.manual_station and game.service.progress.stars==0,"New run starts bare and manual")
+	check(first.equipment==["rag"] and first.manual_station and game.service.progress.stars==0,"New run starts manual with the free cleaning rag")
 	check(not game.shop.order("counter",0).is_empty(),"No early clone")
 	game.service.progress.cash=100
 	delivery("sauce",1)
@@ -99,8 +102,7 @@ func run() -> void:
 	game.service.progress.stars=1
 	delivery("lights")
 	game.player.position=Vector3(1.48,0,8.15)
-	check(game.shop.action(1,{"action":"garland_put"}).is_empty() and game.service.progress.garland_builder==0,"Put reel down to free hands")
-	check(game.shop.action(1,{"action":"garland_take"}).is_empty(),"Pick up owned reel")
+	check(game.service.progress.garland_builder==1,"Delivered garland is carried by the installer")
 	var paid: int=game.service.progress.cash
 	for point in [[-4,2,-7.35],[-2,2.8,-7.35],[0,2.2,-7.35],[2,3,-7.35]]:
 		game.player.position=Vector3(point[0],0,point[2]+1)

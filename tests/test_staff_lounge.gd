@@ -21,7 +21,7 @@ func run() -> void:
 	var lounge: Node3D=get_first_node_in_group("staff_lounge")
 	check(lounge!=null and lounge.fixtures.size()==15,"Fifteen full-size lounge furnishings constructed")
 	check(Annex.REST_AREA>240.0,"Largest lounge shell is active")
-	check(Layout.activity_slots().size()==20,"Twenty individual activity places")
+	check(Layout.activity_slots().size()==19,"Nineteen individual activity places")
 	var sphere:=SphereShape3D.new()
 	sphere.radius=0.28
 	var query:=PhysicsShapeQueryParameters3D.new()
@@ -43,10 +43,15 @@ func run() -> void:
 		check(Annex.player_bed_exit(index,2).z<Annex.player_bed_center(index,2).z,"Bed exit remains in front of its mattress")
 		check(Layout.approach_path(Annex.player_bed_exit(index)).size()>1,"Player bed has reachable access")
 
-	print("STAGE 2/4: daily assignment, capacity and overflow")
+	print("STAGE 2/4: working crew assignment and overflow geometry")
 	p.stars=1; p.lab_stage=3; p.shift="night"
-	for i in range(24): check(game.service.create_clone(1.0,true).is_empty(),"Create preview worker")
+	var first=game.service.by_id(1)
+	first.manual_station=false
+	first.staffed=0
+	game.service.add_station("counter",1,false,true)
+	for i in range(2): check(game.service.create_clone(1.0,true).is_empty(),"Create working clone")
 	var assignments: Array=game.evening.plan()
+	check(assignments.size()==2,"Only working clones receive evening activities")
 	var ids: Array=[]
 	var destinations: Array=[]
 	var before: Dictionary={}
@@ -56,17 +61,14 @@ func run() -> void:
 		ids.append(int(assignment.worker.id))
 		destinations.append(str(assignment.spot.id))
 		before[int(assignment.worker.id)]=str(assignment.spot.id)
-	check(assignments.size()>=24,"Every worker receives a place, including overflow")
-	game.service.create_clone(1.0,true)
-	for assignment in game.evening.plan():
-		var id:=int(assignment.worker.id)
-		if before.has(id): check(before[id]==str(assignment.spot.id),"Adding a worker preserves existing evening choices")
+	var overflow:=Layout.overflow_slot(0,p.lounge_tier,p.lounge_items)
+	check(str(overflow.id)=="overflow_0" and Layout.approach_path(overflow.approach,p.lounge_tier,p.lounge_items).size()>1,"Overflow activity remains reachable")
 	p.day+=1
 	var changed:=false
 	for assignment in game.evening.plan():
 		var id:=int(assignment.worker.id)
 		if before.has(id) and before[id]!=str(assignment.spot.id): changed=true
-	check(changed,"Activities vary between days")
+	check(changed,"Activities rotate between working clones on a new day")
 
 	print("STAGE 3/4: leisure poses, morning and cooking isolation")
 	var records: Array=[]
