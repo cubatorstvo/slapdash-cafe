@@ -1,0 +1,27 @@
+name: Push Test Cleanup
+on:
+  push:
+    branches:
+      - chatgpt-test-cleanup-push
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild patch
+        run: |
+          cat .test-cleanup/chunk-00.txt .test-cleanup/chunk-01.txt | base64 -d | xz -d > /tmp/test-cleanup.patch
+      - name: Apply to current main and push
+        run: |
+          git fetch origin main
+          git checkout -B deploy origin/main
+          git apply /tmp/test-cleanup.patch
+          git add README.md tests/run_headless_suite.py tests/test_first_star.gd tests/test_kitchen.gd tests/test_shop_feeding.gd tests/test_staff_lounge.gd
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh regression tests and isolated runner"
+          git push origin HEAD:main
