@@ -370,6 +370,7 @@ func world_entry() -> Dictionary:
 	data.order_tempo = order_tempo
 	data.model = model.snapshot()
 	data.training = training.summary()
+	data.masterclass = masterclass_station
 	return data
 
 func _build_bell() -> void:

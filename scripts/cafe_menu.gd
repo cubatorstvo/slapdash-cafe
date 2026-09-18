@@ -128,7 +128,7 @@ func show_station(station: Node3D) -> void:
 		return
 	var run = station.training
 	var showcase: bool = game.service.is_showcase(station)
-	_label(training_box, "СТАНЦИЯ %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title], 23)
+	_label(training_box, ("ШЕФ-СТАНЦИЯ · МАСТЕР-КЛАСС · %s"%station.Definition.TYPES[station.type_id].title) if station.masterclass_station else "СТАНЦИЯ %d · %s" % [station.station_id, station.Definition.TYPES[station.type_id].title], 23)
 	var names := PackedStringArray()
 	for role in range(station.crew.size()): names.append(station.crew_name(role))
 	if not station.manual_station: _label(training_box, "Бригада: " + ", ".join(names) if station.ready_crew() else "Нужны клоны: %d/%d · создай в лаборатории"%[station.staffed,station.role_count()], 16)
@@ -148,6 +148,18 @@ func show_station(station: Node3D) -> void:
 				if not wish.is_empty(): _label(training_box, wish)
 				_label(training_box, "Оплата ×%.1f"%float(station.customer_order.get("premium",1)),16)
 			_button(training_box, "Приготовить заказ", func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": dish}))
+		if game.service.progress.stars>=1:
+			_label(training_box,"МАСТЕР-КЛАСС",20)
+			if not game.service.masterclass_pending.is_empty():
+				var pending_dish: String=str(game.service.masterclass_pending.get("dish",""))
+				_label(training_box,"После уже принятых заказов начнётся: "+str(station.Definition.DISHES.get(pending_dish,pending_dish))+". Новые личные заказы временно не принимаются.",16)
+			else:
+				for option in game.service.masterclass_options():
+					var master_dish: String=str(option.dish)
+					if bool(option.available):
+						_button(training_box,"Провести мастер-класс · "+str(station.Definition.DISHES[master_dish]),func():command_requested.emit({"action":"masterclass_start","station":selected_station,"dish":master_dish}))
+					else:
+						_label(training_box,"○ %s — %s"%[station.Definition.DISHES[master_dish],option.reason],14)
 		_button(training_box, "Вернуться", close)
 		panel.show()
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -166,7 +178,8 @@ func show_station(station: Node3D) -> void:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()
 		_label(training_box, "Качество блюда: %s" % report.grade, 17)
-		if report.get("style_count", 0) > 0: _label(training_box, "Ловкая подача · эффектность +20%", 17)
+		var effect: Dictionary=preload("res://scripts/masterclass_library.gd").effectiveness(report)
+		_label(training_box,"Эффектность: %s · %s"%[effect.label,effect.explanation],17)
 		if run.phase == "review":
 			var details := PackedStringArray()
 			for criterion in report.criteria: details.append(criterion.label)
@@ -217,11 +230,12 @@ func show_station(station: Node3D) -> void:
 				var warning := _label(training_box, "Роли записаны вместе: замена одной очистит связанный черновик второй. Прежний рабочий рецепт останется до принятия нового.", 15)
 				warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_button(training_box, "Начать показ", start_pass)
-			if not showcase: _button(training_box, "Обучить бригаду · вернуться к заказам", func(): send("accept"))
+			if run.purpose=="masterclass": _button(training_box, "Сохранить мастер-класс в видеотеку", func(): send("accept"))
+			elif not showcase: _button(training_box, "Обучить бригаду · вернуться к заказам", func(): send("accept"))
 			else: _label(training_box, "Личный показ инспектору. Звонок подаёт блюдо; рабочая запись бригады сохранится.")
 			var old_time: float = station.recipes.get(run.dish, {}).get("duration", 0)
 			_label(training_box, "Рабочая запись: %.1f с. Черновик: %.1f с." % [old_time, (lengths.max() / 60.0) if not lengths.is_empty() else 0.0], 15)
-		if run.lead == game.session.local_id(): _button(training_box, "Прервать проверку" if showcase else "Закончить обучение", func(): send("cancel"))
+		if run.lead == game.session.local_id(): _button(training_box, "Прервать проверку" if showcase else "Закончить мастер-класс" if run.purpose=="masterclass" else "Закончить обучение", func(): send("cancel"))
 	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

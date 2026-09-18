@@ -132,7 +132,7 @@ func run() -> void:
 
 	print("[6/7] Fixed station slots, save/load drafts and malformed data rejection")
 	var saved: Dictionary = bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version == 13, "Station save uses current slot format")
+	check(saved.version == 14, "Station save uses current masterclass-library format")
 	for entry in saved.stations:
 		check(entry.has("slot") and not entry.has("position") and not entry.has("yaw") and not entry.has("id"), "Slot save omits transforms and runtime IDs")
 	check(service.load_data(saved), "Station save loads")

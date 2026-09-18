@@ -16,6 +16,7 @@ var tab := "overview"
 var stamp := ""
 var selections := {}
 var confirm_reset := false
+var confirm_delete_masterclass := -1
 var lab_branch := "formula"
 var lab_target := 2
 var lab_reserve := 150
@@ -46,7 +47,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
+	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["videos", "Видеотека"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -87,6 +88,7 @@ func open(page := "overview") -> void:
 	game.cookbook.close()
 	game.session.suspend_input()
 	confirm_reset = false
+	confirm_delete_masterclass = -1
 	panel.show()
 	stamp = ""
 	rebuild()
@@ -174,6 +176,26 @@ func rebuild() -> void:
 			button(content,"Формулы, выращивание и рекалибровка →",func():tab="laboratory";stamp="";rebuild())
 			label(content,"ОБУСТРОЙСТВО",20)
 			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
+		"videos":
+			label(content,"ВИДЕОТЕКА МАСТЕР-КЛАССОВ",23)
+			label(content,"Записи общие для кафе. Здесь хранятся полные принятые способы; монтаж хайлайтов появится на следующем этапе.",15)
+			if service.masterclasses.is_empty(): label(content,"Пока нет записей. Проведи мастер-класс у шеф-станции.")
+			for record in service.masterclasses:
+				var id: int=int(record.get("id",0))
+				var quality: Dictionary=record.get("quality",{})
+				var effect: Dictionary=record.get("effectiveness",{})
+				label(content,str(record.get("name","Запись")),20)
+				label(content,"%s · %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
+				label(content,str(effect.get("explanation","Аккуратное приготовление.")),14)
+				if bool(record.get("archived",false)): label(content,"Архивная запись из прежнего рабочего способа · стол %d"%int(record.get("source_station",0)),14)
+				var row:=HBoxContainer.new(); content.add_child(row)
+				var edit:=LineEdit.new(); row.add_child(edit); edit.text=str(record.get("name","")); edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL; edit.editable=host
+				button(row,"Переименовать",func():send({"action":"masterclass_rename","id":id,"name":edit.text}),host)
+				if confirm_delete_masterclass==id:
+					button(row,"Подтвердить удаление",func():send({"action":"masterclass_delete","id":id});confirm_delete_masterclass=-1,host)
+					button(row,"Отмена",func():confirm_delete_masterclass=-1;stamp="";rebuild(),host)
+				else:
+					button(row,"Удалить…",func():confirm_delete_masterclass=id;stamp="";rebuild(),host)
 		"laboratory":
 			laboratory_page()
 		"lounge":
