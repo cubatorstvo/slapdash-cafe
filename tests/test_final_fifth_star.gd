@@ -29,6 +29,7 @@ func ready_progression():
 	p.fifth_star_solyanka_served=p.FIFTH_STAR_SOLYANKA_SERVED
 	p.fifth_star_auto_served=p.FIFTH_STAR_AUTO_SERVED
 	p.orchestration_expanded=true
+	p.journey_auto_served=1
 	return p
 
 func run() -> void:
