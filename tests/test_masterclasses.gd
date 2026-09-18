@@ -74,7 +74,7 @@ func run()->void:
 	check(service.rename_masterclass(second_id,"Быстрый обед").is_empty() and service.masterclass_by_id(second_id).name=="Быстрый обед","Masterclass can be renamed")
 	var first_id: int=int(service.masterclasses[0].id)
 	check(service.delete_masterclass(first_id).is_empty() and service.masterclasses.size()==1,"Masterclass can be deleted independently")
-	var chef=service.by_id(1)
+	var chef: Node3D=service.by_id(1)
 	check(service.request_manual(chef,"wine",1),"Normal chef cooking still starts after masterclasses")
 	chef.training.close()
 
@@ -92,8 +92,7 @@ func run()->void:
 	legacy.erase("masterclasses")
 	legacy.erase("next_masterclass_id")
 	check(service.load_data(legacy),"Old v13 cafe still loads")
-	check(kitchen==null or true,"Old node references are intentionally replaced on load")
-	var archives:=service.masterclasses.filter(func(record):return bool(record.get("archived",false)) and record.dish=="meal")
+	var archives: Array=service.masterclasses.filter(func(record):return bool(record.get("archived",false)) and record.dish=="meal")
 	check(archives.size()>=1 and str(archives[0].name).contains("Архив"),"Old production method appears as an archive masterclass")
 	check(service.by_id(4).recipes.has("meal"),"Migrated station keeps its original working recipe")
 

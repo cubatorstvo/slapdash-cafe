@@ -379,7 +379,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		else: game.save_cafe()
 		return
 	if action=="masterclass_start":
-		var chef:=game.service.by_id(1)
+		var chef: Node3D=game.service.by_id(1)
 		if chef==null or not near_peer(sender,chef,5.0):
 			message_to(sender,"Подойди к шеф-станции.")
 			return
