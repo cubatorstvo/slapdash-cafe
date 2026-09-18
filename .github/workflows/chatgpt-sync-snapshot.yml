@@ -1,12 +1,10 @@
-name: ChatGPT Main Patch
+name: Push Solyanka To Main
 on:
   push:
     branches:
       - chatgpt-sync-snapshot
-
 permissions:
   contents: write
-
 jobs:
   apply:
     runs-on: ubuntu-latest
@@ -14,28 +12,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Apply verified patch to main
+      - name: Rebuild patch payload
         run: |
-          if [ ! -f .sync/patch-ready ]; then
-            echo "Patch chunks are still being staged."
-            exit 0
-          fi
-          shopt -s nullglob
-          parts=(.sync/patch-part-*)
-          if [ ${#parts[@]} -eq 0 ]; then
-            echo "No main patch chunks in this revision."
-            exit 0
-          fi
-          cat "${parts[@]}" > /tmp/apply-main.patch.gz.b64
-          base64 -d /tmp/apply-main.patch.gz.b64 | gzip -d > /tmp/apply-main.patch
+          cat .solyanka-push/chunk-00.txt .solyanka-push/chunk-01.txt .solyanka-push/chunk-02.txt .solyanka-push/chunk-03.txt | base64 -d | xz -d > /tmp/solyanka.patch
+      - name: Apply to current main and push
+        run: |
           git fetch origin main
-          git checkout -B main origin/main
-          test "$(git rev-parse HEAD)" = "15129dd9bc8a40729ecd6e11e6405b990a61d50b"
-          patch -p1 < /tmp/apply-main.patch
-          git diff --check
-          git status --short
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B deploy origin/main
+          git apply /tmp/solyanka.patch
           git add -A
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "Add three-role solyanka kitchen"
           git push origin HEAD:main
