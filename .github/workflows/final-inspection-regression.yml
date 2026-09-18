@@ -21,3 +21,5 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --version
       - name: Run headless regression suite
         run: python3 tests/run_headless_suite.py --godot /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+      - name: Run online host guest observer regression
+        run: python3 tests/run_online_cafe_test.py /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
