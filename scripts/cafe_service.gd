@@ -617,6 +617,109 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 		if station==null or station.manual_station or station.masterclass_station or station.type_id!=str(record.source_type) or str(record.dish) not in station.dishes(): return "В выборе есть несовместимый стол."
 	return ""
 
+func training_course_preview(assignments: Array,mode := "together") -> Dictionary:
+	_ensure_groups()
+	if mode not in ["together","by_groups"]: return {"error":"Неизвестный режим курса."}
+	if assignments.is_empty(): return {"error":"Добавь хотя бы один урок."}
+	var type_id: String=""
+	var selected: Array=[]
+	var lessons: Array=[]
+	var seen_dishes: Array=[]
+	for raw in assignments:
+		if not raw is Dictionary: return {"error":"Некорректный урок."}
+		var record_id: int=int(raw.get("record_id",raw.get("record",0)))
+		var record: Dictionary=masterclass_by_id(record_id)
+		if record.is_empty(): return {"error":"Запись #%d не найдена."%record_id}
+		var ids: Array=raw.get("station_ids",raw.get("stations",[])) if raw.get("station_ids",raw.get("stations",[])) is Array else []
+		var unique: Array=[]
+		for raw_id in ids:
+			var station_id: int=int(raw_id)
+			if station_id not in unique: unique.append(station_id)
+		unique.sort()
+		if unique.is_empty(): return {"error":"Выбери хотя бы один стол."}
+		var dish: String=str(record.get("dish",""))
+		if dish in seen_dishes: return {"error":"В курсе может быть только одна запись на блюдо."}
+		seen_dishes.append(dish)
+		var record_type: String=str(record.get("source_type",""))
+		if type_id.is_empty(): type_id=record_type
+		elif type_id!=record_type: return {"error":"Один курс содержит записи только одной кухни."}
+		var mastered:=0
+		var waiting: Array=[]
+		for station_id in unique:
+			var station=by_id(station_id)
+			if station==null or station.manual_station or station.masterclass_station or station.type_id!=record_type or dish not in station.dishes(): return {"error":"Стол %d несовместим с записью «%s»."%[station_id,str(record.get("name","Запись"))]}
+			if station_id not in selected: selected.append(station_id)
+			if station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id: mastered+=1
+			else: waiting.append(station_id)
+		lessons.append({"record_id":record_id,"dish":dish,"name":str(record.get("name","Запись")),"grade":str(record.get("quality",{}).get("grade","D")),"effectiveness":str(record.get("effectiveness",{}).get("label","Обычная")),"duration":float(record.get("duration",0.0)),"film":float(record.get("highlight_duration",0.0)),"mastered":mastered,"selected":unique.size(),"waiting":waiting})
+	selected.sort()
+	var temp=TableGroupRegistry.new()
+	if not temp.restore(group_registry.snapshot(),Definition.TYPES): return {"error":"Не удалось построить предпросмотр групп."}
+	for lesson in lessons: temp.apply_plan_to_selection(selected,str(lesson.dish),int(lesson.record_id))
+	var projected: Array=[]
+	for group in temp.all(): projected.append(_public_group(group))
+	var employees:=0
+	for station_id in selected:
+		var station=by_id(int(station_id))
+		if station!=null: employees+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	var all_needed: Array=[]
+	for lesson in lessons:
+		for station_id in lesson.waiting:
+			if station_id not in all_needed: all_needed.append(station_id)
+	all_needed.sort()
+	var batch_rows: Array=[]
+	if mode=="together":
+		var reasons: Array=[]
+		if progress.shift!="open": reasons.append("До следующего рабочего дня")
+		if progress.busy(): reasons.append("Сначала завершится проверка кафе")
+		if "television" not in progress.lounge_items: reasons.append("Нет телевизора")
+		elif bool(movie_state.get("playing",false)): reasons.append("Телевизор занят")
+		for lesson in lessons:
+			for station_id in lesson.waiting:
+				var station=by_id(int(station_id))
+				var missing: Array=Definition.missing_equipment(str(lesson.dish),station.equipment)
+				if not missing.is_empty(): reasons.append("Стол %d: требуется оборудование — %s"%[station_id,", ".join(missing)])
+				elif station.staffed>=0 and station.staffed<station.role_count(): reasons.append("Стол %d: нужны сотрудники"%station_id)
+				elif not station.ready_crew(): reasons.append("Стол %d: сотрудник занят другой активностью"%station_id)
+		batch_rows.append({"stations":all_needed.duplicate(),"blocked_reason":str(reasons[0]) if not reasons.is_empty() else "","ready":reasons.is_empty()})
+	else:
+		var group_order: Array=[]
+		for station_id in selected:
+			var group_id: String=temp.group_id_for_station(int(station_id))
+			if not group_id.is_empty() and group_id not in group_order: group_order.append(group_id)
+		for group_id in group_order:
+			var group: Dictionary=temp.by_id(str(group_id))
+			var needed: Array=[]
+			var reason: String=""
+			for lesson in lessons:
+				for station_id in lesson.waiting:
+					if station_id not in group.station_ids: continue
+					if station_id not in needed: needed.append(station_id)
+					var station=by_id(int(station_id))
+					var missing: Array=Definition.missing_equipment(str(lesson.dish),station.equipment)
+					if reason.is_empty() and not missing.is_empty(): reason="Стол %d: требуется оборудование — %s"%[station_id,", ".join(missing)]
+					elif reason.is_empty() and station.staffed>=0 and station.staffed<station.role_count(): reason="Стол %d: нужны сотрудники"%station_id
+					elif reason.is_empty() and not station.ready_crew(): reason="Стол %d: сотрудник занят другой активностью"%station_id
+			if reason.is_empty() and progress.shift!="open": reason="До следующего рабочего дня"
+			if reason.is_empty() and progress.busy(): reason="Сначала завершится проверка кафе"
+			if reason.is_empty() and "television" not in progress.lounge_items: reason="Нет телевизора"
+			elif reason.is_empty() and bool(movie_state.get("playing",false)): reason="Телевизор занят"
+			batch_rows.append({"group":str(group_id),"name":str(group.name),"stations":needed,"blocked_reason":reason,"ready":reason.is_empty()})
+	var max_out:=0
+	for batch in batch_rows: max_out=maxi(max_out,batch.stations.size())
+	var total_film:=0.0
+	for lesson in lessons: total_film+=float(lesson.film)
+	return {"error":"","type_id":type_id,"stations":selected,"employees":employees,"places":selected.size(),"lessons":lessons,"groups":projected,"batches":batch_rows,"simultaneous_out":max_out,"film_total":total_film,"mode":mode}
+
+func edit_training_course(course_id: int,assignments: Array,mode := "together",peer := 1) -> String:
+	return training_queue.edit_course(course_id,assignments,mode,peer) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
+
+func resume_training_assignment(station_id: int,dish: String,peer := 1) -> String:
+	return training_queue.resume_assignment(station_id,dish,peer) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
+
+func training_course_views() -> Array:
+	return training_queue.course_views() if is_instance_valid(training_queue) else []
+
 func queue_training_course(assignments: Array,mode := "together",command_id := "",peer := 1) -> Dictionary:
 	if not is_instance_valid(training_queue): return {"error":"Система очереди обучения недоступна.","course_id":0}
 	return training_queue.enqueue_course(assignments,str(mode),str(command_id),int(peer))
