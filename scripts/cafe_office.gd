@@ -22,6 +22,10 @@ var confirm_delete_masterclass := -1
 var group_selected_stations: Array=[]
 var group_pending_assignment: Dictionary={}
 var group_command_serial:=1
+var course_editor: Dictionary={}
+var course_editor_message: String=""
+var course_group_order: Array=[]
+var course_command_serial:=1
 var group_selected_groups: Array=[]
 var group_merge_choices: Dictionary={}
 var group_merge_active: Array=[]
@@ -112,6 +116,9 @@ func open(page := "overview") -> void:
 	confirm_reset = false
 	confirm_delete_masterclass = -1
 	group_pending_assignment={}
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
 	group_selected_stations=[]
 	group_selected_groups=[]
 	group_merge_choices={}
@@ -137,6 +144,7 @@ func set_group_station_selected(id: int,on: bool) -> void:
 	elif not on: group_selected_stations.erase(id)
 	group_selected_stations.sort()
 	group_pending_assignment={}
+	if not course_editor.is_empty(): _sync_course_group_order()
 	stamp=""
 	rebuild()
 
@@ -144,6 +152,7 @@ func select_group_stations(ids: Array) -> void:
 	group_selected_stations=ids.duplicate()
 	group_selected_stations.sort()
 	group_pending_assignment={}
+	if not course_editor.is_empty(): _sync_course_group_order()
 	stamp=""
 	rebuild()
 
@@ -151,6 +160,178 @@ func stage_group_assignment(record_id: int) -> void:
 	var command: String="office:%d:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),group_command_serial,record_id]
 	group_command_serial+=1
 	group_pending_assignment={"record":record_id,"stations":group_selected_stations.duplicate(),"command":command}
+	stamp=""
+	rebuild()
+
+func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
+	course_editor={"open":true,"records":[],"mode":"together","editing":edit_course_id,"type_id":""}
+	course_editor_message=""
+	course_group_order=[]
+	group_selected_stations=[]
+	if edit_course_id>0:
+		var view: Dictionary=game.service.training_queue.course_view(edit_course_id)
+		if view.is_empty():
+			course_editor_message="Курс не найден."
+		else:
+			course_editor.mode=str(view.get("mode","together"))
+			course_editor.editing=edit_course_id
+			for assignment in view.get("assignments",[]):
+				var rid: int=int(assignment.get("record_id",0))
+				if rid>0: _course_editor_add_record_internal(rid)
+				for raw_id in assignment.get("station_ids",[]):
+					var sid: int=int(raw_id)
+					if sid not in group_selected_stations: group_selected_stations.append(sid)
+			group_selected_stations.sort()
+			course_group_order=view.get("group_order",[]).duplicate()
+	if record_id>0: _course_editor_add_record_internal(record_id)
+	tab="groups"
+	stamp=""
+	rebuild()
+
+func course_editor_close() -> void:
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
+	stamp=""
+	rebuild()
+
+func _course_editor_add_record_internal(record_id: int) -> bool:
+	var record: Dictionary=game.service.masterclass_by_id(record_id)
+	if record.is_empty():
+		course_editor_message="Запись не найдена."
+		return false
+	var record_type: String=str(record.get("source_type",""))
+	var current_type: String=str(course_editor.get("type_id",""))
+	if not current_type.is_empty() and current_type!=record_type:
+		course_editor_message="Эта запись относится к другой кухне. Сформируй для неё отдельный курс."
+		return false
+	course_editor.type_id=record_type
+	var records: Array=course_editor.get("records",[])
+	var dish: String=str(record.get("dish",""))
+	for index in range(records.size()):
+		var existing: Dictionary=game.service.masterclass_by_id(int(records[index]))
+		if str(existing.get("dish",""))==dish:
+			records[index]=record_id
+			course_editor.records=records
+			course_editor_message="Версия блюда заменена на «%s»."%str(record.get("name","Запись"))
+			return true
+	records.append(record_id)
+	course_editor.records=records
+	course_editor_message=""
+	return true
+
+func course_editor_add_record(record_id: int) -> void:
+	if course_editor.is_empty(): course_editor={"open":true,"records":[],"mode":"together","editing":0,"type_id":""}
+	_course_editor_add_record_internal(record_id)
+	stamp=""
+	rebuild()
+
+func course_editor_remove_record(index: int) -> void:
+	var records: Array=course_editor.get("records",[])
+	if index>=0 and index<records.size(): records.remove_at(index)
+	course_editor.records=records
+	if records.is_empty(): course_editor.type_id=""
+	course_editor_message=""
+	stamp=""
+	rebuild()
+
+func course_editor_move_record(index: int,delta: int) -> void:
+	var records: Array=course_editor.get("records",[])
+	var target: int=index+delta
+	if index<0 or index>=records.size() or target<0 or target>=records.size(): return
+	var value=records[index]
+	records[index]=records[target]
+	records[target]=value
+	course_editor.records=records
+	stamp=""
+	rebuild()
+
+func course_editor_set_mode(mode: String) -> void:
+	if mode in ["together","by_groups"]: course_editor.mode=mode
+	stamp=""
+	rebuild()
+
+func _course_group_id_for_station(station_id: int) -> String:
+	return game.service.group_id_for_station(station_id)
+
+func _sync_course_group_order() -> void:
+	var valid: Array=[]
+	for raw_id in group_selected_stations:
+		var group_id: String=_course_group_id_for_station(int(raw_id))
+		if not group_id.is_empty() and group_id not in valid: valid.append(group_id)
+	var next: Array=[]
+	for group_id in course_group_order:
+		if group_id in valid and group_id not in next: next.append(group_id)
+	for group_id in valid:
+		if group_id not in next: next.append(group_id)
+	course_group_order=next
+
+func course_editor_select_group(group_id: String,on: bool) -> void:
+	var group: Dictionary=game.service.table_group_by_id(group_id)
+	if group.is_empty(): return
+	if on:
+		for raw_id in group.stations:
+			var station_id: int=int(raw_id)
+			if station_id not in group_selected_stations: group_selected_stations.append(station_id)
+		if group_id not in course_group_order: course_group_order.append(group_id)
+	else:
+		for raw_id in group.stations: group_selected_stations.erase(int(raw_id))
+		course_group_order.erase(group_id)
+	group_selected_stations.sort()
+	_sync_course_group_order()
+	stamp=""
+	rebuild()
+
+func course_editor_select_all_compatible() -> void:
+	var type_id: String=str(course_editor.get("type_id",""))
+	if type_id.is_empty(): return
+	group_selected_stations=[]
+	for station in game.service.stations:
+		if station.manual_station or station.masterclass_station or station.type_id!=type_id: continue
+		group_selected_stations.append(station.station_id)
+	group_selected_stations.sort()
+	_sync_course_group_order()
+	stamp=""
+	rebuild()
+
+func course_editor_move_group(group_id: String,delta: int) -> void:
+	_sync_course_group_order()
+	var index: int=course_group_order.find(group_id)
+	var target: int=index+delta
+	if index<0 or target<0 or target>=course_group_order.size(): return
+	var value=course_group_order[index]
+	course_group_order[index]=course_group_order[target]
+	course_group_order[target]=value
+	stamp=""
+	rebuild()
+
+func course_editor_assignments() -> Array:
+	var result: Array=[]
+	for raw_record_id in course_editor.get("records",[]):
+		result.append({"record_id":int(raw_record_id),"station_ids":group_selected_stations.duplicate()})
+	return result
+
+func course_editor_submit() -> void:
+	var assignments:=course_editor_assignments()
+	var preview: Dictionary=game.service.training_course_preview(assignments,str(course_editor.get("mode","together")),course_group_order)
+	if not str(preview.get("error","")).is_empty():
+		course_editor_message=str(preview.error)
+		stamp=""
+		rebuild()
+		return
+	var editing: int=int(course_editor.get("editing",0))
+	var payload: Dictionary={"assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate()}
+	if editing>0:
+		payload.action="training_course_edit"
+		payload.course=editing
+	else:
+		payload.action="training_course_confirm"
+		payload.command="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
+		course_command_serial+=1
+	send(payload)
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
 	stamp=""
 	rebuild()
 
