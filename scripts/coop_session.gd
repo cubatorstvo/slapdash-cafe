@@ -414,11 +414,13 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			"training_course_confirm":
 				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
 				var command: String=str(value.get("command","course:%d:%d"%[sender,game.service.training_queue.next_course_id]))
-				var result: Dictionary=game.service.queue_training_course(assignments,str(value.get("mode","together")),command,sender)
+				var group_order: Array=value.get("group_order",[]) if value.get("group_order",[]) is Array else []
+				var result: Dictionary=game.service.queue_training_course(assignments,str(value.get("mode","together")),command,sender,group_order)
 				error=str(result.get("error",""))
 			"training_course_edit":
 				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
-				error=game.service.edit_training_course(int(value.get("course",0)),assignments,str(value.get("mode","together")),sender)
+				var group_order: Array=value.get("group_order",[]) if value.get("group_order",[]) is Array else []
+				error=game.service.edit_training_course(int(value.get("course",0)),assignments,str(value.get("mode","together")),sender,group_order)
 			"training_resume":
 				error=game.service.resume_training_assignment(int(value.get("station",0)),str(value.get("dish","")),sender)
 			"training_cancel_course":
