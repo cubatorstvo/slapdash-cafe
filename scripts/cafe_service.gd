@@ -481,16 +481,64 @@ func source_label(station_id: int,dish: String) -> String:
 	if not current.is_empty(): return str(current.get("name",source.get("name","Запись")))+(" · запланировано" if bool(source.get("planned",false)) else "")
 	return str(source.get("name","Запись"))+" · Запись удалена"
 
+func desired_source(group_id: String,dish: String) -> Dictionary:
+	_ensure_groups()
+	var group: Dictionary=group_registry.by_id(group_id)
+	if group.is_empty(): return {}
+	var item: Dictionary=group_registry.plan_record(group,dish)
+	if item.is_empty(): return {}
+	var record_id:=int(item.record_id)
+	var record:=masterclass_by_id(record_id)
+	return {"id":record_id,"name":str(record.get("name","Запись #%d"%record_id)),"revision":int(item.revision)}
+
+func desired_source_label(group_id: String,dish: String) -> String:
+	var source:=desired_source(group_id,dish)
+	if source.is_empty(): return "не назначено"
+	return str(source.name) if not masterclass_by_id(int(source.id)).is_empty() else str(source.name)+" · Запись удалена"
+
 func station_group_status(station_id: int,dish: String) -> String:
 	var station:=by_id(station_id)
 	if station==null: return "нет стола"
+	var group: Dictionary=group_registry.for_station(station_id)
+	var desired: Dictionary=group_registry.plan_record(group,dish) if not group.is_empty() else {}
+	var active: bool=station.dish_active(dish)
 	if is_instance_valid(staff_training) and staff_training.targets_station(station_id,dish): return staff_training.phase_label()
 	var missing: Array=Definition.missing_equipment(dish,station.equipment)
-	if not missing.is_empty(): return "требуется оборудование"
-	if station.staffed>=0 and station.staffed<station.role_count(): return "требуются работники"
-	if station.recipes.has(dish): return "освоено"
-	if station.method_plan.has(dish): return "запланировано обучение"
-	return "нет способа"
+	if not missing.is_empty(): return "ждёт оснащение"
+	if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
+	if not desired.is_empty():
+		var actual: Dictionary=station.method_sources.get(dish,{})
+		if station.recipes.has(dish) and int(actual.get("id",0))==int(desired.record_id): return "освоено" if active else "освоено · выключено в меню"
+		if station.recipes.has(dish): return "работает по старому · ожидает переобучения" if active else "старый способ · выключено в меню"
+		return "ожидает обучения" if active else "обучение запланировано · блюдо выключено"
+	if station.recipes.has(dish): return "освоено" if active else "освоено · выключено в меню"
+	return "нет способа" if active else "выключено в меню"
+
+func group_dish_summary(group_id: String,dish: String) -> Dictionary:
+	var group:=table_group_by_id(group_id)
+	if group.is_empty(): return {}
+	var states: Dictionary={}
+	var mastered:=0
+	for raw_id in group.stations:
+		var state:=station_group_status(int(raw_id),dish)
+		states[state]=int(states.get(state,0))+1
+		if state.begins_with("освоено"): mastered+=1
+	return {"desired":desired_source_label(group_id,dish),"mastered":mastered,"total":group.stations.size(),"states":states}
+
+func add_station_to_group(group_id: String,station_id: int) -> String:
+	_ensure_groups()
+	var group:=group_registry.by_id(group_id)
+	var station:=by_id(station_id)
+	if group.is_empty() or station==null: return "Группа или стол не найдены."
+	if station.type_id!=str(group.type_id): return "Стол относится к другой кухне."
+	var ids: Array=group.station_ids.duplicate()
+	if station_id not in ids: ids.append(station_id)
+	var error:=group_registry.set_members(group_id,ids,str(group.type_id))
+	if not error.is_empty(): return error
+	_ensure_groups()
+	_sync_all_group_intent()
+	progress.revision+=1
+	return ""
 
 func compatible_training_station_ids(record_id: int) -> Array:
 	var record:=masterclass_by_id(record_id)
