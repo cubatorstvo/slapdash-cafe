@@ -10,6 +10,12 @@ func check(ok: bool,message: String)->void:
 		failures+=1
 		printerr("FAIL: ",message)
 
+func tree_text(node: Node)->String:
+	var result: String=""
+	if node is Label or node is Button: result+=str(node.text)+"\n"
+	for child in node.get_children(): result+=tree_text(child)
+	return result
+
 func repeated(value: Dictionary,count: int)->Array:
 	var result: Array=[]
 	for i in range(count): result.append(value.duplicate(true))
@@ -150,14 +156,27 @@ func run()->void:
 	var large_performance: Dictionary=service.group_performance(large_group)
 	check(int(large_performance.portions_served)>=1 and int(large_performance.revenue)>=25,"Large group performance remains readable")
 
-	print("7/9: feed aggregation window separates later identical events")
+	print("7/10: statistics and group UI render the same drill-down data")
+	game.office.open("stats")
+	var rendered: String=tree_text(game.office.content)
+	check("ЛЕНТА И СТАТИСТИКА" in rendered and "[СИСТЕМА]" in rendered,"Statistics tab renders system feed")
+	service.analytics.losses.busy=maxi(1,int(service.analytics.losses.get("busy",0)))
+	game.office.set_stats_focus({"reason":"busy","dish":"sausage","stations":[2,3],"group":str(large_group.id)})
+	rendered=tree_text(game.office.content)
+	check("ПОДРОБНОСТИ" in rendered and "Сетевая сосиска" in rendered and "Столы: 2, 3" in rendered,"Event drill-down renders dish, tables and masterclass")
+	game.office.tab="groups"; game.office.stamp=""; game.office.rebuild()
+	rendered=tree_text(game.office.content)
+	check("Результат блюда:" in rendered and "Сетевая сосиска" in rendered,"Group cards render masterclass assignment beside service results")
+	game.office.close()
+
+	print("8/10: feed aggregation window separates later identical events")
 	var before: int=service.analytics.feed.size()
 	Insights.loss(service.analytics,"sausage","busy",1,0,[2,3],str(large_group.id))
 	Insights.tick(service.analytics,Insights.FEED_WINDOW+0.1)
 	Insights.loss(service.analytics,"sausage","busy",1,0,[2,3],str(large_group.id))
 	check(service.analytics.feed.size()==before+2,"Same event outside the short aggregation window creates a new feed row")
 
-	print("8/9: v19 persists analytics and v18 migrates cleanly")
+	print("9/10: v19 persists analytics and v18 migrates cleanly")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	check(saved.version==19 and saved.analytics.get("feed",[]).size()>0,"Stage 6 save writes analytics in v19")
 	var feed_size: int=saved.analytics.feed.size()
@@ -169,7 +188,7 @@ func run()->void:
 	check(service.load_data(legacy),"v18 cafe remains loadable")
 	check(service.analytics.feed.is_empty() and service.save_data().version==19,"v18 migrates with blank historical analytics and writes v19")
 
-	print("9/9: completion percentages preserve absolute and relative meaning")
+	print("10/10: completion percentages preserve absolute and relative meaning")
 	check(is_equal_approx(Insights.completion_percent(180,200),90.0),"180 of 200 renders as 90 percent")
 	check(is_equal_approx(Insights.completion_percent(0,0),0.0),"Empty cafe percentage is safe")
 
