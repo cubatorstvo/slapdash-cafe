@@ -400,7 +400,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
 		return
-if action=="masterclass_watch":
+	if action=="masterclass_watch":
 		var lounge=game.get_tree().get_first_node_in_group("staff_lounge")
 		var tv: Node3D=lounge.television_node() if is_instance_valid(lounge) else null
 		if tv==null or not near_peer(sender,tv,4.8):
@@ -664,6 +664,7 @@ func _world(packet: PackedByteArray) -> void:
 		if not station.station_id in ids:
 			game.service.stations.remove_at(i)
 			station.queue_free()
+	game.service.sync_masterclass_live_scene()
 	for key in ["served", "revenue", "missed"]: game.service.set(key, data[key])
 	game.service.open_for_business = data.open
 	game.service.masterclasses=data.get("masterclasses",[]).duplicate(true)

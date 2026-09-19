@@ -86,6 +86,17 @@ func any_training() -> bool:
 func masterclass_active() -> bool: return is_instance_valid(masterclass_station)
 func masterclass_locked() -> bool: return masterclass_active() or not masterclass_pending.is_empty()
 
+func sync_masterclass_live_scene() -> void:
+	var stage: Node3D=by_id(1)
+	var should_show: bool=stage!=null and stage.masterclass_station and stage.training.active()
+	if should_show and not is_instance_valid(masterclass_live_scene):
+		masterclass_live_scene=MasterclassLiveScene.new()
+		add_child(masterclass_live_scene)
+		masterclass_live_scene.setup(stage)
+	elif not should_show and is_instance_valid(masterclass_live_scene):
+		masterclass_live_scene.queue_free()
+		masterclass_live_scene=null
+
 func stable_chef() -> Node3D:
 	return chef_station_backup if is_instance_valid(chef_station_backup) else by_id(1)
 
@@ -164,9 +175,7 @@ func _try_begin_masterclass() -> void:
 	masterclass_station=stage
 	masterclass_pending.clear()
 	stage.training.open(dish,peer,"masterclass")
-	masterclass_live_scene=MasterclassLiveScene.new()
-	add_child(masterclass_live_scene)
-	masterclass_live_scene.setup(stage)
+	sync_masterclass_live_scene()
 	progress.revision+=1
 	trace("masterclass_started",{"dish":dish,"peer":peer,"type":stage.type_id})
 
