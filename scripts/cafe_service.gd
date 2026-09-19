@@ -350,6 +350,16 @@ func _public_group(group: Dictionary) -> Dictionary:
 	if group.is_empty(): return {}
 	return {"id":str(group.id),"name":str(group.name),"type":str(group.type_id),"type_id":str(group.type_id),"stations":group.station_ids.duplicate(),"station_ids":group.station_ids.duplicate(),"dishes":Definition.TYPES[str(group.type_id)].dishes.duplicate(),"active_dishes":group.active_dishes.duplicate(),"curriculum":group.curriculum.duplicate(true),"plan_revision":int(group.plan_revision)}
 
+func group_snapshot() -> Dictionary:
+	_ensure_groups()
+	return group_registry.snapshot()
+
+func apply_group_snapshot(data: Dictionary) -> bool:
+	if not group_registry.restore(data,Definition.TYPES): return false
+	_ensure_groups()
+	_sync_all_group_intent()
+	return true
+
 func table_groups() -> Array:
 	_ensure_groups()
 	var result: Array=[]
