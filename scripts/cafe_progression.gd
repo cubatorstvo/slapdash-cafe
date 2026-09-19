@@ -77,6 +77,7 @@ var lab_calibration := preload("res://scripts/laboratory_progression.gd").blank_
 var lab_auto_calibration := false
 var starter_reward := false
 var deliveries: Array = []
+var delivery_history: Array = []
 var next_delivery_id := 1
 var garland_owned := false
 var lounge_tier := 0
@@ -258,7 +259,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "fifth_star_auto_served", "fifth_star_solyanka_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "orchestration_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "fifth_star_auto_served", "fifth_star_solyanka_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "deliveries", "delivery_history", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "orchestration_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:

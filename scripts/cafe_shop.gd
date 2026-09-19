@@ -368,6 +368,8 @@ func _install_parcel(parcel: Dictionary) -> String:
 		p.lab_stage+=1
 	elif spec.kind=="garland": p.garland_owned=true
 	elif spec.kind=="decor": p.decorations.append(parcel.item); p.popularity+=game.service.Progression.DECOR[parcel.item].popularity
+	p.delivery_history.push_front({"id":int(parcel.id),"item":str(parcel.item),"items":parcel.get("items",[parcel.item]).duplicate(),"station":int(parcel.station),"installer":parcel_has_installer(parcel),"day":int(p.day)})
+	while p.delivery_history.size()>12: p.delivery_history.pop_back()
 	p.deliveries.erase(parcel)
 	p.revision+=1
 	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installer":parcel_has_installer(parcel)})

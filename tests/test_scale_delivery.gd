@@ -94,6 +94,7 @@ func run()->void:
 		game.shop.advance(0.5)
 		game.shop._process(0.016)
 	check(delivery_by_station(service,7).is_empty() and delivery_by_station(service,8).is_empty() and delivery_by_station(service,9).is_empty(),"Each assembler completes and removes its own box")
+	check(p.delivery_history.size()>=3 and p.delivery_history.slice(0,3).all(func(entry):return bool(entry.get("installer",false))),"Completed assembler installations remain visible in delivery history")
 	game.shop._process(0.016)
 	check(game.shop.installers.is_empty(),"Assemblers leave after installation")
 	for id in [7,8,9]:
@@ -157,6 +158,7 @@ func run()->void:
 	game.player.global_position=game.shop.installation_position(manual)
 	check(game.shop.action(1,{"action":"install_parcel","id":manual.id}).is_empty(),"Player manually installs the box")
 	check("plates" in source.equipment and delivery_by_station(service,2).is_empty(),"Manual installation still updates the station")
+	check(p.delivery_history.any(func(entry):return not bool(entry.get("installer",false)) and str(entry.get("item",""))=="plates"),"Completed manual installation is also recorded with its installation method")
 
 	print("7/8: v17 persists twenty-slot stations and their unlearned lesson plans")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))

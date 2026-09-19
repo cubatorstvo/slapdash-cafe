@@ -370,10 +370,17 @@ func rebuild() -> void:
 			lounge_page()
 		"deliveries":
 			label(content,"ДОСТАВКИ",23)
-			if progress.deliveries.is_empty(): label(content,"Все коробки разобраны.")
+			if progress.deliveries.is_empty() and progress.delivery_history.is_empty(): label(content,"Доставок пока нет.")
 			for parcel in progress.deliveries:
-				var state := "В пути" if parcel.remaining>0 else ("Сборщик несёт" if parcel.get("installer_state","")=="walking" else "Сборщик ждёт" if parcel.get("installer_state","")=="waiting" else "Сборщик устанавливает" if parcel.get("installer_state","")=="installing" else "Сборщик назначен") if bool(parcel.get("installer",false)) else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
-				label(content,game.shop.parcel_name(parcel)+" · "+state+(" · место %d"%parcel.station if parcel.station>0 else ""))
+				var state := "В пути" if parcel.remaining>0 else ("Сборщик несёт" if parcel.get("installer_state","")=="walking" else "Сборщик ждёт" if parcel.get("installer_state","")=="waiting" else "Сборщик устанавливает" if parcel.get("installer_state","")=="installing" else "Сборщик назначен") if bool(parcel.get("installer",false)) else "Несёт игрок" if parcel.owner>0 else "Доставлено · ждёт ручной установки"
+				var method: String="сборщик" if bool(parcel.get("installer",false)) else "вручную"
+				label(content,game.shop.parcel_name(parcel)+" · "+method+" · "+state+(" · место %d"%parcel.station if parcel.station>0 else ""))
+			if not progress.delivery_history.is_empty():
+				label(content,"ЗАВЕРШЕНО",19)
+				for completed in progress.delivery_history:
+					var method: String="сборщик" if bool(completed.get("installer",false)) else "вручную"
+					var completed_name: String=game.shop.parcel_name(completed)
+					label(content,"%s · %s · установка завершена%s"%[completed_name,method," · место %d"%int(completed.get("station",0)) if int(completed.get("station",0))>0 else ""],14)
 		"star":
 			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · День пяти звёзд" if progress.stars==4 else "КАФЕ · 5★"
 			label(content,star_title,23)
