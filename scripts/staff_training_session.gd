@@ -115,7 +115,7 @@ func _advance_paths(delta: float)->bool:
 		if path.is_empty(): continue
 		finished=false
 		var actor: Node3D=actors[key]
-		if actor.walk_to(path[0],delta):
+		if actor.walk_to(path[0],delta*1.8):
 			path.pop_front()
 			actor_paths[key]=path
 	for key in actor_paths:
