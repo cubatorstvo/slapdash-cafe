@@ -434,6 +434,11 @@ func lounge_page() -> void:
 	var p=game.service.progress
 	var forecast:=Lounge.report(p,game.evening.workers().size())
 	var host: bool=not game.session.is_guest()
+	var installer_toggle:=CheckBox.new(); content.add_child(installer_toggle)
+	installer_toggle.text="Прислать сборщика для новых предметов · бесплатно"
+	installer_toggle.button_pressed=send_installers
+	installer_toggle.disabled=not host
+	installer_toggle.toggled.connect(func(on):send_installers=on;stamp="";rebuild())
 	label(content,"КОМНАТА ОТДЫХА · "+str(Lounge.STAGES[p.lounge_tier].name),23)
 	label(content,"Сегодня: +%d%% к темпу всех клонов. Завтра: +%d%%."%[roundi((p.rest_multiplier-1.0)*100),roundi(float(forecast.bonus)*100)],20)
 	label(content,"Мест: %d · клонов: %d · уют: +%d%%. Бонус делится на всю команду, максимум +30%%. Если мест не хватает, общий бонус меньше."%[forecast.places,forecast.workers,roundi(float(forecast.comfort)*100)])
