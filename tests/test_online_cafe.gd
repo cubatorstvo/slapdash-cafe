@@ -150,7 +150,7 @@ func host_tick() -> void:
 		stage = 1
 	elif stage == 1:
 		var guest_id:=member_named("guest")
-		if not started_staff_training and guest_id>0 and barrier.has_from("movie-checked",guest_id):
+		if not started_staff_training and guest_id>0 and barrier.has_from("movie-checked",guest_id) and not bool(game.service.movie_state.get("playing",false)):
 			var lesson_error: String=game.service.start_group_training(502,[3])
 			if not lesson_error.is_empty(): fail("Staff training did not start: "+lesson_error); return
 			started_staff_training=true
