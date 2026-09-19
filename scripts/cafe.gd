@@ -387,6 +387,11 @@ func _physics_process(delta: float) -> void:
 
 func refresh_hud() -> void:
 	hud.clone_status.text = "День %d · %d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.day, service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
+	var feed_lines: Array=[]
+	for entry in service.analytics.feed.slice(0,mini(3,service.analytics.feed.size())):
+		var source: String="ИГРОК · %s: "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "СИСТЕМА: "
+		feed_lines.append(source+service.feed_text(entry))
+	hud.set_event_feed(feed_lines)
 	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"

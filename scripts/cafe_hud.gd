@@ -23,6 +23,8 @@ var progress: ProgressBar
 var pause_panel: PanelContainer
 var toast: Label
 var toast_tween: Tween
+var event_feed_panel: PanelContainer
+var event_feed_text: Label
 
 func _ready() -> void:
 	var root := Control.new()
@@ -60,6 +62,16 @@ func _ready() -> void:
 	progress = ProgressBar.new()
 	order.add_child(progress)
 	progress.hide()
+	event_feed_panel=_panel(root)
+	event_feed_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	event_feed_panel.offset_left=26
+	event_feed_panel.offset_right=560
+	event_feed_panel.offset_top=164
+	event_feed_panel.offset_bottom=270
+	event_feed_text=_label(event_feed_panel,"",14,CafeStyle.CREAM)
+	event_feed_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+	event_feed_text.max_lines_visible=4
+	event_feed_panel.hide()
 	recipe_panel = _panel(root)
 	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	recipe_panel.offset_left = -346
@@ -160,6 +172,13 @@ func recipe_panel_text() -> String:
 			for nested in child.get_children():
 				if nested is Label: parts.append(nested.text)
 	return " ".join(parts)
+
+func set_event_feed(lines: Array) -> void:
+	if lines.is_empty():
+		event_feed_panel.hide()
+		return
+	event_feed_text.text="\n".join(lines)
+	event_feed_panel.show()
 
 func show_toast(message: String) -> void:
 	if toast_tween != null: toast_tween.kill()
