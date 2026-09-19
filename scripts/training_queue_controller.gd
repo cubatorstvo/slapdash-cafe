@@ -229,11 +229,32 @@ func _retire_pending_course(course: Dictionary)->void:
 		if str(batch.get("state","")) not in ["completed","cancelled"]: batch.state="cancelled"
 		_clear_batch_stations(batch)
 
+func _course_intent(course: Dictionary)->Array:
+	if course.get("assignments",[]) is Array and not course.get("assignments",[]).is_empty(): return course.assignments
+	var order: Array=[]
+	var merged: Dictionary={}
+	for batch_id in course.get("batch_ids",[]):
+		var batch:=_batch(int(batch_id))
+		for lesson_id in batch.get("lesson_ids",[]):
+			var lesson:=_lesson(int(lesson_id))
+			var key: String=str(lesson.get("record_id",0))
+			if key not in merged:
+				order.append(key)
+				merged[key]={"record_id":int(lesson.record_id),"dish":str(lesson.dish),"station_ids":[],"versions":{}}
+			for station_id in lesson.get("station_ids",[]):
+				if int(station_id) not in merged[key].station_ids: merged[key].station_ids.append(int(station_id))
+				merged[key].versions[str(int(station_id))]=int(lesson.get("versions",{}).get(str(int(station_id)),1))
+	var result: Array=[]
+	for key in order:
+		merged[key].station_ids.sort()
+		result.append(merged[key])
+	return result
+
 func course_view(course_id: int)->Dictionary:
 	var course:=_course(course_id)
 	if course.is_empty(): return {}
 	var rows: Array=[]
-	for raw in course.get("assignments",[]):
+	for raw in _course_intent(course):
 		var row: Dictionary=raw.duplicate(true)
 		var record: Dictionary=service.masterclass_by_id(int(row.get("record_id",0)))
 		row.name=str(record.get("name","Запись #%d"%int(row.get("record_id",0))))
@@ -249,7 +270,7 @@ func course_view(course_id: int)->Dictionary:
 			var lesson:=_lesson(int(lesson_id))
 			lesson_rows.append({"id":int(lesson.id),"dish":str(lesson.dish),"record_id":int(lesson.record_id),"name":str(lesson.record.get("name","Запись")),"state":str(lesson.state),"stations":lesson.station_ids.duplicate()})
 		batch_rows.append({"id":int(batch.id),"state":str(batch.state),"stations":batch.station_ids.duplicate(),"blocked_reason":str(batch.get("blocked_reason","")),"lessons":lesson_rows})
-	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and int(course.get("id",0))!=active_batch_id}
+	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
 
 func course_views()->Array:
 	var result: Array=[]
