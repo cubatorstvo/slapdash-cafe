@@ -29,6 +29,27 @@ static func summary(record: Dictionary) -> Dictionary:
 	result.erase("tracks")
 	return result
 
+static func movie_payload(record: Dictionary) -> Dictionary:
+	var payload:=record.duplicate(true)
+	var segments: Array=record.get("highlight_segments",[])
+	var compact_tracks: Array=[]
+	for source_track in record.get("tracks",[]):
+		var compact: Dictionary={"group":source_track.get("group",-1),"frames":[]}
+		var frames: Array=source_track.get("frames",[])
+		for segment in segments:
+			for tick in range(int(segment.source_start),int(segment.source_end)):
+				if not frames.is_empty(): compact.frames.append(frames[mini(tick,frames.size()-1)])
+		compact_tracks.append(compact)
+	payload.tracks=compact_tracks
+	var compact_segments: Array=[]
+	for segment in segments:
+		var copy: Dictionary=segment.duplicate(true)
+		copy.source_start=int(copy.film_start)
+		copy.source_end=int(copy.film_end)
+		compact_segments.append(copy)
+	payload.highlight_segments=compact_segments
+	return payload
+
 static func valid(record: Dictionary) -> bool:
 	if not record is Dictionary: return false
 	if int(record.get("id",0))<=0 or not record.get("name","") is String: return false

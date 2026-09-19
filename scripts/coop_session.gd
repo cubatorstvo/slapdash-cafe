@@ -3,7 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
-const PROTOCOL := "slapdash-cafe-scale-28"
+const PROTOCOL := "slapdash-cafe-scale-29"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -153,6 +153,7 @@ func _register(value: String, version: String) -> void:
 	members[sender] = game.steam.peer_name(sender) if transport == "steam" else value.strip_edges().left(24)
 	player_poses[sender] = {"position": [-7.0, 0.02, 6.0], "yaw": 0.0, "pitch": -0.15}
 	broadcast_roster()
+	if bool(game.service.movie_state.get("playing",false)): _send_movie_record(sender)
 
 func broadcast_roster() -> void:
 	for id in members:
@@ -163,6 +164,27 @@ func _rejected(message: String) -> void: leave(message)
 
 @rpc("authority", "call_remote", "reliable", 0)
 func _roster(value: Dictionary) -> void: members = value
+
+func _send_movie_record(peer: int) -> void:
+	var record: Dictionary=game.service.movie_record()
+	if record.is_empty(): return
+	var payload: Dictionary=game.service.Masterclasses.movie_payload(record)
+	var packet:=var_to_bytes(payload).compress(FileAccess.COMPRESSION_DEFLATE)
+	if peer==1:
+		game.service.remote_movie_record=payload
+	elif connected and members.has(peer):
+		_movie_record.rpc_id(peer,packet)
+
+func _broadcast_movie_record() -> void:
+	for id in members:
+		if int(id)!=1: _send_movie_record(int(id))
+
+@rpc("authority","call_remote","reliable",0)
+func _movie_record(packet: PackedByteArray) -> void:
+	if not guest: return
+	var bytes:=packet.decompress_dynamic(16777216,FileAccess.COMPRESSION_DEFLATE)
+	var value=bytes_to_var(bytes)
+	if value is Dictionary: game.service.remote_movie_record=value
 
 func sleep_participants() -> Array:
 	var result: Array = []
@@ -378,6 +400,18 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
 		return
+if action=="masterclass_watch":
+		var lounge=game.get_tree().get_first_node_in_group("staff_lounge")
+		var tv: Node3D=lounge.television_node() if is_instance_valid(lounge) else null
+		if tv==null or not near_peer(sender,tv,4.8):
+			message_to(sender,"Подойди к телевизору в комнате отдыха.")
+			return
+		var error: String=game.service.start_highlights(int(value.get("id",0)),sender)
+		if not error.is_empty(): message_to(sender,error)
+		else:
+			_broadcast_movie_record()
+			message_to(sender,"Хайлайты запущены на телевизоре.")
+		return
 	if action=="masterclass_start":
 		var chef: Node3D=game.service.by_id(1)
 		if chef==null or not near_peer(sender,chef,5.0):
@@ -579,7 +613,7 @@ func advance(delta: float) -> void:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"visit_kind":customer.get("visit_kind",""),"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"laboratory": game.laboratory.snapshot(), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot(), "masterclasses":game.service.masterclass_summaries(), "next_masterclass_id":game.service.next_masterclass_id}
+	var data := {"laboratory": game.laboratory.snapshot(), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot(), "masterclasses":game.service.masterclass_summaries(), "next_masterclass_id":game.service.next_masterclass_id, "movie":game.service.movie_snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -634,6 +668,7 @@ func _world(packet: PackedByteArray) -> void:
 	game.service.open_for_business = data.open
 	game.service.masterclasses=data.get("masterclasses",[]).duplicate(true)
 	game.service.next_masterclass_id=int(data.get("next_masterclass_id",1))
+	game.service.apply_movie_snapshot(data.get("movie",{}))
 	game.service.progress.restore(data.progression, true)
 	game.laboratory.restore(data.laboratory)
 	ids.clear()
