@@ -146,6 +146,7 @@ func _complete()->void:
 		station.drafts.erase(dish)
 		station.group_training_state=""
 	service.trace("group_training_complete",{"dish":dish,"record":record_id,"stations":station_ids.duplicate()})
+	service.feed_system("training",{"dish":dish,"record":record_id,"name":str(record.get("name","Запись")),"stations":station_ids.duplicate()},station_ids.size())
 	service.progress.revision+=1
 	var game=service.game
 	reset()

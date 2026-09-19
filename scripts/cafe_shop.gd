@@ -368,11 +368,17 @@ func _install_parcel(parcel: Dictionary) -> String:
 		p.lab_stage+=1
 	elif spec.kind=="garland": p.garland_owned=true
 	elif spec.kind=="decor": p.decorations.append(parcel.item); p.popularity+=game.service.Progression.DECOR[parcel.item].popularity
-	p.delivery_history.push_front({"id":int(parcel.id),"item":str(parcel.item),"items":parcel.get("items",[parcel.item]).duplicate(),"station":int(parcel.station),"installer":parcel_has_installer(parcel),"day":int(p.day)})
+	var completed_by_installer: bool=parcel_has_installer(parcel)
+	var completed_station_id: int=int(parcel.station) if spec.kind=="station" else 0
+	p.delivery_history.push_front({"id":int(parcel.id),"item":str(parcel.item),"items":parcel.get("items",[parcel.item]).duplicate(),"station":int(parcel.station),"installer":completed_by_installer,"day":int(p.day)})
 	while p.delivery_history.size()>12: p.delivery_history.pop_back()
 	p.deliveries.erase(parcel)
 	p.revision+=1
-	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installer":parcel_has_installer(parcel)})
+	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installer":completed_by_installer})
+	if completed_by_installer and completed_station_id>0:
+		var installed=game.service.by_id(completed_station_id)
+		var missing_workers: int=1 if installed!=null and installed.staffed>=0 and installed.staffed<installed.role_count() else 0
+		game.service.feed_system("installer",{"stations":[completed_station_id],"workers_missing":missing_workers},1)
 	return ""
 
 func _advance_installer(parcel: Dictionary,delta: float) -> void:
@@ -552,6 +558,7 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 		p.deliveries.append(_new_delivery(type_id,station_id,contents,bool(with_installers),8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"unit_price":unit_price}))
 	p.revision+=1
 	log_event("station_batch_ordered",{"type":type_id,"stations":unique_ids,"equipment":chosen_equipment,"group":group_id,"installer":with_installers,"price":total})
+	game.service.feed_system("batch",{"stations":unique_ids,"group":group_id},unique_ids.size())
 	return ""
 
 func reward_sauce() -> void:

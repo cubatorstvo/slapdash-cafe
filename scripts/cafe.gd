@@ -558,6 +558,7 @@ func new_cafe() -> void:
 	service.revenue = 0
 	service.guests_arrived=0
 	service.order_stats=service.blank_order_stats()
+	service.analytics=preload("res://scripts/cafe_insights.gd").blank()
 	service.open_for_business = false
 	service.initial_stations()
 	laboratory.recover()

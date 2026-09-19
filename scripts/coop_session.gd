@@ -4,7 +4,7 @@ const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
-const PROTOCOL := "slapdash-cafe-scale-32"
+const PROTOCOL := "slapdash-cafe-scale-33"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -407,7 +407,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		else:
 			var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
 			if ids.size()>game.service.SLOT_COUNT: ids=ids.slice(0,game.service.SLOT_COUNT)
-			error=game.service.start_group_training(int(value.get("record",0)),ids)
+			error=game.service.start_group_training(int(value.get("record",0)),ids,sender)
 		if not error.is_empty(): message_to(sender,error)
 		else:
 			game.save_cafe()
@@ -644,7 +644,7 @@ func advance(delta: float) -> void:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"visit_kind":customer.get("visit_kind",""),"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"laboratory":game.laboratory.snapshot(),"sleeping":sleeping_peers.duplicate(true),"sleep_scene":sleep_scene.duplicate(true),"sleep_revision":sleep_revision,"protocol":PROTOCOL,"stations":entries,"players":player_poses,"customers":customers,"served":game.service.served,"revenue":game.service.revenue,"missed":game.service.missed,"guests_arrived":game.service.guests_arrived,"order_stats":game.service.order_stats.duplicate(true),"open":game.service.open_for_business,"progression":game.service.progress.snapshot(),"masterclasses":game.service.masterclass_summaries(),"next_masterclass_id":game.service.next_masterclass_id,"movie":game.service.movie_snapshot(),"table_group_names":game.service.table_group_names.duplicate(true),"staff_training":game.service.staff_training.snapshot()}
+	var data := {"laboratory":game.laboratory.snapshot(),"sleeping":sleeping_peers.duplicate(true),"sleep_scene":sleep_scene.duplicate(true),"sleep_revision":sleep_revision,"protocol":PROTOCOL,"stations":entries,"players":player_poses,"customers":customers,"served":game.service.served,"revenue":game.service.revenue,"missed":game.service.missed,"guests_arrived":game.service.guests_arrived,"order_stats":game.service.order_stats.duplicate(true),"analytics":game.service.analytics.duplicate(true),"open":game.service.open_for_business,"progression":game.service.progress.snapshot(),"masterclasses":game.service.masterclass_summaries(),"next_masterclass_id":game.service.next_masterclass_id,"movie":game.service.movie_snapshot(),"table_group_names":game.service.table_group_names.duplicate(true),"staff_training":game.service.staff_training.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -704,6 +704,7 @@ func _world(packet: PackedByteArray) -> void:
 	game.service.sync_masterclass_live_scene()
 	for key in ["served","revenue","missed","guests_arrived"]: game.service.set(key,int(data.get(key,0)))
 	game.service.order_stats=data.get("order_stats",game.service.blank_order_stats()).duplicate(true)
+	game.service.analytics=game.service.Insights.normalize(data.get("analytics",{}))
 	game.service.open_for_business = data.open
 	game.service.masterclasses=data.get("masterclasses",[]).duplicate(true)
 	game.service.next_masterclass_id=int(data.get("next_masterclass_id",1))
