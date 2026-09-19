@@ -154,6 +154,7 @@ func request_masterclass(dish: String, peer: int) -> String:
 	masterclass_pending={"dish":dish,"peer":peer}
 	progress.revision+=1
 	trace("masterclass_requested",{"dish":dish,"peer":peer})
+	feed_player(peer,"masterclass",{"dish":dish})
 	_try_begin_masterclass()
 	return ""
 
@@ -414,7 +415,7 @@ func preview_table_groups(record_id: int,ids: Array) -> Array:
 		overrides[int(raw_id)]={"id":record_id,"name":str(record.name),"dish":str(record.dish),"pending":true}
 	return _derive_table_groups(overrides)
 
-func start_group_training(record_id: int,ids: Array) -> String:
+func start_group_training(record_id: int,ids: Array,peer := 1) -> String:
 	var error:=training_selection_error(record_id,ids)
 	if not error.is_empty(): return error
 	var unique: Array=[]
@@ -426,6 +427,7 @@ func start_group_training(record_id: int,ids: Array) -> String:
 	staff_training.start(record,unique)
 	progress.revision+=1
 	trace("group_training_assigned",{"record":record_id,"dish":record.dish,"stations":unique})
+	feed_player(int(peer),"group_training",{"record":record_id,"dish":record.dish,"stations":unique},unique.size())
 	return ""
 
 func _archive_legacy_recipes() -> void:
@@ -639,7 +641,9 @@ func _record_failed_order(customer: Dictionary,reason := "busy") -> void:
 	order_stats.orders_failed=int(order_stats.orders_failed)+1
 	order_stats.portions_unserved=int(order_stats.portions_unserved)+maxi(0,int(customer.get("portions_total",1))-int(customer.get("portions_done",0)))
 	missed+=1
-	progress.record_demand(str(customer.dish),reason)
+	_analytics_loss(customer,reason)
+	var legacy_reason: String="busy" if reason in ["busy","chef_wait","closing","wait"] else "untrained"
+	progress.record_demand(str(customer.dish),legacy_reason)
 
 func _finish_multi_departure(customer: Dictionary,station: Node3D,reason := "busy") -> void:
 	if bool(customer.get("stats_finalized",false)): return
@@ -651,7 +655,8 @@ func _finish_multi_departure(customer: Dictionary,station: Node3D,reason := "bus
 	else: order_stats.orders_failed=int(order_stats.orders_failed)+1
 	order_stats.portions_unserved=int(order_stats.portions_unserved)+remaining
 	missed+=1
-	progress.record_demand(str(customer.dish),reason)
+	_analytics_loss(customer,reason)
+	progress.record_demand(str(customer.dish),"busy" if reason in ["busy","wait","closing","chef_wait"] else "untrained")
 	_release_order_station(station,int(customer.id))
 	customer.state="leaving"
 	customer.path=[Vector3(17.4,0,1.65)]
@@ -663,6 +668,7 @@ func _complete_multi_order(customer: Dictionary,station: Node3D) -> void:
 	if bool(customer.get("stats_finalized",false)): return
 	customer.stats_finalized=true
 	order_stats.orders_completed=int(order_stats.orders_completed)+1
+	Insights.complete(analytics,str(customer.dish),station.station_id if station!=null else 0)
 	_count_completed_customer(customer,station)
 	_release_order_station(station,int(customer.id))
 	customer.state="leaving"
@@ -677,7 +683,8 @@ func advance_large_order_queue(delta: float) -> void:
 		customer.order_age=float(customer.get("order_age",0.0))+delta
 		_update_multi_caption(customer)
 		if float(customer.order_age)>=float(customer.wait_limit) and customer.state!="portion_eating":
-			_finish_multi_departure(customer,by_id(int(customer.get("station",-1))),"busy")
+			var timeout_reason: String="wait" if int(customer.get("station",-1))>0 else str(problem_context(str(customer.dish)).reason)
+			_finish_multi_departure(customer,by_id(int(customer.get("station",-1))),timeout_reason)
 	var line: Array=customers.filter(func(c):return c.state=="auto_queue")
 	for i in range(line.size()):
 		var customer: Dictionary=line[i]
@@ -691,6 +698,7 @@ func advance_large_order_queue(delta: float) -> void:
 			_update_multi_caption(customer)
 
 func advance(delta: float) -> void:
+	Insights.tick(analytics,delta)
 	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
 	_try_begin_masterclass()
 	if bool(movie_state.get("playing",false)):
@@ -712,7 +720,7 @@ func advance(delta: float) -> void:
 				spawn_customer()
 				spawn_clock = progress.arrival_interval()
 		advance_chef_orders(delta)
-	advance_queue()
+	advance_queue(delta)
 	advance_large_order_queue(delta)
 	for station in stations:
 		station.training.advance(delta)
@@ -734,7 +742,7 @@ func advance(delta: float) -> void:
 			if customer.eat_age>=1.2:
 				var table: Node3D=by_id(int(customer.station))
 				if int(customer.portions_done)>=int(customer.portions_total): _complete_multi_order(customer,table)
-				elif float(customer.order_age)>=float(customer.wait_limit): _finish_multi_departure(customer,table,"busy")
+				elif float(customer.order_age)>=float(customer.wait_limit): _finish_multi_departure(customer,table,"wait")
 				elif table!=null: _start_automatic_order(table,customer)
 			continue
 		if customer.state=="eating":
@@ -771,7 +779,7 @@ func advance(delta: float) -> void:
 				customer.wait += delta
 				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут твоего показа · [E]"
 				if customer.wait >= 14:
-					finish_customer(customer.id, false)
+					finish_customer(customer.id,false,"unlearned")
 
 func has_automatic_station() -> bool:
 	for station in stations:
@@ -837,7 +845,8 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 		candidates=[personal] if personal!=null and personal.manual_station and recipe in personal.dishes() and chef_queue().size()<CHEF_QUEUE_LIMIT else []
 	var station: Node3D=null if candidates.is_empty() else candidates[rng.randi_range(0,candidates.size()-1)]
 	if station==null and not visit_data.is_empty(): return false
-	var queue_large: bool=station==null and portions>1 and offered and not banquet and not chef_guest and visit_data.is_empty()
+	var problem: Dictionary=problem_context(recipe)
+	var queue_large: bool=station==null and portions>1 and str(problem.reason)=="busy" and not banquet and not chef_guest and visit_data.is_empty()
 	var person:=Person.new()
 	person.color=Color("d6b56b") if banquet else [Color("ae7381"),Color("839fbb"),Color("c6a66b"),Color("91aa78")][next_customer_id%4]
 	add_child(person)
@@ -847,6 +856,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	guests_arrived+=1
 	order_stats.orders_arrived=int(order_stats.orders_arrived)+1
 	order_stats.portions_ordered=int(order_stats.portions_ordered)+portions
+	Insights.arrival(analytics,recipe,portions)
 	if not visit_data.is_empty():
 		data.visit_id=int(visit_data.id); data.visit_slot=int(visit_data.slot); data.visit_kind=str(visit_data.kind)
 		data.chef_order=false
@@ -859,8 +869,8 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 		else:
 			data.state="leaving"
 			data.path=[Vector3(-9.6,0,2.6),Vector3(17.4,0,1.65)]
-			person.caption.text+=("\nВсе заняты · зайду позже" if offered else "\nЕщё не готовят · загляну позже")
-			_record_failed_order(data,"busy" if offered else "untrained")
+			person.caption.text+="\n"+Insights.reason_label(str(problem.reason))
+			_record_failed_order(data,str(problem.reason))
 			if banquet: progress.banquet_finished+=1
 	else:
 		if station.manual_station:
@@ -882,10 +892,10 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	next_customer_id+=1
 	return station!=null or queue_large
 
-func finish_customer(id: int, accepted: bool) -> void:
+func finish_customer(id: int, accepted: bool, failure_reason := "") -> void:
 	for customer in customers:
 		if customer.id!=id or customer.state in ["leaving","eating","portion_eating"]: continue
-		if customer.state=="queued": dismiss_queue(customer); return
+		if customer.state=="queued": dismiss_queue(customer,failure_reason if not failure_reason.is_empty() else "busy"); return
 		var station: Node3D=by_id(int(customer.get("station",-1)))
 		if int(customer.get("portions_total",1))>1:
 			if not accepted:
@@ -904,6 +914,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 			station.order_portions_done=int(customer.portions_done)
 			station.order_paid=int(customer.order_paid)
 			order_stats.portions_served=int(order_stats.portions_served)+1
+			Insights.portion(analytics,str(customer.dish),station.station_id,payment)
 			revenue+=payment
 			progress.cash+=payment
 			var payload: Array=station.model.take_serving()
@@ -945,11 +956,15 @@ func finish_customer(id: int, accepted: bool) -> void:
 			customer.stats_finalized=true
 			order_stats.orders_completed=int(order_stats.orders_completed)+1
 			order_stats.portions_served=int(order_stats.portions_served)+1
+			Insights.portion(analytics,str(customer.dish),station.station_id,payment)
+			Insights.complete(analytics,str(customer.dish),station.station_id)
 			_count_completed_customer(customer,station)
 			revenue+=payment
 			progress.cash+=payment
 		else:
-			_record_failed_order(customer,"untrained")
+			var reason: String=str(failure_reason)
+			if reason.is_empty(): reason="unlearned" if not station.recipes.has(str(customer.dish)) else "wait"
+			_record_failed_order(customer,reason)
 		if customer.get("banquet",false):
 			progress.banquet_finished+=1
 			if paid: progress.banquet_served+=1
