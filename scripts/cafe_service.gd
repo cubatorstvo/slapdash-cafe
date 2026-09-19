@@ -20,6 +20,7 @@ const SLOT_Z := -1.4
 var stations: Array = []
 var customers: Array = []
 var next_customer_id := 1
+var next_order_id := 1
 var served := 0
 var missed := 0
 var revenue := 0
@@ -1129,7 +1130,14 @@ func advance(delta: float) -> void:
 			for customer in customers:
 				if customer.id == station.customer_id: customer.view.react(station.model.customer_reaction)
 		if station.order_tick >= station.Run.duration_ticks(record.tracks):
-			finish_customer(station.customer_id,true)
+			var current_customer: Dictionary={}
+			for customer in customers:
+				if int(customer.id)==int(station.customer_id):
+					current_customer=customer
+					break
+			var portion_number: int=int(current_customer.get("portions_done",0))+1 if not current_customer.is_empty() else 0
+			var order_id: int=int(current_customer.get("order_id",0)) if not current_customer.is_empty() else 0
+			finish_customer(station.customer_id,true,"",portion_number,order_id)
 			_start_pending_teacher(station)
 	for index in range(customers.size() - 1, -1, -1):
 		var customer: Dictionary = customers[index]
@@ -1249,7 +1257,8 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	add_child(person)
 	person.position=Vector3(-11.4,0,1.65)
 	person.caption.text=Definition.DISHES[recipe]+(" ×%d"%portions if portions>1 else "")
-	var data: Dictionary={"id":next_customer_id,"view":person,"station":station.station_id if station!=null else -1,"dish":recipe,"state":"walking","wait":0.0,"path":[],"banquet":banquet,"chef_order":chef_guest and not banquet,"portions_total":portions,"portions_done":0,"order_paid":0,"order_age":0.0,"wait_limit":order_wait_limit(portions,station,recipe),"stats_finalized":false}
+	var data: Dictionary={"id":next_customer_id,"order_id":next_order_id,"view":person,"station":station.station_id if station!=null else -1,"dish":recipe,"state":"walking","wait":0.0,"path":[],"banquet":banquet,"chef_order":chef_guest and not banquet,"portions_total":portions,"portions_done":0,"order_paid":0,"order_age":0.0,"wait_limit":order_wait_limit(portions,station,recipe),"stats_finalized":false}
+	next_order_id+=1
 	guests_arrived+=1
 	order_stats.orders_arrived=int(order_stats.orders_arrived)+1
 	order_stats.portions_ordered=int(order_stats.portions_ordered)+portions
@@ -1289,9 +1298,11 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	next_customer_id+=1
 	return station!=null or queue_large
 
-func finish_customer(id: int, accepted: bool, failure_reason := "") -> void:
+func finish_customer(id: int, accepted: bool, failure_reason := "", portion_number := 0, expected_order_id := 0) -> void:
 	for customer in customers:
 		if customer.id!=id or customer.state in ["leaving","eating","portion_eating"]: continue
+		if expected_order_id>0 and int(customer.get("order_id",0))!=expected_order_id: return
+		if bool(customer.get("stats_finalized",false)): return
 		if customer.state=="queued": dismiss_queue(customer,failure_reason if not failure_reason.is_empty() else "busy"); return
 		var station: Node3D=by_id(int(customer.get("station",-1)))
 		if int(customer.get("portions_total",1))>1:
@@ -1299,6 +1310,9 @@ func finish_customer(id: int, accepted: bool, failure_reason := "") -> void:
 				_finish_multi_departure(customer,station,"busy")
 				return
 			if station==null: return
+			var next_portion: int=int(customer.get("portions_done",0))+1
+			if portion_number<=0: portion_number=next_portion
+			if portion_number!=next_portion: return
 			var report: Dictionary=station.model.quality()
 			var paid: bool=bool(report.get("present",false))
 			var payment: int=roundi(base_price_for(str(customer.dish))*float(report.get("price_factor",0.0))*float(report.get("style_multiplier",1.0))) if paid else 0
@@ -1545,6 +1559,107 @@ func refresh_views(delta := 0.016) -> void:
 			var station: Node3D = by_id(customer.station)
 			if is_instance_valid(station): station.direct_attention(customer.view)
 
+func _customer_save_entry(customer: Dictionary) -> Dictionary:
+	var view: Node3D=customer.view
+	var data: Dictionary={
+		"id":int(customer.get("id",0)),
+		"order_id":int(customer.get("order_id",0)),
+		"station":int(customer.get("station",-1)),
+		"dish":str(customer.get("dish","")),
+		"state":str(customer.get("state","walking")),
+		"wait":float(customer.get("wait",0.0)),
+		"path":customer.get("path",[]).duplicate(),
+		"banquet":bool(customer.get("banquet",false)),
+		"chef_order":bool(customer.get("chef_order",false)),
+		"portions_total":int(customer.get("portions_total",1)),
+		"portions_done":int(customer.get("portions_done",0)),
+		"order_paid":int(customer.get("order_paid",0)),
+		"order_age":float(customer.get("order_age",0.0)),
+		"wait_limit":float(customer.get("wait_limit",0.0)),
+		"stats_finalized":bool(customer.get("stats_finalized",false)),
+		"eat_age":float(customer.get("eat_age",0.0)),
+		"automatic_serving":bool(customer.get("automatic_serving",false)),
+		"order":customer.get("order",{}).duplicate(true),
+		"position":view.position,
+		"yaw":view.rotation.y,
+		"color":view.color,
+		"meal":view.meal_items.duplicate(true),
+		"meal_age":view.meal_age,
+		"playback_speed":view.playback_speed,
+		"mouth_amount":view.mouth_amount,
+		"drinking":view.drinking,
+		"drunk_ml":view.drunk_ml,
+		"chewing":view.chewing,
+		"caption":view.caption.text
+	}
+	for key in ["visit_id","visit_slot","visit_kind"]:
+		if customer.has(key): data[key]=customer[key]
+	return data
+
+func _restore_customer(data: Dictionary) -> bool:
+	var id:=int(data.get("id",0))
+	var order_id:=int(data.get("order_id",0))
+	var dish:=str(data.get("dish",""))
+	var state:=str(data.get("state","walking"))
+	if id<=0 or order_id<=0 or dish not in Definition.DISHES: return false
+	if state not in ["walking","waiting","queued","auto_queue","cooking","training","serving","eating","portion_eating","leaving"]: return false
+	var person:=Person.new()
+	person.color=data.get("color",Color("a66c76"))
+	add_child(person)
+	person.position=data.get("position",Vector3(-11.4,0,1.65))
+	person.rotation.y=float(data.get("yaw",0.0))
+	person.playback_speed=float(data.get("playback_speed",1.0))
+	person.mouth_amount=float(data.get("mouth_amount",0.0))
+	person.drinking=bool(data.get("drinking",false))
+	person.drunk_ml=float(data.get("drunk_ml",0.0))
+	person.chewing=float(data.get("chewing",0.0))
+	person.caption.text=str(data.get("caption",Definition.DISHES[dish]))
+	var customer: Dictionary={
+		"id":id,"order_id":order_id,"view":person,"station":int(data.get("station",-1)),"dish":dish,"state":state,
+		"wait":float(data.get("wait",0.0)),"path":data.get("path",[]).duplicate(),"banquet":bool(data.get("banquet",false)),
+		"chef_order":bool(data.get("chef_order",false)),"portions_total":maxi(1,int(data.get("portions_total",1))),
+		"portions_done":maxi(0,int(data.get("portions_done",0))),"order_paid":maxi(0,int(data.get("order_paid",0))),
+		"order_age":maxf(0.0,float(data.get("order_age",0.0))),"wait_limit":maxf(0.0,float(data.get("wait_limit",0.0))),
+		"stats_finalized":bool(data.get("stats_finalized",false)),"eat_age":maxf(0.0,float(data.get("eat_age",0.0))),
+		"automatic_serving":bool(data.get("automatic_serving",false)),"order":data.get("order",{}).duplicate(true)
+	}
+	for key in ["visit_id","visit_slot","visit_kind"]:
+		if data.has(key): customer[key]=data[key]
+	if data.get("meal",[]) is Array and not data.get("meal",[]).is_empty() and state in ["eating","portion_eating"]:
+		person.begin_meal(data.meal)
+		person.meal_age=float(data.get("meal_age",customer.eat_age))
+		customer.eat_age=float(data.get("eat_age",person.meal_age))
+	if customer.has("visit_kind"): Visits.badge(person,str(customer.visit_kind))
+	var station:=by_id(int(customer.station))
+	if station!=null and station.manual_station and state=="training":
+		customer.state="waiting"
+		customer.path=[]
+		station.state="waiting"
+		station.customer_id=id
+		station.order_dish=dish
+		station.customer_order=customer.order.duplicate(true)
+		person.caption.text=(preload("res://scripts/chef_orders.gd").special_request(station.customer_order) if not station.customer_order.is_empty() else Definition.DISHES[dish])+" · [E] у стойки"
+	customers.append(customer)
+	next_customer_id=maxi(next_customer_id,id+1)
+	next_order_id=maxi(next_order_id,order_id+1)
+	return true
+
+func _restore_active_customers(saved_customers: Array) -> bool:
+	for raw in saved_customers:
+		if not raw is Dictionary or not _restore_customer(raw): return false
+	for station in stations:
+		if station.state!="training" or station.training.active(): continue
+		var attached:=false
+		for customer in customers:
+			if int(customer.get("station",-1))==station.station_id and int(customer.get("id",0))==station.customer_id and str(customer.get("state",""))=="waiting":
+				attached=true
+				break
+		if not attached:
+			station.state="idle"
+			station.customer_id=-1
+			station.customer_order={}
+	return true
+
 func save_data() -> Dictionary:
 	var entries: Array = []
 	var stable_stations: Array=stations.duplicate()
@@ -1563,7 +1678,9 @@ func save_data() -> Dictionary:
 		entry.active_dishes=entry.active_dishes.duplicate()
 		entries.append(entry)
 	_ensure_groups()
-	return {"format":"station-cafe","version":21,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot(),"training_queue":training_queue.snapshot(),"staff_training":staff_training.snapshot(true),"movie":movie_state.duplicate(true),"remote_movie_record":remote_movie_record.duplicate(true)}
+	var saved_customers: Array=[]
+	for customer in customers: saved_customers.append(_customer_save_entry(customer))
+	return {"format":"station-cafe","version":22,"progression":progress.snapshot(),"stations":entries,"customers":saved_customers,"next_customer_id":next_customer_id,"next_order_id":next_order_id,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot(),"training_queue":training_queue.snapshot(),"staff_training":staff_training.snapshot(true),"movie":movie_state.duplicate(true),"remote_movie_record":remote_movie_record.duplicate(true)}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
@@ -1587,6 +1704,8 @@ func clear_world() -> void:
 		customer.view.queue_free()
 	stations.clear()
 	customers.clear()
+	next_customer_id=1
+	next_order_id=1
 	chef_order_clock=3.0
 
 func _saved_slot(entry: Dictionary, version: int) -> int:
@@ -1595,13 +1714,32 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	if version>=18 and not data.get("order_stats",{}) is Dictionary: return false
 	if version>=19 and not data.get("analytics",{}) is Dictionary: return false
 	if version>=20 and not data.get("table_group_registry",{}) is Dictionary: return false
 	if version>=21 and (not data.get("training_queue",{}) is Dictionary or not data.get("staff_training",{}) is Dictionary or not data.get("movie",{}) is Dictionary or not data.get("remote_movie_record",{}) is Dictionary): return false
+	if version>=22 and (not data.get("customers",[]) is Array or int(data.get("next_customer_id",0))<=0 or int(data.get("next_order_id",0))<=0): return false
+	if version>=22:
+		var customer_ids: Array=[]
+		var order_ids: Array=[]
+		for saved_customer in data.customers:
+			if not saved_customer is Dictionary: return false
+			var saved_id:=int(saved_customer.get("id",0))
+			var saved_order_id:=int(saved_customer.get("order_id",0))
+			var saved_station:=int(saved_customer.get("station",-1))
+			var saved_total:=int(saved_customer.get("portions_total",1))
+			var saved_done:=int(saved_customer.get("portions_done",0))
+			if saved_id<=0 or saved_order_id<=0 or saved_id in customer_ids or saved_order_id in order_ids: return false
+			if str(saved_customer.get("dish","")) not in Definition.DISHES: return false
+			if str(saved_customer.get("state","")) not in ["walking","waiting","queued","auto_queue","cooking","training","serving","eating","portion_eating","leaving"]: return false
+			if saved_station<-1 or saved_station>SLOT_COUNT: return false
+			if saved_total<1 or saved_done<0 or saved_done>saved_total or int(saved_customer.get("order_paid",0))<0: return false
+			if not saved_customer.get("path",[]) is Array or not saved_customer.get("order",{}) is Dictionary or typeof(saved_customer.get("stats_finalized",false))!=TYPE_BOOL: return false
+			customer_ids.append(saved_id)
+			order_ids.append(saved_order_id)
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
@@ -1615,6 +1753,11 @@ func load_data(data: Dictionary) -> bool:
 		if version>=16 and not entry.get("method_sources",{}) is Dictionary: return false
 		if version>=17 and not entry.get("method_plan",{}) is Dictionary: return false
 		if version>=20 and (not entry.get("active_dishes",[]) is Array or typeof(entry.get("active_menu_initialized",false))!=TYPE_BOOL): return false
+		if version>=22:
+			if str(entry.get("state","idle")) not in ["idle","waiting","cooking","serving","training"]: return false
+			if not entry.get("customer_order",{}) is Dictionary or not entry.get("order_model",{}) is Dictionary: return false
+			if not Station.TeamModel.finite(entry.get("order_tick",0.0)) or not Station.TeamModel.finite(entry.get("order_tempo",1.0)): return false
+			if int(entry.get("order_portions_total",1))<1 or int(entry.get("order_portions_done",0))<0 or int(entry.get("order_paid",0))<0: return false
 		for collection in [entry.recipes, entry.drafts]:
 			for dish in collection:
 				if not dish in Definition.TYPES[entry.type].dishes: return false
@@ -1646,6 +1789,19 @@ func load_data(data: Dictionary) -> bool:
 		station.method_plan=entry.get("method_plan",{}).duplicate(true)
 		station.active_dishes=entry.get("active_dishes",[]).duplicate()
 		station.active_menu_initialized=bool(entry.get("active_menu_initialized",false)) if version>=20 else false
+		if version>=22:
+			station.state=str(entry.get("state","idle"))
+			station.order_dish=str(entry.get("order_dish",""))
+			station.order_tick=maxf(0.0,float(entry.get("order_tick",0.0)))
+			station.order_tempo=maxf(0.01,float(entry.get("order_tempo",1.0)))
+			station.order_portions_total=maxi(1,int(entry.get("order_portions_total",1)))
+			station.order_portions_done=maxi(0,int(entry.get("order_portions_done",0)))
+			station.order_paid=maxi(0,int(entry.get("order_paid",0)))
+			station.customer_id=int(entry.get("customer_id",-1))
+			station.customer_order=entry.get("customer_order",{}).duplicate(true)
+			station.pending_teacher=int(entry.get("pending_teacher",0))
+			station.pending_dish=str(entry.get("pending_dish",""))
+			if entry.get("order_model",{}) is Dictionary and not entry.get("order_model",{}).is_empty(): station.model.restore(entry.order_model)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	suppress_group_autocreate=false
 	served=int(data.get("served",0))
@@ -1701,6 +1857,10 @@ func load_data(data: Dictionary) -> bool:
 	assign_clones()
 	spawn_clock = progress.arrival_interval()
 	chef_order_clock=float(data.get("chef_order_clock",progress.chef_order_delay(rng)))
+	if version>=22:
+		next_customer_id=maxi(1,int(data.get("next_customer_id",1)))
+		next_order_id=maxi(1,int(data.get("next_order_id",1)))
+		if not _restore_active_customers(data.get("customers",[])): return false
 	if version>=21:
 		if not training_queue.restore(data.get("training_queue",{})): return false
 		apply_movie_snapshot(data.get("movie",{}))

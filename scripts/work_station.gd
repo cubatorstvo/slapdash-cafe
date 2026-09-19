@@ -374,7 +374,20 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"staffed":staffed,"equipment":equipment,"manual":manual_station,"slot":slot_index,"type":type_id,"crew":crew,"upgrades":upgrades,"recipes":recipes,"drafts":drafts,"method_sources":method_sources,"method_plan":method_plan,"active_dishes":active_dishes,"active_menu_initialized":active_menu_initialized}
+	var entry: Dictionary={"staffed":staffed,"equipment":equipment,"manual":manual_station,"slot":slot_index,"type":type_id,"crew":crew,"upgrades":upgrades,"recipes":recipes,"drafts":drafts,"method_sources":method_sources,"method_plan":method_plan,"active_dishes":active_dishes,"active_menu_initialized":active_menu_initialized}
+	entry.state=state
+	entry.order_dish=order_dish
+	entry.order_tick=order_tick
+	entry.order_tempo=order_tempo
+	entry.order_portions_total=order_portions_total
+	entry.order_portions_done=order_portions_done
+	entry.order_paid=order_paid
+	entry.customer_id=customer_id
+	entry.customer_order=customer_order.duplicate(true)
+	entry.pending_teacher=pending_teacher
+	entry.pending_dish=pending_dish
+	entry.order_model=model.snapshot()
+	return entry
 
 func world_entry() -> Dictionary:
 	var data := save_entry()

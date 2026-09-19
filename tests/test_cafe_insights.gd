@@ -193,17 +193,17 @@ func run()->void:
 	Insights.loss(service.analytics,"sausage","busy",1,0,[2,3],str(large_group.id))
 	check(service.analytics.feed.size()==before+2,"Same event outside the short aggregation window creates a new feed row")
 
-	print("9/10: v21 persists analytics and v18 migrates cleanly")
+	print("9/10: v22 persists analytics and v18 migrates cleanly")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==21 and saved.analytics.get("feed",[]).size()>0,"Current v21 save writes analytics with persistent groups")
+	check(saved.version==22 and saved.analytics.get("feed",[]).size()>0,"Current v22 save writes analytics with persistent groups")
 	var feed_size: int=saved.analytics.feed.size()
-	check(service.load_data(saved),"v21 cafe reloads")
-	check(service.analytics.feed.size()==feed_size and int(service.analytics.losses.get("busy",0))>=2,"v21 reload preserves feed and loss totals")
+	check(service.load_data(saved),"v22 cafe reloads")
+	check(service.analytics.feed.size()==feed_size and int(service.analytics.losses.get("busy",0))>=2,"v22 reload preserves feed and loss totals")
 	var legacy: Dictionary=bytes_to_var(var_to_bytes(saved))
 	legacy.version=18
 	legacy.erase("analytics")
 	check(service.load_data(legacy),"v18 cafe remains loadable")
-	check(service.analytics.feed.is_empty() and service.save_data().version==21,"v18 migrates with blank historical analytics and writes v21")
+	check(service.analytics.feed.is_empty() and service.save_data().version==22,"v18 migrates with blank historical analytics and writes v22")
 
 	print("10/10: completion percentages preserve absolute and relative meaning")
 	check(is_equal_approx(Insights.completion_percent(180,200),90.0),"180 of 200 renders as 90 percent")
@@ -211,5 +211,5 @@ func run()->void:
 
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: merged feed, exact causes, group/masterclass drill-down, guided first training, twenty-table scale and v21 analytics" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: merged feed, exact causes, group/masterclass drill-down, guided first training, twenty-table scale and v22 analytics" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

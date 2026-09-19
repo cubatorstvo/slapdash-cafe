@@ -110,7 +110,7 @@ func run()->void:
 	check(not str(invalid.error).is_empty(),"T14 deleted recording cannot create a new assignment")
 	dispose(game)
 
-	print("T15: v21 restores queue transitions and resumes a movie exactly once")
+	print("T15: v22 restores queue transitions and resumes a movie exactly once")
 	game=await make_game()
 	service=game.service
 	station=service.add_station("counter",1,false)
@@ -122,7 +122,7 @@ func run()->void:
 	var saved_course: Dictionary=service.queue_training_course([{"record_id":1421,"station_ids":[2]},{"record_id":1422,"station_ids":[2]}],"together","t15",1)
 	var course_id:=int(saved_course.course_id)
 	var queued_save: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(queued_save.version==21 and queued_save.training_queue.courses.size()==1,"T15 queued course is serialized in v21")
+	check(queued_save.version==22 and queued_save.training_queue.courses.size()==1,"T15 queued course is serialized in v22")
 	check(service.load_data(queued_save),"T15 queued save reloads")
 	station=service.by_id(2)
 	service.training_queue.advance(0.0)
@@ -188,7 +188,7 @@ func run()->void:
 	station=service.by_id(2)
 	check(service.training_queue.has_pending() and int(service.training_queue.pending_source(2,"potato").get("id",0))==1431,"T15 migration creates a pending lesson from the old desired plan")
 	var migrated21: Dictionary=service.save_data()
-	check(migrated21.version==21 and migrated21.training_queue.courses.size()==1,"T15 migration persists once in v21")
+	check(migrated21.version==22 and migrated21.training_queue.courses.size()==1,"T15 migration persists once in v22")
 	dispose(game)
 
 	print("PASS: T13-T15 assignment versions, deleted records and save recovery" if failures==0 else "FAILURES: %d"%failures)

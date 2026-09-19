@@ -149,11 +149,11 @@ func run()->void:
 	check(service.station_group_status(3,"potato")=="нужны сотрудники","Vacancy is shown in group readiness")
 	second.staffed=1
 
-	print("7/7: v21 persists permanent group identity, learned source links and working recipes")
+	print("7/7: v22 persists permanent group identity, learned source links and working recipes")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==21 and saved.table_group_registry.groups.has(str(counter_group.id)),"Current save writes persistent group registry in v21")
+	check(saved.version==22 and saved.table_group_registry.groups.has(str(counter_group.id)),"Current save writes persistent group registry in v22")
 	var saved_group_id: String=str(counter_group.id)
-	check(service.load_data(saved),"v21 cafe reloads")
+	check(service.load_data(saved),"v22 cafe reloads")
 	check(service.by_id(2).recipes.has("potato") and service.by_id(2).method_sources.potato.id==900,"Reload preserves learned full method and deleted source id")
 	check(service.table_group_by_id(saved_group_id).name=="Картофельная линия","Reload preserves permanent group ID and name")
 	check(service.source_label(2,"potato").contains("Запись удалена"),"Deleted-film marker survives reload")
