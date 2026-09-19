@@ -653,6 +653,14 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 			else: waiting.append(station_id)
 		lessons.append({"record_id":record_id,"dish":dish,"name":str(record.get("name","Запись")),"grade":str(record.get("quality",{}).get("grade","D")),"effectiveness":str(record.get("effectiveness",{}).get("label","Обычная")),"duration":float(record.get("duration",0.0)),"film":float(record.get("highlight_duration",0.0)),"mastered":mastered,"selected":unique.size(),"waiting":waiting})
 	selected.sort()
+	var preferred_station_sets: Array=[]
+	for raw_group_id in group_order:
+		var source_group: Dictionary=table_group_by_id(str(raw_group_id))
+		if source_group.is_empty(): continue
+		var subset: Array=[]
+		for station_id in source_group.stations:
+			if int(station_id) in selected: subset.append(int(station_id))
+		if not subset.is_empty(): preferred_station_sets.append(subset)
 	var temp=TableGroupRegistry.new()
 	if not temp.restore(group_registry.snapshot(),Definition.TYPES): return {"error":"Не удалось построить предпросмотр групп."}
 	for lesson in lessons: temp.apply_plan_to_selection(selected,str(lesson.dish),int(lesson.record_id))
@@ -687,11 +695,14 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		for station_id in selected:
 			var group_id: String=temp.group_id_for_station(int(station_id))
 			if not group_id.is_empty() and group_id not in actual_group_order: actual_group_order.append(group_id)
-		if not group_order.is_empty():
+		if not preferred_station_sets.is_empty():
 			var preferred: Array=[]
-			for raw_group_id in group_order:
-				var wanted: String=str(raw_group_id)
-				if wanted in actual_group_order and wanted not in preferred: preferred.append(wanted)
+			for station_set in preferred_station_sets:
+				for station_id in station_set:
+					var wanted: String=temp.group_id_for_station(int(station_id))
+					if wanted in actual_group_order and wanted not in preferred:
+						preferred.append(wanted)
+						break
 			for group_id in actual_group_order:
 				if group_id not in preferred: preferred.append(group_id)
 			actual_group_order=preferred
