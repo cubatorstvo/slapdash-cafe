@@ -1020,7 +1020,7 @@ func start_banquet(peer: int) -> String:
 	open_for_business = false
 	# Do not wait forever for an unattended personal/untrained counter.
 	for customer in customers:
-		if customer.state in ["walking", "waiting"]: finish_customer(customer.id, false)
+		if customer.state in ["walking","waiting"]: finish_customer(customer.id,false,"closing")
 	progress.phase = "preparing"
 	progress.event_peer = peer
 	progress.result = ""
@@ -1164,7 +1164,7 @@ func save_data() -> Dictionary:
 		entry.method_sources=entry.method_sources.duplicate(true)
 		entry.method_plan=entry.method_plan.duplicate(true)
 		entries.append(entry)
-	return {"format":"station-cafe","version":18,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true)}
+	return {"format":"station-cafe","version":19,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true)}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
@@ -1194,10 +1194,11 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	if version>=18 and not data.get("order_stats",{}) is Dictionary: return false
+	if version>=19 and not data.get("analytics",{}) is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
@@ -1249,6 +1250,7 @@ func load_data(data: Dictionary) -> bool:
 	else:
 		guests_arrived=maxi(0,served+missed)
 		order_stats={"orders_arrived":guests_arrived,"orders_completed":served,"orders_partial":0,"orders_failed":missed,"portions_ordered":guests_arrived,"portions_served":served,"portions_unserved":missed}
+	analytics=Insights.normalize(data.get("analytics",{})) if version>=19 else Insights.blank()
 	table_group_names=data.get("table_group_names",{}).duplicate(true) if version>=16 and data.get("table_group_names",{}) is Dictionary else {}
 	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
 	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
@@ -1406,10 +1408,15 @@ func end_shift() -> void:
 	trace("shift_closed", {"day":progress.day,"elapsed":progress.shift_elapsed})
 	open_for_business = false
 	progress.shift = "closing"
-	for customer in customers:
-		if customer.state=="queued": dismiss_queue(customer); continue
-		var station: Node3D = by_id(customer.station)
-		if station != null and station.manual_station and not station.training.active() and customer.state != "leaving": finish_customer(customer.id, false)
+	for customer in customers.duplicate():
+		if customer.state=="queued":
+			dismiss_queue(customer,"closing")
+			continue
+		if customer.state=="auto_queue":
+			_finish_multi_departure(customer,null,"closing")
+			continue
+		var station: Node3D = by_id(int(customer.get("station",-1)))
+		if station != null and station.manual_station and not station.training.active() and customer.state != "leaving": finish_customer(customer.id,false,"closing")
 	progress.revision += 1
 
 func advance_shift(delta: float) -> void:
@@ -1566,23 +1573,30 @@ func assign_customer(station: Node3D, customer: Dictionary) -> void:
 	station.state="waiting"
 	_update_multi_caption(customer)
 
-func advance_queue() -> void:
+func advance_queue(delta: float) -> void:
 	var line:=chef_queue()
 	var first: Node3D=by_id(1)
 	if first==null: return
 	if not line.is_empty() and first.state=="idle" and first.customer_id<0 and not first.training.active() and progress.shift not in ["closing","night"]:
 		assign_customer(first,line.pop_front())
+	for i in range(line.size()-1,-1,-1):
+		var customer: Dictionary=line[i]
+		customer.wait=float(customer.get("wait",0.0))+delta
+		if not customer.get("banquet",false) and float(customer.wait)>=CHEF_WAIT_LIMIT:
+			dismiss_queue(customer,"chef_wait")
+			line.remove_at(i)
 	for i in range(line.size()):
 		var goal:=queue_point(i)
 		if line[i].view.position.distance_to(goal)>0.05: line[i].path=[goal]
 		var bonus_text: String=" · ×%.1f"%float(line[i].get("order",{}).get("chef_bonus",1.0)) if line[i].get("chef_order",false) else ""
-		line[i].view.caption.text=Definition.DISHES[line[i].dish]+"\nК шефу%s · %d в очереди"%[bonus_text,i+1]
+		var left: int=maxi(0,ceili(CHEF_WAIT_LIMIT-float(line[i].get("wait",0.0)))) if not line[i].get("banquet",false) else 0
+		line[i].view.caption.text=Definition.DISHES[line[i].dish]+"\nК шефу%s · %d в очереди%s"%[bonus_text,i+1," · %d с"%left if left>0 else ""]
 
-func dismiss_queue(customer: Dictionary) -> void:
+func dismiss_queue(customer: Dictionary,reason := "busy") -> void:
 	if customer.state=="leaving": return
 	customer.state="leaving"
 	customer.path=[Vector3(-8.8,0,4.8),Vector3(17.4,0,1.65)]
-	customer.view.caption.text="До завтра!"
-	_record_failed_order(customer,"busy")
+	customer.view.caption.text="До завтра · "+Insights.reason_label(str(reason))
+	_record_failed_order(customer,str(reason))
 	if customer.get("banquet",false): progress.banquet_finished+=1
 	Visits.settled(self,customer,false,"D")
