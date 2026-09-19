@@ -523,7 +523,7 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 	var unique_ids: Array=[]
 	for raw_id in station_ids:
 		var station_id: int=int(raw_id)
-		if station_id<2 or station_id>Expansion.SLOT_COUNT or station_id in unique_ids: return "Проверь выбранные места."
+		if station_id<=Expansion.BASE_SLOT_COUNT or station_id>Expansion.SLOT_COUNT or station_id in unique_ids: return "Проверь выбранные места."
 		if game.service.by_id(station_id)!=null or pending(type_id,station_id): return "Место %d уже занято или ожидает доставку."%station_id
 		unique_ids.append(station_id)
 	var chosen_equipment: Array=[]

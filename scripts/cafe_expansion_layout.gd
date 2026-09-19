@@ -31,7 +31,7 @@ static func section_for(slot_index: int)->String:
 
 static func free_slot_ids(service: Node)->Array:
 	var result: Array=[]
-	for slot in range(1,SLOT_COUNT):
+	for slot in range(BASE_SLOT_COUNT,SLOT_COUNT):
 		if service.by_id(slot+1)==null: result.append(slot+1)
 	return result
 

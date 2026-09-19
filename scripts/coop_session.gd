@@ -4,7 +4,7 @@ const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
-const PROTOCOL := "slapdash-cafe-scale-30"
+const PROTOCOL := "slapdash-cafe-scale-31"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -377,7 +377,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		return
 	if sleep_scene_active(): return
 	if sleeping_peers.has(sender) and action!="wake": return
-	if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor"]:
+	if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor","installer_owned_parcel"]:
 		var error: String = game.shop.action(sender,value)
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
@@ -448,18 +448,20 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		elif action in ["lab_pot","lab_scan","lab_press","lab_restart","lab_production_config","lab_cal_auto","lab_cal_start"]: game.save_cafe()
 		return
-	if action in ["buy_bundle", "buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
+	if action in ["buy_station_batch","buy_bundle", "buy", "banquet", "cancel_banquet", "business", "save", "new_cafe"]:
 		if sender != 1:
 			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
 			return
-		if action in ["buy_bundle","buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
+		if action in ["buy_station_batch","buy_bundle","buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
 			message_to(sender,"Подойди к компьютеру кафе.")
 			return
 		var error := ""
 		match action:
+			"buy_station_batch":
+				if value.get("stations",[]) is Array and value.get("equipment",[]) is Array: error=game.shop.order_station_batch(str(value.get("type","")),value.stations,value.equipment,str(value.get("group","")),bool(value.get("installers",false)))
 			"buy_bundle":
-				if value.get("items") is Array: error=game.shop.order_bundle(value.items,int(value.get("station",0)))
-			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)))
+				if value.get("items") is Array: error=game.shop.order_bundle(value.items,int(value.get("station",0)),bool(value.get("installers",false)))
+			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)),bool(value.get("installers",false)))
 			"banquet": error = game.service.start_banquet(sender)
 			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
 			"save":

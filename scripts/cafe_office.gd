@@ -5,6 +5,7 @@ const Lounge = preload("res://scripts/lounge_progression.gd")
 const P = preload("res://scripts/cafe_progression.gd")
 const Style = preload("res://scripts/cafe_theme.gd")
 const Definition = preload("res://scripts/station_definition.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 var game: Node3D
 var panel: PanelContainer
 var content: VBoxContainer
@@ -24,6 +25,11 @@ var lab_target := 2
 var lab_reserve := 150
 var visit_live_status: Label
 var lab_live_status: Label
+var scale_type := "counter"
+var scale_slots: Array=[]
+var scale_equipment: Array=[]
+var scale_group := ""
+var send_installers := false
 
 func _ready() -> void:
 	layer = 17
@@ -127,6 +133,28 @@ func stage_group_assignment(record_id: int) -> void:
 	stamp=""
 	rebuild()
 
+func set_scale_type(value: String) -> void:
+	scale_type=value
+	scale_slots=[]
+	scale_equipment=[]
+	scale_group=""
+	stamp=""
+	rebuild()
+
+func toggle_scale_slot(id: int,on: bool) -> void:
+	if on and id not in scale_slots: scale_slots.append(id)
+	elif not on: scale_slots.erase(id)
+	scale_slots.sort()
+	stamp=""
+	rebuild()
+
+func toggle_scale_equipment(id: String,on: bool) -> void:
+	if on and id not in scale_equipment: scale_equipment.append(id)
+	elif not on: scale_equipment.erase(id)
+	scale_equipment.sort()
+	stamp=""
+	rebuild()
+
 func _process(_delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
 	var progress = game.service.progress
@@ -186,6 +214,58 @@ func rebuild() -> void:
 				if progress.stars<1:
 					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
 				else: bundle_controls(station,catalog)
+			label(content,"МАСШТАБИРОВАНИЕ · ПОДГОТОВЛЕННЫЕ СЕКЦИИ",20)
+			label(content,"Новые секции дают 14 дополнительных мест: вместе с основным залом кафе вмещает до 20 производственных станций. Один выбранный комплект = одна коробка на конкретное место.",15)
+			var type_row:=HBoxContainer.new(); content.add_child(type_row)
+			for type_id in ["counter","kitchen","grill_kitchen","solyanka_kitchen"]:
+				var chosen_type: String=type_id
+				var available: bool=game.shop.type_available(type_id)
+				button(type_row,("✓ " if scale_type==type_id else "")+Definition.TYPES[type_id].title,func():set_scale_type(chosen_type),host and available)
+			if not game.shop.type_available(scale_type): scale_type="counter"
+			label(content,"МЕСТА УСТАНОВКИ",17)
+			var free_slots: Array=Expansion.free_slot_ids(service)
+			for section in Expansion.SECTION_ROWS:
+				var row:=HBoxContainer.new(); content.add_child(row)
+				label(row,str(section.name),15)
+				for slot_index in section.slots:
+					var station_id: int=int(slot_index)+1
+					var free: bool=station_id in free_slots and not game.shop.pending(scale_type,station_id)
+					if not free: scale_slots.erase(station_id)
+					var check:=CheckBox.new(); row.add_child(check)
+					check.text=str(station_id)+(" · занято" if not free else "")
+					check.button_pressed=free and station_id in scale_slots
+					check.disabled=not host or not free
+					check.toggled.connect(func(on):toggle_scale_slot(station_id,on))
+			label(content,"ОСНАЩЕНИЕ КАЖДОЙ КОРОБКИ",17)
+			for item in game.shop.equipment_catalog(scale_type):
+				var spec: Dictionary=game.shop.ITEMS[item]
+				var available: bool=progress.stars>=int(spec.get("star",0))
+				if not available: scale_equipment.erase(item)
+				var check:=CheckBox.new(); content.add_child(check)
+				check.text=str(spec.name)+" · %d"%int(spec.price)+(" · звезда %d"%int(spec.get("star",0)) if not available else "")
+				check.button_pressed=available and item in scale_equipment
+				check.disabled=not host or not available
+				var equip_id: String=item
+				check.toggled.connect(func(on):toggle_scale_equipment(equip_id,on))
+			label(content,"ГРУППА И УЧЕБНЫЙ ПЛАН",17)
+			button(content,("✓ " if scale_group.is_empty() else "")+"Без группы",func():scale_group="";stamp="";rebuild(),host)
+			for group in service.table_groups():
+				if str(group.type)!=scale_type: continue
+				var group_id: String=str(group.id)
+				button(content,("✓ " if scale_group==group_id else "")+str(group.name),func():scale_group=group_id;stamp="";rebuild(),host)
+			var installer_toggle:=CheckBox.new(); content.add_child(installer_toggle)
+			installer_toggle.text="Прислать сборщиков · бесплатно"
+			installer_toggle.button_pressed=send_installers
+			installer_toggle.disabled=not host
+			installer_toggle.toggled.connect(func(on):send_installers=on;stamp="";rebuild())
+			var unit_price: int=int(game.shop.ITEMS[scale_type].price)
+			for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
+			var total_price: int=unit_price*scale_slots.size()
+			label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d%s"%[scale_slots.size(),unit_price,total_price," · сборщики +0" if send_installers else ""],18)
+			if not scale_group.is_empty():
+				var plan: Dictionary=game.shop.group_training_plan(scale_group,scale_type)
+				label(content,"Учебный план: "+(", ".join(plan.keys().map(func(dish):return Definition.DISHES.get(str(dish),str(dish)))) if not plan.is_empty() else "у группы нет доступных фильмов"),15)
+			button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":scale_group,"installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
 			label(content,"РАСШИРЕНИЕ КУХНИ",20)
 			shop_button("counter",0,service.by_id(2)!=null and service.by_id(3)!=null)
 			button(content,"Расширение зала · 180",func():send({"action":"buy","kind":"expansion"}),host and progress.stars>=2 and not progress.expanded and progress.cash>=180)
@@ -292,8 +372,8 @@ func rebuild() -> void:
 			label(content,"ДОСТАВКИ",23)
 			if progress.deliveries.is_empty(): label(content,"Все коробки разобраны.")
 			for parcel in progress.deliveries:
-				var state := "В пути" if parcel.remaining>0 else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
-				label(content,game.shop.ITEMS[parcel.item].name+" · "+state+(" · станция %d"%parcel.station if parcel.station>0 else ""))
+				var state := "В пути" if parcel.remaining>0 else ("Сборщик несёт" if parcel.get("installer_state","")=="walking" else "Сборщик ждёт" if parcel.get("installer_state","")=="waiting" else "Сборщик устанавливает" if parcel.get("installer_state","")=="installing" else "Сборщик назначен") if bool(parcel.get("installer",false)) else "Несёт игрок" if parcel.owner>0 else "У входа / поставлена на пол"
+				label(content,game.shop.parcel_name(parcel)+" · "+state+(" · место %d"%parcel.station if parcel.station>0 else ""))
 		"star":
 			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · День пяти звёзд" if progress.stars==4 else "КАФЕ · 5★"
 			label(content,star_title,23)
@@ -329,7 +409,7 @@ func shop_button(item: String, station_id: int, installed := false) -> void:
 	var prerequisite: bool = spec.kind!="lab_upgrade" or LabPolicy.error(p,item).is_empty()
 	var suffix := " · установлено" if installed else " · доставка заказана" if waiting else " · звезда %d"%gate if p.stars<gate else " · %d"%spec.price
 	if not prerequisite: suffix=" · сначала лаборатория / усилитель"
-	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id}),not game.session.is_guest() and not installed and not waiting and prerequisite and p.stars>=gate and p.cash>=spec.price and not p.busy())
+	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id,"installers":send_installers}),not game.session.is_guest() and not installed and not waiting and prerequisite and p.stars>=gate and p.cash>=spec.price and not p.busy())
 
 func bundle_controls(station: Node3D, catalog: Array) -> void:
 	var id: int=station.station_id
@@ -348,7 +428,7 @@ func bundle_controls(station: Node3D, catalog: Array) -> void:
 			if on: selections[id].append(item)
 			else: selections[id].erase(item)
 			rebuild())
-	button(content,"Заказать комплект · %d"%total,func():send({"action":"buy_bundle","station":id,"items":selections[id].duplicate()}),total>0 and game.service.progress.cash>=total and not game.service.progress.busy() and not game.session.is_guest())
+	button(content,"Заказать комплект · %d"%total,func():send({"action":"buy_bundle","station":id,"items":selections[id].duplicate(),"installers":send_installers}),total>0 and game.service.progress.cash>=total and not game.service.progress.busy() and not game.session.is_guest())
 
 func lounge_page() -> void:
 	var p=game.service.progress
@@ -374,7 +454,7 @@ func lounge_button(item: String, spec: Dictionary, installed: bool) -> void:
 	var error:=Lounge.item_error(p,spec)
 	var waiting: bool=game.shop.pending(item,0)
 	var suffix: String=" · установлено" if installed else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
-	button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0}),not game.session.is_guest() and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
+	button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0,"installers":send_installers}),not game.session.is_guest() and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
 
 func laboratory_page() -> void:
 	var p=game.service.progress

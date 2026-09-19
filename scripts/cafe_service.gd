@@ -682,7 +682,7 @@ func finish_customer(id: int, accepted: bool) -> void:
 		Visits.settled(self,customer,paid,str(report.grade))
 		return
 
-func purchase(kind: String, id: String, station_id := 0) -> String:
+func purchase(kind: String, id: String, station_id := 0, with_installer := false) -> String:
 	if progress.busy(): return "Сначала заверши проверку."
 	if kind == "lab_expansion":
 		if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
@@ -720,7 +720,7 @@ func purchase(kind: String, id: String, station_id := 0) -> String:
 		trace("expansion")
 		return ""
 	var item := "sauce_ramp" if kind == "upgrade" else kind if kind in ["counter","kitchen","grill_kitchen","solyanka_kitchen"] else id
-	return game.shop.order(item, station_id)
+	return game.shop.order(item, station_id, with_installer)
 
 func start_banquet(peer: int) -> String:
 	if Visits.busy(progress): return "Сначала заверши или отмени добровольный визит в компьютере."
