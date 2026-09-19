@@ -395,7 +395,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error: String=game.service.Visits.action(game.service,action,int(value.get("id",-1)))
 		if not error.is_empty(): message_to(sender,error)
 		return
-	if action in ["group_rename","group_train","group_create","group_split","group_members","group_merge","group_active","training_cancel_course","training_cancel_batch","training_cancel_lesson"]:
+	if action in ["group_rename","group_train","group_create","group_split","group_members","group_merge","group_active","training_course_confirm","training_course_edit","training_cancel_course","training_cancel_batch","training_cancel_lesson","training_resume"]:
 		if sender!=1:
 			message_to(sender,"Группами столов управляет хозяин кафе.")
 			return
@@ -411,6 +411,16 @@ func execute_action(sender: int, value: Dictionary) -> void:
 				if ids.size()>game.service.SLOT_COUNT: ids=ids.slice(0,game.service.SLOT_COUNT)
 				var command: String=str(value.get("command","legacy:%d:%d:%s"%[sender,int(value.get("record",0)),",".join(ids.map(func(id):return str(int(id))))]))
 				error=game.service.start_group_training(int(value.get("record",0)),ids,sender,command)
+			"training_course_confirm":
+				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
+				var command: String=str(value.get("command","course:%d:%d"%[sender,game.service.training_queue.next_course_id]))
+				var result: Dictionary=game.service.queue_training_course(assignments,str(value.get("mode","together")),command,sender)
+				error=str(result.get("error",""))
+			"training_course_edit":
+				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
+				error=game.service.edit_training_course(int(value.get("course",0)),assignments,str(value.get("mode","together")),sender)
+			"training_resume":
+				error=game.service.resume_training_assignment(int(value.get("station",0)),str(value.get("dish","")),sender)
 			"training_cancel_course":
 				error=game.service.cancel_training_course(int(value.get("course",0)))
 			"training_cancel_batch":
@@ -437,7 +447,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		else:
 			game.save_cafe()
-			var success: String="Учебный сеанс назначен. Сотрудники закончат текущие заказы и соберутся у телевизора." if action=="group_train" else "Группы столов обновлены."
+			var success: String="Курс поставлен в очередь." if action in ["group_train","training_course_confirm","training_course_edit","training_resume"] else "Очередь обучения обновлена." if action.begins_with("training_") else "Группы столов обновлены."
 			message_to(sender,success)
 		return
 	if action in ["masterclass_rename","masterclass_delete"]:
