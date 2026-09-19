@@ -158,7 +158,7 @@ func host_tick() -> void:
 			started_staff_training=true
 			barrier.send("staff-started")
 			print("CHECK: host assigned shared staff television training")
-		if first.training.phase == "recording" and second.training.phase == "recording":
+		if started_staff_training and first.training.phase == "recording" and second.training.phase == "recording":
 			print("READY: late join")
 			saw_parallel = true
 			stage = 2
