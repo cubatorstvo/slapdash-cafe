@@ -612,27 +612,31 @@ func problem_context(dish: String)->Dictionary:
 		if station.manual_station or station.masterclass_station or dish not in station.dishes(): continue
 		relevant.append(station)
 	if relevant.is_empty(): return {"reason":"no_station","stations":[],"group":""}
+	var active: Array=relevant.filter(func(station):return station.dish_active(dish))
+	if active.is_empty():
+		var ids: Array=relevant.map(func(station):return station.station_id)
+		return {"reason":"menu_off","stations":ids,"group":group_id_for_stations(ids)}
 	var ready: Array=[]
-	for station in relevant:
+	for station in active:
 		if station.recipes.has(dish) and Definition.missing_equipment(dish,station.equipment).is_empty() and (station.staffed<0 or station.staffed>=station.role_count()) and station.group_training_state.is_empty():
 			ready.append(station)
 	if not ready.is_empty():
 		var ids: Array=ready.map(func(station):return station.station_id)
 		if ready.any(func(station):return station.state!="idle" or station.customer_id>=0 or station.pending_teacher>0):
 			return {"reason":"busy","stations":ids,"group":group_id_for_stations(ids)}
-	for station in relevant:
+	for station in active:
 		if not station.group_training_state.is_empty() or (is_instance_valid(staff_training) and staff_training.targets_station(station.station_id,dish)):
-			var ids: Array=relevant.map(func(item):return item.station_id)
+			var ids: Array=active.map(func(item):return item.station_id)
 			return {"reason":"training","stations":ids,"group":group_id_for_stations(ids)}
-	for station in relevant:
+	for station in active:
 		if station.staffed>=0 and station.staffed<station.role_count():
-			var ids: Array=relevant.map(func(item):return item.station_id)
+			var ids: Array=active.map(func(item):return item.station_id)
 			return {"reason":"workers","stations":ids,"group":group_id_for_stations(ids)}
-	for station in relevant:
+	for station in active:
 		if not Definition.missing_equipment(dish,station.equipment).is_empty():
-			var ids: Array=relevant.map(func(item):return item.station_id)
+			var ids: Array=active.map(func(item):return item.station_id)
 			return {"reason":"equipment","stations":ids,"group":group_id_for_stations(ids)}
-	var ids: Array=relevant.map(func(item):return item.station_id)
+	var ids: Array=active.map(func(item):return item.station_id)
 	return {"reason":"unlearned","stations":ids,"group":group_id_for_stations(ids)}
 
 func _analytics_loss(customer: Dictionary,reason: String)->void:
@@ -689,7 +693,7 @@ func order_wait_limit(portions: int,station: Node3D=null,dish := "") -> float:
 func automatic_station_candidates(dish: String,idle_only := true) -> Array:
 	var result: Array=[]
 	for station in stations:
-		if station.manual_station or station.masterclass_station or not station.ready_crew() or not station.recipes.has(dish): continue
+		if station.manual_station or station.masterclass_station or not station.dish_active(dish) or not station.ready_crew() or not station.recipes.has(dish): continue
 		if idle_only and (station.state!="idle" or station.pending_teacher>0): continue
 		result.append(station)
 	return result
@@ -952,7 +956,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	var offered:=false
 	for station in stations:
 		if not recipe in station.dishes(): continue
-		if station.manual_station or not station.ready_crew(): continue
+		if station.manual_station or not station.dish_active(recipe) or not station.ready_crew(): continue
 		if station.recipes.has(recipe): offered=true
 		if station.state=="idle" and station.pending_teacher==0:
 			if station.recipes.has(recipe): candidates.append(station)
@@ -1281,8 +1285,10 @@ func save_data() -> Dictionary:
 		entry.drafts = entry.drafts.duplicate()
 		entry.method_sources=entry.method_sources.duplicate(true)
 		entry.method_plan=entry.method_plan.duplicate(true)
+		entry.active_dishes=entry.active_dishes.duplicate()
 		entries.append(entry)
-	return {"format":"station-cafe","version":19,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true)}
+	_ensure_groups()
+	return {"format":"station-cafe","version":20,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot()}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
@@ -1296,6 +1302,7 @@ func clear_world() -> void:
 	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
 	remote_movie_record={}
 	table_group_names.clear()
+	group_registry.reset()
 	for station in stations:
 		remove_child(station)
 		station.queue_free()
@@ -1312,11 +1319,12 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	if version>=18 and not data.get("order_stats",{}) is Dictionary: return false
 	if version>=19 and not data.get("analytics",{}) is Dictionary: return false
+	if version>=20 and not data.get("table_group_registry",{}) is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
@@ -1329,6 +1337,7 @@ func load_data(data: Dictionary) -> bool:
 		if not entry.get("recipes") is Dictionary or not entry.get("drafts") is Dictionary or not entry.get("upgrades") is Array: return false
 		if version>=16 and not entry.get("method_sources",{}) is Dictionary: return false
 		if version>=17 and not entry.get("method_plan",{}) is Dictionary: return false
+		if version>=20 and (not entry.get("active_dishes",[]) is Array or not entry.get("active_menu_initialized",false) is bool): return false
 		for collection in [entry.recipes, entry.drafts]:
 			for dish in collection:
 				if not dish in Definition.TYPES[entry.type].dishes: return false
@@ -1344,6 +1353,7 @@ func load_data(data: Dictionary) -> bool:
 		for record in data.get("masterclasses",[]):
 			if not Masterclasses.valid(record): return false
 	clear_world()
+	suppress_group_autocreate=true
 	for entry in data.stations:
 		var slot_index := _saved_slot(entry, version)
 		var station := add_station(entry.type, slot_index, entry.get("manual", false))
@@ -1357,7 +1367,10 @@ func load_data(data: Dictionary) -> bool:
 		station.drafts = entry.drafts.duplicate(true)
 		station.method_sources=entry.get("method_sources",{}).duplicate(true)
 		station.method_plan=entry.get("method_plan",{}).duplicate(true)
+		station.active_dishes=entry.get("active_dishes",[]).duplicate()
+		station.active_menu_initialized=bool(entry.get("active_menu_initialized",false)) if version>=20 else false
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
+	suppress_group_autocreate=false
 	served=int(data.get("served",0))
 	revenue=int(data.get("revenue",0))
 	missed=int(data.get("missed",0))
@@ -1376,6 +1389,12 @@ func load_data(data: Dictionary) -> bool:
 	for record in masterclasses:
 		Masterclasses.ensure_highlights(record)
 		next_masterclass_id=maxi(next_masterclass_id,int(record.get("id",0))+1)
+	if version>=20:
+		if not group_registry.restore(data.get("table_group_registry",{}),Definition.TYPES): return false
+	else:
+		group_registry.migrate_legacy(stations,table_group_names,Definition.TYPES)
+	_ensure_groups()
+	_sync_all_group_intent()
 	open_for_business = data.get("open", true)
 	progress = Progression.new()
 	if data.get("progression") is Dictionary:
