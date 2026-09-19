@@ -2,6 +2,7 @@ extends Node3D
 ## Purchased low-poly furnishings, staged interiors and ambient motion.
 const P = preload("res://scripts/props.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
+const MoviePlayer = preload("res://scripts/masterclass_movie_player.gd")
 const WOOD := Color("976c4f")
 const DARK_WOOD := Color("503e35")
 const CREAM := Color("f1d9ae")
@@ -17,6 +18,9 @@ var rods: Array = []
 var fishes: Array = []
 var rocking_root: Node3D
 var television_ball: Node3D
+var television_screen: MeshInstance3D
+var television_status: Label3D
+var movie_player: Node
 var pong_ball: Node3D
 var arcade_sprite: Node3D
 var ambient_clock := 0.0
@@ -125,13 +129,18 @@ func build_tv(parent: Node3D) -> void:
 	box(parent,Vector3(0.7,0.05,0.30),Vector3(0,0.76,0),INK)
 	box(parent,Vector3(0.12,0.25,0.12),Vector3(0,0.87,0),INK)
 	box(parent,Vector3(2.30,1.35,0.16),Vector3(0,1.57,0),INK)
-	glow(box(parent,Vector3(2.12,1.16,0.015),Vector3(0,1.57,-0.087),Color("345f71")),0.65)
+	television_screen=box(parent,Vector3(2.12,1.16,0.015),Vector3(0,1.57,-0.087),Color("345f71"))
+	glow(television_screen,0.65)
 	# A tiny original silent space programme: moving moon, stars, horizon.
 	for i in range(16):
 		P.ball(parent,0.013,Vector3(-0.93+fmod(i*0.327,1.84),1.14+fmod(i*0.197,0.88),-0.107),CREAM)
 	box(parent,Vector3(2.1,0.28,0.014),Vector3(0,1.12,-0.109),Color("658a8b"))
 	television_ball=P.ball(parent,0.15,Vector3(-0.3,1.75,-0.115),GOLD)
-	label(parent,"ПОСЛЕ СМЕНЫ",Vector3(0,2.43,0),30).rotation.y=PI
+	television_status=label(parent,"СВОБОДЕН",Vector3(0,2.43,0),24)
+	television_status.rotation.y=PI
+	movie_player=MoviePlayer.new()
+	add_child(movie_player)
+	movie_player.setup(television_screen)
 
 func build_rocker(parent: Node3D) -> void:
 	rocking_root=Node3D.new()
@@ -362,6 +371,18 @@ func build_interior() -> void:
 	var sign:=label(self,"ЗДЕСЬ МОЖНО НИЧЕГО НЕ УСПЕВАТЬ",Vector3(10.4,3.10,back-0.23),32)
 	sign.rotation.y=PI
 
+func television_target(camera: Camera3D) -> Dictionary:
+	if not fixtures.has("television"): return {}
+	var tv: Node3D=fixtures.television
+	var center: Vector3=tv.to_global(Vector3(0,1.55,-0.12))
+	var offset:=center-camera.global_position
+	if offset.length()>4.6: return {}
+	if (-camera.global_basis.z).dot(offset.normalized())<0.55: return {}
+	return {"action":"open_videos","hint":"(E) Телевизор · видеотека"}
+
+func television_node() -> Node3D:
+	return fixtures.get("television",null)
+
 func _process(delta: float) -> void:
 	if game==null or not is_instance_valid(game.service): return
 	if game.session_paused and not game.session.online(): return
@@ -369,6 +390,10 @@ func _process(delta: float) -> void:
 	var night: bool=game.service.progress.shift=="night"
 	var clock: float=game.service.progress.night_elapsed if night else ambient_clock
 	if is_instance_valid(television_ball): television_ball.position.x=sin(clock*0.13)*0.67
+	if is_instance_valid(movie_player): movie_player.sync(game.service.movie_snapshot(),game.service.movie_record())
+	if is_instance_valid(television_status):
+		var movie: Dictionary=game.service.movie_snapshot()
+		television_status.text=("ХАЙЛАЙТЫ · %.1f / %.1f с"%[float(movie.elapsed),float(movie.duration)]) if bool(movie.playing) else "СВОБОДЕН"
 	if is_instance_valid(arcade_sprite):
 		arcade_sprite.position.x=snappedf(sin(clock*0.37)*0.22,0.11)
 		arcade_sprite.position.y=1.54-fposmod(clock*0.07,0.32)

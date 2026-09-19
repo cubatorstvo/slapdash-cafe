@@ -204,7 +204,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if not recording:
 					var night: Dictionary = interaction_target()
 					if not night.is_empty():
-						session.request_action(night)
+						if night.get("action","")=="open_videos": office.open("videos")
+						else: session.request_action(night)
 						return
 				if not recording and shop.computer_hit(camera):
 					office.open()
@@ -557,6 +558,10 @@ func new_cafe() -> void:
 	save_cafe()
 
 func interaction_target() -> Dictionary:
+	var lounge=get_tree().get_first_node_in_group("staff_lounge")
+	if is_instance_valid(lounge):
+		var tv_target: Dictionary=lounge.television_target(camera)
+		if not tv_target.is_empty(): return tv_target
 	if is_instance_valid(annex):
 		var sleep_target: Dictionary = annex.sleep_target(camera,session.local_id())
 		if not sleep_target.is_empty(): return sleep_target

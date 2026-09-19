@@ -178,14 +178,17 @@ func rebuild() -> void:
 			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
 		"videos":
 			label(content,"ВИДЕОТЕКА МАСТЕР-КЛАССОВ",23)
-			label(content,"Записи общие для кафе. Здесь хранятся полные принятые способы; монтаж хайлайтов появится на следующем этапе.",15)
+			label(content,"Хайлайты собраны из реальных кадров принятого приготовления и идут ровно 30% исходного времени. Запуск происходит на телевизоре комнаты отдыха.",15)
+			var has_tv: bool="television" in progress.lounge_items
+			if not has_tv: label(content,"Для просмотра установи телевизор в комнате отдыха.",15)
 			if service.masterclasses.is_empty(): label(content,"Пока нет записей. Проведи мастер-класс у шеф-станции.")
 			for record in service.masterclasses:
 				var id: int=int(record.get("id",0))
 				var quality: Dictionary=record.get("quality",{})
 				var effect: Dictionary=record.get("effectiveness",{})
 				label(content,str(record.get("name","Запись")),20)
-				label(content,"%s · %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
+				label(content,"%s · %.1f с · фильм %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),float(record.get("highlight_duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
+				button(content,"Посмотреть хайлайты на телевизоре",func():send({"action":"masterclass_watch","id":id},true),has_tv and float(record.get("highlight_duration",0.0))>0.0)
 				label(content,str(effect.get("explanation","Аккуратное приготовление.")),14)
 				if bool(record.get("archived",false)): label(content,"Архивная запись из прежнего рабочего способа · стол %d"%int(record.get("source_station",0)),14)
 				var row:=HBoxContainer.new(); content.add_child(row)
