@@ -104,7 +104,7 @@ func timeout_message() -> String:
 		second.training.phase if second != null else "?",
 		barrier.dump() if is_instance_valid(barrier) else "{}",
 		str(game.session.members) if is_instance_valid(game) else "{}"
-	]
+	] + (" staff=%s saw_staff=%s source=%s"%[game.service.staff_training.phase if is_instance_valid(game) and game.service.staff_training.is_active() else "idle",str(saw_staff_training),str(game.service.by_id(3).method_sources.get("potato",{})) if is_instance_valid(game) and game.service.by_id(3)!=null else "{}"])
 func _process(delta: float) -> bool:
 	if started == 0: return false
 	timer += delta
@@ -119,7 +119,9 @@ func _process(delta: float) -> bool:
 			fail("Shared table group name missing")
 			return false
 		if game.service.staff_training.is_active(): saw_staff_training=true
-	if not game.session.is_guest(): game.service.advance(delta)
+	if not game.session.is_guest():
+		game.service.advance(delta)
+		if started_staff_training and game.service.staff_training.is_active(): game.service.staff_training.advance(delta*4.0)
 	var teaching = game.local_station()
 	if teaching != null and teaching.training.phase == "recording":
 		game.bind_training()
@@ -154,6 +156,7 @@ func host_tick() -> void:
 			var lesson_error: String=game.service.start_group_training(502,[3])
 			if not lesson_error.is_empty(): fail("Staff training did not start: "+lesson_error); return
 			started_staff_training=true
+			barrier.send("staff-started")
 			print("CHECK: host assigned shared staff television training")
 		if first.training.phase == "recording" and second.training.phase == "recording":
 			print("READY: late join")
