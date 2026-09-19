@@ -146,6 +146,7 @@ func run()->void:
 	check(service.by_id(accepted_station).recipes.has("sausage"),"Disabling menu never deletes learned recipe")
 
 	print("T23 migration part: v19 derived groups and method_plan become persistent groups once")
+	service.by_id(6).method_sources.potato={"id":901,"name":"Новая картошка"}
 	var legacy: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	legacy.version=19
 	legacy.erase("table_group_registry")
