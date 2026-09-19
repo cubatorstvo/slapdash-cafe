@@ -1,0 +1,94 @@
+name: Stage 3 visual check
+on:
+  push:
+    branches:
+      - work/training-fixes-stage3-visual
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Godot 4.7.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+      - name: Create visual fixture
+        shell: bash
+        run: |
+          cat > tests/visual_course_editor.gd <<'GDSCRIPT'
+          extends SceneTree
+          const Scene=preload("res://scenes/cafe.tscn")
+          const Library=preload("res://scripts/masterclass_library.gd")
+          func repeated(value: Dictionary,count: int)->Array:
+              var out: Array=[]
+              for i in range(count): out.append(value.duplicate(true))
+              return out
+          func record_for(station: Node3D,id: int,dish: String,name: String)->Dictionary:
+              station.model.reset(dish)
+              var frames:=repeated(station.model.snapshot(),120)
+              return Library.make_record(id,dish,station.type_id,[{"group":1,"frames":frames}],2.0,station.model.quality(),name)
+          func _initialize()->void:
+              run.call_deferred()
+          func run()->void:
+              DisplayServer.window_set_size(Vector2i(1600,1000))
+              var game=Scene.instantiate()
+              root.add_child(game)
+              await process_frame
+              game.set_physics_process(false)
+              game.new_cafe()
+              game.service.progress.stars=2
+              game.service.progress.shift="open"
+              game.service.open_for_business=false
+              if "television" not in game.service.progress.lounge_items: game.service.progress.lounge_items.append("television")
+              var a=game.service.add_station("counter",1,false)
+              var b=game.service.add_station("counter",2,false)
+              for station in [a,b]:
+                  station.staffed=1
+                  station.equipment=["jug","cup","plates","pan","sauce","rag"]
+                  station.apply_equipment()
+              var wine=record_for(a,3101,"wine","Быстрый напиток")
+              var potato=record_for(a,3102,"potato","Картошка без дырок")
+              var sausage=record_for(a,3103,"sausage","Сосиска в соусе")
+              game.service.masterclasses=[wine,potato,sausage]
+              game.service.create_table_group([2,3],"Линия напитков и закусок")
+              game.office.open("groups")
+              game.office.select_group_stations([2,3])
+              game.office.course_editor_open()
+              game.office.course_editor_add_record(3101)
+              game.office.course_editor_add_record(3102)
+              game.office.course_editor_add_record(3103)
+              game.office.course_editor_set_mode("together")
+              game.office.rebuild()
+              await process_frame
+              await process_frame
+              var target: Control=null
+              var stack: Array=[game.office.content]
+              while not stack.is_empty():
+                  var node=stack.pop_back()
+                  if node is Label and str(node.text)=="ЕДИНЫЙ РЕДАКТОР КУРСА":
+                      target=node
+                      break
+                  for child in node.get_children(): stack.append(child)
+              if target!=null:
+                  game.office.scroll.scroll_vertical=maxi(0,int(target.global_position.y-game.office.content.global_position.y)-20)
+              await process_frame
+              await process_frame
+              var image:=root.get_viewport().get_texture().get_image()
+              var error:=image.save_png("/tmp/stage3_course_editor.png")
+              print("VISUAL_SCREENSHOT=",error)
+              game._shutdown_tree(game)
+              game.free()
+              quit(0 if error==OK else 1)
+          GDSCRIPT
+      - name: Import project
+        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit
+      - name: Render editor screenshot
+        run: xvfb-run -a -s "-screen 0 1600x1000x24" /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --path . --script res://tests/visual_course_editor.gd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage3-course-editor
+          path: /tmp/stage3_course_editor.png
