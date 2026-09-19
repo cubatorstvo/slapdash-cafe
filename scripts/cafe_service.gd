@@ -581,14 +581,6 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 		if not station.ready_crew(): return "Станция %d: сотрудник временно занят."%id
 	return ""
 
-func preview_table_groups(record_id: int,ids: Array) -> Array:
-	var record:=masterclass_by_id(record_id)
-	if record.is_empty(): return table_groups()
-	var overrides: Dictionary={}
-	for raw_id in ids:
-		overrides[int(raw_id)]={"id":record_id,"name":str(record.name),"dish":str(record.dish),"pending":true}
-	return _derive_table_groups(overrides)
-
 func start_group_training(record_id: int,ids: Array,peer := 1) -> String:
 	var error:=training_selection_error(record_id,ids)
 	if not error.is_empty(): return error
