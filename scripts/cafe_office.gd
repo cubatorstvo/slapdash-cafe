@@ -353,14 +353,15 @@ func rebuild() -> void:
 					check.disabled=not host
 					check.toggled.connect(func(on):set_group_station_selected(station_id,on))
 				label(content,"Блюдо → запись → готовность столов",16)
+				var performance: Dictionary=service.group_performance(group)
 				for dish in group.dishes:
 					var first_id: int=int(group.stations[0])
 					var readiness: Array=[]
 					for raw_id in group.stations:
 						var station_id: int=int(raw_id)
 						readiness.append("%d: %s"%[station_id,service.station_group_status(station_id,str(dish))])
-					label(content,"%s → %s → %s"%[Definition.DISHES.get(str(dish),str(dish)),service.source_label(first_id,str(dish)),"; ".join(readiness)],15)
-				var performance: Dictionary=service.group_performance(group)
+					var dish_result: Dictionary=performance.dishes.get(str(dish),{})
+					label(content,"%s → %s → %s\nРезультат блюда: %d заказов · %d порций · доход %d"%[Definition.DISHES.get(str(dish),str(dish)),service.source_label(first_id,str(dish)),"; ".join(readiness),int(dish_result.get("orders_completed",0)),int(dish_result.get("portions_served",0)),int(dish_result.get("revenue",0))],15)
 				var total_group: int=int(performance.orders_completed)+int(performance.losses)
 				var group_pct: float=Insights.completion_percent(int(performance.orders_completed),total_group)
 				var perf_line:=label(content,"Результат: %d из %d заказов · %.0f%% · %d порций · доход %d"%[int(performance.orders_completed),total_group,group_pct,int(performance.portions_served),int(performance.revenue)],15)
@@ -509,7 +510,9 @@ func stats_page()->void:
 		if stations.is_empty() and not reason.is_empty():
 			for detail in service.analytics.loss_details.values():
 				if str(detail.get("reason",""))!=reason: continue
-				label(content,"%s · %d случаев · столы %s"%[Definition.DISHES.get(str(detail.get("dish","")),str(detail.get("dish",""))),int(detail.get("count",0)),", ".join(detail.get("stations",[]).map(func(id):return str(id)))],14)
+				var scenario: Dictionary=detail
+				var scenario_button:=button(content,"%s · %d случаев · столы %s"%[Definition.DISHES.get(str(detail.get("dish","")),str(detail.get("dish",""))),int(detail.get("count",0)),", ".join(detail.get("stations",[]).map(func(id):return str(id)))],func():set_stats_focus(scenario))
+				scenario_button.tooltip_text="Открыть связанное блюдо, группу, столы и назначенный мастер-класс."
 		button(content,"Закрыть подробности",func():set_stats_focus({}))
 
 func shop_button(item: String, station_id: int, installed := false) -> void:
