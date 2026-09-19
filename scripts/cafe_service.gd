@@ -5,10 +5,11 @@ const Definition = preload("res://scripts/station_definition.gd")
 const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
-const SLOT_COUNT := 6
+const SLOT_COUNT := Expansion.SLOT_COUNT
 const SLOT_GAP := 0.6
 const SLOT_ROW_CENTER_X := 3.0
 const SLOT_Z := -1.4
@@ -45,12 +46,7 @@ func _ready() -> void:
 	staff_training.setup(self)
 
 func slot_position(slot_index: int) -> Vector3:
-	if slot_index == 4: return Vector3(10.2, 0, 4.75)
-	if slot_index == 5: return Vector3(3.2, 0, 4.75)
-	var legacy_slots := 4
-	var row_width := Station.SLOT_WIDTH * legacy_slots + SLOT_GAP * (legacy_slots - 1)
-	var first_center := SLOT_ROW_CENTER_X - row_width / 2.0 + Station.SLOT_WIDTH / 2.0
-	return Vector3(first_center + slot_index * (Station.SLOT_WIDTH + SLOT_GAP), 0, SLOT_Z)
+	return Expansion.position(slot_index)
 
 func starter_layout_positions() -> Array:
 	var positions: Array = []
@@ -297,6 +293,10 @@ func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Di
 		var pending: Dictionary=staff_training.pending_source(station.station_id,dish)
 		if not pending.is_empty(): return pending
 	if station.method_sources.has(dish): return station.method_sources[dish].duplicate(true)
+	if station.method_plan.has(dish):
+		var planned: Dictionary=station.method_plan[dish].duplicate(true)
+		planned.planned=true
+		return planned
 	if station.recipes.has(dish): return {"id":0,"name":"Локальный способ","legacy":true}
 	return {}
 
@@ -353,7 +353,7 @@ func source_label(station_id: int,dish: String) -> String:
 	if bool(source.get("legacy",false)): return "Локальный способ"
 	var id: int=int(source.get("id",0))
 	var current:=masterclass_by_id(id)
-	if not current.is_empty(): return str(current.get("name",source.get("name","Запись")))
+	if not current.is_empty(): return str(current.get("name",source.get("name","Запись")))+(" · запланировано" if bool(source.get("planned",false)) else "")
 	return str(source.get("name","Запись"))+" · Запись удалена"
 
 func station_group_status(station_id: int,dish: String) -> String:
@@ -364,6 +364,7 @@ func station_group_status(station_id: int,dish: String) -> String:
 	if not missing.is_empty(): return "требуется оборудование"
 	if station.staffed>=0 and station.staffed<station.role_count(): return "требуются работники"
 	if station.recipes.has(dish): return "освоено"
+	if station.method_plan.has(dish): return "запланировано обучение"
 	return "нет способа"
 
 func compatible_training_station_ids(record_id: int) -> Array:
@@ -871,8 +872,9 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entry.method_sources=entry.method_sources.duplicate(true)
+		entry.method_plan=entry.method_plan.duplicate(true)
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 16, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id, "table_group_names":table_group_names.duplicate(true)}
+	return {"format": "station-cafe", "version": 17, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id, "table_group_names":table_group_names.duplicate(true)}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
@@ -902,7 +904,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	var slots: Array = []
@@ -916,6 +918,7 @@ func load_data(data: Dictionary) -> bool:
 			if not member is Dictionary or not member.get("name") is String: return false
 		if not entry.get("recipes") is Dictionary or not entry.get("drafts") is Dictionary or not entry.get("upgrades") is Array: return false
 		if version>=16 and not entry.get("method_sources",{}) is Dictionary: return false
+		if version>=17 and not entry.get("method_plan",{}) is Dictionary: return false
 		for collection in [entry.recipes, entry.drafts]:
 			for dish in collection:
 				if not dish in Definition.TYPES[entry.type].dishes: return false
@@ -943,6 +946,7 @@ func load_data(data: Dictionary) -> bool:
 		station.recipes = entry.recipes.duplicate(true)
 		station.drafts = entry.drafts.duplicate(true)
 		station.method_sources=entry.get("method_sources",{}).duplicate(true)
+		station.method_plan=entry.get("method_plan",{}).duplicate(true)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	served = int(data.get("served", 0))
 	revenue = int(data.get("revenue", 0))

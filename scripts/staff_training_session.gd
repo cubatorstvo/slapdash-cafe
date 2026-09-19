@@ -142,6 +142,7 @@ func _complete()->void:
 		if station==null: continue
 		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true)}
 		station.method_sources[dish]={"id":record_id,"name":str(record.get("name","Запись"))}
+		station.method_plan.erase(dish)
 		station.drafts.erase(dish)
 		station.group_training_state=""
 	service.trace("group_training_complete",{"dish":dish,"record":record_id,"stations":station_ids.duplicate()})

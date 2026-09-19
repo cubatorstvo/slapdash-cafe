@@ -28,6 +28,7 @@ var upgrades: Array = []
 var recipes := {}
 var drafts := {}
 var method_sources := {}
+var method_plan := {}
 var group_training_state := ""
 var model
 var view: Node3D
@@ -362,7 +363,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts, "method_sources":method_sources}
+	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts, "method_sources":method_sources, "method_plan":method_plan}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
@@ -384,6 +385,7 @@ func world_entry() -> Dictionary:
 	data.training = training.summary()
 	data.masterclass = masterclass_station
 	data.group_training_state=group_training_state
+	data.method_plan=method_plan.duplicate(true)
 	return data
 
 func _build_bell() -> void:

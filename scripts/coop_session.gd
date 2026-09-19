@@ -669,6 +669,7 @@ func _world(packet: PackedByteArray) -> void:
 		station.manual_station = entry.get("manual", false)
 		station.masterclass_station=bool(entry.get("masterclass",false))
 		station.method_sources=entry.get("method_sources",{}).duplicate(true)
+		station.method_plan=entry.get("method_plan",{}).duplicate(true)
 		station.group_training_state=str(entry.get("group_training_state",""))
 		station.equipment = entry.get("equipment",station.equipment).duplicate()
 		station.apply_equipment()
