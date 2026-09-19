@@ -4,7 +4,7 @@ const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
-const PROTOCOL := "slapdash-cafe-scale-29"
+const PROTOCOL := "slapdash-cafe-scale-30"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -24,6 +24,7 @@ var remote_customers := {}
 var sleeping_peers := {}
 var sleep_scene := {}
 var sleep_revision := 0
+var last_movie_record_id := 0
 const SLEEP_SECONDS := 7.0
 const WAKE_SECONDS := 5.8
 
@@ -393,6 +394,25 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error: String=game.service.Visits.action(game.service,action,int(value.get("id",-1)))
 		if not error.is_empty(): message_to(sender,error)
 		return
+	if action in ["group_rename","group_train"]:
+		if sender!=1:
+			message_to(sender,"Группами столов управляет хозяин кафе.")
+			return
+		if not near_peer(sender,game.shop.computer,4.5):
+			message_to(sender,"Подойди к компьютеру кафе.")
+			return
+		var error: String=""
+		if action=="group_rename":
+			error=game.service.rename_table_group(str(value.get("group","")),str(value.get("name","")))
+		else:
+			var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
+			if ids.size()>game.service.SLOT_COUNT: ids=ids.slice(0,game.service.SLOT_COUNT)
+			error=game.service.start_group_training(int(value.get("record",0)),ids)
+		if not error.is_empty(): message_to(sender,error)
+		else:
+			game.save_cafe()
+			message_to(sender,"Учебный сеанс назначен. Сотрудники закончат текущие заказы и соберутся у телевизора." if action=="group_train" else "Название группы сохранено.")
+		return
 	if action in ["masterclass_rename","masterclass_delete"]:
 		if sender!=1:
 			message_to(sender,"Видеотекой управляет хозяин кафе.")
@@ -443,6 +463,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			"banquet": error = game.service.start_banquet(sender)
 			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
 			"save":
+				if game.service.any_training():
+					message_to(sender,"Сначала заверши текущий показ или обучение сотрудников.")
+					return
 				message_to(sender, "Сохранение идёт в фоне." if game.save_cafe() else "Не удалось записать сохранение.")
 				return
 			"new_cafe":
@@ -605,6 +628,11 @@ func advance(delta: float) -> void:
 			var peer: int = station.training.participants[role]
 			if peer > 1 and Time.get_ticks_msec() - int(motion_times.get(peer, 0)) > 500:
 				if station.training.inputs.has(role): station.training.inputs[role].use = false
+	var movie_id: int=int(game.service.movie_state.get("id",0)) if bool(game.service.movie_state.get("playing",false)) else 0
+	if movie_id>0 and movie_id!=last_movie_record_id:
+		_broadcast_movie_record()
+		last_movie_record_id=movie_id
+	elif movie_id==0: last_movie_record_id=0
 	if members.size() < 2: return
 	var entries: Array = []
 	var customers: Array = []
@@ -614,7 +642,7 @@ func advance(delta: float) -> void:
 			customers.append({"playback_speed":station.taster.playback_speed,"mouth_amount":station.model.mouth_opening(), "drinking":station.taster.drinking,"drunk_ml":station.taster.drunk_ml,"chewing":station.taster.chewing,"watching": true, "food_target": station.taster.food_target, "cook_target": station.taster.cook_target, "following_food": station.taster.following_food, "id": -station.station_id, "position": station.taster.global_position, "yaw": station.taster.global_rotation.y, "text": station.taster.caption.text, "reaction": station.model.customer_reaction if station.type_id == "counter" else 0.0})
 	for customer in game.service.customers:
 		customers.append({"visit_kind":customer.get("visit_kind",""),"meal":customer.view.meal_items,"meal_age":customer.view.meal_age,"playback_speed":customer.view.playback_speed,"mouth_amount":customer.view.mouth_amount,"drinking":customer.view.drinking,"drunk_ml":customer.view.drunk_ml,"chewing":customer.view.chewing,"watching": customer.view.watching, "food_target": customer.view.food_target, "cook_target": customer.view.cook_target, "following_food": customer.view.following_food, "id": customer.id, "position": customer.view.global_position, "yaw": customer.view.global_rotation.y, "text": customer.view.caption.text, "reaction": game.service.by_id(customer.station).model.customer_reaction if game.service.by_id(customer.station) != null and game.service.by_id(customer.station).type_id == "counter" and customer.state in ["cooking", "training"] else 0.0})
-	var data := {"laboratory": game.laboratory.snapshot(), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot(), "masterclasses":game.service.masterclass_summaries(), "next_masterclass_id":game.service.next_masterclass_id, "movie":game.service.movie_snapshot()}
+	var data := {"laboratory": game.laboratory.snapshot(), "sleeping": sleeping_peers.duplicate(true), "sleep_scene": sleep_scene.duplicate(true), "sleep_revision":sleep_revision, "protocol": PROTOCOL, "stations": entries, "players": player_poses, "customers": customers, "served": game.service.served, "revenue": game.service.revenue, "missed": game.service.missed, "open": game.service.open_for_business, "progression": game.service.progress.snapshot(), "masterclasses":game.service.masterclass_summaries(), "next_masterclass_id":game.service.next_masterclass_id, "movie":game.service.movie_snapshot(), "table_group_names":game.service.table_group_names.duplicate(true), "staff_training":game.service.staff_training.snapshot()}
 	var bytes := var_to_bytes(data).compress(FileAccess.COMPRESSION_DEFLATE)
 	for id in members:
 		if id != 1: _world.rpc_id(id, bytes)
@@ -640,6 +668,8 @@ func _world(packet: PackedByteArray) -> void:
 		station.staffed = int(entry.get("staffed",station.role_count()))
 		station.manual_station = entry.get("manual", false)
 		station.masterclass_station=bool(entry.get("masterclass",false))
+		station.method_sources=entry.get("method_sources",{}).duplicate(true)
+		station.group_training_state=str(entry.get("group_training_state",""))
 		station.equipment = entry.get("equipment",station.equipment).duplicate()
 		station.apply_equipment()
 		station.customer_order = entry.get("customer_order",{}).duplicate(true)
@@ -670,7 +700,9 @@ func _world(packet: PackedByteArray) -> void:
 	game.service.open_for_business = data.open
 	game.service.masterclasses=data.get("masterclasses",[]).duplicate(true)
 	game.service.next_masterclass_id=int(data.get("next_masterclass_id",1))
+	game.service.table_group_names=data.get("table_group_names",{}).duplicate(true)
 	game.service.apply_movie_snapshot(data.get("movie",{}))
+	game.service.staff_training.apply_snapshot(data.get("staff_training",{}))
 	game.service.progress.restore(data.progression, true)
 	game.laboratory.restore(data.laboratory)
 	ids.clear()
