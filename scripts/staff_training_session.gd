@@ -90,7 +90,7 @@ func _spawn_actors()->void:
 		var station=service.by_id(int(id))
 		if station==null: continue
 		station.group_training_state="walking"
-		var roles:=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		var roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
 		for role in range(roles):
 			var key: String="%d:%d"%[station.station_id,role]
 			var actor:=Avatar.new()
@@ -98,8 +98,8 @@ func _spawn_actors()->void:
 			var member: Dictionary=station.crew[role]
 			actor.caption.text=str(member.get("name","Клон"))+" · на обучение"
 			actor.notebook.show()
-			var home_world:=station.to_global(Vector3(station.role_home_x(role),0,1.85))
-			var target_world:=_viewer_spot(viewer_index)
+			var home_world: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
+			var target_world: Vector3=_viewer_spot(viewer_index)
 			actor.position=service.to_local(home_world)
 			actors[key]=actor
 			actor_meta[key]={"station":station.station_id,"role":role,"home":home_world,"target":target_world,"name":str(member.get("name","Клон"))}

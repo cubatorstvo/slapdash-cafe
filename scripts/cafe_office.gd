@@ -227,7 +227,7 @@ func rebuild() -> void:
 			label(content,"ГРУППЫ ПРОИЗВОДСТВЕННЫХ СТОЛОВ",23)
 			label(content,"Группа объединяет совместимые столы с одинаковыми назначениями. Выбери один стол, несколько или все совместимые; новый способ меняет только выбранное блюдо, остальные назначения сохраняются.",15)
 			if is_instance_valid(service.staff_training) and service.staff_training.is_active():
-				var training_record:=service.masterclass_by_id(service.staff_training.record_id)
+				var training_record: Dictionary=service.masterclass_by_id(service.staff_training.record_id)
 				var training_name: String=str(training_record.get("name",service.staff_training.record.get("name","Запись")))
 				label(content,"УЧЕБНЫЙ СЕАНС · %s · %s · столы %s"%[training_name,service.staff_training.phase_label(),", ".join(service.staff_training.station_ids.map(func(id):return str(id)))],17)
 			for group in service.table_groups():
@@ -277,7 +277,7 @@ func rebuild() -> void:
 				if not group_selected_stations.is_empty() and not chosen_error.is_empty() and group_selected_stations.all(func(id):return id in compatible): label(content,chosen_error,13)
 			if not group_pending_assignment.is_empty():
 				var pending_id: int=int(group_pending_assignment.record)
-				var pending_record:=service.masterclass_by_id(pending_id)
+				var pending_record: Dictionary=service.masterclass_by_id(pending_id)
 				label(content,"ПРЕДПРОСМОТР · после подтверждения",20)
 				for projected in service.preview_table_groups(pending_id,group_pending_assignment.stations):
 					label(content,"%s · столы %s"%[projected.name,", ".join(projected.stations.map(func(id):return str(id)))],15)
