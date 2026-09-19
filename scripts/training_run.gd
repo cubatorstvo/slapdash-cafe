@@ -177,6 +177,7 @@ func accept() -> bool:
 		return true
 	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
 	station.drafts.erase(dish)
+	station.get_parent().local_recipe_learned(station,dish)
 	station.get_parent().progress.revision += 1
 	station.finish_taster(true)
 	close()

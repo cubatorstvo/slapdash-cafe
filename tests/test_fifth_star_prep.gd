@@ -94,7 +94,7 @@ func run() -> void:
 		tracks.append({"group":role+1,"frames":[real_station.model.zone_snapshot(role)]})
 	real_station.recipes.solyanka={"tracks":tracks,"duration":1.0/60.0,"quality":real_station.model.quality()}
 	var saved: Dictionary = game.service.save_data()
-	check(saved.version==19,"Three-role kitchen advances the station save format to v18")
+	check(saved.version==20,"Three-role kitchen remains valid in the current v20 save format")
 	check(game.service.load_data(saved),"Save with role-three item ownership loads successfully")
 	live = game.service.progress
 	check(game.service.by_id(6)!=null and game.service.by_id(6).recipes.has("solyanka"),"Solyanka recording survives save/load")
@@ -110,6 +110,7 @@ func run() -> void:
 	var production_tracks: Array = []
 	for role in range(3): production_tracks.append({"group":role+1,"frames":[finished.zone_snapshot(role)]})
 	real_station.recipes.solyanka = {"tracks":production_tracks,"duration":1.0/60.0,"quality":finished.quality()}
+	check(game.service.set_group_dish_active(game.service.group_id_for_station(real_station.station_id),"solyanka",true).is_empty(),"Production solyanka is enabled in the explicit menu")
 	real_station.staffed = -1
 	live.fifth_star_auto_served = 0
 	live.fifth_star_solyanka_served = 0

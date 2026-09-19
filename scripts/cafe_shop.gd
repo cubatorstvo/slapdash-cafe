@@ -106,15 +106,13 @@ func equipment_catalog(type_id: String) -> Array:
 func group_training_plan(group_id: String,type_id: String) -> Dictionary:
 	if group_id.is_empty(): return {}
 	var group: Dictionary=game.service.table_group_by_id(group_id)
-	if group.is_empty() or str(group.type)!=type_id: return {}
-	var source_station=game.service.by_id(int(group.stations[0]))
-	if source_station==null: return {}
+	if group.is_empty() or str(group.type_id)!=type_id: return {}
 	var plan: Dictionary={}
-	for dish in source_station.dishes():
-		var source: Dictionary=game.service._method_source(source_station,str(dish))
-		var id: int=int(source.get("id",0))
+	for item in group.get("curriculum",[]):
+		var dish:=str(item.get("dish_id",""))
+		var id:=int(item.get("record_id",0))
 		var current: Dictionary=game.service.masterclass_by_id(id)
-		if id>0 and not current.is_empty(): plan[str(dish)]={"id":id,"name":str(current.get("name",source.get("name","Запись")))}
+		if id>0: plan[dish]={"id":id,"name":str(current.get("name","Запись #%d"%id)),"revision":int(item.get("revision",1))}
 	return plan
 
 func _delivery_position(id: int) -> Array:
@@ -356,6 +354,8 @@ func _install_parcel(parcel: Dictionary) -> String:
 			elif ITEMS[item].kind=="equipment" and item not in station.equipment: station.equipment.append(item)
 		station.method_plan=parcel.get("method_plan",{}).duplicate(true)
 		station.apply_equipment(); station.apply_upgrades()
+		var planned_group: String=str(parcel.get("planned_group",""))
+		if not planned_group.is_empty() and not game.service.table_group_by_id(planned_group).is_empty(): game.service.add_station_to_group(planned_group,station.station_id)
 		game.service.assign_clones()
 	elif spec.kind=="lab_upgrade":
 		if game.laboratory.blocks_sleep() or game.laboratory.calibrator.busy(): return "Сначала заверши работу с приборами."

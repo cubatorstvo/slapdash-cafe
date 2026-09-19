@@ -68,6 +68,11 @@ func run()->void:
 	var record: Dictionary=Library.make_record(700,"sausage","counter",recipe.tracks.duplicate(true),1.0,recipe.quality.duplicate(true),"Сетевая сосиска")
 	service.masterclasses=[record]
 	service.next_masterclass_id=701
+	check(service.create_table_group([2,3],"Сервисная линия").is_empty(),"Two counters form an explicit service group")
+	check(service._apply_group_plan(700,[2,3]).size()==1,"Explicit service group receives its desired sausage record")
+	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Service group has sausage explicitly enabled for diagnostics")
+	var service_group: Dictionary=service.table_groups().filter(func(value):return value.stations==[2,3])[0]
+	var service_group_id: String=str(service_group.id)
 
 	print("1/9: repeated same-dish losses merge by reason and retain drill-down context")
 	first.state="cooking"; first.customer_id=501
@@ -77,7 +82,7 @@ func run()->void:
 	check(service.analytics.feed.size()==1 and int(service.analytics.feed[0].count)==4,"Four matching departures merge into one feed event")
 	check("4 гостя ушли" in service.feed_text(service.analytics.feed[0]) and "заняты" in service.feed_text(service.analytics.feed[0]),"Merged event shows correct count and reason")
 	var busy_detail: Dictionary=service.analytics.loss_details.values()[0]
-	check(str(busy_detail.group)=="2-3" and busy_detail.stations==[2,3],"Loss drill-down links the dish to its group and tables")
+	check(str(busy_detail.group)==service_group_id and busy_detail.stations==[2,3],"Loss drill-down links the dish to its persistent group and tables")
 
 	print("2/9: service diagnostics distinguish concrete operational causes")
 	first.state="idle"; first.customer_id=-1
@@ -103,7 +108,7 @@ func run()->void:
 	for i in range(3): Insights.portion(service.analytics,"sausage",2,25)
 	Insights.complete(service.analytics,"sausage",2)
 	Insights.complete(service.analytics,"sausage",2)
-	var group: Dictionary=service.table_group_by_id("2-3")
+	var group: Dictionary=service.table_group_by_id(service_group_id)
 	var performance: Dictionary=service.group_performance(group)
 	check(int(performance.orders_completed)==2 and int(performance.portions_served)==3 and int(performance.revenue)==75,"Group reports orders, portions and revenue")
 	check(int(performance.losses)==4 and int(performance.loss_reasons.get("busy",0))==4,"Group reports its linked historical bottleneck")
@@ -145,12 +150,21 @@ func run()->void:
 		prepare_counter(station,recipe)
 	check(service.stations.size()==20,"Cafe contains one chef station and nineteen production tables")
 	var compatible: Array=service.compatible_training_station_ids(700)
-	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables")
+	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables without auto-merging them")
+	check(service._apply_group_plan(700,compatible).size()>=1,"All compatible source groups can first receive the same desired record")
+	var prepared_group_ids: Array=[]
+	for station_id in compatible:
+		var prepared_group_id: String=service.group_id_for_station(int(station_id))
+		if prepared_group_id not in prepared_group_ids:
+			prepared_group_ids.append(prepared_group_id)
+			check(service.set_group_dish_active(prepared_group_id,"sausage",true).is_empty(),"Source group keeps sausage active before explicit merge")
+	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine nineteen tables once their plans and menu match")
+	check(int(service.desired_source(service.group_id_for_station(2),"sausage").id)==700,"Large explicit group keeps the shared desired record")
 	var groups: Array=service.table_groups()
 	var large_group: Dictionary={}
 	for value in groups:
 		if value.stations.size()==19: large_group=value; break
-	check(not large_group.is_empty(),"Twenty-table layout remains one manageable compatible group when assignments match")
+	check(not large_group.is_empty(),"Twenty-table layout is manageable as one explicit group when the player chooses it")
 	Insights.portion(service.analytics,"sausage",20,25)
 	Insights.complete(service.analytics,"sausage",20)
 	var large_performance: Dictionary=service.group_performance(large_group)
@@ -169,7 +183,7 @@ func run()->void:
 	check("ПОДРОБНОСТИ" in rendered and "Сетевая сосиска" in rendered and "Столы: 2, 3" in rendered,"Event drill-down renders dish, tables and masterclass")
 	game.office.tab="groups"; game.office.stamp=""; game.office.rebuild()
 	rendered=tree_text(game.office.content)
-	check("Результат блюда:" in rendered and "Сетевая сосиска" in rendered,"Group cards render masterclass assignment beside service results")
+	check("АКТИВНОЕ МЕНЮ И УЧЕБНЫЙ ПЛАН" in rendered and "Сетевая сосиска" in rendered,"Group cards render desired masterclass and active-menu state beside service results")
 	game.office.close()
 
 	print("8/10: feed aggregation window separates later identical events")
@@ -179,17 +193,17 @@ func run()->void:
 	Insights.loss(service.analytics,"sausage","busy",1,0,[2,3],str(large_group.id))
 	check(service.analytics.feed.size()==before+2,"Same event outside the short aggregation window creates a new feed row")
 
-	print("9/10: v19 persists analytics and v18 migrates cleanly")
+	print("9/10: v20 persists analytics and v18 migrates cleanly")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==19 and saved.analytics.get("feed",[]).size()>0,"Stage 6 save writes analytics in v19")
+	check(saved.version==20 and saved.analytics.get("feed",[]).size()>0,"Current v20 save writes analytics with persistent groups")
 	var feed_size: int=saved.analytics.feed.size()
-	check(service.load_data(saved),"v19 cafe reloads")
-	check(service.analytics.feed.size()==feed_size and int(service.analytics.losses.get("busy",0))>=2,"v19 reload preserves feed and loss totals")
+	check(service.load_data(saved),"v20 cafe reloads")
+	check(service.analytics.feed.size()==feed_size and int(service.analytics.losses.get("busy",0))>=2,"v20 reload preserves feed and loss totals")
 	var legacy: Dictionary=bytes_to_var(var_to_bytes(saved))
 	legacy.version=18
 	legacy.erase("analytics")
 	check(service.load_data(legacy),"v18 cafe remains loadable")
-	check(service.analytics.feed.is_empty() and service.save_data().version==19,"v18 migrates with blank historical analytics and writes v19")
+	check(service.analytics.feed.is_empty() and service.save_data().version==20,"v18 migrates with blank historical analytics and writes v20")
 
 	print("10/10: completion percentages preserve absolute and relative meaning")
 	check(is_equal_approx(Insights.completion_percent(180,200),90.0),"180 of 200 renders as 90 percent")
@@ -197,5 +211,5 @@ func run()->void:
 
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: merged feed, exact causes, group/masterclass drill-down, guided first training, twenty-table scale and v19 analytics" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: merged feed, exact causes, group/masterclass drill-down, guided first training, twenty-table scale and v20 analytics" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

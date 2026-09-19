@@ -23,6 +23,7 @@ func run() -> void:
 	for i in range(60): frames.append(start.duplicate(true))
 	frames.append(end)
 	station.recipes.wine={"tracks":[{"frames":frames}],"duration":61.0/60.0,"quality":m.quality()}
+	service.set_group_dish_active(service.group_id_for_station(station.station_id),"wine",true)
 	var record_hash:=hash(var_to_bytes(station.recipes.wine))
 	for tempo in [0.7,1.0,2.0,10.0]:
 		station.crew[0].tempo=tempo
