@@ -133,10 +133,10 @@ func run()->void:
 	check(service.station_group_status(3,"potato")=="требуются работники","Vacancy is shown in group readiness")
 	second.staffed=1
 
-	print("7/7: v17 persists group names, learned source links and working recipes")
+	print("7/7: v18 persists group names, learned source links and working recipes")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==17 and saved.table_group_names.get(str(counter_group.id),"")=="Картофельная линия","Current save writes group metadata in v17")
-	check(service.load_data(saved),"v17 cafe reloads")
+	check(saved.version==18 and saved.table_group_names.get(str(counter_group.id),"")=="Картофельная линия","Current save writes group metadata in v18")
+	check(service.load_data(saved),"v18 cafe reloads")
 	check(service.by_id(2).recipes.has("potato") and service.by_id(2).method_sources.potato.id==900,"Reload preserves learned full method and deleted source id")
 	check(service.table_group_by_id("2-3").name=="Картофельная линия","Reload preserves group name")
 	check(service.source_label(2,"potato").contains("Запись удалена"),"Deleted-film marker survives reload")
