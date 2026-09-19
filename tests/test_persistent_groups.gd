@@ -135,6 +135,7 @@ func run()->void:
 	check(not accepted.is_empty(),"Accepted sausage customer exists")
 	var accepted_station: int=int(accepted.station)
 	check(service.set_group_dish_active(four_id,"sausage",false).is_empty(),"Dish can be disabled while its accepted order exists")
+	check(service._apply_group_plan(910,[2,3,4,5]).size()==1 and "sausage" not in service.table_group_by_id(four_id).active_dishes,"Assigning a course to a disabled dish does not silently enable it")
 	var station=service.by_id(accepted_station)
 	accepted.path.clear()
 	accepted.view.global_position=station.to_global(Vector3(0,0,-1.85))
