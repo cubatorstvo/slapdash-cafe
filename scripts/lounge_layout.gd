@@ -212,6 +212,49 @@ static func path_between(start_point: Vector3, target: Vector3, tier := 2, owned
 static func approach_path(target: Vector3, tier := 2, owned: Array = []) -> Array:
 	return path_between(ENTRANCE,target,tier,owned)
 
+static func training_viewer_spots(count: int, tier := 2, owned: Array = []) -> Array:
+	var wanted:=maxi(0,count)
+	if wanted==0: return []
+	var blockers:=obstacles(tier,owned)
+	var candidates: Array=[]
+	var television:=Vector3(6.5,0,11.3)
+	var z:=11.75
+	while z<=back_z(tier)-0.55:
+		var x:=3.75
+		while x<=17.05:
+			var point:=Vector3(x,0,z)
+			if point.distance_to(ENTRANCE)>1.25 and walkable(point,blockers,tier):
+				candidates.append(point)
+			x+=0.55
+		z+=0.55
+	candidates.sort_custom(func(a,b):
+		var a_score: float=Vector3(a).distance_squared_to(television)+absf(float(a.x)-television.x)*0.08
+		var b_score: float=Vector3(b).distance_squared_to(television)+absf(float(b.x)-television.x)*0.08
+		return a_score<b_score)
+	var result: Array=[]
+	for raw in candidates:
+		var point:=Vector3(raw)
+		var separated:=true
+		for chosen in result:
+			if point.distance_to(Vector3(chosen))<0.72:
+				separated=false
+				break
+		if not separated: continue
+		result.append(point)
+		if result.size()>=wanted: break
+	if result.size()<wanted:
+		for index in range(wanted*3):
+			var fallback: Dictionary=overflow_slot(index,tier,owned)
+			var point:=Vector3(fallback.approach)
+			var separated:=true
+			for chosen in result:
+				if point.distance_to(Vector3(chosen))<0.55:
+					separated=false
+					break
+			if separated: result.append(point)
+			if result.size()>=wanted: break
+	return result
+
 static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionary:
 	var blockers:=obstacles(tier,owned)
 	var ring: Array=[]

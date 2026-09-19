@@ -109,6 +109,8 @@ static func loss(data: Dictionary,dish: String,reason: String,total: int,done: i
 
 static func _merge_key(kind: String,payload: Dictionary,source: String,source_name: String)->String:
 	if kind=="partial": return "%s|%s|%s|%s|%d|%d"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),str(payload.get("group","")),int(payload.get("done",0)),int(payload.get("total",0))]
+	if kind in ["group_training","training_wait","training_deferred","training_course_complete","training_cancel"]:
+		return "%s|%d|%d|%s|%s|%s"%[kind,int(payload.get("course",0)),int(payload.get("batch",0)),str(payload.get("reason","")),str(payload.get("scope","")),source]
 	return "%s|%s|%s|%s|%s|%s"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),str(payload.get("group","")),source,source_name]
 
 static func push_feed(data: Dictionary,kind: String,payload: Dictionary={},amount := 1,source := "system",source_name := "")->Dictionary:
@@ -125,7 +127,7 @@ static func push_feed(data: Dictionary,kind: String,payload: Dictionary={},amoun
 			return entry
 	var entry: Dictionary={"id":int(data.get("serial",1)),"kind":kind,"source":source,"source_name":source_name,"count":maxi(1,amount),"at":now,"merge_key":key}
 	data.serial=int(data.get("serial",1))+1
-	for field in ["dish","reason","done","total","stations","group","group_name","name","record","workers_missing","text"]:
+	for field in ["dish","reason","done","total","stations","group","group_name","name","record","workers_missing","text","course","batch","batches","mode","remaining","day","automatic","lesson","scope"]:
 		if payload.has(field): entry[field]=payload[field].duplicate(true) if payload[field] is Array or payload[field] is Dictionary else payload[field]
 	data.feed.push_front(entry)
 	while data.feed.size()>MAX_FEED: data.feed.pop_back()
@@ -155,6 +157,22 @@ static func table_word(value: int)->String:
 	if d>=2 and d<=4: return "стола"
 	return "столов"
 
+static func batch_word(value: int)->String:
+	var n:=absi(value)%100
+	var d:=n%10
+	if n>=11 and n<=14: return "партий"
+	if d==1: return "партия"
+	if d>=2 and d<=4: return "партии"
+	return "партий"
+
+static func lesson_word(value: int)->String:
+	var n:=absi(value)%100
+	var d:=n%10
+	if n>=11 and n<=14: return "уроков"
+	if d==1: return "урок"
+	if d>=2 and d<=4: return "урока"
+	return "уроков"
+
 static func event_text(entry: Dictionary,dish_names: Dictionary)->String:
 	var count: int=int(entry.get("count",1))
 	var dish: String=str(entry.get("dish",""))
@@ -166,7 +184,7 @@ static func event_text(entry: Dictionary,dish_names: Dictionary)->String:
 			if count==1: return "Гость получил %d из %d порций · %s · %s"%[int(entry.get("done",0)),int(entry.get("total",0)),dish_name,reason_label(str(entry.get("reason","")))]
 			return "%d %s ушли частично обслуженными · %s · %s"%[count,guest_word(count),dish_name,reason_label(str(entry.get("reason","")))]
 		"training":
-			return "Мастер-класс «%s» освоили %d %s"%[str(entry.get("name","Запись")),count,table_word(count)]
+			return "Урок завершён · мастер-класс «%s» освоили %d %s"%[str(entry.get("name","Запись")),count,table_word(count)]
 		"installer":
 			var tail: String=""
 			var missing: int=int(entry.get("workers_missing",0))
@@ -175,7 +193,22 @@ static func event_text(entry: Dictionary,dish_names: Dictionary)->String:
 		"masterclass":
 			return "Начат мастер-класс · "+dish_name
 		"group_training":
-			return "Назначено обучение · %s · %d %s"%[dish_name,count,table_word(count)]
+			var course_name: String=str(entry.get("name","Курс"))
+			if bool(entry.get("automatic",false)) and not str(entry.get("group_name","")).is_empty():
+				return "Новые столы группы «%s» записаны на курс «%s» · %d %s"%[str(entry.group_name),course_name,count,table_word(count)]
+			var batch_count: int=maxi(1,int(entry.get("batches",1)))
+			var mode: String="Вместе" if str(entry.get("mode","together"))=="together" else "По группам"
+			return "Курс «%s»: %d %s, %d %s · %s"%[course_name,count,table_word(count),batch_count,batch_word(batch_count),mode]
+		"training_wait":
+			return "Обучение «%s» ждёт: %s"%[str(entry.get("name","Курс")),str(entry.get("reason","условия запуска"))]
+		"training_deferred":
+			var remaining: int=maxi(0,int(entry.get("remaining",0)))
+			return "Курс «%s» перенесён на утро · ещё %d %s"%[str(entry.get("name","Курс")),remaining,lesson_word(remaining)]
+		"training_course_complete":
+			return "Курс «%s» завершён · %d %s"%[str(entry.get("name","Курс")),count,table_word(count)]
+		"training_cancel":
+			var scope: String=str(entry.get("scope","course"))
+			return ("Урок отменён" if scope=="lesson" else "Партия курса отменена" if scope=="batch" else "Курс отменён")+" · «%s»"%str(entry.get("name","Курс"))
 		"batch":
 			return "Заказано %d %s комплектами"%[count,table_word(count)]
 		_:

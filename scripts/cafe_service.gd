@@ -831,6 +831,10 @@ func local_recipe_learned(station: Node3D,dish: String) -> void:
 func request_training(station: Node3D, dish: String, peer: int) -> bool:
 	if station == null or not station.ready_crew() or station.manual_station or not dish in station.dishes() or progress.busy(): return false
 	if station.training.active(): return station.training.lead == peer
+	# Local station teaching is the introductory pre-first-star path. From the first
+	# star onward new assignments are host-authoritative courses built from the
+	# chef's masterclasses. Existing local lessons may still finish normally.
+	if progress.stars>=1: return false
 	if training_for(peer) != null or station.pending_teacher > 0: return false
 	if station.state in ["cooking","serving"]:
 		station.pending_teacher = peer
@@ -840,6 +844,16 @@ func request_training(station: Node3D, dish: String, peer: int) -> bool:
 	_attach_customer(station)
 	station.training.open(dish, peer)
 	return true
+
+func production_scale_summary() -> Dictionary:
+	var places:=0
+	var assigned_workers:=0
+	for station in stations:
+		if station.manual_station or station.masterclass_station: continue
+		places+=1
+		assigned_workers+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	var free_workers: int=progress.free_workers.size()
+	return {"max_places":maxi(0,SLOT_COUNT-1),"places":places,"assigned_workers":assigned_workers,"free_workers":free_workers,"workers":assigned_workers+free_workers}
 
 func _attach_customer(station: Node3D) -> void:
 	for customer in customers:

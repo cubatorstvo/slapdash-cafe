@@ -25,7 +25,7 @@ func setup() -> void:
 	game.service.revenue = 73 if role == "guest" else 0
 	if role == "host":
 		game.service.progress.shift = "open"
-		game.service.progress.stars = 1
+		game.service.progress.stars = 0
 		game.service.progress.cash = 200
 		# Seed owned assets; this test covers transport, shop purchases have their own integration test.
 		game.service.progress.decorations=["sign"]
@@ -33,7 +33,8 @@ func setup() -> void:
 		game.service.by_id(3).upgrades=["sauce_ramp"]
 		game.service.by_id(3).apply_upgrades()
 		game.shop.order("rag",1) # already installed: explicit rejection, no duplicate delivery
-		game.shop.order_bundle(["sauce_ramp"],1)
+		var bundle_fixture: Dictionary=game.shop._new_delivery("sauce_ramp",1,["sauce_ramp"],false,0.0,{})
+		game.service.progress.deliveries.append(bundle_fixture)
 		game.service.progress.free_clones=2
 		game.service.normalize_workers()
 		game.service.progress.free_workers[0].tempo=0.85
@@ -53,8 +54,8 @@ func setup() -> void:
 		counter_source.model.reset("potato")
 		var counter_frames: Array=[]
 		var counter_frame: Dictionary=counter_source.model.snapshot()
-		for i in range(60): counter_frames.append(counter_frame.duplicate(true))
-		game.service.masterclasses.append(MasterclassLibrary.make_record(502,"potato","counter",[{"group":1,"frames":counter_frames}],1.0,counter_source.model.quality(),"Сетевая картошка"))
+		for i in range(900): counter_frames.append(counter_frame.duplicate(true))
+		game.service.masterclasses.append(MasterclassLibrary.make_record(502,"potato","counter",[{"group":1,"frames":counter_frames}],15.0,counter_source.model.quality(),"Сетевая картошка"))
 		game.service.next_masterclass_id=503
 		if not game.service.create_table_group([2,3],"Сетевые стойки").is_empty(): fail("Host could not create shared persistent table group"); return
 		var shared_group: Dictionary=game.service.table_groups().filter(func(value):return value.stations==[2,3])[0]
@@ -67,8 +68,6 @@ func setup() -> void:
 		game.service.by_id(3).order_portions_total=10
 		game.service.by_id(3).order_portions_done=4
 		game.service.by_id(3).order_paid=100
-		var assembler_parcel: Dictionary=game.shop._new_delivery("counter",20,["counter"],true,0.0,{})
-		game.service.progress.deliveries.append(assembler_parcel)
 		game.annex.refresh_shell()
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
@@ -100,6 +99,18 @@ func member_named(name: String) -> int:
 func kitchen_phase() -> String:
 	var kitchen = game.service.by_id(4) if is_instance_valid(game) else null
 	return kitchen.training.phase if kitchen != null else "?"
+func installer_leaving() -> bool:
+	if not is_instance_valid(game): return false
+	for job in game.service.progress.installer_jobs:
+		if str(job.get("phase",""))=="leaving": return true
+	return false
+
+func shared_course_count() -> int:
+	if not is_instance_valid(game) or not is_instance_valid(game.service.training_queue): return 0
+	var count:=0
+	for course in game.service.training_queue.courses:
+		if str(course.get("command_id",""))=="t22-shared-course": count+=1
+	return count
 func expected_stage() -> String:
 	if role == "host":
 		return ["wait-guest", "parallel-recording", "start-kitchen", "shared-zones", "observer-ack", "await-idle-after-release", "quit"][clampi(stage, 0, 6)]
@@ -168,13 +179,31 @@ func host_tick() -> void:
 	elif stage == 1:
 		var guest_id:=member_named("guest")
 		if not started_staff_training and guest_id>0 and barrier.has_from("movie-checked",guest_id) and not bool(game.service.movie_state.get("playing",false)):
-			var lesson_error: String=game.service.start_group_training(502,[3])
+			var before_courses: int=game.service.training_queue.courses.size()
+			var lesson_error: String=game.service.start_group_training(502,[3],1,"t22-shared-course")
 			if not lesson_error.is_empty(): fail("Staff training did not start: "+lesson_error); return
+			var duplicate_error: String=game.service.start_group_training(502,[3],1,"t22-shared-course")
+			if not duplicate_error.is_empty() or game.service.training_queue.courses.size()!=before_courses+1 or shared_course_count()!=1:
+				fail("Repeated T22 command created more than one course")
+				return
+			var t22_parcel: Dictionary=game.shop._new_delivery("counter",20,["counter"],true,0.0,{})
+			game.service.progress.deliveries.append(t22_parcel)
+			var t22_job: Dictionary=game.shop._ensure_installer_job(t22_parcel)
+			var install_at: Vector3=game.shop.installer_approach_position(t22_parcel)
+			t22_job.phase="leaving"
+			t22_job.installed=true
+			t22_job.phase_age=0.0
+			t22_job.position=[install_at.x,0.0,install_at.z]
+			game.service.progress.deliveries.erase(t22_parcel)
+			game.service.progress.delivery_history.push_front({"id":int(t22_parcel.id),"item":"counter","items":["counter"],"station":20,"installer":true,"installer_id":int(t22_parcel.id),"day":int(game.service.progress.day)})
+			game.service.progress.revision+=1
+			game.shop._process(0.016)
 			started_staff_training=true
 			barrier.send("staff-started")
-			print("CHECK: host assigned shared staff television training")
-		if started_staff_training and first.training.phase == "recording" and second.training.phase == "recording":
+			print("CHECK: repeated host command creates exactly one shared course and starts a physical leaving installer")
+		if started_staff_training and first.training.phase=="recording" and second.training.phase=="recording" and game.service.staff_training.phase=="watching" and bool(game.service.movie_state.get("playing",false)) and installer_leaving():
 			print("READY: late join")
+			print("CHECK: late join window has a live staff movie and an installer physically leaving")
 			saw_parallel = true
 			stage = 2
 	elif stage == 2 and game.session.members.size() == 3 and second.training.phase == "idle":
@@ -219,14 +248,11 @@ func guest_tick() -> void:
 	if stage == 0 and first.training.phase == "recording":
 		if first.model.guest_serving.drunk != 225 or first.model.item_available("cup"): return
 		var saw_bundle:=false
-		var saw_installer_delivery:=false
 		for parcel in game.service.progress.deliveries:
 			if parcel.get("items",[])==["sauce_ramp"]: saw_bundle=true
-			if bool(parcel.get("installer",false)) and int(parcel.get("station",0))==20: saw_installer_delivery=true
-		game.shop._process(0.016)
-		if not saw_bundle or not saw_installer_delivery or game.shop.installers.is_empty() or game.service.progress.free_clones!=2: fail("Bundle, assembler or free clones missing"); return
+		if not saw_bundle or game.service.progress.free_clones!=2: fail("Bundle or free clones missing"); return
 		if game.service.progress.free_workers[0].tempo!=0.85 or first.crew[0].tempo!=1.25 or "lab_valve" not in game.service.progress.lab_upgrades: fail("Individual tempo or lab upgrades missing"); return
-		print("CHECK: individual tempo, analytics feed, multi-order progress, consumed cup, deliveries and assembler actor replicated")
+		print("CHECK: individual tempo, analytics feed, multi-order progress, consumed cup and bundle replicated")
 		game.player.global_position=Vector3(6.5,0.02,13.2)
 		stage=20
 		quit_at=timer+0.45
@@ -273,7 +299,8 @@ func guest_tick() -> void:
 		if not saw_staff_training: return
 		var trained_source: Dictionary=game.service.by_id(3).method_sources.get("potato",{})
 		if int(trained_source.get("id",0))!=502: return
-		print("CHECK: guest saw shared staff TV lesson and learned method source")
+		if shared_course_count()!=1: fail("Guest sees duplicated T22 shared course"); return
+		print("CHECK: guest saw one shared staff TV course and learned method source")
 		print("CHECK: guest received host kitchen release")
 		game.session.leave("")
 		stage = 6
@@ -281,7 +308,21 @@ func observer_tick() -> void:
 	if not game.session.synced: return
 	var kitchen = game.service.by_id(4)
 	if stage == 0:
-		if game.service.stations.size() != 4: fail("Late observer did not receive all fixed station slots")
+		if game.service.stations.size() < 4: fail("Late observer did not receive fixed station slots")
+		if not game.service.staff_training.is_active() or game.service.staff_training.phase!="watching" or not bool(game.service.movie_state.get("playing",false)):
+			fail("T22 late observer did not join during the shared staff movie")
+			return
+		if not installer_leaving():
+			fail("T22 late observer did not receive the leaving installer state")
+			return
+		if shared_course_count()!=1:
+			fail("T22 late observer sees an incorrect shared course count: %d"%shared_course_count())
+			return
+		game.shop._process(0.016)
+		if game.shop.installers.is_empty():
+			fail("T22 late observer did not reconstruct the physical leaving installer")
+			return
+		print("CHECK: T22 late observer matches movie, queue and leaving installer state")
 		stage = 1
 	elif stage == 1 and kitchen.training.phase == "recording":
 		if kitchen.training.dish != "meal": fail("Observer kitchen dish %s" % kitchen.training.dish)

@@ -52,6 +52,13 @@ func dispose(game)->void:
 	game._shutdown_tree(game)
 	game.free()
 
+func feed_has(service: Node3D,kind: String,scope := "")->bool:
+	for entry in service.analytics.feed:
+		if str(entry.get("kind",""))!=kind: continue
+		if not scope.is_empty() and str(entry.get("scope",""))!=scope: continue
+		return true
+	return false
+
 func _initialize()->void:
 	run.call_deferred()
 
@@ -126,6 +133,7 @@ func run()->void:
 	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==1321,90.0),"T12 reaches second film after completing first")
 	service.movie_state.elapsed=float(service.movie_state.duration)*0.5
 	check(service.cancel_training_course(cancel_id).is_empty(),"T12 current course can be cancelled")
+	check(feed_has(service,"training_cancel","course"),"T12 course cancellation appears in the significant-event feed")
 	check(await run_until(service,func():return not service.staff_training.is_active(),60.0),"T12 workers return after cancellation")
 	check(int(station.method_sources.get("sausage",{}).get("id",0))==1322,"T12 completed first lesson remains learned")
 	check(int(station.method_sources.get("potato",{}).get("id",0))==1320,"T12 interrupted second lesson keeps the old production method")
@@ -146,6 +154,7 @@ func run()->void:
 	var partial_lessons: Array=partial_batch.lesson_ids.duplicate()
 	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==1332,90.0),"T12 individual cancellation fixture reaches the second film")
 	check(service.cancel_training_lesson(int(partial_lessons[1])).is_empty(),"T12 current individual lesson can be cancelled")
+	check(feed_has(service,"training_cancel","lesson"),"T12 individual lesson cancellation appears in the significant-event feed")
 	check(service.staff_training.is_active() and service.staff_training.phase=="watching" and service.staff_training.record_id==1333,"T12 party remains at the TV and immediately starts the next lesson")
 	check(int(partial_batch.gathers)==1 and int(partial_batch.returns)==0,"T12 individual cancellation causes no extra gather or early return")
 	check(await run_until(service,func():return str(service.training_queue._course(int(partial_cancel.course_id)).get("state",""))=="completed",90.0),"T12 remainder completes after cancelling one film")

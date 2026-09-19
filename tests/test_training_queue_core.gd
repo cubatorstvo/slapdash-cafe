@@ -43,6 +43,14 @@ func serving_sausage_recipe(station: Node3D)->Dictionary:
 func course_state(queue: Node,id: int)->String:
 	return str(queue._course(id).get("state",""))
 
+func feed_count(service: Node3D,kind: String,course_id := 0)->int:
+	var count:=0
+	for entry in service.analytics.feed:
+		if str(entry.get("kind",""))!=kind: continue
+		if course_id>0 and int(entry.get("course",0))!=course_id: continue
+		count+=1
+	return count
+
 func run_until(service: Node3D,predicate: Callable,seconds := 90.0)->bool:
 	var steps:=ceili(seconds/0.1)
 	for i in range(steps):
@@ -123,6 +131,12 @@ func run()->void:
 	var blocked_batch: Dictionary=queue._batch(int(queue._course(int(t06_blocked.course_id)).batch_ids[0]))
 	var ready_batch: Dictionary=queue._batch(int(queue._course(int(t06_ready.course_id)).batch_ids[0]))
 	check(str(blocked_batch.state)=="blocked" and "оборудование" in str(blocked_batch.blocked_reason),"T06 first batch reports missing equipment")
+	var wait_events_before: int=feed_count(service,"training_wait",int(t06_blocked.course_id))
+	check(wait_events_before==1,"T06 first meaningful wait reason creates one visible feed event")
+	for _i in range(5):
+		service.advance(0.1)
+		await process_frame
+	check(feed_count(service,"training_wait",int(t06_blocked.course_id))==wait_events_before,"T06 unchanged wait reason stays internal instead of spamming the feed")
 	check(int(queue.active_batch_id)==int(ready_batch.id),"T06 independent ready batch skips the blocked one")
 	check(await run_until(service,func():return course_state(queue,int(t06_ready.course_id))=="completed"),"T06 ready course completes first")
 	stations[6].equipment.append("pan")

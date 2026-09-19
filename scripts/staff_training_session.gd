@@ -78,9 +78,11 @@ func reset()->void:
 	lesson_id=0
 
 func _viewer_spot(index: int)->Vector3:
-	var row:=int(index/4)
-	var col:=index%4
-	return Vector3(4.75+col*1.10,0,13.15+row*0.72)
+	var tier: int=int(service.progress.lounge_tier)
+	var spots: Array=LoungeLayout.training_viewer_spots(index+1,tier,service.progress.lounge_items)
+	if index<spots.size(): return Vector3(spots[index])
+	var fallback: Dictionary=LoungeLayout.overflow_slot(index,tier,service.progress.lounge_items)
+	return Vector3(fallback.approach)
 
 func _route(home_world: Vector3,target_world: Vector3)->Array:
 	var home: Vector3=service.to_local(home_world)

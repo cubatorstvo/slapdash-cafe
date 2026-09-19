@@ -173,7 +173,10 @@ func show_station(station: Node3D) -> void:
 		summary_text.custom_minimum_size = Vector2(680, 90)
 		recipe_choice.item_selected.connect(func(_i): describe(station))
 		describe(station)
-		_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
+		if game.service.progress.stars>=1:
+			_button(training_box, "Обучение и группа", func(): open_training_group())
+		else:
+			_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
 	else:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()
@@ -239,6 +242,13 @@ func show_station(station: Node3D) -> void:
 	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func open_training_group() -> void:
+	var station_id:=selected_station
+	close()
+	game.office.open("groups")
+	game.office.select_group_stations([station_id])
+	game.office.course_editor_open()
 
 func describe(station: Node3D) -> void:
 	var dish: String = station.dishes()[recipe_choice.selected]

@@ -111,6 +111,84 @@ static func masterclass_training_step(p, station, dish: String, quality: bool, s
 	return step("assign_masterclass_"+dish,"Назначь запись столу: "+str(DISH_NAMES[dish]),detail,"computer",station.station_id)
 
 
+static func _post_star_intro_record(service, stations: Array) -> Dictionary:
+	if service==null: return {}
+	for record in service.masterclasses:
+		var source_type: String=str(record.get("source_type",""))
+		var dish: String=str(record.get("dish",""))
+		for station in stations:
+			if station.manual_station or station.masterclass_station: continue
+			if str(station.type_id)==source_type and dish in station.dishes(): return record
+	return {}
+
+static func _course_has_targets(course: Dictionary)->bool:
+	for assignment in course.get("assignments",[]):
+		if assignment is Dictionary and not assignment.get("station_ids",[]).is_empty(): return true
+	return false
+
+static func _first_course_target(service)->Dictionary:
+	if service==null or not is_instance_valid(service.training_queue): return {}
+	for course in service.training_queue.courses:
+		if not _course_has_targets(course): continue
+		for assignment in course.get("assignments",[]):
+			if not assignment is Dictionary: continue
+			var record_id: int=int(assignment.get("record_id",0))
+			var dish: String=str(assignment.get("dish",""))
+			for raw_id in assignment.get("station_ids",[]):
+				var station_id: int=int(raw_id)
+				var station=service.by_id(station_id)
+				if station==null: continue
+				return {"course_id":int(course.get("id",0)),"station_id":station_id,"record_id":record_id,"dish":dish,"state":str(course.get("state",""))}
+	return {}
+
+static func _course_target_learned(service, target: Dictionary)->bool:
+	if service==null or target.is_empty(): return false
+	var station=service.by_id(int(target.get("station_id",0)))
+	if station==null: return false
+	var dish: String=str(target.get("dish",""))
+	var record_id: int=int(target.get("record_id",0))
+	return station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id
+
+static func _post_star_training_intro(p, stations: Array, service) -> Dictionary:
+	if p.stars<1 or service==null: return {}
+	if service.masterclasses.is_empty():
+		return step("training_intro_masterclass","1/5 · Сними первый мастер-класс","Подойди к шеф-станции → E → МАСТЕР-КЛАСС. Приготовь блюдо и сохрани принятую запись в видеотеку.","station",1)
+	if "television" not in p.lounge_items:
+		var tv:=television_step(p)
+		tv.key="training_intro_tv"
+		tv.title="2/5 · "+str(tv.title)
+		return tv
+	var production: Array=[]
+	for station in stations:
+		if not station.manual_station and not station.masterclass_station: production.append(station)
+	if production.is_empty(): return {}
+	var record: Dictionary=_post_star_intro_record(service,stations)
+	if record.is_empty():
+		return step("training_intro_matching_masterclass","1/5 · Сними мастер-класс для производственного стола","Для установленной кухни пока нет совместимой записи. Подойди к шеф-станции и сохрани мастер-класс блюда этого типа.","station",1)
+	var target: Dictionary=_first_course_target(service)
+	if target.is_empty():
+		var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0)))
+		var station_id: int=int(compatible[0]) if not compatible.is_empty() else int(production[0].station_id)
+		return step("training_intro_course","3/5 · Составь первый курс","E у производственного стола → «Обучение и группа». Добавь запись «%s», выбери стол и поставь курс в очередь."%str(record.get("name","Запись")),"station",station_id)
+	if not _course_target_learned(service,target):
+		var station_id: int=int(target.get("station_id",0))
+		var status: String=service.training_queue.station_status(station_id,str(target.get("dish","")))
+		var suffix: String=" Сейчас: "+status+"." if not status.is_empty() else ""
+		return step("training_intro_wait","4/5 · Дождись окончания первого курса","Курс уже поставлен. Бригада закончит принятый заказ, дойдёт до телевизора, посмотрит фильм и вернётся к столу."+suffix,"television",station_id)
+	if p.journey_auto_served<1:
+		return step("training_intro_first_work","4/5 · Увидь обученную бригаду в работе","Открой кафе и дождись реального заказа этого стола. Постановка курса сама по себе не считается обучением: нужен завершённый фильм и фактическая работа бригады.","station",int(target.get("station_id",0)))
+	if not bool(p.training_intro_mass_seen):
+		var type_id: String=str(record.get("source_type",""))
+		var compatible_count:=0
+		var first_id:=0
+		for station in stations:
+			if station.manual_station or station.masterclass_station or str(station.type_id)!=type_id: continue
+			compatible_count+=1
+			if first_id==0: first_id=int(station.station_id)
+		if compatible_count>=2:
+			return step("training_intro_mass","5/5 · Попробуй массовое назначение","Открой «Обучение и группа» у совместимого стола. В редакторе доступны «Выбрать все совместимые столы» и два режима: «Вместе» или «По группам».","station",first_id)
+	return {}
+
 static func grow(p, stations: Array) -> Dictionary:
 	if not p.free_workers.is_empty() and stations.any(func(station):return not station.manual_station and crew_count(station)<station.role_count()):
 		return step("worker_return","Работник возвращается к назначению","Свободный клон займёт вакансию после завершения рекалибровки. Можно заняться другими делами.","laboratory")
@@ -171,6 +249,8 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 		if p.lab_stage<3: return buy(p,"lab_%d"%p.lab_stage,0,"Собери три детали лаборатории; после первой звезды здесь появятся твои работники.")
 		if p.manual_served<15: return step("practice","Подготовься к дегустации · %d/15 гостей"%p.manual_served,"Закрепи три блюда: дегустатор попросит каждое на B или лучше. Лаборатория уже собрана.","station",1)
 		return step("first_star","Пригласи дегустатора","Компьютер → Звёзды. Три стандартных блюда на B. Неудачное блюдо можно повторить бесплатно.")
+	var training_intro: Dictionary=_post_star_training_intro(p,stations,service)
+	if not training_intro.is_empty(): return training_intro
 	if p.journey_auto_served<1:
 		if worker_count(p,stations)==0: return grow(p,stations)
 		if counters.is_empty(): return buy(p,"counter",2,"Это пустой стол: работник займёт его, а оборудование и запись ты подготовишь сам.")
@@ -264,7 +344,7 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 
 static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	var result:=next_step(p,stations,served,opened,service)
-	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
+	result.chapter="НОВОЕ ОБУЧЕНИЕ · МАСТЕР-КЛАССЫ" if str(result.get("key","")).begins_with("training_intro_") else "ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
 	if p.busy():
 		var inspection_title: String
 		var inspection_detail: String
