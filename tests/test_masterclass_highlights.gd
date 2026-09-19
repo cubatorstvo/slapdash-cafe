@@ -42,7 +42,11 @@ func run()->void:
 		var pose: Dictionary=Highlights.camera_pose("kitchen",i)
 		check(pose.position.is_finite() and pose.target.is_finite(),"Camera preset is finite")
 		camera_positions.append(pose.position)
-	check(camera_positions.duplicate().dedup().size()==4,"All four highlight angles are distinct")
+	var distinct:=true
+	for i in range(camera_positions.size()):
+		for j in range(i+1,camera_positions.size()):
+			if camera_positions[i].is_equal_approx(camera_positions[j]): distinct=false
+	check(distinct,"All four highlight angles are distinct")
 
 	print("3/6: live masterclass creates audience and a moving comedy operator")
 	var game=Scene.instantiate()

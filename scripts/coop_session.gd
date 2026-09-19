@@ -3,6 +3,7 @@ extends Node
 const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
+const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
 const PROTOCOL := "slapdash-cafe-scale-29"
 var game: Node3D
 var transport := "offline"
@@ -168,7 +169,7 @@ func _roster(value: Dictionary) -> void: members = value
 func _send_movie_record(peer: int) -> void:
 	var record: Dictionary=game.service.movie_record()
 	if record.is_empty(): return
-	var payload: Dictionary=game.service.Masterclasses.movie_payload(record)
+	var payload: Dictionary=MasterclassLibrary.movie_payload(record)
 	var packet:=var_to_bytes(payload).compress(FileAccess.COMPRESSION_DEFLATE)
 	if peer==1:
 		game.service.remote_movie_record=payload

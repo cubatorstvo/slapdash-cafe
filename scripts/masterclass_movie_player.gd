@@ -78,7 +78,7 @@ func _camera(index: int)->void:
 func sync(state: Dictionary,value: Dictionary)->void:
 	var playing: bool=bool(state.get("playing",false))
 	var id: int=int(state.get("id",0))
-	if not playing or id<=0 or value.is_empty() or int(value.get("id",0))!=id:
+	if not playing or id<=0 or value.is_empty() or int(value.get("id",0))!=id or not value.get("tracks",[]) is Array or value.get("tracks",[]).is_empty():
 		if active:
 			active=false
 			screen.material_override=idle_material

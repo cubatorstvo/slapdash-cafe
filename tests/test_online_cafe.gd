@@ -1,6 +1,7 @@
 extends SceneTree
 const Scene = preload("res://scenes/cafe.tscn")
 const Barrier = preload("res://tests/online_barrier.gd")
+const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
 var game
 var barrier: Node
 var role := "host"
@@ -35,6 +36,18 @@ func setup() -> void:
 		game.service.progress.free_workers[0].tempo=0.85
 		game.service.progress.lab_upgrades=["lab_valve"]
 		game.service.by_id(1).crew[0].tempo=1.25
+		game.service.progress.lounge_items=["sofa","television"]
+		var movie_source=game.service.by_id(4)
+		movie_source.model.reset("meal")
+		var movie_tracks: Array=[]
+		for movie_role in range(2):
+			var frame: Dictionary=movie_source.model.zone_snapshot(movie_role)
+			var frames: Array=[]
+			for i in range(900): frames.append(frame.duplicate(true))
+			movie_tracks.append({"group":movie_role+1,"frames":frames})
+		game.service.masterclasses=[MasterclassLibrary.make_record(501,"meal","kitchen",movie_tracks,15.0,movie_source.model.quality(),"Сетевые хайлайты")]
+		game.service.next_masterclass_id=502
+		game.annex.refresh_shell()
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
 	game.session.add_child(barrier)
@@ -69,6 +82,8 @@ func expected_stage() -> String:
 	if role == "host":
 		return ["wait-guest", "parallel-recording", "start-kitchen", "shared-zones", "observer-ack", "await-idle-after-release", "quit"][clampi(stage, 0, 6)]
 	if role == "guest":
+		if stage==20: return "move-to-tv"
+		if stage==21: return "shared-highlights"
 		return ["host-wine", "open-potato", "potato-ready", "book-and-roster", "kitchen-role", "host-release-then-leave", "local-restore"][clampi(stage, 0, 6)] if stage < 30 else ("guest-bell" if stage == 30 else "guest-resume")
 	return ["count-stations", "kitchen-recording", "wait-release", "wait-idle"][clampi(stage, 0, 3)]
 func timeout_message() -> String:
@@ -168,6 +183,16 @@ func guest_tick() -> void:
 		if game.service.progress.deliveries.size()!=1 or game.service.progress.deliveries[0].get("items",[])!=["sauce_ramp"] or game.service.progress.free_clones!=2: fail("Bundle or free clones missing"); return
 		if game.service.progress.free_workers[0].tempo!=0.85 or first.crew[0].tempo!=1.25 or "lab_valve" not in game.service.progress.lab_upgrades: fail("Individual tempo or lab upgrades missing"); return
 		print("CHECK: individual tempo, laboratory upgrades, consumed cup and deliveries replicated")
+		game.player.global_position=Vector3(6.5,0.02,13.2)
+		stage=20
+		quit_at=timer+0.45
+	elif stage==20 and timer>quit_at:
+		act("masterclass_watch",0,{"id":501})
+		stage=21
+	elif stage==21 and bool(game.service.movie_state.get("playing",false)) and not game.service.remote_movie_record.is_empty():
+		if first.training.phase!="recording": fail("Shared TV playback interrupted host lesson"); return
+		if game.service.remote_movie_record.get("tracks",[]).is_empty(): fail("Guest did not receive highlight frames"); return
+		print("CHECK: guest watches shared highlights while host lesson keeps running")
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
 		stage = 1
 		quit_at = timer + 0.3
