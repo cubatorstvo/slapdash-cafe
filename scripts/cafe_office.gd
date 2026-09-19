@@ -17,6 +17,8 @@ var stamp := ""
 var selections := {}
 var confirm_reset := false
 var confirm_delete_masterclass := -1
+var group_selected_stations: Array=[]
+var group_pending_assignment: Dictionary={}
 var lab_branch := "formula"
 var lab_target := 2
 var lab_reserve := 150
@@ -47,7 +49,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["videos", "Видеотека"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
+	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["videos", "Видеотека"], ["groups", "Группы столов"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -89,6 +91,8 @@ func open(page := "overview") -> void:
 	game.session.suspend_input()
 	confirm_reset = false
 	confirm_delete_masterclass = -1
+	group_pending_assignment={}
+	group_selected_stations=[]
 	panel.show()
 	stamp = ""
 	rebuild()
@@ -102,6 +106,26 @@ func send(action: Dictionary, dismiss := false) -> void:
 	if dismiss: close()
 	game.session.request_action(action)
 	stamp = ""
+
+func set_group_station_selected(id: int,on: bool) -> void:
+	if on and id not in group_selected_stations: group_selected_stations.append(id)
+	elif not on: group_selected_stations.erase(id)
+	group_selected_stations.sort()
+	group_pending_assignment={}
+	stamp=""
+	rebuild()
+
+func select_group_stations(ids: Array) -> void:
+	group_selected_stations=ids.duplicate()
+	group_selected_stations.sort()
+	group_pending_assignment={}
+	stamp=""
+	rebuild()
+
+func stage_group_assignment(record_id: int) -> void:
+	group_pending_assignment={"record":record_id,"stations":group_selected_stations.duplicate()}
+	stamp=""
+	rebuild()
 
 func _process(_delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
@@ -199,6 +223,67 @@ func rebuild() -> void:
 					button(row,"Отмена",func():confirm_delete_masterclass=-1;stamp="";rebuild(),host)
 				else:
 					button(row,"Удалить…",func():confirm_delete_masterclass=id;stamp="";rebuild(),host)
+		"groups":
+			label(content,"ГРУППЫ ПРОИЗВОДСТВЕННЫХ СТОЛОВ",23)
+			label(content,"Группа объединяет совместимые столы с одинаковыми назначениями. Выбери один стол, несколько или все совместимые; новый способ меняет только выбранное блюдо, остальные назначения сохраняются.",15)
+			if is_instance_valid(service.staff_training) and service.staff_training.is_active():
+				var training_record:=service.masterclass_by_id(service.staff_training.record_id)
+				var training_name: String=str(training_record.get("name",service.staff_training.record.get("name","Запись")))
+				label(content,"УЧЕБНЫЙ СЕАНС · %s · %s · столы %s"%[training_name,service.staff_training.phase_label(),", ".join(service.staff_training.station_ids.map(func(id):return str(id)))],17)
+			for group in service.table_groups():
+				label(content,str(group.name),21)
+				var station_parts: Array=[]
+				for raw_id in group.stations:
+					var station_id: int=int(raw_id)
+					var station=service.by_id(station_id)
+					var worker_text: String="%d/%d работников"%[station.staffed if station.staffed>=0 else station.role_count(),station.role_count()]
+					station_parts.append("стол %d · %s"%[station_id,worker_text])
+				label(content,", ".join(station_parts),15)
+				var rename_row:=HBoxContainer.new(); content.add_child(rename_row)
+				var group_edit:=LineEdit.new(); rename_row.add_child(group_edit); group_edit.text=str(group.name); group_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL; group_edit.editable=host
+				var group_id: String=str(group.id)
+				button(rename_row,"Переименовать",func():send({"action":"group_rename","group":group_id,"name":group_edit.text}),host)
+				button(content,"Выбрать всю группу",func():select_group_stations(group.stations),host)
+				for raw_id in group.stations:
+					var station_id: int=int(raw_id)
+					var check:=CheckBox.new(); content.add_child(check)
+					check.text="Стол %d"%station_id
+					check.button_pressed=station_id in group_selected_stations
+					check.disabled=not host
+					check.toggled.connect(func(on):set_group_station_selected(station_id,on))
+				label(content,"Блюдо → запись → готовность столов",16)
+				for dish in group.dishes:
+					var first_id: int=int(group.stations[0])
+					var readiness: Array=[]
+					for raw_id in group.stations:
+						var station_id: int=int(raw_id)
+						readiness.append("%d: %s"%[station_id,service.station_group_status(station_id,str(dish))])
+					label(content,"%s → %s → %s"%[Definition.DISHES.get(str(dish),str(dish)),service.source_label(first_id,str(dish)),"; ".join(readiness)],15)
+			if group_selected_stations.is_empty():
+				label(content,"Выбери столы галочками или кнопкой группы. Для записи можно сразу выбрать все совместимые столы.",16)
+			else:
+				label(content,"Выбраны столы: "+", ".join(group_selected_stations.map(func(id):return str(id))),18)
+			label(content,"ЗАПИСИ ДЛЯ ОБУЧЕНИЯ",20)
+			if service.masterclasses.is_empty(): label(content,"В видеотеке пока нет записей.")
+			for record in service.masterclasses:
+				var record_id: int=int(record.get("id",0))
+				var compatible: Array=service.compatible_training_station_ids(record_id)
+				if compatible.is_empty(): continue
+				var chosen_error: String=service.training_selection_error(record_id,group_selected_stations) if not group_selected_stations.is_empty() else "Выбери столы."
+				var row:=HBoxContainer.new(); content.add_child(row)
+				label(row,"%s · %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),str(record.get("name","Запись"))],15).size_flags_horizontal=Control.SIZE_EXPAND_FILL
+				button(row,"Все совместимые",func():select_group_stations(compatible),host)
+				button(row,"Назначить выбранным",func():stage_group_assignment(record_id),host and chosen_error.is_empty())
+				if not group_selected_stations.is_empty() and not chosen_error.is_empty() and group_selected_stations.all(func(id):return id in compatible): label(content,chosen_error,13)
+			if not group_pending_assignment.is_empty():
+				var pending_id: int=int(group_pending_assignment.record)
+				var pending_record:=service.masterclass_by_id(pending_id)
+				label(content,"ПРЕДПРОСМОТР · после подтверждения",20)
+				for projected in service.preview_table_groups(pending_id,group_pending_assignment.stations):
+					label(content,"%s · столы %s"%[projected.name,", ".join(projected.stations.map(func(id):return str(id)))],15)
+				var pending_error: String=service.training_selection_error(pending_id,group_pending_assignment.stations)
+				if not pending_error.is_empty(): label(content,pending_error,15)
+				button(content,"Подтвердить обучение · %s"%str(pending_record.get("name","Запись")),func():var payload:=group_pending_assignment.duplicate(true);group_pending_assignment={};send({"action":"group_train","record":int(payload.record),"stations":payload.stations}),host and pending_error.is_empty())
 		"laboratory":
 			laboratory_page()
 		"lounge":
