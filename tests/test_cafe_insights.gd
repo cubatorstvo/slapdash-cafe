@@ -158,6 +158,8 @@ func run()->void:
 
 	print("7/10: statistics and group UI render the same drill-down data")
 	service.feed_system("batch",{"stations":[2,3]},2)
+	game.refresh_hud()
+	check(game.hud.event_feed_panel.visible and "СИСТЕМА:" in game.hud.event_feed_text.text,"Recent system events are visible in the in-game HUD feed")
 	game.office.open("stats")
 	var rendered: String=tree_text(game.office.content)
 	check("ЛЕНТА И СТАТИСТИКА" in rendered and "[СИСТЕМА]" in rendered,"Statistics tab renders system feed")
