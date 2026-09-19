@@ -7,6 +7,7 @@ const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
+const TableGroupRegistry = preload("res://scripts/table_group_registry.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
@@ -42,7 +43,9 @@ var masterclass_live_scene: Node3D
 var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
 var remote_movie_record: Dictionary={}
 var staff_training: Node3D
-var table_group_names: Dictionary={}
+var table_group_names: Dictionary={} # v19 migration only
+var group_registry=TableGroupRegistry.new()
+var suppress_group_autocreate:=false
 
 func blank_order_stats() -> Dictionary:
 	return {"orders_arrived":0,"orders_completed":0,"orders_partial":0,"orders_failed":0,"portions_ordered":0,"portions_served":0,"portions_unserved":0}
@@ -75,6 +78,9 @@ func add_station(type_id: String, slot_index: int, manual := false, bare := fals
 	station.rotation.y = PI
 	add_child(station)
 	stations.append(station)
+	if not manual and not suppress_group_autocreate:
+		group_registry.ensure_station(station,Definition.TYPES)
+		_sync_station_group_intent(station)
 	assign_clones()
 	return station
 
@@ -309,50 +315,160 @@ func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Di
 	if station.recipes.has(dish): return {"id":0,"name":"Локальный способ","legacy":true}
 	return {}
 
-func _group_signature(station: Node3D,overrides: Dictionary={}) -> String:
-	var parts: Array=[station.type_id]
-	for dish in station.dishes():
-		var source: Dictionary=_method_source(station,str(dish),overrides)
-		var token: String="none"
-		if not source.is_empty(): token="legacy" if bool(source.get("legacy",false)) else str(int(source.get("id",0)))
-		parts.append(str(dish)+"="+token)
-	return "|".join(parts)
+func _sync_station_group_intent(station: Node3D) -> void:
+	if station==null or station.manual_station or station.masterclass_station: return
+	var group: Dictionary=group_registry.for_station(station.station_id)
+	if group.is_empty(): return
+	station.active_dishes=group.get("active_dishes",[]).duplicate()
+	station.active_menu_initialized=true
+	var desired: Dictionary={}
+	for item in group.get("curriculum",[]):
+		var dish:=str(item.get("dish_id",""))
+		var record_id:=int(item.get("record_id",0))
+		if dish.is_empty() or record_id<=0: continue
+		var record:=masterclass_by_id(record_id)
+		var previous: Dictionary=station.method_plan.get(dish,{})
+		desired[dish]={"id":record_id,"name":str(record.get("name",previous.get("name","Запись #%d"%record_id))),"group":str(group.id),"revision":int(item.get("revision",1))}
+	station.method_plan=desired
 
-func _derive_table_groups(overrides: Dictionary={}) -> Array:
-	var buckets: Dictionary={}
+func _sync_group_intent(group_id: String) -> void:
+	var group: Dictionary=group_registry.by_id(group_id)
+	if group.is_empty(): return
+	for raw_id in group.station_ids: _sync_station_group_intent(by_id(int(raw_id)))
+
+func _sync_all_group_intent() -> void:
+	for group in group_registry.all(): _sync_group_intent(str(group.id))
+
+func _ensure_groups() -> void:
 	for station in stations:
 		if station.manual_station or station.masterclass_station: continue
-		var signature: String=_group_signature(station,overrides)
-		if not buckets.has(signature): buckets[signature]=[]
-		buckets[signature].append(station.station_id)
-	var result: Array=[]
-	for signature in buckets:
-		var ids: Array=buckets[signature]
-		ids.sort()
-		var id_parts: Array=[]
-		for id in ids: id_parts.append(str(id))
-		var group_id: String="-".join(id_parts)
-		var first:=by_id(int(ids[0]))
-		var auto_name: String="%s · столы %s"%[Definition.TYPES[first.type_id].title,", ".join(id_parts)]
-		result.append({"id":group_id,"name":str(table_group_names.get(group_id,auto_name)),"type":first.type_id,"stations":ids,"dishes":first.dishes().duplicate()})
-	result.sort_custom(func(a,b): return int(a.stations[0])<int(b.stations[0]))
-	return result
+		if group_registry.group_id_for_station(station.station_id).is_empty():
+			group_registry.ensure_station(station,Definition.TYPES)
+			_sync_station_group_intent(station)
+
+func _public_group(group: Dictionary) -> Dictionary:
+	if group.is_empty(): return {}
+	return {"id":str(group.id),"name":str(group.name),"type":str(group.type_id),"type_id":str(group.type_id),"stations":group.station_ids.duplicate(),"station_ids":group.station_ids.duplicate(),"dishes":Definition.TYPES[str(group.type_id)].dishes.duplicate(),"active_dishes":group.active_dishes.duplicate(),"curriculum":group.curriculum.duplicate(true),"plan_revision":int(group.plan_revision)}
 
 func table_groups() -> Array:
-	return _derive_table_groups()
+	_ensure_groups()
+	var result: Array=[]
+	for group in group_registry.all(): result.append(_public_group(group))
+	return result
 
 func table_group_by_id(group_id: String) -> Dictionary:
-	for group in table_groups():
-		if str(group.id)==group_id: return group
-	return {}
+	_ensure_groups()
+	return _public_group(group_registry.by_id(group_id))
+
+func group_for_station(station_id: int) -> Dictionary:
+	_ensure_groups()
+	return _public_group(group_registry.for_station(station_id))
+
+func group_id_for_station(station_id: int) -> String:
+	_ensure_groups()
+	return group_registry.group_id_for_station(station_id)
 
 func rename_table_group(group_id: String,value: String) -> String:
-	if table_group_by_id(group_id).is_empty(): return "Группа уже изменилась. Обнови список."
-	var name:=value.strip_edges().left(48)
-	if name.is_empty(): return "Название группы не может быть пустым."
-	table_group_names[group_id]=name
+	_ensure_groups()
+	var error:=group_registry.rename(group_id,value)
+	if error.is_empty(): progress.revision+=1
+	return error
+
+func _compatible_group_selection(ids: Array) -> Dictionary:
+	var unique: Array=[]
+	var type_id: String=""
+	for raw in ids:
+		var station:=by_id(int(raw))
+		if station==null or station.manual_station or station.masterclass_station: return {"error":"Выбери производственные столы."}
+		if type_id.is_empty(): type_id=station.type_id
+		elif station.type_id!=type_id: return {"error":"В одной группе могут быть только столы одной кухни."}
+		if station.station_id not in unique: unique.append(station.station_id)
+	unique.sort()
+	return {"error":"","type_id":type_id,"stations":unique}
+
+func create_table_group(ids: Array,name := "") -> String:
+	_ensure_groups()
+	var checked:=_compatible_group_selection(ids)
+	if not str(checked.error).is_empty(): return str(checked.error)
+	if checked.stations.is_empty(): return "Выбери хотя бы один стол."
+	var first_group: Dictionary=group_registry.for_station(int(checked.stations[0]))
+	var title:=name.strip_edges().left(48)
+	if title.is_empty(): title="%s · группа"%Definition.TYPES[str(checked.type_id)].title
+	var created:=group_registry.create_group(checked.stations,str(checked.type_id),title,first_group)
+	if created.is_empty(): return "Не удалось создать группу."
+	_ensure_groups()
+	_sync_all_group_intent()
 	progress.revision+=1
 	return ""
+
+func split_table_group(group_id: String,ids: Array) -> String:
+	_ensure_groups()
+	var source:=group_registry.by_id(group_id)
+	if source.is_empty(): return "Группа не найдена."
+	var created:=group_registry.split(group_id,ids)
+	if created.is_empty(): return "Для разделения выбери часть столов группы."
+	_sync_group_intent(group_id)
+	_sync_group_intent(str(created.id))
+	progress.revision+=1
+	return ""
+
+func set_table_group_members(group_id: String,ids: Array) -> String:
+	_ensure_groups()
+	var source:=group_registry.by_id(group_id)
+	if source.is_empty(): return "Группа не найдена."
+	var checked:=_compatible_group_selection(ids)
+	if not str(checked.error).is_empty(): return str(checked.error)
+	if str(checked.type_id)!=str(source.type_id): return "Новая группа должна состоять из столов той же кухни."
+	var error:=group_registry.set_members(group_id,checked.stations,str(source.type_id))
+	if not error.is_empty(): return error
+	_ensure_groups()
+	_sync_all_group_intent()
+	progress.revision+=1
+	return ""
+
+func preview_group_merge(group_ids: Array) -> Dictionary:
+	_ensure_groups()
+	return group_registry.preview_merge(group_ids)
+
+func merge_table_groups(group_ids: Array,record_choices: Dictionary={},active_dishes: Array=[]) -> String:
+	_ensure_groups()
+	var preview:=group_registry.preview_merge(group_ids)
+	if preview.is_empty(): return "Выбери минимум две группы одной кухни."
+	var target:=group_registry.merge(group_ids,record_choices,active_dishes)
+	if target.is_empty(): return "Не удалось объединить группы."
+	_sync_group_intent(str(target.id))
+	progress.revision+=1
+	return ""
+
+func set_group_dish_active(group_id: String,dish: String,enabled: bool) -> String:
+	_ensure_groups()
+	var group:=group_registry.by_id(group_id)
+	if group.is_empty(): return "Группа не найдена."
+	if dish not in Definition.TYPES[str(group.type_id)].dishes: return "Блюдо не относится к этой кухне."
+	var error:=group_registry.set_active_dish(group_id,dish,enabled)
+	if error.is_empty():
+		_sync_group_intent(group_id)
+		progress.revision+=1
+	return error
+
+func _apply_group_plan(record_id: int,ids: Array) -> Array:
+	_ensure_groups()
+	var record:=masterclass_by_id(record_id)
+	if record.is_empty(): return []
+	var affected:=group_registry.apply_plan_to_selection(ids,str(record.dish),record_id)
+	for group_id in affected: _sync_group_intent(str(group_id))
+	return affected
+
+func preview_table_groups(record_id: int,ids: Array) -> Array:
+	_ensure_groups()
+	var record:=masterclass_by_id(record_id)
+	if record.is_empty(): return table_groups()
+	var temp=TableGroupRegistry.new()
+	if not temp.restore(group_registry.snapshot(),Definition.TYPES): return table_groups()
+	temp.apply_plan_to_selection(ids,str(record.dish),record_id)
+	var result: Array=[]
+	for group in temp.all(): result.append(_public_group(group))
+	return result
 
 func source_label(station_id: int,dish: String) -> String:
 	var station:=by_id(station_id)
@@ -418,6 +534,8 @@ func preview_table_groups(record_id: int,ids: Array) -> Array:
 func start_group_training(record_id: int,ids: Array,peer := 1) -> String:
 	var error:=training_selection_error(record_id,ids)
 	if not error.is_empty(): return error
+	var affected_groups:=_apply_group_plan(record_id,ids)
+	if affected_groups.is_empty(): return "Не удалось обновить учебный план группы."
 	var unique: Array=[]
 	for raw_id in ids:
 		var id: int=int(raw_id)
