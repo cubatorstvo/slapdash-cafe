@@ -150,7 +150,8 @@ func run()->void:
 	var station=add_counter(service,1)
 	var old_potato=record_for(station,2301,"potato","UI · версия A")
 	var new_potato=record_for(station,2302,"potato","UI · версия B")
-	service.masterclasses=[old_potato,new_potato]
+	var extra_sausage=record_for(station,2303,"sausage","UI · дополнительный урок")
+	service.masterclasses=[old_potato,new_potato,extra_sausage]
 	service.progress.lounge_items.erase("television")
 	game.office.open("groups")
 	game.office.select_group_stations([2])
@@ -166,9 +167,38 @@ func run()->void:
 	check(press(game.office,"Редактировать ожидающий курс"),"UI T13 edit button opens the queued course")
 	game.office.course_editor_add_record(2302)
 	check(game.office.course_editor.records==[2302],"UI T13 second version replaces the same-dish draft row")
+	game.office.course_editor_add_record(2303)
+	game.office.course_editor_move_record(1,-1)
+	check(game.office.course_editor.records==[2303,2302],"UI T13 queued-course editor can change composition and lesson order")
 	check(press(game.office,"Сохранить изменения курса"),"UI T13 saves queued-course replacement")
 	await process_frame
+	var edited_view: Dictionary=service.training_queue.course_view(course_id)
+	check(edited_view.assignments.size()==2 and int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 edited course persists the new lesson order")
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2302,"UI T13 queue now points to the new record version")
+	dispose(game)
+
+	print("UI T13 active: a new UI assignment waits behind the old frozen film")
+	game=await make_game()
+	service=game.service
+	station=add_counter(service,1)
+	old_potato=record_for(station,2311,"potato","UI · активная A")
+	new_potato=record_for(station,2312,"potato","UI · активная B")
+	service.masterclasses=[old_potato,new_potato]
+	game.office.open("groups")
+	game.office.select_group_stations([2])
+	check(press(game.office,"Составить курс из выбранных столов"),"UI T13 active opens first editor")
+	game.office.course_editor_add_record(2311)
+	check(press(game.office,"Поставить курс в очередь"),"UI T13 active queues old film")
+	await process_frame
+	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==2311),"UI T13 active old film starts")
+	game.office.course_editor_open(2312)
+	game.office.course_editor_select_group(service.group_id_for_station(2),true)
+	check(press(game.office,"Поставить курс в очередь"),"UI T13 active queues the newer version while old film is running")
+	await process_frame
+	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2312,"UI T13 active exposes the newer pending version")
+	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2311 and not service.staff_training.is_active(),60.0),"UI T13 active old film commits old knowledge first")
+	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2312,"UI T13 active still requires the newer version after old film completion")
+	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2312,90.0),"UI T13 active eventually retrains through the UI-created follow-up course")
 	dispose(game)
 
 	print("UI T12: cancel an active course and resume its suspended plan from the queue page")
