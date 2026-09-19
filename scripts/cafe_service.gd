@@ -1395,7 +1395,7 @@ func load_data(data: Dictionary) -> bool:
 		if not entry.get("recipes") is Dictionary or not entry.get("drafts") is Dictionary or not entry.get("upgrades") is Array: return false
 		if version>=16 and not entry.get("method_sources",{}) is Dictionary: return false
 		if version>=17 and not entry.get("method_plan",{}) is Dictionary: return false
-		if version>=20 and (not entry.get("active_dishes",[]) is Array or not entry.get("active_menu_initialized",false) is bool): return false
+		if version>=20 and (not entry.get("active_dishes",[]) is Array or typeof(entry.get("active_menu_initialized",false))!=TYPE_BOOL): return false
 		for collection in [entry.recipes, entry.drafts]:
 			for dish in collection:
 				if not dish in Definition.TYPES[entry.type].dishes: return false

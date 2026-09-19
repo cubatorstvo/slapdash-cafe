@@ -94,7 +94,7 @@ func run()->void:
 	check(not four.is_empty(),"Four-table group exists")
 	var four_id: String=str(four.id)
 	check(service._apply_group_plan(800,[2,3,4,5]).size()==1 and service._apply_group_plan(900,[2,3,4,5]).size()==1,"Four-table group has two desired dishes")
-	var preview:=service.preview_table_groups(901,[2])
+	var preview: Array=service.preview_table_groups(901,[2])
 	var preview_source: Dictionary={}
 	var preview_new: Dictionary={}
 	for group in preview:
@@ -102,11 +102,11 @@ func run()->void:
 		elif group.stations==[2]: preview_new=group
 	check(preview_source.stations==[3,4,5] and preview_source.name=="Общая линия","Preview keeps source ID/name and three untouched tables")
 	check(not preview_new.is_empty() and preview_new.name=="Общая линия · 2","Preview proposes a distinct inherited subgroup for the one changed table")
-	var preview_wine:=preview_new.curriculum.filter(func(item):return str(item.dish_id)=="wine")
+	var preview_wine: Array=preview_new.curriculum.filter(func(item):return str(item.dish_id)=="wine")
 	check(preview_wine.size()==1 and int(preview_wine[0].record_id)==800,"Preview subgroup inherits other dish assignment")
 	check(service._apply_group_plan(901,[2]).size()==1,"Partial plan change applies")
-	var source_after:=service.table_group_by_id(four_id)
-	var split_after:=group_with(service,[2])
+	var source_after: Dictionary=service.table_group_by_id(four_id)
+	var split_after: Dictionary=group_with(service,[2])
 	check(source_after.stations==[3,4,5] and source_after.name=="Общая линия","Source group keeps its permanent identity after split")
 	check(not split_after.is_empty() and split_after.id!=four_id,"Selected table receives a new permanent group ID")
 	check(int(service.desired_source(split_after.id,"wine").id)==800 and int(service.desired_source(split_after.id,"potato").id)==901,"New group inherits wine and changes only potato")
@@ -114,10 +114,10 @@ func run()->void:
 	check(service.station_group_status(2,"potato").contains("старому"),"Card distinguishes existing method from desired retraining")
 
 	print("T03: merging different plans resolves conflicts without replacing actual knowledge early")
-	var merge_preview:=service.preview_group_merge([four_id,str(split_after.id)])
+	var merge_preview: Dictionary=service.preview_group_merge([four_id,str(split_after.id)])
 	check(not merge_preview.is_empty() and merge_preview.differences.has("potato"),"Merge preview exposes differing potato assignments")
 	check(service.merge_table_groups([four_id,str(split_after.id)],{"wine":800,"potato":901},["wine","potato"]).is_empty(),"Player-selected final assignments merge the groups")
-	var merged:=service.table_group_by_id(four_id)
+	var merged: Dictionary=service.table_group_by_id(four_id)
 	check(merged.stations==[2,3,4,5] and merged.name=="Общая линия","First selected group keeps permanent ID/name after merge")
 	check(service.table_group_by_id(str(split_after.id)).is_empty(),"Merged organizational record is removed")
 	check(int(service.desired_source(four_id,"potato").id)==901,"Merged group uses the chosen desired potato record")
@@ -156,12 +156,12 @@ func run()->void:
 	legacy.table_group_names={"2-3-4-5":"Старая линия игрока"}
 	# Make the four migrated counters identical by actual learned sources, as v19 grouping did.
 	check(service.load_data(legacy),"v19 developed cafe migrates")
-	var migrated:=service.table_group_by_id("2-3-4-5")
+	var migrated: Dictionary=service.table_group_by_id("2-3-4-5")
 	check(not migrated.is_empty() and migrated.name=="Старая линия игрока","Migration preserves old displayed group ID and custom name")
 	check(int(service.desired_source("2-3-4-5","potato").id)==901,"Legacy method_plan becomes explicit desired curriculum")
 	check(service.by_id(2).recipes.has("potato") and int(service.by_id(2).method_sources.potato.id)==900,"Migration preserves actual learned recipe and source separately")
 	check(service.by_id(2).active_menu_initialized and "potato" in service.by_id(2).active_dishes,"Migration initializes explicit active menu from prior working behavior")
-	var migrated_save:=service.save_data()
+	var migrated_save: Dictionary=service.save_data()
 	check(migrated_save.version==20 and migrated_save.table_group_registry.groups.has("2-3-4-5"),"Migrated cafe subsequently saves only the persistent v20 group identity")
 
 	game._shutdown_tree(game)
