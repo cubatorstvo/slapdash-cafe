@@ -326,7 +326,7 @@ func refresh(local_peer: int, delta: float) -> void:
 				else:
 					for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
 	if not manual_station and not group_training_state.is_empty():
-		var training_text: String={"assigned":"НАЗНАЧЕНО ОБУЧЕНИЕ","gathering":"ЗАКАНЧИВАЕТ И СОБИРАЕТСЯ","walking":"ИДЁТ К ТЕЛЕВИЗОРУ","watching":"СМОТРИТ ХАЙЛАЙТЫ","returning":"ВОЗВРАЩАЕТСЯ"}.get(group_training_state,"ОБУЧЕНИЕ")
+		var training_text: String={"draining":"ЗАКАНЧИВАЕТ ПРИНЯТЫЙ ЗАКАЗ","assigned":"НАЗНАЧЕНО ОБУЧЕНИЕ","gathering":"ЗАКАНЧИВАЕТ И СОБИРАЕТСЯ","walking":"ИДЁТ К ТЕЛЕВИЗОРУ","watching":"СМОТРИТ ХАЙЛАЙТЫ","returning":"ВОЗВРАЩАЕТСЯ"}.get(group_training_state,"ОБУЧЕНИЕ")
 		view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,training_text]
 		if state!="cooking":
 			for student in students: student.hide()

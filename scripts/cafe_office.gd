@@ -21,6 +21,7 @@ var confirm_reset := false
 var confirm_delete_masterclass := -1
 var group_selected_stations: Array=[]
 var group_pending_assignment: Dictionary={}
+var group_command_serial:=1
 var group_selected_groups: Array=[]
 var group_merge_choices: Dictionary={}
 var group_merge_active: Array=[]
@@ -147,7 +148,9 @@ func select_group_stations(ids: Array) -> void:
 	rebuild()
 
 func stage_group_assignment(record_id: int) -> void:
-	group_pending_assignment={"record":record_id,"stations":group_selected_stations.duplicate()}
+	var command: String="office:%d:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),group_command_serial,record_id]
+	group_command_serial+=1
+	group_pending_assignment={"record":record_id,"stations":group_selected_stations.duplicate(),"command":command}
 	stamp=""
 	rebuild()
 
@@ -467,7 +470,7 @@ func rebuild() -> void:
 					label(content,"%s · ID %s · столы %s"%[projected.name,projected.id,", ".join(projected.stations.map(func(id):return str(id)))],15)
 				var pending_error: String=service.training_selection_error(pending_id,group_pending_assignment.stations)
 				if not pending_error.is_empty(): label(content,pending_error,15)
-				button(content,"Подтвердить план и обучение · %s"%str(pending_record.get("name","Запись")),func():var payload:=group_pending_assignment.duplicate(true);group_pending_assignment={};send({"action":"group_train","record":int(payload.record),"stations":payload.stations}),host and pending_error.is_empty())
+				button(content,"Подтвердить план и обучение · %s"%str(pending_record.get("name","Запись")),func():var payload:=group_pending_assignment.duplicate(true);group_pending_assignment={};send({"action":"group_train","record":int(payload.record),"stations":payload.stations,"command":str(payload.command)}),host and pending_error.is_empty())
 		"laboratory":
 			laboratory_page()
 		"lounge":

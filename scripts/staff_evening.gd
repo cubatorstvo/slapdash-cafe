@@ -25,7 +25,10 @@ func workers() -> Array:
 			var id:=int(member.get("clone_id",0))
 			if id<=0: continue
 			var home: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
-			result.append({"id":id,"name":str(member.name),"home":home,"station":station,"from_lab":false})
+			var handoff: Dictionary=game.service.training_queue.handoff_for_clone(id) if is_instance_valid(game.service.training_queue) else {}
+			var from_training:=not handoff.is_empty()
+			if from_training: home=handoff.position
+			result.append({"id":id,"name":str(member.name),"home":home,"station":station,"from_lab":false,"from_training":from_training})
 	result.sort_custom(func(a,b): return int(a.id)<int(b.id))
 	return result
 
@@ -71,6 +74,9 @@ func settle(actor: Node3D, spot: Dictionary, identity: int) -> void:
 func route_for(info: Dictionary, target: Vector3) -> Array:
 	var home: Vector3=info.home
 	var route: Array
+	if bool(info.get("from_training",false)) and home.x>Annex.REST_X_MIN and home.x<Annex.REST_X_MAX and home.z>Annex.CAFE_BACK_Z:
+		route=Lounge.path_between(home,target,game.service.progress.lounge_tier,game.service.progress.lounge_items)
+		return route
 	if bool(info.get("from_lab",false)):
 		route=[home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
 	else:

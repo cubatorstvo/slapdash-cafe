@@ -5,6 +5,7 @@ const Definition = preload("res://scripts/station_definition.gd")
 const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
+const TrainingQueueController = preload("res://scripts/training_queue_controller.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
 const TableGroupRegistry = preload("res://scripts/table_group_registry.gd")
@@ -43,6 +44,7 @@ var masterclass_live_scene: Node3D
 var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
 var remote_movie_record: Dictionary={}
 var staff_training: Node3D
+var training_queue: Node
 var table_group_names: Dictionary={} # v19 migration only
 var group_registry=TableGroupRegistry.new()
 var suppress_group_autocreate:=false
@@ -52,6 +54,9 @@ func blank_order_stats() -> Dictionary:
 
 func _ready() -> void:
 	rng.randomize()
+	training_queue=TrainingQueueController.new()
+	add_child(training_queue)
+	training_queue.setup(self)
 	staff_training=StaffTrainingSession.new()
 	add_child(staff_training)
 	staff_training.setup(self)
@@ -95,6 +100,7 @@ func training_for(peer: int) -> Node3D:
 	return null
 
 func any_training() -> bool:
+	if is_instance_valid(training_queue) and int(training_queue.active_batch_id)>0: return true
 	if is_instance_valid(staff_training) and staff_training.is_active(): return true
 	for station in stations:
 		if station.training.active() or station.pending_teacher > 0: return true
@@ -248,6 +254,8 @@ func rename_masterclass(id: int, value: String) -> String:
 	var name:=value.strip_edges().left(64)
 	if name.is_empty(): return "Название не может быть пустым."
 	record.name=name
+	if int(remote_movie_record.get("id",0))==id: remote_movie_record.name=name
+	if is_instance_valid(training_queue): training_queue.record_renamed(id,name)
 	progress.revision+=1
 	return ""
 
@@ -266,6 +274,7 @@ func masterclass_summaries() -> Array:
 
 func start_highlights(id: int, peer: int) -> String:
 	if is_instance_valid(staff_training) and staff_training.is_active(): return "Телевизор занят обучением сотрудников."
+	if is_instance_valid(training_queue) and training_queue.ready_for_tv(): return "Следующий сеанс — обучение сотрудников."
 	if "television" not in progress.lounge_items: return "Сначала установи телевизор в комнате отдыха."
 	var record:=masterclass_by_id(id)
 	if record.is_empty(): return "Запись не найдена."
@@ -307,6 +316,9 @@ func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Di
 	if is_instance_valid(staff_training):
 		var pending: Dictionary=staff_training.pending_source(station.station_id,dish)
 		if not pending.is_empty(): return pending
+	if is_instance_valid(training_queue):
+		var queued: Dictionary=training_queue.pending_source(station.station_id,dish)
+		if not queued.is_empty(): return queued
 	if station.method_sources.has(dish): return station.method_sources[dish].duplicate(true)
 	if station.method_plan.has(dish):
 		var planned: Dictionary=station.method_plan[dish].duplicate(true)
@@ -542,6 +554,9 @@ func station_group_status(station_id: int,dish: String) -> String:
 	var desired: Dictionary=group_registry.plan_record(group,dish) if not group.is_empty() else {}
 	var active: bool=station.dish_active(dish)
 	if is_instance_valid(staff_training) and staff_training.targets_station(station_id,dish): return staff_training.phase_label()
+	if is_instance_valid(training_queue):
+		var queue_state: String=training_queue.station_status(station_id,dish)
+		if not queue_state.is_empty(): return queue_state
 	var missing: Array=Definition.missing_equipment(dish,station.equipment)
 	if not missing.is_empty(): return "ждёт оснащение"
 	if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
@@ -589,10 +604,7 @@ func compatible_training_station_ids(record_id: int) -> Array:
 	return result
 
 func training_selection_error(record_id: int,ids: Array) -> String:
-	if not is_instance_valid(staff_training): return "Система обучения недоступна."
-	if staff_training.is_active(): return "Сначала заверши текущий учебный сеанс."
-	if bool(movie_state.get("playing",false)): return "Телевизор сейчас занят просмотром."
-	if "television" not in progress.lounge_items: return "Сначала установи телевизор в комнате отдыха."
+	if not is_instance_valid(training_queue): return "Система очереди обучения недоступна."
 	var record:=masterclass_by_id(record_id)
 	if record.is_empty(): return "Запись не найдена."
 	if ids.is_empty(): return "Выбери хотя бы один стол."
@@ -602,30 +614,35 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 		if id in seen: continue
 		seen.append(id)
 		var station:=by_id(id)
-		if station==null or station.manual_station or station.type_id!=str(record.source_type) or str(record.dish) not in station.dishes(): return "В выборе есть несовместимый стол."
-		if station.training.active() or station.pending_teacher>0: return "Станция %d занята другим обучением."%id
-		var missing: Array=Definition.missing_equipment(str(record.dish),station.equipment)
-		if not missing.is_empty(): return "Станция %d: требуется оборудование — %s."%[id,", ".join(missing)]
-		if station.staffed>=0 and station.staffed<station.role_count(): return "Станция %d: сначала заполни вакансии."%id
-		if not station.ready_crew(): return "Станция %d: сотрудник временно занят."%id
+		if station==null or station.manual_station or station.masterclass_station or station.type_id!=str(record.source_type) or str(record.dish) not in station.dishes(): return "В выборе есть несовместимый стол."
 	return ""
 
-func start_group_training(record_id: int,ids: Array,peer := 1) -> String:
+func queue_training_course(assignments: Array,mode := "together",command_id := "",peer := 1) -> Dictionary:
+	if not is_instance_valid(training_queue): return {"error":"Система очереди обучения недоступна.","course_id":0}
+	return training_queue.enqueue_course(assignments,str(mode),str(command_id),int(peer))
+
+func start_group_training(record_id: int,ids: Array,peer := 1,command_id := "") -> String:
 	var error:=training_selection_error(record_id,ids)
 	if not error.is_empty(): return error
-	var affected_groups:=_apply_group_plan(record_id,ids)
-	if affected_groups.is_empty(): return "Не удалось обновить учебный план группы."
 	var unique: Array=[]
 	for raw_id in ids:
 		var id: int=int(raw_id)
 		if id not in unique: unique.append(id)
 	unique.sort()
+	var result: Dictionary=queue_training_course([{"record_id":record_id,"station_ids":unique}],"together",command_id,peer)
+	if not str(result.get("error","")).is_empty(): return str(result.error)
 	var record:=masterclass_by_id(record_id)
-	staff_training.start(record,unique)
-	progress.revision+=1
-	trace("group_training_assigned",{"record":record_id,"dish":record.dish,"stations":unique})
-	feed_player(int(peer),"group_training",{"record":record_id,"dish":record.dish,"stations":unique},unique.size())
+	trace("group_training_assigned",{"course":int(result.get("course_id",0)),"record":record_id,"dish":record.dish,"stations":unique,"duplicate":bool(result.get("duplicate",false))})
 	return ""
+
+func cancel_training_course(course_id: int) -> String:
+	return training_queue.cancel_course(course_id) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
+
+func cancel_training_batch(batch_id: int) -> String:
+	return training_queue.cancel_batch(batch_id) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
+
+func cancel_training_lesson(lesson_id: int) -> String:
+	return training_queue.cancel_lesson(lesson_id) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
 
 func _archive_legacy_recipes() -> void:
 	for station in stations:
@@ -917,9 +934,12 @@ func advance(delta: float) -> void:
 	if bool(movie_state.get("playing",false)):
 		movie_state.elapsed=minf(float(movie_state.elapsed)+delta,float(movie_state.duration))
 		if float(movie_state.elapsed)>=float(movie_state.duration): movie_state.playing=false
+	# Shift closure is resolved before the queue may start another lesson. This makes
+	# the boundary between two films deterministic.
+	advance_shift(delta)
+	if is_instance_valid(training_queue): training_queue.advance(delta)
 	if is_instance_valid(staff_training): staff_training.advance(delta)
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
-	advance_shift(delta)
 	advance_event(delta)
 	Visits.advance(self,delta)
 	autosave_clock += delta
@@ -1379,10 +1399,11 @@ func save_data() -> Dictionary:
 		entry.active_dishes=entry.active_dishes.duplicate()
 		entries.append(entry)
 	_ensure_groups()
-	return {"format":"station-cafe","version":20,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot()}
+	return {"format":"station-cafe","version":21,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot(),"training_queue":training_queue.snapshot(),"staff_training":staff_training.snapshot(true),"movie":movie_state.duplicate(true),"remote_movie_record":remote_movie_record.duplicate(true)}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
+	if is_instance_valid(training_queue): training_queue.reset()
 	if is_instance_valid(chef_station_backup):
 		chef_station_backup.queue_free()
 		chef_station_backup=null
@@ -1410,12 +1431,13 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	if version>=18 and not data.get("order_stats",{}) is Dictionary: return false
 	if version>=19 and not data.get("analytics",{}) is Dictionary: return false
 	if version>=20 and not data.get("table_group_registry",{}) is Dictionary: return false
+	if version>=21 and (not data.get("training_queue",{}) is Dictionary or not data.get("staff_training",{}) is Dictionary or not data.get("movie",{}) is Dictionary or not data.get("remote_movie_record",{}) is Dictionary): return false
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
@@ -1515,6 +1537,15 @@ func load_data(data: Dictionary) -> bool:
 	assign_clones()
 	spawn_clock = progress.arrival_interval()
 	chef_order_clock=float(data.get("chef_order_clock",progress.chef_order_delay(rng)))
+	if version>=21:
+		if not training_queue.restore(data.get("training_queue",{})): return false
+		apply_movie_snapshot(data.get("movie",{}))
+		remote_movie_record=data.get("remote_movie_record",{}).duplicate(true)
+		staff_training.apply_snapshot(data.get("staff_training",{}))
+	else:
+		training_queue.reset()
+		staff_training.reset()
+		training_queue.migrate_from_plans()
 	return true
 
 func valid_tracks(tracks: Variant, type_id: String) -> bool:
@@ -1645,6 +1676,7 @@ func end_shift() -> void:
 			continue
 		var station: Node3D = by_id(int(customer.get("station",-1)))
 		if station != null and station.manual_station and not station.training.active() and customer.state != "leaving": finish_customer(customer.id,false,"closing")
+	if is_instance_valid(training_queue): training_queue.on_shift_closed()
 	progress.revision += 1
 
 func advance_shift(delta: float) -> void:
@@ -1654,6 +1686,7 @@ func advance_shift(delta: float) -> void:
 		progress.shift_elapsed += delta
 		if progress.shift_elapsed >= Progression.SHIFT_SECONDS: end_shift()
 	if progress.shift == "closing":
+		if is_instance_valid(training_queue) and training_queue.active_blocks_night(): return
 		for station in stations:
 			if station.state != "idle" or station.pending_teacher > 0: return
 		progress.shift = "night"
@@ -1665,6 +1698,7 @@ func advance_shift(delta: float) -> void:
 func next_day() -> String:
 	if progress.shift != "night" or any_training(): return "Сначала заверши дела текущей смены."
 	if game != null and is_instance_valid(game.evening): game.evening.apply_rest()
+	if is_instance_valid(training_queue): training_queue.clear_handoffs()
 	trace("next_day", {"day":progress.day+1})
 	progress.day += 1
 	progress.shift = "open"

@@ -40,7 +40,7 @@ func run()->void:
 	var service=game.service
 	var p=service.progress
 	p.stars=1
-	p.shift="morning"
+	p.shift="open"
 	if "television" not in p.lounge_items: p.lounge_items.append("television")
 	game.annex.refresh_shell()
 	await process_frame
@@ -79,14 +79,17 @@ func run()->void:
 	first.state="cooking"
 	first.order_dish="wine"
 	check(service.start_group_training(900,[2]).is_empty(),"One selected table accepts the lesson")
-	check(not first.ready_crew() and second.ready_crew(),"Only selected table stops accepting new orders")
-	check(service.station_group_status(2,"potato")=="назначено","Assignment status is visible immediately")
-	service.staff_training.advance(0.01)
-	check(service.staff_training.phase=="gathering" and service.station_group_status(2,"potato")=="собираются","Assigned crew enters gathering state")
-	service.staff_training.advance(0.5)
-	check(service.staff_training.phase=="gathering","Crew remains at a busy table until its order is done")
+	check(first.ready_crew() and second.ready_crew(),"Queued assignment alone does not stop either table")
+	check(service.station_group_status(2,"potato")=="в очереди на обучение","Queued assignment status is visible immediately")
+	service.training_queue.advance(0.0)
+	check(not first.ready_crew() and second.ready_crew(),"Only the selected draining table stops accepting new orders")
+	check(service.station_group_status(2,"potato")=="заканчивает принятый заказ","Draining status is visible while the accepted order finishes")
+	service.training_queue.advance(0.0)
+	check(not service.staff_training.is_active(),"Crew remains at a busy table until its order is done")
 	first.state="idle"
 	first.order_dish=""
+	service.training_queue.advance(0.0)
+	service.staff_training.advance(0.01)
 	service.staff_training.advance(0.01)
 	check(service.staff_training.phase=="walking" and service.staff_training.actors.size()==1,"Finished crew leaves for the television with one visible worker")
 	var worker=service.staff_training.actors.values()[0]
@@ -105,11 +108,13 @@ func run()->void:
 	check(not second.recipes.has("potato"),"Unselected table keeps its previous method set")
 
 	check(service.start_group_training(900,[2,3]).is_empty(),"Both compatible tables can be selected together")
+	service.training_queue.advance(0.0)
+	service.training_queue.advance(0.0)
 	service.staff_training.advance(0.01)
 	service.staff_training.advance(0.01)
 	advance_until(service,"watching")
-	check(service.staff_training.actors.size()==2,"Both crews attend one shared viewing")
-	check(is_equal_approx(float(service.movie_state.duration),0.3),"Two-table lesson still takes exactly 30% of source time")
+	check(service.staff_training.actors.size()==1 and service.staff_training.station_ids==[3],"The table that already mastered the whole course is excluded from the second party")
+	check(is_equal_approx(float(service.movie_state.duration),0.3),"The remaining one-table lesson still takes exactly 30% of source time")
 	finish_session(service)
 	check(second.recipes.has("potato") and second.method_sources.potato.id==900,"Second table learns after the shared viewing")
 
@@ -144,11 +149,11 @@ func run()->void:
 	check(service.station_group_status(3,"potato")=="нужны сотрудники","Vacancy is shown in group readiness")
 	second.staffed=1
 
-	print("7/7: v20 persists permanent group identity, learned source links and working recipes")
+	print("7/7: v21 persists permanent group identity, learned source links and working recipes")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==20 and saved.table_group_registry.groups.has(str(counter_group.id)),"Current save writes persistent group registry in v20")
+	check(saved.version==21 and saved.table_group_registry.groups.has(str(counter_group.id)),"Current save writes persistent group registry in v21")
 	var saved_group_id: String=str(counter_group.id)
-	check(service.load_data(saved),"v20 cafe reloads")
+	check(service.load_data(saved),"v21 cafe reloads")
 	check(service.by_id(2).recipes.has("potato") and service.by_id(2).method_sources.potato.id==900,"Reload preserves learned full method and deleted source id")
 	check(service.table_group_by_id(saved_group_id).name=="Картофельная линия","Reload preserves permanent group ID and name")
 	check(service.source_label(2,"potato").contains("Запись удалена"),"Deleted-film marker survives reload")

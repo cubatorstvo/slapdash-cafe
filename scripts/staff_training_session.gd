@@ -1,5 +1,5 @@
 extends Node3D
-## One shared television lesson. Selected crews finish current work, gather, watch once, then return.
+## Physical executor for one selected staff party. Queue ownership lives in training_queue_controller.gd.
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const LoungeLayout=preload("res://scripts/lounge_layout.gd")
@@ -10,6 +10,9 @@ var dish:=""
 var record_id:=0
 var record: Dictionary={}
 var station_ids: Array=[]
+var target_station_ids: Array=[]
+var queue_owned:=false
+var lesson_id:=0
 var actors: Dictionary={}
 var actor_paths: Dictionary={}
 var actor_meta: Dictionary={}
@@ -24,21 +27,32 @@ func is_active()->bool: return active
 func phase_label()->String:
 	return {"assigned":"назначено","gathering":"собираются","walking":"собираются","watching":"смотрят","returning":"возвращаются"}.get(phase,"")
 
-func targets_station(station_id: int, target_dish := "")->bool:
-	return active and station_id in station_ids and (target_dish.is_empty() or target_dish==dish)
+func targets_station(station_id: int,target_dish := "")->bool:
+	if not active: return false
+	if target_dish.is_empty(): return station_id in station_ids
+	return station_id in target_station_ids and target_dish==dish
 
 func pending_source(station_id: int,target_dish: String)->Dictionary:
 	if not targets_station(station_id,target_dish): return {}
-	return {"id":record_id,"name":str(record.get("name","Запись")),"pending":true}
+	return {"id":record_id,"name":str(record.get("name","Запись")),"pending":true,"state":phase}
 
-func start(value: Dictionary, ids: Array)->void:
+func start(value: Dictionary,ids: Array)->void:
+	_start(value,ids,ids,0,false)
+
+func start_queue(value: Dictionary,party_ids: Array,target_ids: Array,queue_lesson_id: int)->void:
+	_start(value,party_ids,target_ids,queue_lesson_id,true)
+
+func _start(value: Dictionary,party_ids: Array,target_ids: Array,queue_lesson_id: int,owned: bool)->void:
 	reset()
 	active=true
 	phase="assigned"
 	dish=str(value.get("dish",""))
 	record_id=int(value.get("id",0))
 	record=value.duplicate(true)
-	station_ids=ids.duplicate()
+	station_ids=party_ids.duplicate()
+	target_station_ids=target_ids.duplicate()
+	queue_owned=owned
+	lesson_id=queue_lesson_id
 	for id in station_ids:
 		var station=service.by_id(int(id))
 		if station!=null: station.group_training_state="assigned"
@@ -59,6 +73,9 @@ func reset()->void:
 	record_id=0
 	record={}
 	station_ids.clear()
+	target_station_ids.clear()
+	queue_owned=false
+	lesson_id=0
 
 func _viewer_spot(index: int)->Vector3:
 	var row:=int(index/4)
@@ -66,7 +83,7 @@ func _viewer_spot(index: int)->Vector3:
 	return Vector3(4.75+col*1.10,0,13.15+row*0.72)
 
 func _route(home_world: Vector3,target_world: Vector3)->Array:
-	var home:=service.to_local(home_world)
+	var home: Vector3=service.to_local(home_world)
 	var door_cafe:=service.to_local(Annex.REST_DOOR_CAFE)
 	var door_room:=service.to_local(Annex.REST_DOOR_ROOM)
 	var target:=service.to_local(target_world)
@@ -102,7 +119,7 @@ func _spawn_actors()->void:
 			var target_world: Vector3=_viewer_spot(viewer_index)
 			actor.position=service.to_local(home_world)
 			actors[key]=actor
-			actor_meta[key]={"station":station.station_id,"role":role,"home":home_world,"target":target_world,"name":str(member.get("name","Клон"))}
+			actor_meta[key]={"station":station.station_id,"role":role,"clone_id":int(member.get("clone_id",0)),"home":home_world,"target":target_world,"name":str(member.get("name","Клон"))}
 			var path: Array=_route(home_world,target_world)
 			if not path.is_empty(): path.pop_front()
 			actor_paths[key]=path
@@ -135,8 +152,23 @@ func _begin_return()->void:
 		var station=service.by_id(int(meta.station))
 		if station!=null: station.group_training_state="returning"
 		actors[key].caption.text=str(meta.name)+" · возвращается"
+	revision+=1
 
-func _complete()->void:
+func _switch_queue_lesson(next: Dictionary)->void:
+	dish=str(next.get("dish",""))
+	lesson_id=int(next.get("lesson_id",0))
+	target_station_ids=next.get("target_ids",[]).duplicate()
+	record=next.get("record",{}).duplicate(true)
+	record_id=int(record.get("id",0))
+	phase="watching"
+	for id in station_ids:
+		var station=service.by_id(int(id))
+		if station!=null: station.group_training_state="watching"
+	service.start_training_movie(record)
+	if is_instance_valid(service.training_queue): service.training_queue.executor_watching(lesson_id)
+	revision+=1
+
+func _complete_legacy()->void:
 	for id in station_ids:
 		var station=service.by_id(int(id))
 		if station==null: continue
@@ -151,6 +183,52 @@ func _complete()->void:
 	var game=service.game
 	reset()
 	if game!=null: game.save_cafe()
+
+func _capture_missing_handoffs()->void:
+	var captured: Dictionary={}
+	for key in actors:
+		var meta: Dictionary=actor_meta.get(key,{})
+		var clone_id:=int(meta.get("clone_id",0))
+		if clone_id<=0 or captured.has(clone_id): continue
+		var actor: Node3D=actors[key]
+		service.training_queue.capture_handoff(clone_id,actor.global_position)
+		captured[clone_id]=true
+	for id in station_ids:
+		var station=service.by_id(int(id))
+		if station==null: continue
+		var roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		for role in range(roles):
+			var member: Dictionary=station.crew[role]
+			var clone_id:=int(member.get("clone_id",0))
+			if clone_id<=0 or captured.has(clone_id): continue
+			var home: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
+			service.training_queue.capture_handoff(clone_id,home)
+			captured[clone_id]=true
+
+func handoff_to_evening()->void:
+	if not active: return
+	if phase=="watching" and bool(service.movie_state.get("playing",false)): service.stop_highlights()
+	_capture_missing_handoffs()
+	reset()
+	revision+=1
+
+func cancel_queue(to_evening := false)->void:
+	if not active or not queue_owned: return
+	if phase=="watching" and bool(service.movie_state.get("playing",false)): service.stop_highlights()
+	if to_evening:
+		handoff_to_evening()
+	else:
+		_begin_return()
+
+func cancel_current_lesson_and_continue(next: Dictionary={},to_evening := false)->void:
+	if not active or not queue_owned: return
+	if phase=="watching" and bool(service.movie_state.get("playing",false)): service.stop_highlights()
+	if to_evening:
+		handoff_to_evening()
+	elif not next.is_empty():
+		_switch_queue_lesson(next)
+	else:
+		_begin_return()
 
 func advance(delta: float)->void:
 	if not active: return
@@ -173,6 +251,7 @@ func advance(delta: float)->void:
 					var station=service.by_id(int(id))
 					if station!=null: station.group_training_state="watching"
 				service.start_training_movie(record)
+				if queue_owned and is_instance_valid(service.training_queue): service.training_queue.executor_watching(lesson_id)
 				revision+=1
 		"watching":
 			var tv:=service.to_local(Vector3(6.5,1.55,11.3))
@@ -181,17 +260,31 @@ func advance(delta: float)->void:
 				var actor=actors[keys[index]]
 				actor.caption.text=str(actor_meta[keys[index]].name)+" · конспектирует"
 				actor.observe(tv,tv+Vector3(0.4 if index%2==0 else -0.4,0,0),delta,index)
-			if not bool(service.movie_state.get("playing",false)): _begin_return()
+			if not bool(service.movie_state.get("playing",false)):
+				if queue_owned and is_instance_valid(service.training_queue):
+					var next: Dictionary=service.training_queue.executor_movie_finished(lesson_id)
+					match str(next.get("action","return")):
+						"next": _switch_queue_lesson(next)
+						"evening": handoff_to_evening()
+						_: _begin_return()
+				else: _begin_return()
 		"returning":
-			if _advance_paths(delta): _complete()
+			if _advance_paths(delta):
+				if queue_owned and is_instance_valid(service.training_queue):
+					service.training_queue.executor_return_finished()
+					var game=service.game
+					reset()
+					if game!=null: game.save_cafe()
+				else: _complete_legacy()
 
-func snapshot()->Dictionary:
+func snapshot(full_record := false)->Dictionary:
 	if not active: return {"active":false,"revision":revision}
 	var people: Array=[]
 	for key in actors:
 		var actor: Node3D=actors[key]
-		people.append({"key":key,"name":str(actor_meta[key].name),"position":actor.position,"yaw":actor.rotation.y,"watching":phase=="watching"})
-	return {"active":true,"revision":revision,"phase":phase,"dish":dish,"record_id":record_id,"record_name":str(record.get("name","Запись")),"stations":station_ids.duplicate(),"actors":people}
+		people.append({"key":key,"name":str(actor_meta.get(key,{}).get("name","Клон")),"position":actor.position,"yaw":actor.rotation.y,"watching":phase=="watching","meta":actor_meta.get(key,{}).duplicate(true),"path":actor_paths.get(key,[]).duplicate()})
+	var stored_record: Dictionary=record.duplicate(true) if full_record else {"id":record_id,"name":str(record.get("name","Запись")),"dish":dish}
+	return {"active":true,"revision":revision,"phase":phase,"dish":dish,"record_id":record_id,"record":stored_record,"record_name":str(record.get("name","Запись")),"stations":station_ids.duplicate(),"targets":target_station_ids.duplicate(),"queue_owned":queue_owned,"lesson_id":lesson_id,"actors":people}
 
 func apply_snapshot(data: Dictionary)->void:
 	if not data.get("active",false):
@@ -202,12 +295,15 @@ func apply_snapshot(data: Dictionary)->void:
 	phase=str(data.get("phase",""))
 	dish=str(data.get("dish",""))
 	record_id=int(data.get("record_id",0))
-	record={"id":record_id,"name":str(data.get("record_name","Запись")),"dish":dish}
+	record=data.get("record",{"id":record_id,"name":str(data.get("record_name","Запись")),"dish":dish}).duplicate(true)
 	station_ids=data.get("stations",[]).duplicate()
+	target_station_ids=data.get("targets",station_ids).duplicate()
+	queue_owned=bool(data.get("queue_owned",false))
+	lesson_id=int(data.get("lesson_id",0))
 	revision=int(data.get("revision",revision))
 	for station in service.stations:
 		if station.station_id in station_ids: station.group_training_state=phase
-		elif not station.manual_station: station.group_training_state=""
+		elif not station.manual_station and station.group_training_state in ["assigned","gathering","walking","watching","returning"]: station.group_training_state=""
 	var keep: Array=[]
 	for index in range(data.get("actors",[]).size()):
 		var entry: Dictionary=data.actors[index]
@@ -217,7 +313,8 @@ func apply_snapshot(data: Dictionary)->void:
 			var actor:=Avatar.new()
 			add_child(actor)
 			actors[key]=actor
-		actor_meta[key]={"name":str(entry.get("name","Клон"))}
+		actor_meta[key]=entry.get("meta",{"name":str(entry.get("name","Клон"))}).duplicate(true)
+		actor_paths[key]=entry.get("path",[]).duplicate()
 		var actor: Node3D=actors[key]
 		actor.position=entry.position
 		actor.rotation.y=float(entry.get("yaw",0.0))
@@ -230,3 +327,5 @@ func apply_snapshot(data: Dictionary)->void:
 		if key not in keep:
 			if is_instance_valid(actors[key]): actors[key].queue_free()
 			actors.erase(key)
+			actor_meta.erase(key)
+			actor_paths.erase(key)
