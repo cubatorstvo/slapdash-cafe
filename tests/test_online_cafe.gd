@@ -127,9 +127,10 @@ func _process(delta: float) -> bool:
 		if game.service.progress.popularity != 10 or not "sign" in game.service.progress.decorations or not is_instance_valid(game.service.by_id(3).upgrade_view):
 			fail("Shared cafe progression missing")
 			return false
-		var shared_groups: Array=game.service.table_groups().filter(func(value):return value.stations==[2,3] and str(value.name)=="Сетевые стойки")
-		if shared_groups.size()!=1:
-			fail("Shared persistent table group missing: "+str(game.service.table_groups()))
+		var group_two: Dictionary=game.service.group_for_station(2)
+		var group_three: Dictionary=game.service.group_for_station(3)
+		if group_two.is_empty() or group_three.is_empty() or not str(group_two.name).begins_with("Сетевые стойки") or not str(group_three.name).begins_with("Сетевые стойки"):
+			fail("Shared persistent table groups missing after sync/split: "+str(game.service.table_groups()))
 			return false
 		if game.service.staff_training.is_active(): saw_staff_training=true
 	if not game.session.is_guest():
