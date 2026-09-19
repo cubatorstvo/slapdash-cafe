@@ -66,6 +66,7 @@ func advance(delta: float)->void:
 	if operator.walk_to(target,delta*1.45):
 		waypoint_index=(waypoint_index+1)%waypoints.size()
 		if waypoint_index%2==1: crouch_clock=0.55
+		operator.walk_to(waypoints[waypoint_index],delta*1.45)
 	operator.scale.y=lerpf(operator.scale.y,0.72 if crouch_clock>0 else 1.0,1.0-exp(-delta*8.0))
 	operator.watching=true
 	operator.cook_target=point(Vector3(0,1.45,0.35))

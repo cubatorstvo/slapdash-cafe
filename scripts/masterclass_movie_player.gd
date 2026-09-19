@@ -22,7 +22,6 @@ func setup(target_screen: MeshInstance3D)->void:
 	viewport.name="MasterclassMovieViewport"
 	viewport.size=Vector2i(640,360)
 	viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
-	viewport.render_target_v_flip=true
 	viewport.world_3d=World3D.new()
 	add_child(viewport)
 	world_root=Node3D.new()
