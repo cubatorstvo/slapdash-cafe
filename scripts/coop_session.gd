@@ -395,7 +395,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error: String=game.service.Visits.action(game.service,action,int(value.get("id",-1)))
 		if not error.is_empty(): message_to(sender,error)
 		return
-	if action in ["group_rename","group_train"]:
+	if action in ["group_rename","group_train","group_create","group_split","group_members","group_merge","group_active"]:
 		if sender!=1:
 			message_to(sender,"Группами столов управляет хозяин кафе.")
 			return
@@ -403,16 +403,34 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			message_to(sender,"Подойди к компьютеру кафе.")
 			return
 		var error: String=""
-		if action=="group_rename":
-			error=game.service.rename_table_group(str(value.get("group","")),str(value.get("name","")))
-		else:
-			var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
-			if ids.size()>game.service.SLOT_COUNT: ids=ids.slice(0,game.service.SLOT_COUNT)
-			error=game.service.start_group_training(int(value.get("record",0)),ids,sender)
+		match action:
+			"group_rename":
+				error=game.service.rename_table_group(str(value.get("group","")),str(value.get("name","")))
+			"group_train":
+				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
+				if ids.size()>game.service.SLOT_COUNT: ids=ids.slice(0,game.service.SLOT_COUNT)
+				error=game.service.start_group_training(int(value.get("record",0)),ids,sender)
+			"group_create":
+				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
+				error=game.service.create_table_group(ids,str(value.get("name","")))
+			"group_split":
+				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
+				error=game.service.split_table_group(str(value.get("group","")),ids)
+			"group_members":
+				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
+				error=game.service.set_table_group_members(str(value.get("group","")),ids)
+			"group_merge":
+				var groups: Array=value.get("groups",[]) if value.get("groups",[]) is Array else []
+				var choices: Dictionary=value.get("choices",{}) if value.get("choices",{}) is Dictionary else {}
+				var active: Array=value.get("active",[]) if value.get("active",[]) is Array else []
+				error=game.service.merge_table_groups(groups,choices,active)
+			"group_active":
+				error=game.service.set_group_dish_active(str(value.get("group","")),str(value.get("dish","")),bool(value.get("enabled",false)))
 		if not error.is_empty(): message_to(sender,error)
 		else:
 			game.save_cafe()
-			message_to(sender,"Учебный сеанс назначен. Сотрудники закончат текущие заказы и соберутся у телевизора." if action=="group_train" else "Название группы сохранено.")
+			var success: String="Учебный сеанс назначен. Сотрудники закончат текущие заказы и соберутся у телевизора." if action=="group_train" else "Группы столов обновлены."
+			message_to(sender,success)
 		return
 	if action in ["masterclass_rename","masterclass_delete"]:
 		if sender!=1:
