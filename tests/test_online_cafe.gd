@@ -56,6 +56,8 @@ func setup() -> void:
 		game.service.masterclasses.append(MasterclassLibrary.make_record(502,"potato","counter",[{"group":1,"frames":counter_frames}],1.0,counter_source.model.quality(),"Сетевая картошка"))
 		game.service.next_masterclass_id=503
 		game.service.table_group_names["2-3"]="Сетевые стойки"
+		var assembler_parcel: Dictionary=game.shop._new_delivery("counter",20,["counter"],true,0.0,{})
+		game.service.progress.deliveries.append(assembler_parcel)
 		game.annex.refresh_shell()
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
@@ -203,9 +205,15 @@ func guest_tick() -> void:
 	if first.model.potatoes.size() != 3 or first.model.sausages.size() != 3 or first.model.vessels.cup == null: fail("New stock and vessels not replicated")
 	if stage == 0 and first.training.phase == "recording":
 		if first.model.guest_serving.drunk != 225 or first.model.item_available("cup"): return
-		if game.service.progress.deliveries.size()!=1 or game.service.progress.deliveries[0].get("items",[])!=["sauce_ramp"] or game.service.progress.free_clones!=2: fail("Bundle or free clones missing"); return
+		var saw_bundle:=false
+		var saw_installer_delivery:=false
+		for parcel in game.service.progress.deliveries:
+			if parcel.get("items",[])==["sauce_ramp"]: saw_bundle=true
+			if bool(parcel.get("installer",false)) and int(parcel.get("station",0))==20: saw_installer_delivery=true
+		game.shop._process(0.016)
+		if not saw_bundle or not saw_installer_delivery or game.shop.installers.is_empty() or game.service.progress.free_clones!=2: fail("Bundle, assembler or free clones missing"); return
 		if game.service.progress.free_workers[0].tempo!=0.85 or first.crew[0].tempo!=1.25 or "lab_valve" not in game.service.progress.lab_upgrades: fail("Individual tempo or lab upgrades missing"); return
-		print("CHECK: individual tempo, laboratory upgrades, consumed cup and deliveries replicated")
+		print("CHECK: individual tempo, laboratory upgrades, consumed cup, deliveries and assembler actor replicated")
 		game.player.global_position=Vector3(6.5,0.02,13.2)
 		stage=20
 		quit_at=timer+0.45
