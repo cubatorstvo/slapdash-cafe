@@ -62,6 +62,7 @@ func run() -> void:
 	var tracks: Array = []
 	for role in range(3): tracks.append({"group":1, "frames":[finished.zone_snapshot(role)]})
 	station.recipes.solyanka = {"tracks":tracks, "duration":1.0/60.0, "quality":finished.quality()}
+	check(service.set_group_dish_active(service.group_id_for_station(station.station_id),"solyanka",true).is_empty(),"Solyanka is enabled in the explicit production menu")
 	var initial_requirements: Array = p.star_requirements(service.stations, service.served)
 	check(initial_requirements[0].done and initial_requirements[1].done, "Staffed kitchen and B+ recording satisfy the first two preparation requirements")
 	check(not initial_requirements[2].done and not initial_requirements[3].done, "Real service counters still have to be earned")

@@ -110,6 +110,7 @@ func run() -> void:
 	var production_tracks: Array = []
 	for role in range(3): production_tracks.append({"group":role+1,"frames":[finished.zone_snapshot(role)]})
 	real_station.recipes.solyanka = {"tracks":production_tracks,"duration":1.0/60.0,"quality":finished.quality()}
+	check(game.service.set_group_dish_active(game.service.group_id_for_station(real_station.station_id),"solyanka",true).is_empty(),"Production solyanka is enabled in the explicit menu")
 	real_station.staffed = -1
 	live.fifth_star_auto_served = 0
 	live.fifth_star_solyanka_served = 0

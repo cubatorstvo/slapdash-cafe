@@ -70,6 +70,7 @@ func run()->void:
 	service.next_masterclass_id=701
 	check(service.create_table_group([2,3],"Сервисная линия").is_empty(),"Two counters form an explicit service group")
 	check(service._apply_group_plan(700,[2,3]).size()==1,"Explicit service group receives its desired sausage record")
+	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Service group has sausage explicitly enabled for diagnostics")
 	var service_group: Dictionary=service.table_groups().filter(func(value):return value.stations==[2,3])[0]
 	var service_group_id: String=str(service_group.id)
 
@@ -152,6 +153,7 @@ func run()->void:
 	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables without auto-merging them")
 	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine all nineteen compatible tables into one managed group")
 	check(service._apply_group_plan(700,compatible).size()==1,"Large explicit group receives one desired record")
+	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Large explicit group keeps sausage active")
 	var groups: Array=service.table_groups()
 	var large_group: Dictionary={}
 	for value in groups:

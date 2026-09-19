@@ -129,7 +129,7 @@ func _process(delta: float) -> bool:
 			return false
 		var shared_groups: Array=game.service.table_groups().filter(func(value):return value.stations==[2,3] and str(value.name)=="Сетевые стойки")
 		if shared_groups.size()!=1:
-			fail("Shared persistent table group missing")
+			fail("Shared persistent table group missing: "+str(game.service.table_groups()))
 			return false
 		if game.service.staff_training.is_active(): saw_staff_training=true
 	if not game.session.is_guest():
