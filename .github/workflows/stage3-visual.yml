@@ -65,21 +65,21 @@ jobs:
               game.office.rebuild()
               await process_frame
               await process_frame
-              func find_label(text_value: String)->Control:
+              var find_label:=func(text_value: String):
                   var stack: Array=[game.office.content]
                   while not stack.is_empty():
                       var node=stack.pop_back()
                       if node is Label and str(node.text)==text_value: return node
                       for child in node.get_children(): stack.append(child)
                   return null
-              var target: Control=find_label("ЕДИНЫЙ РЕДАКТОР КУРСА")
+              var target: Control=find_label.call("ЕДИНЫЙ РЕДАКТОР КУРСА")
               if target!=null:
                   game.office.scroll.scroll_vertical=maxi(0,int(target.global_position.y-game.office.content.global_position.y)-20)
               await process_frame
               await process_frame
               var image:=root.get_viewport().get_texture().get_image()
               var error:=image.save_png("/tmp/stage3_course_editor_top.png")
-              var preview_target: Control=find_label("ПРЕДПРОСМОТР")
+              var preview_target: Control=find_label.call("ПРЕДПРОСМОТР")
               if preview_target!=null:
                   game.office.scroll.scroll_vertical=maxi(0,int(preview_target.global_position.y-game.office.content.global_position.y)-180)
               await process_frame
