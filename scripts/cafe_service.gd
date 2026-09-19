@@ -715,7 +715,7 @@ func advance_chef_orders(delta: float) -> void:
 	# so serving one customer never causes an immediate replacement to appear.
 	chef_order_clock=progress.chef_order_delay(rng)
 
-func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_data: Dictionary = {}) -> bool:
+func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_data: Dictionary = {}, requested_portions := 0) -> bool:
 	if customers.size() >= 18: return false
 	if recipe.is_empty():
 		var pool: Array = progress.available_dishes()
@@ -725,39 +725,52 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 			for starter in ["sausage","potato","wine"]:
 				if starter in pool and starter not in progress.tutorial_served: recipe = starter; break
 	if not recipe in Definition.DISHES: return false
-	var candidates: Array = []
-	var untrained: Array = []
-	var offered := false
+	var portions: int=int(requested_portions)
+	if portions<=0:
+		portions=1 if banquet or chef_guest or not visit_data.is_empty() else portion_count_for_new_order()
+	if portions not in [1,3,5,10]: portions=1
+	if banquet or chef_guest or not visit_data.is_empty(): portions=1
+	var candidates: Array=[]
+	var untrained: Array=[]
+	var offered:=false
 	for station in stations:
 		if not recipe in station.dishes(): continue
 		if station.manual_station or not station.ready_crew(): continue
-		if station.recipes.has(recipe): offered = true
-		if station.state == "idle" and station.pending_teacher == 0:
+		if station.recipes.has(recipe): offered=true
+		if station.state=="idle" and station.pending_teacher==0:
 			if station.recipes.has(recipe): candidates.append(station)
-			else: untrained.append(station)
-	if candidates.is_empty() and not banquet and not chef_guest and visit_data.is_empty(): candidates=untrained
+			elif portions==1: untrained.append(station)
+	if candidates.is_empty() and portions==1 and not banquet and not chef_guest and visit_data.is_empty(): candidates=untrained
 	if chef_guest:
 		var personal:=by_id(1)
 		candidates=[personal] if personal!=null and personal.manual_station and recipe in personal.dishes() and chef_queue().size()<CHEF_QUEUE_LIMIT else []
-	var station: Node3D = null if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
+	var station: Node3D=null if candidates.is_empty() else candidates[rng.randi_range(0,candidates.size()-1)]
 	if station==null and not visit_data.is_empty(): return false
-	var person := Person.new()
-	person.color = Color("d6b56b") if banquet else [Color("ae7381"), Color("839fbb"), Color("c6a66b"), Color("91aa78")][next_customer_id % 4]
+	var queue_large: bool=station==null and portions>1 and offered and not banquet and not chef_guest and visit_data.is_empty()
+	var person:=Person.new()
+	person.color=Color("d6b56b") if banquet else [Color("ae7381"),Color("839fbb"),Color("c6a66b"),Color("91aa78")][next_customer_id%4]
 	add_child(person)
-	person.position = Vector3(-11.4, 0, 1.65)
-	person.caption.text = Definition.DISHES[recipe]
-	var data := {"id": next_customer_id, "view": person, "station": station.station_id if station != null else -1, "dish": recipe, "state": "walking", "wait": 0.0, "path": [], "banquet": banquet, "chef_order": chef_guest and not banquet}
+	person.position=Vector3(-11.4,0,1.65)
+	person.caption.text=Definition.DISHES[recipe]+(" ×%d"%portions if portions>1 else "")
+	var data: Dictionary={"id":next_customer_id,"view":person,"station":station.station_id if station!=null else -1,"dish":recipe,"state":"walking","wait":0.0,"path":[],"banquet":banquet,"chef_order":chef_guest and not banquet,"portions_total":portions,"portions_done":0,"order_paid":0,"order_age":0.0,"wait_limit":order_wait_limit(portions,station,recipe),"stats_finalized":false}
+	guests_arrived+=1
+	order_stats.orders_arrived=int(order_stats.orders_arrived)+1
+	order_stats.portions_ordered=int(order_stats.portions_ordered)+portions
 	if not visit_data.is_empty():
 		data.visit_id=int(visit_data.id); data.visit_slot=int(visit_data.slot); data.visit_kind=str(visit_data.kind)
 		data.chef_order=false
 		Visits.badge(person,str(visit_data.kind))
-	if station == null:
-		data.state = "leaving"
-		data.path = [Vector3(-9.6, 0, 2.6), Vector3(17.4, 0, 1.65)]
-		person.caption.text += "\nВсе заняты · зайду позже" if offered else "\nЕщё не готовят · загляну позже"
-		missed += 1
-		progress.record_demand(recipe, "busy" if offered else "untrained")
-		if banquet: progress.banquet_finished += 1
+	if station==null:
+		if queue_large:
+			data.state="auto_queue"
+			data.path=[auto_queue_point(customers.filter(func(c):return c.state=="auto_queue").size())]
+			_update_multi_caption(data)
+		else:
+			data.state="leaving"
+			data.path=[Vector3(-9.6,0,2.6),Vector3(17.4,0,1.65)]
+			person.caption.text+=("\nВсе заняты · зайду позже" if offered else "\nЕщё не готовят · загляну позже")
+			_record_failed_order(data,"busy" if offered else "untrained")
+			if banquet: progress.banquet_finished+=1
 	else:
 		if station.manual_station:
 			var order_serial: int=maxi(3,progress.manual_served) if banquet and chef_guest else progress.manual_served
@@ -773,29 +786,63 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 			data.path=[queue_point(chef_queue().size())]
 			person.caption.text=Definition.DISHES[recipe]+"\nОчередь к шефу"
 		else: assign_customer(station,data)
-	trace("customer_arrived",{"dish":recipe,"station":data.station,"order":station.customer_order if station != null else {}})
+	trace("customer_arrived",{"dish":recipe,"station":data.station,"portions":portions,"order":station.customer_order if station!=null else {}})
 	customers.append(data)
-	next_customer_id += 1
-	return station != null
+	next_customer_id+=1
+	return station!=null or queue_large
 
 func finish_customer(id: int, accepted: bool) -> void:
 	for customer in customers:
-		if customer.id != id or customer.state in ["leaving","eating"]: continue
+		if customer.id!=id or customer.state in ["leaving","eating"]: continue
 		if customer.state=="queued": dismiss_queue(customer); return
-		var station: Node3D = by_id(customer.station)
-		var report: Dictionary = station.model.quality()
-		var paid := accepted and bool(report.get("present", false))
-		var premium: float = float(station.customer_order.get("premium",1.0)) if station.manual_station else 1.0
-		var base_price := 65 if customer.dish == "meal" else 95 if customer.dish in Progression.ORCHESTRATION_DISHES else 80 if customer.dish in Progression.SPECIALTY_DISHES else 25
-		var payment := roundi(base_price * report.price_factor * report.style_multiplier * premium) if paid else 0
+		var station: Node3D=by_id(int(customer.get("station",-1)))
+		if int(customer.get("portions_total",1))>1:
+			if not accepted:
+				_finish_multi_departure(customer,station,"busy")
+				return
+			if station==null: return
+			var report: Dictionary=station.model.quality()
+			var paid: bool=bool(report.get("present",false))
+			var payment: int=roundi(base_price_for(str(customer.dish))*float(report.get("price_factor",0.0))*float(report.get("style_multiplier",1.0))) if paid else 0
+			if not paid:
+				trace("multi_portion_rejected",{"dish":customer.dish,"done":int(customer.get("portions_done",0))})
+				_start_automatic_order(station,customer)
+				return
+			customer.portions_done=int(customer.get("portions_done",0))+1
+			customer.order_paid=int(customer.get("order_paid",0))+payment
+			station.order_portions_done=int(customer.portions_done)
+			station.order_paid=int(customer.order_paid)
+			order_stats.portions_served=int(order_stats.portions_served)+1
+			revenue+=payment
+			progress.cash+=payment
+			var payload: Array=station.model.take_serving()
+			for item in payload: item.from=station.to_global(item.from)
+			trace("multi_portion_paid",{"dish":customer.dish,"portion":int(customer.portions_done),"total":int(customer.portions_total),"payment":payment,"paid_total":int(customer.order_paid)})
+			_update_multi_caption(customer)
+			if not payload.is_empty():
+				customer.state="portion_eating"
+				customer.eat_age=0.0
+				customer.path=[]
+				customer.view.begin_meal(payload)
+				station.state="serving"
+				station.customer_id=customer.id
+			else:
+				if int(customer.portions_done)>=int(customer.portions_total): _complete_multi_order(customer,station)
+				else: _start_automatic_order(station,customer)
+			return
+		if station==null: return
+		var report: Dictionary=station.model.quality()
+		var paid:=accepted and bool(report.get("present",false))
+		var premium: float=float(station.customer_order.get("premium",1.0)) if station.manual_station else 1.0
+		var payment:=roundi(base_price_for(str(customer.dish))*float(report.price_factor)*float(report.style_multiplier)*premium) if paid else 0
 		trace("customer_finished",{"dish":customer.dish,"station":station.station_id,"grade":report.grade,"payment":payment,"accepted":paid})
-		customer.state = "leaving"
-		customer.view.playback_speed = 1.0
-		customer.view.caption.text = "%s · +%d\nСпасибо!" % [report.grade, payment] if paid else "Загляну позже"
-		if paid and report.get("style_count", 0) > 0: customer.view.caption.text += "\nЛовкая подача · +20%"
-		customer.path = [Vector3(17.4, 0, 1.65)]
-		station.customer_id = -1
-		if not station.training.active(): station.state = "idle"
+		customer.state="leaving"
+		customer.view.playback_speed=1.0
+		customer.view.caption.text="%s · +%d\nСпасибо!"%[report.grade,payment] if paid else "Загляну позже"
+		if paid and report.get("style_count",0)>0: customer.view.caption.text+="\nЛовкая подача · +20%"
+		customer.path=[Vector3(17.4,0,1.65)]
+		station.customer_id=-1
+		if not station.training.active(): station.state="idle"
 		if accepted:
 			var payload: Array=station.model.take_serving()
 			if not payload.is_empty():
@@ -804,32 +851,18 @@ func finish_customer(id: int, accepted: bool) -> void:
 				customer.view.begin_meal(payload)
 				station.state="serving"; station.customer_id=customer.id
 		if paid:
-			served += 1
-			if station.manual_station:
-				progress.manual_served += 1
-				if not progress.starter_reward: game.shop.reward_sauce()
-				if not customer.dish in progress.tutorial_served: progress.tutorial_served.append(customer.dish)
-			elif customer.get("automatic_serving",false):
-				progress.journey_auto_served+=1
-				if customer.dish=="meal": progress.journey_meals_served+=1
-				if progress.stars==2: progress.third_star_auto_served+=1
-				if progress.stars==3:
-					progress.fourth_star_auto_served+=1
-					if customer.dish in Progression.SPECIALTY_DISHES: progress.fourth_star_specialty_served+=1
-				if progress.stars==4:
-					progress.fifth_star_auto_served+=1
-					if customer.dish in Progression.ORCHESTRATION_DISHES: progress.fifth_star_solyanka_served+=1
-				if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
-			revenue += payment
-			progress.cash += payment
-			progress.record_demand(customer.dish, "served")
+			customer.stats_finalized=true
+			order_stats.orders_completed=int(order_stats.orders_completed)+1
+			order_stats.portions_served=int(order_stats.portions_served)+1
+			_count_completed_customer(customer,station)
+			revenue+=payment
+			progress.cash+=payment
 		else:
-			missed += 1
-			progress.record_demand(customer.dish, "untrained")
-		if customer.get("banquet", false):
-			progress.banquet_finished += 1
-			if paid: progress.banquet_served += 1
-			if paid and report.grade in ["B", "A", "S"]: progress.banquet_good += 1
+			_record_failed_order(customer,"untrained")
+		if customer.get("banquet",false):
+			progress.banquet_finished+=1
+			if paid: progress.banquet_served+=1
+			if paid and report.grade in ["B","A","S"]: progress.banquet_good+=1
 		Visits.settled(self,customer,paid,str(report.grade))
 		return
 
