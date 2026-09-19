@@ -14,6 +14,8 @@ var suspended_assignments: Dictionary={}
 var active_batch_id:=0
 var revision:=0
 var handoff_positions: Dictionary={}
+var auto_reconcile_due:=true
+var auto_reconcile_clock:=0.0
 
 func setup(owner_service: Node3D)->void:
 	service=owner_service
@@ -30,6 +32,8 @@ func reset()->void:
 	next_batch_id=1
 	next_lesson_id=1
 	handoff_positions.clear()
+	auto_reconcile_due=true
+	auto_reconcile_clock=0.0
 	revision+=1
 
 func _course(id: int)->Dictionary:
@@ -63,7 +67,10 @@ func _current_assignment(station_id: int,dish: String)->Dictionary:
 			return {"record_id":int(item.get("record_id",0)),"revision":int(item.get("revision",1)),"group":str(group.id)}
 	return {}
 
-func _assignment_key(station_id: int,dish: String,version: int)->String:
+func _assignment_key(station_id: int,dish: String,record_id: int,version: int)->String:
+	return "%d|%s|%d|%d"%[station_id,dish,record_id,version]
+
+func _legacy_assignment_key(station_id: int,dish: String,version: int)->String:
 	return "%d|%s|%d"%[station_id,dish,version]
 
 func _actual_matches(station,record_id: int,dish: String)->bool:
@@ -99,7 +106,8 @@ func _capture_assignments(assignments: Array)->Array:
 		for station_id in spec.station_ids:
 			var current:=_current_assignment(int(station_id),str(record.dish))
 			versions[str(int(station_id))]=int(current.get("revision",1))
-			suspended_assignments.erase(_assignment_key(int(station_id),str(record.dish),int(current.get("revision",1))))
+			suspended_assignments.erase(_assignment_key(int(station_id),str(record.dish),int(current.get("record_id",record.id)),int(current.get("revision",1))))
+			suspended_assignments.erase(_legacy_assignment_key(int(station_id),str(record.dish),int(current.get("revision",1))))
 		result.append({"record_id":int(record.id),"record":record.duplicate(true),"dish":str(record.dish),"station_ids":spec.station_ids.duplicate(),"versions":versions})
 	return result
 
@@ -311,7 +319,7 @@ func course_view(course_id: int)->Dictionary:
 			var lesson:=_lesson(int(lesson_id))
 			lesson_rows.append({"id":int(lesson.id),"dish":str(lesson.dish),"record_id":int(lesson.record_id),"name":str(lesson.record.get("name","Запись")),"state":str(lesson.state),"stations":lesson.station_ids.duplicate()})
 		batch_rows.append({"id":int(batch.id),"state":str(batch.state),"stations":batch.station_ids.duplicate(),"blocked_reason":str(batch.get("blocked_reason","")),"lessons":lesson_rows})
-	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"group_order":course.get("group_order",[]).duplicate(),"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
+	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"group_order":course.get("group_order",[]).duplicate(),"automatic":bool(course.get("automatic",false)),"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
 
 func course_views()->Array:
 	var result: Array=[]
@@ -336,6 +344,8 @@ func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,
 	course.mode=mode
 	course.state="queued"
 	course.peer=int(peer)
+	course.automatic=false
+	course.erase("auto_key")
 	course.signature=_signature(captured,mode,preferred_order)
 	course.assignments=_intent_from_captured(captured)
 	_build_course_batches(course,captured,mode,preferred_order)
@@ -353,6 +363,125 @@ func resume_assignment(station_id: int,dish: String,peer := 1)->String:
 	if _actual_matches(station,record_id,dish): return "Этот способ уже освоен."
 	var result:=enqueue_course([{"record_id":record_id,"station_ids":[station_id]}],"together","resume:%d:%s:%d"%[station_id,dish,int(current.get("revision",0))],peer)
 	return str(result.get("error",""))
+
+func request_auto_reconcile()->void:
+	auto_reconcile_due=true
+
+func _pending_current_course_id(station_id: int,dish: String,record_id: int,version: int)->int:
+	for lesson in lessons:
+		if str(lesson.get("state","")) not in ["queued","blocked","deferred","active","watching"]: continue
+		if str(lesson.get("dish",""))!=dish or int(lesson.get("record_id",0))!=record_id: continue
+		if station_id not in lesson.get("station_ids",[]): continue
+		if int(lesson.get("versions",{}).get(str(station_id),0))==version: return int(lesson.get("course_id",0))
+	return 0
+
+func _waiting_auto_course(auto_key: String)->Dictionary:
+	for course in courses:
+		if not bool(course.get("automatic",false)) or str(course.get("auto_key",""))!=auto_key: continue
+		if str(course.get("state","")) not in ["queued","blocked","deferred"]: continue
+		if active_batch_id in course.get("batch_ids",[]): continue
+		return course
+	return {}
+
+func _auto_captured_specs(specs: Array)->Array:
+	var result: Array=[]
+	for spec in specs:
+		var record: Dictionary=service.masterclass_by_id(int(spec.record_id))
+		if record.is_empty(): return []
+		result.append({"record_id":int(spec.record_id),"record":record.duplicate(true),"dish":str(spec.dish),"station_ids":spec.station_ids.duplicate(),"versions":spec.versions.duplicate(true)})
+	return result
+
+func _replace_waiting_auto_course(course: Dictionary,captured: Array,auto_key: String)->void:
+	var signature:=_signature(captured,"together")
+	if str(course.get("signature",""))==signature: return
+	_retire_pending_course(course)
+	_supersede_waiting(captured)
+	course.mode="together"
+	course.state="queued"
+	course.peer=1
+	course.signature=signature
+	course.assignments=_intent_from_captured(captured)
+	course.group_order=[]
+	course.automatic=true
+	course.auto_key=auto_key
+	_build_course_batches(course,captured,"together")
+	_update_course_state(int(course.id))
+	revision+=1
+	service.progress.revision+=1
+
+func _create_auto_course(captured: Array,auto_key: String)->Dictionary:
+	if captured.is_empty(): return {}
+	_supersede_waiting(captured)
+	var course_id:=next_course_id
+	next_course_id+=1
+	var signature:=_signature(captured,"together")
+	var course: Dictionary={"id":course_id,"command_id":"auto:"+auto_key+":"+signature,"mode":"together","state":"queued","batch_ids":[],"signature":signature,"peer":1,"created_day":service.progress.day,"assignments":_intent_from_captured(captured),"group_order":[],"automatic":true,"auto_key":auto_key}
+	courses.append(course)
+	_build_course_batches(course,captured,"together")
+	_update_course_state(course_id)
+	revision+=1
+	service.progress.revision+=1
+	service.trace("automatic_training_queued",{"course":course_id,"auto_key":auto_key,"stations":_course_station_ids(course_id)})
+	service.feed_system("group_training",{"course":course_id,"stations":_course_station_ids(course_id),"automatic":true},_course_station_ids(course_id).size())
+	return course
+
+func reconcile_automatic_needs()->void:
+	if service==null: return
+	if service.game!=null and is_instance_valid(service.game.session) and service.game.session.is_guest(): return
+	var buckets: Dictionary={}
+	for group in service.table_groups():
+		var curriculum: Array=group.get("curriculum",[])
+		if curriculum.is_empty(): continue
+		for raw_station_id in group.get("stations",[]):
+			var station_id:=int(raw_station_id)
+			var station=service.by_id(station_id)
+			if station==null or station.manual_station or station.masterclass_station: continue
+			if station.staffed>=0 and station.staffed<station.role_count(): continue
+			var residue: Array=[]
+			var ready:=true
+			for item in curriculum:
+				var dish:=str(item.get("dish_id",""))
+				var record_id:=int(item.get("record_id",0))
+				var version:=int(item.get("revision",1))
+				if dish.is_empty() or record_id<=0: continue
+				if _actual_matches(station,record_id,dish): continue
+				if assignment_suspended(station_id,dish): continue
+				var record: Dictionary=service.masterclass_by_id(record_id)
+				if record.is_empty():
+					ready=false
+					break
+				if not Definition.missing_equipment(dish,station.equipment).is_empty():
+					ready=false
+					break
+				residue.append({"dish":dish,"record_id":record_id,"revision":version})
+			if not ready or residue.is_empty(): continue
+			var residue_parts: Array=[]
+			for item in residue: residue_parts.append("%s:%d:%d"%[str(item.dish),int(item.record_id),int(item.revision)])
+			var auto_key: String="%s|%s"%[str(group.id),">".join(residue_parts)]
+			var waiting: Dictionary=_waiting_auto_course(auto_key)
+			var blocked_by_other:=false
+			for item in residue:
+				var owner:=_pending_current_course_id(station_id,str(item.dish),int(item.record_id),int(item.revision))
+				if owner>0 and (waiting.is_empty() or owner!=int(waiting.id)):
+					blocked_by_other=true
+					break
+			if blocked_by_other: continue
+			if not buckets.has(auto_key):
+				var lesson_specs: Array=[]
+				for item in residue:
+					lesson_specs.append({"record_id":int(item.record_id),"dish":str(item.dish),"station_ids":[],"versions":{}})
+				buckets[auto_key]={"group":str(group.id),"specs":lesson_specs}
+			var bucket: Dictionary=buckets[auto_key]
+			for index in range(residue.size()):
+				bucket.specs[index].station_ids.append(station_id)
+				bucket.specs[index].versions[str(station_id)]=int(residue[index].revision)
+	for auto_key in buckets:
+		var bucket: Dictionary=buckets[auto_key]
+		var captured:=_auto_captured_specs(bucket.specs)
+		if captured.is_empty(): continue
+		var waiting:=_waiting_auto_course(str(auto_key))
+		if waiting.is_empty(): _create_auto_course(captured,str(auto_key))
+		else: _replace_waiting_auto_course(waiting,captured,str(auto_key))
 
 func migrate_from_plans()->void:
 	for group in service.table_groups():
@@ -544,8 +673,13 @@ func _advance_active()->void:
 		elif phase=="watching": batch.state="watching"
 		elif phase=="returning": batch.state="returning"
 
-func advance(_delta: float)->void:
+func advance(delta: float)->void:
 	if service==null: return
+	auto_reconcile_clock+=maxf(0.0,delta)
+	if auto_reconcile_due or auto_reconcile_clock>=3.0:
+		auto_reconcile_due=false
+		auto_reconcile_clock=0.0
+		reconcile_automatic_needs()
 	if service.progress.shift=="open":
 		for batch in batches:
 			if str(batch.get("state",""))=="deferred" and int(batch.get("defer_day",0))<=service.progress.day: batch.state="queued"
@@ -579,6 +713,7 @@ func _apply_lesson(lesson: Dictionary)->void:
 	service.trace("training_lesson_complete",{"lesson":int(lesson.id),"dish":str(lesson.dish),"record":int(lesson.record_id),"stations":lesson.station_ids.duplicate()})
 	service.feed_system("training",{"dish":str(lesson.dish),"record":int(lesson.record_id),"name":str(record.get("name","Запись")),"stations":lesson.station_ids.duplicate()},lesson.station_ids.size())
 	service.progress.revision+=1
+	request_auto_reconcile()
 
 func executor_movie_finished(lesson_id: int)->Dictionary:
 	var lesson:=_lesson(lesson_id)
@@ -642,7 +777,7 @@ func _suspend_lesson_targets(lesson: Dictionary)->void:
 	for station_id in lesson.get("station_ids",[]):
 		var current:=_current_assignment(int(station_id),str(lesson.dish))
 		if int(current.get("record_id",0))==int(lesson.record_id):
-			suspended_assignments[_assignment_key(int(station_id),str(lesson.dish),int(current.get("revision",0)))]=true
+			suspended_assignments[_assignment_key(int(station_id),str(lesson.dish),int(lesson.record_id),int(current.get("revision",0)))]=true
 
 func record_renamed(record_id: int,value: String)->void:
 	for lesson in lessons:
@@ -675,6 +810,7 @@ func cancel_batch(batch_id: int)->String:
 	_update_course_state(int(batch.course_id))
 	revision+=1
 	service.progress.revision+=1
+	request_auto_reconcile()
 	return ""
 
 func cancel_course(course_id: int)->String:
@@ -702,6 +838,7 @@ func cancel_course(course_id: int)->String:
 	course.state="cancelled"
 	revision+=1
 	service.progress.revision+=1
+	request_auto_reconcile()
 	return ""
 
 func cancel_lesson(lesson_id: int)->String:
@@ -734,11 +871,12 @@ func cancel_lesson(lesson_id: int)->String:
 	_update_course_state(int(lesson.course_id))
 	revision+=1
 	service.progress.revision+=1
+	request_auto_reconcile()
 	return ""
 
 func assignment_suspended(station_id: int,dish: String)->bool:
 	var current:=_current_assignment(station_id,dish)
-	return bool(suspended_assignments.get(_assignment_key(station_id,dish,int(current.get("revision",0))),false))
+	return bool(suspended_assignments.get(_assignment_key(station_id,dish,int(current.get("record_id",0)),int(current.get("revision",0))),false))
 
 func _defer_batch(batch: Dictionary)->void:
 	for lesson in _pending_lessons(batch):
@@ -867,6 +1005,28 @@ func restore(data: Dictionary)->bool:
 	lessons=data.get("lessons",[]).duplicate(true)
 	command_courses=data.get("command_courses",{}).duplicate(true)
 	suspended_assignments=data.get("suspended_assignments",{}).duplicate(true)
+	var migrated_suspended: Dictionary={}
+	for raw_key in suspended_assignments.keys():
+		var key:=str(raw_key)
+		var parts:=key.split("|")
+		if parts.size()==4:
+			migrated_suspended[key]=true
+			continue
+		if parts.size()!=3: continue
+		var station_id:=int(parts[0])
+		var dish:=str(parts[1])
+		var version:=int(parts[2])
+		var record_id:=0
+		for lesson in data.get("lessons",[]):
+			if not lesson is Dictionary or str(lesson.get("dish",""))!=dish or station_id not in lesson.get("station_ids",[]): continue
+			if int(lesson.get("versions",{}).get(str(station_id),0))==version:
+				record_id=int(lesson.get("record_id",0))
+				break
+		if record_id<=0:
+			var current:=_current_assignment(station_id,dish)
+			record_id=int(current.get("record_id",0))
+		if record_id>0: migrated_suspended[_assignment_key(station_id,dish,record_id,version)]=true
+	suspended_assignments=migrated_suspended
 	active_batch_id=int(data.get("active_batch_id",0))
 	next_course_id=maxi(1,int(data.get("next_course_id",1)))
 	next_batch_id=maxi(1,int(data.get("next_batch_id",1)))
@@ -879,6 +1039,7 @@ func restore(data: Dictionary)->bool:
 		next_lesson_id=maxi(next_lesson_id,int(lesson.get("id",0))+1)
 		if not lesson.get("record",{}) is Dictionary: return false
 	_rebuild_station_states()
+	request_auto_reconcile()
 	return true
 
 func apply_public_snapshot(data: Dictionary)->void:

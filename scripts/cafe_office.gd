@@ -656,6 +656,8 @@ func rebuild() -> void:
 				var state := "В пути" if parcel.remaining>0 else ("Сборщик несёт" if parcel.get("installer_state","")=="walking" else "Сборщик ждёт" if parcel.get("installer_state","")=="waiting" else "Сборщик устанавливает" if parcel.get("installer_state","")=="installing" else "Сборщик назначен") if bool(parcel.get("installer",false)) else "Несёт игрок" if parcel.owner>0 else "Доставлено · ждёт ручной установки"
 				var method: String="сборщик" if bool(parcel.get("installer",false)) else "вручную"
 				label(content,game.shop.parcel_name(parcel)+" · "+method+" · "+state+(" · место %d"%parcel.station if parcel.station>0 else ""))
+				var plan_note: String=game.shop.parcel_plan_note(parcel)
+				if not plan_note.is_empty(): label(content,plan_note,14)
 			if not progress.delivery_history.is_empty():
 				label(content,"ЗАВЕРШЕНО",19)
 				for completed in progress.delivery_history:
@@ -811,7 +813,8 @@ func training_queue_page(host: bool) -> void:
 	if views.is_empty(): label(content,"Ожидающих и активных курсов нет.",14)
 	for course in views:
 		var mode_label: String="Вместе" if str(course.mode)=="together" else "По группам"
-		label(content,"Курс #%d · %s · %s"%[int(course.id),mode_label,str(course.state)],17)
+		var auto_label: String=" · автоматически по плану" if bool(course.get("automatic",false)) else ""
+		label(content,"Курс #%d · %s · %s%s"%[int(course.id),mode_label,str(course.state),auto_label],17)
 		for assignment in course.assignments:
 			label(content,"  %s · %s · столы %s"%[Definition.DISHES.get(str(assignment.dish),str(assignment.dish)),str(assignment.name),", ".join(assignment.station_ids.map(func(id):return str(id)))],14)
 		if bool(course.editable): button(content,"Редактировать ожидающий курс",func():course_editor_open(0,int(course.id)),host)

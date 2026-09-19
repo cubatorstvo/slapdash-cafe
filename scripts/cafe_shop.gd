@@ -103,6 +103,27 @@ func equipment_catalog(type_id: String) -> Array:
 	result.sort()
 	return result
 
+func group_purchase_snapshot(group_id: String,type_id: String) -> Dictionary:
+	if group_id.is_empty(): return {}
+	var group: Dictionary=game.service.table_group_by_id(group_id)
+	if group.is_empty() or str(group.type_id)!=type_id: return {}
+	return {"id":str(group.id),"name":str(group.name),"type_id":str(group.type_id),"active_dishes":group.active_dishes.duplicate(),"curriculum":group.curriculum.duplicate(true),"plan_revision":int(group.plan_revision)}
+
+func parcel_plan_note(parcel: Dictionary) -> String:
+	var group_id:=str(parcel.get("planned_group",""))
+	if group_id.is_empty(): return ""
+	var snapshot: Dictionary=parcel.get("planned_group_snapshot",{}) if parcel.get("planned_group_snapshot",{}) is Dictionary else {}
+	var current: Dictionary=game.service.table_group_by_id(group_id)
+	if current.is_empty(): return "Группа из заказа удалена · будет создана отдельная группа по сохранённому плану."
+	if snapshot.is_empty(): return ""
+	if int(snapshot.get("plan_revision",0))!=int(current.get("plan_revision",0)):
+		return "План группы изменился после заказа · при установке применится текущая версия."
+	var bought: Dictionary={}
+	var now: Dictionary={}
+	for item in snapshot.get("curriculum",[]): bought[str(item.get("dish_id",""))]=int(item.get("record_id",0))
+	for item in current.get("curriculum",[]): now[str(item.get("dish_id",""))]=int(item.get("record_id",0))
+	return "План группы изменился после заказа · при установке применится текущая версия." if bought!=now else ""
+
 func group_training_plan(group_id: String,type_id: String) -> Dictionary:
 	if group_id.is_empty(): return {}
 	var group: Dictionary=game.service.table_group_by_id(group_id)
@@ -343,6 +364,7 @@ func _install_parcel(parcel: Dictionary) -> String:
 				if item not in station.upgrades: station.upgrades.append(item)
 			elif ITEMS.has(item) and ITEMS[item].kind=="equipment" and item not in station.equipment: station.equipment.append(item)
 		station.apply_equipment(); station.apply_upgrades()
+		game.service.request_auto_training_reconcile()
 	elif spec.kind=="station":
 		if game.service.by_id(int(parcel.station))!=null: return "Место пока занято."
 		var station=game.service.add_station(str(parcel.item),int(parcel.station)-1,false,true)
@@ -352,11 +374,14 @@ func _install_parcel(parcel: Dictionary) -> String:
 			if item=="sauce_ramp":
 				if item not in station.upgrades: station.upgrades.append(item)
 			elif ITEMS[item].kind=="equipment" and item not in station.equipment: station.equipment.append(item)
-		station.method_plan=parcel.get("method_plan",{}).duplicate(true)
 		station.apply_equipment(); station.apply_upgrades()
 		var planned_group: String=str(parcel.get("planned_group",""))
-		if not planned_group.is_empty() and not game.service.table_group_by_id(planned_group).is_empty(): game.service.add_station_to_group(planned_group,station.station_id)
+		var purchase_snapshot: Dictionary=parcel.get("planned_group_snapshot",{}) if parcel.get("planned_group_snapshot",{}) is Dictionary else {}
+		var legacy_plan: Dictionary=parcel.get("method_plan",{}) if parcel.get("method_plan",{}) is Dictionary else {}
+		var group_error: String=game.service.attach_purchased_station_to_group(station,planned_group,purchase_snapshot,legacy_plan)
+		if not group_error.is_empty(): return group_error
 		game.service.assign_clones()
+		game.service.request_auto_training_reconcile()
 	elif spec.kind=="lab_upgrade":
 		if game.laboratory.blocks_sleep() or game.laboratory.calibrator.busy(): return "Сначала заверши работу с приборами."
 		var error:=LabPolicy.error(p,str(parcel.item))
@@ -547,6 +572,7 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 		group=game.service.table_group_by_id(group_id)
 		if group.is_empty() or str(group.type)!=type_id: return "Выбранная группа не подходит этой кухне."
 	var plan:=group_training_plan(group_id,type_id)
+	var group_snapshot:=group_purchase_snapshot(group_id,type_id)
 	var unit_price: int=int(ITEMS[type_id].price)+equipment_cost
 	var total: int=unit_price*unique_ids.size()
 	if p.cash<total: return "Не хватает денег на выбранные комплекты."
@@ -555,7 +581,7 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 		var station_id: int=int(unique_ids[index])
 		var contents: Array=[type_id]
 		contents.append_array(chosen_equipment)
-		p.deliveries.append(_new_delivery(type_id,station_id,contents,bool(with_installers),8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"unit_price":unit_price}))
+		p.deliveries.append(_new_delivery(type_id,station_id,contents,bool(with_installers),8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"planned_group_snapshot":group_snapshot.duplicate(true),"unit_price":unit_price}))
 	p.revision+=1
 	log_event("station_batch_ordered",{"type":type_id,"stations":unique_ids,"equipment":chosen_equipment,"group":group_id,"installer":with_installers,"price":total})
 	game.service.feed_system("batch",{"stations":unique_ids,"group":group_id},unique_ids.size())

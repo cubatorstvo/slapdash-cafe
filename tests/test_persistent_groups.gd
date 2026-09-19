@@ -174,6 +174,8 @@ func run()->void:
 	check(int(service.desired_source("2-3-4-5","potato").id)==901,"Legacy method_plan becomes explicit desired curriculum")
 	check(service.by_id(2).recipes.has("potato") and int(service.by_id(2).method_sources.potato.id)==900,"Migration preserves actual learned recipe and source separately")
 	check(service.by_id(2).active_menu_initialized and "potato" in service.by_id(2).active_dishes,"Migration initializes explicit active menu from prior working behavior")
+	var migrated_pending: Dictionary=service.training_queue.pending_source(2,"potato")
+	check(int(migrated_pending.get("id",0))==901,"T23 migrated desired method becomes an actual queued training task without manual reassignment")
 	var migrated_save: Dictionary=service.save_data()
 	check(migrated_save.version==21 and migrated_save.table_group_registry.groups.has("2-3-4-5"),"Migrated cafe subsequently saves only the persistent v21 group identity")
 

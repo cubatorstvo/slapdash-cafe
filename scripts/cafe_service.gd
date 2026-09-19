@@ -327,6 +327,9 @@ func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Di
 	if station.recipes.has(dish): return {"id":0,"name":"Локальный способ","legacy":true}
 	return {}
 
+func request_auto_training_reconcile() -> void:
+	if is_instance_valid(training_queue): training_queue.request_auto_reconcile()
+
 func _sync_station_group_intent(station: Node3D) -> void:
 	if station==null or station.manual_station or station.masterclass_station: return
 	var group: Dictionary=group_registry.for_station(station.station_id)
@@ -347,6 +350,7 @@ func _sync_group_intent(group_id: String) -> void:
 	var group: Dictionary=group_registry.by_id(group_id)
 	if group.is_empty(): return
 	for raw_id in group.station_ids: _sync_station_group_intent(by_id(int(raw_id)))
+	request_auto_training_reconcile()
 
 func _sync_all_group_intent() -> void:
 	for group in group_registry.all(): _sync_group_intent(str(group.id))
@@ -557,12 +561,17 @@ func station_group_status(station_id: int,dish: String) -> String:
 	if is_instance_valid(training_queue):
 		var queue_state: String=training_queue.station_status(station_id,dish)
 		if not queue_state.is_empty(): return queue_state
+	var actual: Dictionary=station.method_sources.get(dish,{})
+	var desired_mastered: bool=not desired.is_empty() and station.recipes.has(dish) and int(actual.get("id",0))==int(desired.record_id)
 	var missing: Array=Definition.missing_equipment(dish,station.equipment)
+	if desired_mastered:
+		if not missing.is_empty(): return "ждёт оснащение"
+		if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
+		return "освоено" if active else "освоено · выключено в меню"
+	if not desired.is_empty() and masterclass_by_id(int(desired.record_id)).is_empty(): return "нужна действующая запись для нового обучения"
 	if not missing.is_empty(): return "ждёт оснащение"
 	if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
 	if not desired.is_empty():
-		var actual: Dictionary=station.method_sources.get(dish,{})
-		if station.recipes.has(dish) and int(actual.get("id",0))==int(desired.record_id): return "освоено" if active else "освоено · выключено в меню"
 		if station.recipes.has(dish): return "работает по старому · ожидает переобучения" if active else "старый способ · выключено в меню"
 		return "ожидает обучения" if active else "обучение запланировано · блюдо выключено"
 	if station.recipes.has(dish): return "освоено" if active else "освоено · выключено в меню"
@@ -592,6 +601,39 @@ func add_station_to_group(group_id: String,station_id: int) -> String:
 	_ensure_groups()
 	_sync_all_group_intent()
 	progress.revision+=1
+	return ""
+
+func attach_purchased_station_to_group(station: Node3D,planned_group: String,purchase_snapshot: Dictionary={},legacy_plan: Dictionary={}) -> String:
+	if station==null or station.manual_station or station.masterclass_station: return "Стол недоступен."
+	if planned_group.is_empty(): return ""
+	var current: Dictionary=group_registry.by_id(planned_group)
+	if not current.is_empty() and str(current.type_id)==station.type_id:
+		return add_station_to_group(planned_group,station.station_id)
+	var template: Dictionary={}
+	if not purchase_snapshot.is_empty() and str(purchase_snapshot.get("type_id",purchase_snapshot.get("type","")))==station.type_id:
+		template={
+			"active_dishes":purchase_snapshot.get("active_dishes",[]).duplicate(),
+			"curriculum":purchase_snapshot.get("curriculum",[]).duplicate(true),
+			"plan_revision":int(purchase_snapshot.get("plan_revision",1))
+		}
+	elif not legacy_plan.is_empty():
+		var curriculum: Array=[]
+		var active: Array=[]
+		for dish in Definition.TYPES[station.type_id].dishes:
+			var raw: Dictionary=legacy_plan.get(str(dish),{}) if legacy_plan.get(str(dish),{}) is Dictionary else {}
+			var record_id:=int(raw.get("id",raw.get("record_id",0)))
+			if record_id<=0: continue
+			curriculum.append({"dish_id":str(dish),"record_id":record_id,"revision":maxi(1,int(raw.get("revision",1)))})
+			active.append(str(dish))
+		template={"active_dishes":active,"curriculum":curriculum,"plan_revision":1}
+	if template.is_empty(): return ""
+	var source_name:=str(purchase_snapshot.get("name","Группа заказа")).strip_edges()
+	if source_name.is_empty(): source_name="Группа заказа"
+	var created:=group_registry.create_group([station.station_id],station.type_id,source_name+" · отдельная",template)
+	if created.is_empty(): return "Не удалось восстановить план группы из заказа."
+	_sync_group_intent(str(created.id))
+	progress.revision+=1
+	announce("Группа «%s» была удалена. Стол %d получил отдельную группу с планом из заказа."%[source_name,station.station_id])
 	return ""
 
 func compatible_training_station_ids(record_id: int) -> Array:
@@ -1668,6 +1710,7 @@ func load_data(data: Dictionary) -> bool:
 		training_queue.reset()
 		staff_training.reset()
 		training_queue.migrate_from_plans()
+	request_auto_training_reconcile()
 	return true
 
 func valid_tracks(tracks: Variant, type_id: String) -> bool:
@@ -1889,6 +1932,7 @@ func normalize_workers() -> void:
 func assign_clones() -> void:
 	# Existing saves keep their workers at 100%; unassigned workers retain individual tempo.
 	normalize_workers()
+	var changed:=false
 	for station in stations:
 		if station.manual_station or station.staffed<0: continue
 		while station.staffed<station.role_count():
@@ -1901,8 +1945,10 @@ func assign_clones() -> void:
 			station.crew[station.staffed].tempo=worker.tempo
 			station.crew[station.staffed].rest=worker.get("rest",1.0)
 			station.staffed+=1
+			changed=true
 			progress.revision+=1
 	progress.free_clones=progress.free_workers.size()
+	if changed: request_auto_training_reconcile()
 
 func clone_options() -> Array:
 	var options: Array=[]
