@@ -55,11 +55,13 @@ func setup() -> void:
 		for i in range(60): counter_frames.append(counter_frame.duplicate(true))
 		game.service.masterclasses.append(MasterclassLibrary.make_record(502,"potato","counter",[{"group":1,"frames":counter_frames}],1.0,counter_source.model.quality(),"Сетевая картошка"))
 		game.service.next_masterclass_id=503
-		game.service.table_group_names["2-3"]="Сетевые стойки"
+		if not game.service.create_table_group([2,3],"Сетевые стойки").is_empty(): fail("Host could not create shared persistent table group"); return
+		var shared_group: Dictionary=game.service.table_groups().filter(func(value):return value.stations==[2,3])[0]
+		var shared_group_id: String=str(shared_group.id)
 		game.service.guests_arrived=5
 		game.service.order_stats={"orders_arrived":5,"orders_completed":2,"orders_partial":1,"orders_failed":2,"portions_ordered":16,"portions_served":11,"portions_unserved":5}
 		game.service.analytics.losses.busy=3
-		game.service.analytics.loss_details["busy|potato|2-3"]={"reason":"busy","dish":"potato","count":3,"portions_unserved":3,"stations":[2,3],"group":"2-3"}
+		game.service.analytics.loss_details["busy|potato|2-3"]={"reason":"busy","dish":"potato","count":3,"portions_unserved":3,"stations":[2,3],"group":shared_group_id}
 		game.service.feed_system("batch",{"stations":[7,8]},2)
 		game.service.by_id(3).order_portions_total=10
 		game.service.by_id(3).order_portions_done=4
@@ -125,8 +127,9 @@ func _process(delta: float) -> bool:
 		if game.service.progress.popularity != 10 or not "sign" in game.service.progress.decorations or not is_instance_valid(game.service.by_id(3).upgrade_view):
 			fail("Shared cafe progression missing")
 			return false
-		if str(game.service.table_group_names.get("2-3",""))!="Сетевые стойки":
-			fail("Shared table group name missing")
+		var shared_groups: Array=game.service.table_groups().filter(func(value):return value.stations==[2,3] and str(value.name)=="Сетевые стойки")
+		if shared_groups.size()!=1:
+			fail("Shared persistent table group missing")
 			return false
 		if game.service.staff_training.is_active(): saw_staff_training=true
 	if not game.session.is_guest():
