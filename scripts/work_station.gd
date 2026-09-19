@@ -37,6 +37,9 @@ var state := "idle"
 var order_dish := ""
 var order_tick := 0.0
 var order_tempo := 1.0
+var order_portions_total := 1
+var order_portions_done := 0
+var order_paid := 0
 var customer_id := -1
 var pending_teacher := 0
 var pending_dish := ""
@@ -296,7 +299,9 @@ func refresh(local_peer: int, delta: float) -> void:
 		if type_id=="counter":
 			for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
 		view.station_label.text = "ШЕФ-СТАНЦИЯ · МАСТЕР-КЛАСС" if masterclass_station else "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
-	if not manual_station: view.station_label.text="СТАНЦИЯ %d · [E] ПОКАЖИ КАК"%station_id
+	if not manual_station:
+		view.station_label.text="СТАНЦИЯ %d · [E] ПОКАЖИ КАК"%station_id
+		if order_portions_total>1 and state in ["cooking","serving"]: view.station_label.text="СТАНЦИЯ %d · ЗАКАЗ %d/%d · +%d"%[station_id,order_portions_done,order_portions_total,order_paid]
 	if not manual_station and staffed>=0:
 		for role in range(role_count()):
 			if role>=staffed:
@@ -372,6 +377,9 @@ func world_entry() -> Dictionary:
 	data.erase("drafts")
 	data.known = recipes.keys()
 	data.order_dish = order_dish
+	data.order_portions_total=order_portions_total
+	data.order_portions_done=order_portions_done
+	data.order_paid=order_paid
 	data.customer_id = customer_id
 	data.customer_order = customer_order
 	data.recipe_times = {}

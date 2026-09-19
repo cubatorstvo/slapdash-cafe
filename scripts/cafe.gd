@@ -556,6 +556,8 @@ func new_cafe() -> void:
 	service.served = 0
 	service.missed = 0
 	service.revenue = 0
+	service.guests_arrived=0
+	service.order_stats=service.blank_order_stats()
 	service.open_for_business = false
 	service.initial_stations()
 	laboratory.recover()
