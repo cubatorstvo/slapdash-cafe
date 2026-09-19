@@ -6,6 +6,7 @@ const P = preload("res://scripts/cafe_progression.gd")
 const Style = preload("res://scripts/cafe_theme.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
+const Insights = preload("res://scripts/cafe_insights.gd")
 var game: Node3D
 var panel: PanelContainer
 var content: VBoxContainer
@@ -30,6 +31,7 @@ var scale_slots: Array=[]
 var scale_equipment: Array=[]
 var scale_group := ""
 var send_installers := false
+var stats_focus: Dictionary={}
 
 func _ready() -> void:
 	layer = 17
@@ -55,7 +57,7 @@ func _ready() -> void:
 	timer.add_theme_color_override("font_color", Style.GOLD)
 	var tabs := HBoxContainer.new()
 	column.add_child(tabs)
-	for entry in [["overview", "Кафе"], ["stations", "Интернет-магазин"], ["videos", "Видеотека"], ["groups", "Группы столов"], ["laboratory", "Лаборатория"], ["lounge", "Комната отдыха"], ["deliveries", "Доставки"], ["star", "Звёзды"]]:
+	for entry in [["overview","Кафе"],["stats","Лента / статистика"],["stations","Интернет-магазин"],["videos","Видеотека"],["groups","Группы столов"],["laboratory","Лаборатория"],["lounge","Комната отдыха"],["deliveries","Доставки"],["star","Звёзды"]]:
 		var key: String = entry[0]
 		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
 	scroll = ScrollContainer.new()
@@ -87,6 +89,13 @@ func button(parent: Node, text: String, callback: Callable, enabled := true) -> 
 	parent.add_child(node)
 	return node
 
+func metric(parent: Node,text: String,tooltip: String,callback := Callable()) -> Control:
+	var node: Control
+	if callback.is_valid(): node=button(parent,text,callback)
+	else: node=label(parent,text,16)
+	node.tooltip_text=tooltip
+	return node
+
 func opened() -> bool: return panel.visible
 func open(page := "overview") -> void:
 	tab = page
@@ -99,6 +108,7 @@ func open(page := "overview") -> void:
 	confirm_delete_masterclass = -1
 	group_pending_assignment={}
 	group_selected_stations=[]
+	stats_focus={}
 	panel.show()
 	stamp = ""
 	rebuild()
@@ -182,7 +192,7 @@ func rebuild() -> void:
 	if not host: label(content,"Покупки подтверждает хозяин кафе. Коробки можно распаковывать вместе.",15)
 	match tab:
 		"overview":
-			var goal: Dictionary=preload("res://scripts/cafe_journey.gd").current(progress,service.stations,service.served,service.open_for_business)
+			var goal: Dictionary=preload("res://scripts/cafe_journey.gd").current(progress,service.stations,service.served,service.open_for_business,service)
 			label(content,str(goal.chapter),16)
 			label(content,str(goal.title),22)
 			label(content,str(goal.detail),17)
@@ -198,6 +208,11 @@ func rebuild() -> void:
 			label(content,"Гости: пришло %d · обслужено %d · ушло %d"%[service.guests_arrived,service.served,service.missed],15)
 			label(content,"Заказы: завершено %d · частично %d · не выполнено %d"%[int(service.order_stats.orders_completed),int(service.order_stats.orders_partial),int(service.order_stats.orders_failed)],15)
 			label(content,"Порции: заказано %d · выдано %d · не получено %d"%[int(service.order_stats.portions_ordered),int(service.order_stats.portions_served),int(service.order_stats.portions_unserved)],15)
+			var completion: float=Insights.completion_percent(int(service.order_stats.orders_completed),int(service.order_stats.orders_arrived))
+			label(content,"%d из %d заказов выполнено · %.0f%% · доход %d"%[int(service.order_stats.orders_completed),int(service.order_stats.orders_arrived),completion,service.revenue],16)
+			var bottleneck: Dictionary=service.top_bottleneck()
+			if not bottleneck.is_empty(): label(content,"Сейчас мешает: %s (%d). %s"%[bottleneck.label,bottleneck.count,bottleneck.suggestion],15)
+			button(content,"Открыть ленту и подробную статистику",func():tab="stats";stamp="";rebuild())
 			if progress.journey_auto_served>0:
 				label(content,"Другие пути развития: повысить формулу в лаборатории или улучшить прогноз отдыха. Выбирай то, что сейчас полезнее твоему кафе.",15)
 				button(content,"Формулы и выращивание",func():tab="laboratory";stamp="";rebuild())
@@ -209,6 +224,8 @@ func rebuild() -> void:
 			if confirm_reset:
 				button(content,"Подтвердить новое прохождение",func():send({"action":"new_cafe"},true),host and not service.any_training() and not progress.busy())
 			else: button(content,"Новое прохождение…",func():confirm_reset=true;rebuild())
+		"stats":
+			stats_page()
 		"stations", "decor", "night":
 			label(content,"ТЯП-ЛЯП МАРКЕТ · доставка в коробках",23)
 			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
@@ -343,6 +360,15 @@ func rebuild() -> void:
 						var station_id: int=int(raw_id)
 						readiness.append("%d: %s"%[station_id,service.station_group_status(station_id,str(dish))])
 					label(content,"%s → %s → %s"%[Definition.DISHES.get(str(dish),str(dish)),service.source_label(first_id,str(dish)),"; ".join(readiness)],15)
+				var performance: Dictionary=service.group_performance(group)
+				var total_group: int=int(performance.orders_completed)+int(performance.losses)
+				var group_pct: float=Insights.completion_percent(int(performance.orders_completed),total_group)
+				var perf_line:=label(content,"Результат: %d из %d заказов · %.0f%% · %d порций · доход %d"%[int(performance.orders_completed),total_group,group_pct,int(performance.portions_served),int(performance.revenue)],15)
+				perf_line.tooltip_text="Статистика суммирует работу текущих столов группы; потери привязаны к группе, известной в момент события."
+				if not performance.loss_reasons.is_empty():
+					var loss_parts: Array=[]
+					for reason in performance.loss_reasons: loss_parts.append("%s: %d"%[Insights.reason_label(str(reason)),int(performance.loss_reasons[reason])])
+					label(content,"Потери: "+", ".join(loss_parts),14)
 			if group_selected_stations.is_empty():
 				label(content,"Выбери столы галочками или кнопкой группы. Для записи можно сразу выбрать все совместимые столы.",16)
 			else:
@@ -411,6 +437,80 @@ func rebuild() -> void:
 				button(content,invite_text,func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
 	scroll.scroll_vertical = offset
+
+
+func set_stats_focus(value: Dictionary)->void:
+	stats_focus=value.duplicate(true)
+	stamp=""
+	rebuild()
+
+func stats_page()->void:
+	var service=game.service
+	var stats: Dictionary=service.order_stats
+	label(content,"ЛЕНТА И СТАТИСТИКА",23)
+	var arrived: int=int(stats.orders_arrived)
+	var completed: int=int(stats.orders_completed)
+	var completion: float=Insights.completion_percent(completed,arrived)
+	metric(content,"Гости · пришло %d · обслужено %d · ушло %d"%[service.guests_arrived,service.served,service.missed],"Гость считается один раз независимо от числа порций.")
+	metric(content,"Заказы · %d из %d выполнено · %.0f%% · частично %d · не выполнено %d"%[completed,arrived,completion,int(stats.orders_partial),int(stats.orders_failed)],"Один гость с десятью порциями — один заказ. Нажми причины ниже, чтобы увидеть блюда, группы и столы.")
+	metric(content,"Порции · %d из %d выдано · %.0f%% · не получено %d"%[int(stats.portions_served),int(stats.portions_ordered),Insights.completion_percent(int(stats.portions_served),int(stats.portions_ordered)),int(stats.portions_unserved)],"Порции считаются фактически: заказ ×10 добавляет десять заказанных порций.")
+	metric(content,"Доход · %d"%service.revenue,"Сумма всех однажды принятых порций и завершённых одно-порционных заказов.")
+	var bottleneck: Dictionary=service.top_bottleneck()
+	if not bottleneck.is_empty():
+		label(content,"НАБЛЮДАЕМОЕ УЗКОЕ МЕСТО",19)
+		label(content,"%s · %d случаев\n%s"%[bottleneck.label,bottleneck.count,bottleneck.suggestion],16)
+
+	label(content,"ОСНОВНЫЕ ПРИЧИНЫ ПОТЕРЬ",19)
+	if service.analytics.losses.is_empty(): label(content,"Пока нет зарегистрированных потерь.",15)
+	else:
+		var reasons: Array=service.analytics.losses.keys()
+		reasons.sort_custom(func(a,b):return int(service.analytics.losses[a])>int(service.analytics.losses[b]))
+		for reason in reasons:
+			var count: int=int(service.analytics.losses[reason])
+			var pct: float=0.0 if service.missed<=0 else float(count)/float(service.missed)*100.0
+			var node:=button(content,"%s · %d · %.0f%%"%[Insights.reason_label(str(reason)),count,pct],func():set_stats_focus({"reason":str(reason)}))
+			node.tooltip_text=Insights.suggestion(str(reason))
+
+	label(content,"СИСТЕМНАЯ ЛЕНТА",19)
+	if service.analytics.feed.is_empty(): label(content,"Событий пока нет. Потери, обучение и сборщики появятся здесь.",15)
+	for entry in service.analytics.feed:
+		var source: String="[ИГРОК · %s] "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "[СИСТЕМА] "
+		var text: String=source+service.feed_text(entry)
+		var event_button:=button(content,text,func():set_stats_focus(entry))
+		var reason: String=str(entry.get("reason",""))
+		var tip: String="Нажми, чтобы открыть связанное блюдо, группу и столы."
+		if not reason.is_empty(): tip+="\n"+Insights.suggestion(reason)
+		event_button.tooltip_text=tip
+
+	if not stats_focus.is_empty():
+		label(content,"ПОДРОБНОСТИ",20)
+		var reason: String=str(stats_focus.get("reason",""))
+		var dish: String=str(stats_focus.get("dish",""))
+		if not dish.is_empty(): label(content,"Блюдо: "+str(Definition.DISHES.get(dish,dish)),17)
+		if not reason.is_empty(): label(content,"Причина: %s\nРекомендация: %s"%[Insights.reason_label(reason),Insights.suggestion(reason)],16)
+		var group_id: String=str(stats_focus.get("group",""))
+		if not group_id.is_empty():
+			var group: Dictionary=service.table_group_by_id(group_id)
+			label(content,"Группа: "+(str(group.get("name",group_id)) if not group.is_empty() else group_id),16)
+		var stations: Array=stats_focus.get("stations",[]) if stats_focus.get("stations",[]) is Array else []
+		if not stations.is_empty():
+			label(content,"Столы: "+", ".join(stations.map(func(id):return str(id))),16)
+			for raw_id in stations:
+				var station_id: int=int(raw_id)
+				var station=service.by_id(station_id)
+				if station==null: continue
+				var details: String="Стол %d · %s"%[station_id,service.station_group_status(station_id,dish) if not dish.is_empty() else "активен"]
+				if not dish.is_empty():
+					details+=" · запись: "+service.source_label(station_id,dish)
+					var source_data: Dictionary=service._method_source(station,dish)
+					var record: Dictionary=service.masterclass_by_id(int(source_data.get("id",0)))
+					if not record.is_empty(): details+=" · %.1f с · %s"%[float(record.get("duration",0.0)),str(record.get("effectiveness",{}).get("label","Обычная"))]
+				label(content,details,14)
+		if stations.is_empty() and not reason.is_empty():
+			for detail in service.analytics.loss_details.values():
+				if str(detail.get("reason",""))!=reason: continue
+				label(content,"%s · %d случаев · столы %s"%[Definition.DISHES.get(str(detail.get("dish","")),str(detail.get("dish",""))),int(detail.get("count",0)),", ".join(detail.get("stations",[]).map(func(id):return str(id)))],14)
+		button(content,"Закрыть подробности",func():set_stats_focus({}))
 
 func shop_button(item: String, station_id: int, installed := false) -> void:
 	var p = game.service.progress
