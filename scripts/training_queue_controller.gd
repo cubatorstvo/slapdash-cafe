@@ -182,7 +182,7 @@ func _intent_from_captured(captured: Array)->Array:
 		result.append({"record_id":int(spec.record_id),"dish":str(spec.dish),"station_ids":spec.station_ids.duplicate(),"versions":spec.versions.duplicate(true)})
 	return result
 
-func _build_course_batches(course: Dictionary,captured: Array,mode: String)->void:
+func _build_course_batches(course: Dictionary,captured: Array,mode: String,preferred_group_order: Array=[])->void:
 	course.batch_ids=[]
 	if mode=="together":
 		var all_ids: Array=[]
@@ -202,6 +202,14 @@ func _build_course_batches(course: Dictionary,captured: Array,mode: String)->voi
 			if group_id not in group_order:
 				group_order.append(group_id)
 				group_specs[group_id]=[]
+	if not preferred_group_order.is_empty():
+		var ordered: Array=[]
+		for raw_group_id in preferred_group_order:
+			var wanted: String=str(raw_group_id)
+			if wanted in group_order and wanted not in ordered: ordered.append(wanted)
+		for group_id in group_order:
+			if group_id not in ordered: ordered.append(group_id)
+		group_order=ordered
 	for group_id in group_order:
 		var group: Dictionary=service.table_group_by_id(str(group_id))
 		for spec in captured:
@@ -270,7 +278,7 @@ func course_view(course_id: int)->Dictionary:
 			var lesson:=_lesson(int(lesson_id))
 			lesson_rows.append({"id":int(lesson.id),"dish":str(lesson.dish),"record_id":int(lesson.record_id),"name":str(lesson.record.get("name","Запись")),"state":str(lesson.state),"stations":lesson.station_ids.duplicate()})
 		batch_rows.append({"id":int(batch.id),"state":str(batch.state),"stations":batch.station_ids.duplicate(),"blocked_reason":str(batch.get("blocked_reason","")),"lessons":lesson_rows})
-	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
+	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"group_order":course.get("group_order",[]).duplicate(),"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
 
 func course_views()->Array:
 	var result: Array=[]
@@ -279,7 +287,7 @@ func course_views()->Array:
 		result.append(course_view(int(course.id)))
 	return result
 
-func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1)->String:
+func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[])->String:
 	var course:=_course(course_id)
 	if course.is_empty(): return "Курс не найден."
 	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающий курс."
@@ -296,7 +304,8 @@ func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1)
 	course.peer=int(peer)
 	course.signature=_signature(captured,mode)
 	course.assignments=_intent_from_captured(captured)
-	_build_course_batches(course,captured,mode)
+	course.group_order=group_order.duplicate()
+	_build_course_batches(course,captured,mode,group_order)
 	_update_course_state(course_id)
 	revision+=1
 	service.progress.revision+=1
@@ -328,7 +337,7 @@ func migrate_from_plans()->void:
 		var command: String="migration:%s:%d"%[str(group.id),int(group.get("plan_revision",1))]
 		enqueue_course(assignments,"together",command,1)
 
-func enqueue_course(assignments: Array,mode := "together",command_id := "",peer := 1)->Dictionary:
+func enqueue_course(assignments: Array,mode := "together",command_id := "",peer := 1,group_order: Array=[])->Dictionary:
 	var command:=str(command_id)
 	if not command.is_empty() and command_courses.has(command):
 		return {"error":"","course_id":int(command_courses[command]),"duplicate":true}
@@ -345,10 +354,10 @@ func enqueue_course(assignments: Array,mode := "together",command_id := "",peer 
 	_supersede_waiting(captured)
 	var course_id:=next_course_id
 	next_course_id+=1
-	var course: Dictionary={"id":course_id,"command_id":command,"mode":mode,"state":"queued","batch_ids":[],"signature":signature,"peer":int(peer),"created_day":service.progress.day,"assignments":_intent_from_captured(captured)}
+	var course: Dictionary={"id":course_id,"command_id":command,"mode":mode,"state":"queued","batch_ids":[],"signature":signature,"peer":int(peer),"created_day":service.progress.day,"assignments":_intent_from_captured(captured),"group_order":group_order.duplicate()}
 	courses.append(course)
 	if not command.is_empty(): command_courses[command]=course_id
-	_build_course_batches(course,captured,mode)
+	_build_course_batches(course,captured,mode,group_order)
 	_update_course_state(course_id)
 	revision+=1
 	service.progress.revision+=1
