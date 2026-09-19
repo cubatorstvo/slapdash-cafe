@@ -189,7 +189,7 @@ func snapshot()->Dictionary:
 	for key in actors:
 		var actor: Node3D=actors[key]
 		people.append({"key":key,"name":str(actor_meta[key].name),"position":actor.position,"yaw":actor.rotation.y,"watching":phase=="watching"})
-	return {"active":true,"revision":revision,"phase":phase,"dish":dish,"record_id":record_id,"stations":station_ids.duplicate(),"actors":people}
+	return {"active":true,"revision":revision,"phase":phase,"dish":dish,"record_id":record_id,"record_name":str(record.get("name","Запись")),"stations":station_ids.duplicate(),"actors":people}
 
 func apply_snapshot(data: Dictionary)->void:
 	if not data.get("active",false):
@@ -200,6 +200,7 @@ func apply_snapshot(data: Dictionary)->void:
 	phase=str(data.get("phase",""))
 	dish=str(data.get("dish",""))
 	record_id=int(data.get("record_id",0))
+	record={"id":record_id,"name":str(data.get("record_name","Запись")),"dish":dish}
 	station_ids=data.get("stations",[]).duplicate()
 	revision=int(data.get("revision",revision))
 	for station in service.stations:

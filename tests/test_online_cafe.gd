@@ -10,6 +10,8 @@ var timer := 0.0
 var started := 0
 var quit_at := 0.0
 var saw_parallel := false
+var saw_staff_training := false
+var started_staff_training := false
 func _initialize() -> void: setup.call_deferred()
 func setup() -> void:
 	role = OS.get_cmdline_user_args()[0]
@@ -46,7 +48,14 @@ func setup() -> void:
 			for i in range(900): frames.append(frame.duplicate(true))
 			movie_tracks.append({"group":movie_role+1,"frames":frames})
 		game.service.masterclasses=[MasterclassLibrary.make_record(501,"meal","kitchen",movie_tracks,15.0,movie_source.model.quality(),"Сетевые хайлайты")]
-		game.service.next_masterclass_id=502
+		var counter_source=game.service.by_id(3)
+		counter_source.model.reset("potato")
+		var counter_frames: Array=[]
+		var counter_frame: Dictionary=counter_source.model.snapshot()
+		for i in range(60): counter_frames.append(counter_frame.duplicate(true))
+		game.service.masterclasses.append(MasterclassLibrary.make_record(502,"potato","counter",[{"group":1,"frames":counter_frames}],1.0,counter_source.model.quality(),"Сетевая картошка"))
+		game.service.next_masterclass_id=503
+		game.service.table_group_names["2-3"]="Сетевые стойки"
 		game.annex.refresh_shell()
 	barrier = Barrier.new()
 	barrier.name = "OnlineBarrier"
@@ -106,6 +115,10 @@ func _process(delta: float) -> bool:
 		if game.service.progress.popularity != 10 or not "sign" in game.service.progress.decorations or not is_instance_valid(game.service.by_id(3).upgrade_view):
 			fail("Shared cafe progression missing")
 			return false
+		if str(game.service.table_group_names.get("2-3",""))!="Сетевые стойки":
+			fail("Shared table group name missing")
+			return false
+		if game.service.staff_training.is_active(): saw_staff_training=true
 	if not game.session.is_guest(): game.service.advance(delta)
 	var teaching = game.local_station()
 	if teaching != null and teaching.training.phase == "recording":
@@ -135,10 +148,17 @@ func host_tick() -> void:
 		first.model.wine=775
 		game.session.send_input(first,{}, {"feed":true})
 		stage = 1
-	elif stage == 1 and first.training.phase == "recording" and second.training.phase == "recording":
-		print("READY: late join")
-		saw_parallel = true
-		stage = 2
+	elif stage == 1:
+		var guest_id:=member_named("guest")
+		if not started_staff_training and guest_id>0 and barrier.has_from("movie-checked",guest_id):
+			var lesson_error: String=game.service.start_group_training(502,[3])
+			if not lesson_error.is_empty(): fail("Staff training did not start: "+lesson_error); return
+			started_staff_training=true
+			print("CHECK: host assigned shared staff television training")
+		if first.training.phase == "recording" and second.training.phase == "recording":
+			print("READY: late join")
+			saw_parallel = true
+			stage = 2
 	elif stage == 2 and game.session.members.size() == 3 and second.training.phase == "idle":
 		act("cancel", 1)
 		game.player.global_position = kitchen.to_global(Vector3(-1.3, 0.02, 1.8))
@@ -193,6 +213,7 @@ func guest_tick() -> void:
 		if first.training.phase!="recording": fail("Shared TV playback interrupted host lesson"); return
 		if game.service.remote_movie_record.get("tracks",[]).is_empty(): fail("Guest did not receive highlight frames"); return
 		print("CHECK: guest watches shared highlights while host lesson keeps running")
+		barrier.send("movie-checked")
 		game.player.global_position = second.to_global(Vector3(0, 0.02, 1.8))
 		stage = 1
 		quit_at = timer + 0.3
@@ -225,6 +246,10 @@ func guest_tick() -> void:
 		if kitchen.training.phase != "recording": fail("Guest left after kitchen already idle")
 		if not saw_parallel: fail("Parallel training not seen")
 		if not barrier.has_from("kitchen-release", 1): fail("kitchen-release not from host")
+		if not saw_staff_training: return
+		var trained_source: Dictionary=game.service.by_id(3).method_sources.get("potato",{})
+		if int(trained_source.get("id",0))!=502: return
+		print("CHECK: guest saw shared staff TV lesson and learned method source")
 		print("CHECK: guest received host kitchen release")
 		game.session.leave("")
 		stage = 6
