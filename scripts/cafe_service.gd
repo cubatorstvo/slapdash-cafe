@@ -870,6 +870,7 @@ func save_data() -> Dictionary:
 		entry.upgrades = entry.upgrades.duplicate()
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
+		entry.method_sources=entry.method_sources.duplicate(true)
 		entries.append(entry)
 	return {"format": "station-cafe", "version": 16, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id, "table_group_names":table_group_names.duplicate(true)}
 
@@ -884,6 +885,7 @@ func clear_world() -> void:
 	masterclass_live_scene=null
 	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
 	remote_movie_record={}
+	table_group_names.clear()
 	for station in stations:
 		remove_child(station)
 		station.queue_free()
@@ -902,6 +904,7 @@ func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
 	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
+	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
