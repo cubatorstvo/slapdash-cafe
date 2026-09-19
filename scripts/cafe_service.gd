@@ -617,7 +617,7 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 		if station==null or station.manual_station or station.masterclass_station or station.type_id!=str(record.source_type) or str(record.dish) not in station.dishes(): return "В выборе есть несовместимый стол."
 	return ""
 
-func training_course_preview(assignments: Array,mode := "together") -> Dictionary:
+func training_course_preview(assignments: Array,mode := "together",group_order: Array=[]) -> Dictionary:
 	_ensure_groups()
 	if mode not in ["together","by_groups"]: return {"error":"Неизвестный режим курса."}
 	if assignments.is_empty(): return {"error":"Добавь хотя бы один урок."}
@@ -683,11 +683,19 @@ func training_course_preview(assignments: Array,mode := "together") -> Dictionar
 				elif not station.ready_crew(): reasons.append("Стол %d: сотрудник занят другой активностью"%station_id)
 		batch_rows.append({"stations":all_needed.duplicate(),"blocked_reason":str(reasons[0]) if not reasons.is_empty() else "","ready":reasons.is_empty()})
 	else:
-		var group_order: Array=[]
+		var actual_group_order: Array=[]
 		for station_id in selected:
 			var group_id: String=temp.group_id_for_station(int(station_id))
-			if not group_id.is_empty() and group_id not in group_order: group_order.append(group_id)
-		for group_id in group_order:
+			if not group_id.is_empty() and group_id not in actual_group_order: actual_group_order.append(group_id)
+		if not group_order.is_empty():
+			var preferred: Array=[]
+			for raw_group_id in group_order:
+				var wanted: String=str(raw_group_id)
+				if wanted in actual_group_order and wanted not in preferred: preferred.append(wanted)
+			for group_id in actual_group_order:
+				if group_id not in preferred: preferred.append(group_id)
+			actual_group_order=preferred
+		for group_id in actual_group_order:
 			var group: Dictionary=temp.by_id(str(group_id))
 			var needed: Array=[]
 			var reason: String=""
@@ -711,8 +719,8 @@ func training_course_preview(assignments: Array,mode := "together") -> Dictionar
 	for lesson in lessons: total_film+=float(lesson.film)
 	return {"error":"","type_id":type_id,"stations":selected,"employees":employees,"places":selected.size(),"lessons":lessons,"groups":projected,"batches":batch_rows,"simultaneous_out":max_out,"film_total":total_film,"mode":mode}
 
-func edit_training_course(course_id: int,assignments: Array,mode := "together",peer := 1) -> String:
-	return training_queue.edit_course(course_id,assignments,mode,peer) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
+func edit_training_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[]) -> String:
+	return training_queue.edit_course(course_id,assignments,mode,peer,group_order) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
 
 func resume_training_assignment(station_id: int,dish: String,peer := 1) -> String:
 	return training_queue.resume_assignment(station_id,dish,peer) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
@@ -720,9 +728,9 @@ func resume_training_assignment(station_id: int,dish: String,peer := 1) -> Strin
 func training_course_views() -> Array:
 	return training_queue.course_views() if is_instance_valid(training_queue) else []
 
-func queue_training_course(assignments: Array,mode := "together",command_id := "",peer := 1) -> Dictionary:
+func queue_training_course(assignments: Array,mode := "together",command_id := "",peer := 1,group_order: Array=[]) -> Dictionary:
 	if not is_instance_valid(training_queue): return {"error":"Система очереди обучения недоступна.","course_id":0}
-	return training_queue.enqueue_course(assignments,str(mode),str(command_id),int(peer))
+	return training_queue.enqueue_course(assignments,str(mode),str(command_id),int(peer),group_order)
 
 func start_group_training(record_id: int,ids: Array,peer := 1,command_id := "") -> String:
 	var error:=training_selection_error(record_id,ids)
