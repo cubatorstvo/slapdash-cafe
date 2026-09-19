@@ -176,7 +176,7 @@ func show_station(station: Node3D) -> void:
 		if game.service.progress.stars>=1:
 			_button(training_box, "Обучение и группа", func(): open_training_group())
 		else:
-			_button(training_box, "Обучить здесь", func(): command_requested.emit({"action": "open", "station": selected_station, "dish": station.dishes()[recipe_choice.selected]}))
+			_label(training_box, "Обучение бригад откроется после первой звезды. Способ готовки записывается только на Шеф-станции как мастер-класс.", 15)
 	else:
 		_label(training_box, station.Definition.DISHES[run.dish], 20)
 		var report: Dictionary = station.model.quality()

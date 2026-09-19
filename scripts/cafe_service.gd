@@ -104,7 +104,7 @@ func any_training() -> bool:
 	if is_instance_valid(training_queue) and int(training_queue.active_batch_id)>0: return true
 	if is_instance_valid(staff_training) and staff_training.is_active(): return true
 	for station in stations:
-		if station.training.active() or station.pending_teacher > 0: return true
+		if station.training.active(): return true
 	return not masterclass_pending.is_empty()
 
 func masterclass_active() -> bool: return is_instance_valid(masterclass_station)
@@ -810,41 +810,6 @@ func cancel_training_batch(batch_id: int) -> String:
 func cancel_training_lesson(lesson_id: int) -> String:
 	return training_queue.cancel_lesson(lesson_id) if is_instance_valid(training_queue) else "Система очереди обучения недоступна."
 
-func _archive_legacy_recipes() -> void:
-	for station in stations:
-		if station.manual_station: continue
-		for dish in station.recipes:
-			var recipe: Dictionary=station.recipes[dish]
-			masterclasses.append(Masterclasses.make_record(next_masterclass_id,str(dish),station.type_id,recipe.tracks,float(recipe.duration),recipe.get("quality",{}),Masterclasses.default_name(str(dish),1,true,station.station_id),true,station.station_id))
-			next_masterclass_id+=1
-
-func local_recipe_learned(station: Node3D,dish: String) -> void:
-	if station==null or station.manual_station or station.masterclass_station or dish not in station.dishes(): return
-	_ensure_groups()
-	var group_id:=group_registry.group_id_for_station(station.station_id)
-	if group_id.is_empty(): return
-	# Legacy local teaching is the pre-first-star onboarding path. It makes the newly
-	# learned dish usable, while course assignments keep menu state independent.
-	group_registry.set_active_dish(group_id,dish,true)
-	_sync_group_intent(group_id)
-
-func request_training(station: Node3D, dish: String, peer: int) -> bool:
-	if station == null or not station.ready_crew() or station.manual_station or not dish in station.dishes() or progress.busy(): return false
-	if station.training.active(): return station.training.lead == peer
-	# Local station teaching is the introductory pre-first-star path. From the first
-	# star onward new assignments are host-authoritative courses built from the
-	# chef's masterclasses. Existing local lessons may still finish normally.
-	if progress.stars>=1: return false
-	if training_for(peer) != null or station.pending_teacher > 0: return false
-	if station.state in ["cooking","serving"]:
-		station.pending_teacher = peer
-		station.pending_dish = dish
-		return true
-	station.training.dish = dish
-	_attach_customer(station)
-	station.training.open(dish, peer)
-	return true
-
 func production_scale_summary() -> Dictionary:
 	var places:=0
 	var assigned_workers:=0
@@ -908,7 +873,7 @@ func problem_context(dish: String)->Dictionary:
 			ready.append(station)
 	if not ready.is_empty():
 		var ids: Array=ready.map(func(station):return station.station_id)
-		if ready.any(func(station):return station.state!="idle" or station.customer_id>=0 or station.pending_teacher>0):
+		if ready.any(func(station):return station.state!="idle" or station.customer_id>=0):
 			return {"reason":"busy","stations":ids,"group":group_id_for_stations(ids)}
 	for station in active:
 		if not station.group_training_state.is_empty() or (is_instance_valid(staff_training) and staff_training.targets_station(station.station_id,dish)):
@@ -982,7 +947,7 @@ func automatic_station_candidates(dish: String,idle_only := true) -> Array:
 	var result: Array=[]
 	for station in stations:
 		if station.manual_station or station.masterclass_station or not station.dish_active(dish) or not station.ready_crew() or not station.recipes.has(dish): continue
-		if idle_only and (station.state!="idle" or station.pending_teacher>0): continue
+		if idle_only and station.state!="idle": continue
 		result.append(station)
 	return result
 
@@ -1011,12 +976,6 @@ func _start_automatic_order(station: Node3D,customer: Dictionary) -> void:
 	customer.automatic_serving=true
 	_update_multi_caption(customer)
 
-func _start_pending_teacher(station: Node3D) -> void:
-	if station==null or station.pending_teacher<=0 or station.state=="serving": return
-	var teacher: int=station.pending_teacher
-	station.pending_teacher=0
-	station.training.open(station.pending_dish,teacher)
-
 func _release_order_station(station: Node3D,customer_id: int) -> void:
 	if station==null or station.customer_id!=customer_id: return
 	station.customer_id=-1
@@ -1024,7 +983,6 @@ func _release_order_station(station: Node3D,customer_id: int) -> void:
 	station.order_portions_total=1
 	station.order_portions_done=0
 	station.order_paid=0
-	_start_pending_teacher(station)
 
 func _count_completed_customer(customer: Dictionary,station: Node3D) -> void:
 	served+=1
@@ -1153,7 +1111,6 @@ func advance(delta: float) -> void:
 			var portion_number: int=int(current_customer.get("portions_done",0))+1 if not current_customer.is_empty() else 0
 			var order_id: int=int(current_customer.get("order_id",0)) if not current_customer.is_empty() else 0
 			finish_customer(station.customer_id,true,"",portion_number,order_id)
-			_start_pending_teacher(station)
 	for index in range(customers.size() - 1, -1, -1):
 		var customer: Dictionary = customers[index]
 		if customer.state=="portion_eating":
@@ -1173,9 +1130,6 @@ func advance(delta: float) -> void:
 				var table: Node3D=by_id(customer.station)
 				if table!=null and table.customer_id==customer.id:
 					table.customer_id=-1; table.state="idle"
-					if table.pending_teacher>0:
-						var teacher: int=table.pending_teacher; table.pending_teacher=0
-						table.training.open(table.pending_dish,teacher)
 			continue
 		if not customer.path.is_empty():
 			if customer.view.walk_to(customer.path[0], delta): customer.path.pop_front()
@@ -1256,7 +1210,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 		if not recipe in station.dishes(): continue
 		if station.manual_station or not station.dish_active(recipe) or not station.ready_crew(): continue
 		if station.recipes.has(recipe): offered=true
-		if station.state=="idle" and station.pending_teacher==0:
+		if station.state=="idle":
 			if station.recipes.has(recipe): candidates.append(station)
 			elif portions==1: untrained.append(station)
 	if candidates.is_empty() and portions==1 and not banquet and not chef_guest and visit_data.is_empty(): candidates=untrained
@@ -1814,8 +1768,6 @@ func load_data(data: Dictionary) -> bool:
 			station.order_paid=maxi(0,int(entry.get("order_paid",0)))
 			station.customer_id=int(entry.get("customer_id",-1))
 			station.customer_order=entry.get("customer_order",{}).duplicate(true)
-			station.pending_teacher=int(entry.get("pending_teacher",0))
-			station.pending_dish=str(entry.get("pending_dish",""))
 			if entry.get("order_model",{}) is Dictionary and not entry.get("order_model",{}).is_empty(): station.model.restore(entry.order_model)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	suppress_group_autocreate=false
@@ -1833,7 +1785,6 @@ func load_data(data: Dictionary) -> bool:
 	table_group_names=data.get("table_group_names",{}).duplicate(true) if version>=16 and data.get("table_group_names",{}) is Dictionary else {}
 	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
 	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
-	if version<14: _archive_legacy_recipes()
 	for record in masterclasses:
 		Masterclasses.ensure_highlights(record)
 		next_masterclass_id=maxi(next_masterclass_id,int(record.get("id",0))+1)
@@ -2028,7 +1979,7 @@ func advance_shift(delta: float) -> void:
 	if progress.shift == "closing":
 		if is_instance_valid(training_queue) and training_queue.active_blocks_night(): return
 		for station in stations:
-			if station.state != "idle" or station.pending_teacher > 0: return
+			if station.state != "idle": return
 		progress.shift = "night"
 		progress.night_elapsed=0.0
 		progress.revision += 1

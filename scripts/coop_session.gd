@@ -5,7 +5,7 @@ const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
-const PROTOCOL := "slapdash-cafe-scale-35"
+const PROTOCOL := "slapdash-cafe-scale-36"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -75,7 +75,6 @@ func leave(message: String) -> void:
 	if game != null:
 		for station in game.service.stations:
 			if station.training.active(): station.training.close()
-			station.pending_teacher = 0
 		if is_instance_valid(game.steam): game.steam.leave_lobby()
 	if multiplayer.multiplayer_peer != null: multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
@@ -134,7 +133,6 @@ func _peer_left(id: int) -> void:
 		if game.service.progress.garland_builder == id: game.service.progress.garland_builder = 0
 		for station in game.service.stations:
 			if station.training.lead == id or station.training.role_for(id) >= 0: station.training.close()
-			if station.pending_teacher == id: station.pending_teacher = 0
 		broadcast_roster()
 		_broadcast_sleep_state()
 		_try_finish_sleep()
@@ -540,11 +538,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		return
 	if action == "open":
 		if not near_peer(sender, station, 5.0): return
-		if game.service.progress.stars>=1 and not run.active():
-			message_to(sender,"После первой звезды новые способы назначаются через «Обучение и группа» и курсы у телевизора.")
-			return
-		if game.service.request_training(station, str(value.get("dish", "")), sender):
-			message_to(sender, "Станция завершит заказ и начнёт показ." if station.pending_teacher > 0 else "Выбери роли для записи.")
+		message_to(sender,"Способ готовки записывается только на Шеф-станции через мастер-класс.")
 		return
 	if action == "ring":
 		var role: int = run.role_for(sender)

@@ -43,8 +43,6 @@ var order_portions_total := 1
 var order_portions_done := 0
 var order_paid := 0
 var customer_id := -1
-var pending_teacher := 0
-var pending_dish := ""
 var students: Array = []
 var zone_panels: Array = []
 var zone_labels: Array = []
@@ -384,8 +382,6 @@ func save_entry() -> Dictionary:
 	entry.order_paid=order_paid
 	entry.customer_id=customer_id
 	entry.customer_order=customer_order.duplicate(true)
-	entry.pending_teacher=pending_teacher
-	entry.pending_dish=pending_dish
 	entry.order_model=model.snapshot()
 	return entry
 
