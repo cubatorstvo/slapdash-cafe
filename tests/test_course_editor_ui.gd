@@ -195,7 +195,9 @@ func run()->void:
 	game.office.course_editor_select_group(service.group_id_for_station(2),true)
 	check(press(game.office,"Поставить курс в очередь"),"UI T13 active queues the newer version while old film is running")
 	await process_frame
-	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2312,"UI T13 active exposes the newer pending version")
+	check(int(service.desired_source(service.group_id_for_station(2),"potato").get("id",0))==2312,"UI T13 active updates the desired version while the old frozen film remains current")
+	var live_views: Array=service.training_course_views()
+	check(live_views.any(func(view):return view.assignments.any(func(item):return int(item.record_id)==2312)),"UI T13 active keeps the newer UI-created assignment in the queue")
 	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2311 and not service.staff_training.is_active(),60.0),"UI T13 active old film commits old knowledge first")
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2312,"UI T13 active still requires the newer version after old film completion")
 	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2312,90.0),"UI T13 active eventually retrains through the UI-created follow-up course")
