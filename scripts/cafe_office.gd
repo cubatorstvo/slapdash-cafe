@@ -334,6 +334,7 @@ func course_editor_submit() -> void:
 		payload.action="training_course_confirm"
 		payload.command="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
 		course_command_serial+=1
+	game.hud.notice.text=""
 	send(payload)
 	var notice: String=str(game.hud.notice.text)
 	if notice=="Курс поставлен в очередь.":
