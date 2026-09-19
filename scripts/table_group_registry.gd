@@ -274,7 +274,7 @@ func apply_plan_to_selection(station_ids: Array,dish: String,record_id: int)->Ar
 		affected.append(target_id)
 	return affected
 
-func merge(group_ids: Array,record_choices: Dictionary={},active_dishes: Array=[])->Dictionary:
+func merge(group_ids: Array,record_choices: Dictionary={},active_dishes: Variant=null)->Dictionary:
 	var ids: Array=[]
 	for raw in group_ids:
 		var id:=str(raw)
@@ -290,10 +290,12 @@ func merge(group_ids: Array,record_choices: Dictionary={},active_dishes: Array=[
 			if station_id not in members: members.append(station_id)
 	members.sort()
 	var allowed: Array=[]
-	for dish in target.get("active_dishes",[]): if dish not in allowed: allowed.append(dish)
-	for id in ids:
-		for dish in groups[id].get("active_dishes",[]): if dish not in allowed: allowed.append(dish)
-	if not active_dishes.is_empty(): allowed=active_dishes.duplicate()
+	if active_dishes is Array:
+		allowed=active_dishes.duplicate()
+	else:
+		for dish in target.get("active_dishes",[]): if dish not in allowed: allowed.append(dish)
+		for id in ids:
+			for dish in groups[id].get("active_dishes",[]): if dish not in allowed: allowed.append(dish)
 	var all_dishes: Array=[]
 	for id in ids:
 		for item in groups[id].curriculum:

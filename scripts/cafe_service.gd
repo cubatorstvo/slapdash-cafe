@@ -396,11 +396,32 @@ func _compatible_group_selection(ids: Array) -> Dictionary:
 	unique.sort()
 	return {"error":"","type_id":type_id,"stations":unique}
 
+func _same_group_intent(a: Dictionary,b: Dictionary) -> bool:
+	var active_a: Array=a.get("active_dishes",[]).duplicate()
+	var active_b: Array=b.get("active_dishes",[]).duplicate()
+	active_a.sort()
+	active_b.sort()
+	if active_a!=active_b: return false
+	var plan_a: Dictionary={}
+	var plan_b: Dictionary={}
+	for item in a.get("curriculum",[]): plan_a[str(item.get("dish_id",""))]=int(item.get("record_id",0))
+	for item in b.get("curriculum",[]): plan_b[str(item.get("dish_id",""))]=int(item.get("record_id",0))
+	return plan_a==plan_b
+
 func create_table_group(ids: Array,name := "") -> String:
 	_ensure_groups()
 	var checked:=_compatible_group_selection(ids)
 	if not str(checked.error).is_empty(): return str(checked.error)
 	if checked.stations.is_empty(): return "Выбери хотя бы один стол."
+	var source_groups: Array=[]
+	for raw_id in checked.stations:
+		var source_id:=group_registry.group_id_for_station(int(raw_id))
+		if not source_id.is_empty() and source_id not in source_groups: source_groups.append(source_id)
+	if source_groups.size()>1:
+		var base: Dictionary=group_registry.by_id(str(source_groups[0]))
+		for source_id in source_groups.slice(1):
+			if not _same_group_intent(base,group_registry.by_id(str(source_id))):
+				return "У выбранных столов разные планы или активное меню. Сначала раздели нужные части и используй «Объединить группы»."
 	var first_group: Dictionary=group_registry.for_station(int(checked.stations[0]))
 	var title:=name.strip_edges().left(48)
 	if title.is_empty(): title="%s · группа"%Definition.TYPES[str(checked.type_id)].title
@@ -440,10 +461,18 @@ func preview_group_merge(group_ids: Array) -> Dictionary:
 	_ensure_groups()
 	return group_registry.preview_merge(group_ids)
 
-func merge_table_groups(group_ids: Array,record_choices: Dictionary={},active_dishes: Array=[]) -> String:
+func merge_table_groups(group_ids: Array,record_choices: Dictionary={},active_dishes: Variant=null) -> String:
 	_ensure_groups()
 	var preview:=group_registry.preview_merge(group_ids)
 	if preview.is_empty(): return "Выбери минимум две группы одной кухни."
+	for dish in preview.get("differences",{}):
+		var chosen:=int(record_choices.get(str(dish),0))
+		if chosen<=0 or chosen not in preview.differences[dish]: return "Выбери итоговую запись для блюда «%s»."%Definition.DISHES.get(str(dish),str(dish))
+		var record:=masterclass_by_id(chosen)
+		if record.is_empty() or str(record.get("dish",""))!=str(dish): return "Выбранная запись больше недоступна. Обнови объединение."
+	if active_dishes is Array:
+		for dish in active_dishes:
+			if str(dish) not in Definition.TYPES[str(preview.type_id)].dishes: return "Активное меню содержит блюдо другой кухни."
 	var target:=group_registry.merge(group_ids,record_choices,active_dishes)
 	if target.is_empty(): return "Не удалось объединить группы."
 	_sync_group_intent(str(target.id))
@@ -703,7 +732,9 @@ func _analytics_loss(customer: Dictionary,reason: String)->void:
 	var normalized: String="unlearned" if reason=="untrained" else reason
 	var context: Dictionary=problem_context(str(customer.dish))
 	if normalized in ["closing","chef_wait","wait"]: context.reason=normalized
-	Insights.loss(analytics,str(customer.dish),str(context.reason),int(customer.get("portions_total",1)),int(customer.get("portions_done",0)),context.get("stations",[]),str(context.get("group","")))
+	var group_id: String=str(context.get("group",""))
+	var group: Dictionary=table_group_by_id(group_id) if not group_id.is_empty() else {}
+	Insights.loss(analytics,str(customer.dish),str(context.reason),int(customer.get("portions_total",1)),int(customer.get("portions_done",0)),context.get("stations",[]),group_id,str(group.get("name",group_id)))
 
 func top_bottleneck()->Dictionary:
 	var reason:=Insights.top_reason(analytics)

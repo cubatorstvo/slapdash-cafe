@@ -86,7 +86,7 @@ static func suggestion(reason: String)->String:
 		"wait":"Ускорь способ приготовления или добавь подходящие столы."
 	}.get(reason,"Проверь связанное блюдо, группу и состояние столов.")
 
-static func loss(data: Dictionary,dish: String,reason: String,total: int,done: int,station_ids: Array,group_id := "")->void:
+static func loss(data: Dictionary,dish: String,reason: String,total: int,done: int,station_ids: Array,group_id := "",group_name := "")->void:
 	var row:=_dish(data,dish)
 	var partial:=done>0
 	if partial: row.orders_partial=int(row.orders_partial)+1
@@ -99,17 +99,17 @@ static func loss(data: Dictionary,dish: String,reason: String,total: int,done: i
 	data.losses[reason]=int(data.losses[reason])+1
 	var sorted_ids:=station_ids.duplicate()
 	sorted_ids.sort()
-	var key: String="%s|%s|%s"%[reason,dish,"-".join(sorted_ids.map(func(id):return str(id)))]
+	var key: String="%s|%s|%s|%s"%[reason,dish,group_id,"-".join(sorted_ids.map(func(id):return str(id)))]
 	if not data.loss_details.has(key):
-		data.loss_details[key]={"reason":reason,"dish":dish,"count":0,"portions_unserved":0,"stations":sorted_ids,"group":group_id}
+		data.loss_details[key]={"reason":reason,"dish":dish,"count":0,"portions_unserved":0,"stations":sorted_ids,"group":group_id,"group_name":group_name}
 	var detail: Dictionary=data.loss_details[key]
 	detail.count=int(detail.count)+1
 	detail.portions_unserved=int(detail.portions_unserved)+missing
-	push_feed(data,"partial" if partial else "loss",{"dish":dish,"reason":reason,"done":done,"total":total,"stations":sorted_ids,"group":group_id},1)
+	push_feed(data,"partial" if partial else "loss",{"dish":dish,"reason":reason,"done":done,"total":total,"stations":sorted_ids,"group":group_id,"group_name":group_name},1)
 
 static func _merge_key(kind: String,payload: Dictionary,source: String,source_name: String)->String:
-	if kind=="partial": return "%s|%s|%s|%d|%d"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),int(payload.get("done",0)),int(payload.get("total",0))]
-	return "%s|%s|%s|%s|%s"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),source,source_name]
+	if kind=="partial": return "%s|%s|%s|%s|%d|%d"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),str(payload.get("group","")),int(payload.get("done",0)),int(payload.get("total",0))]
+	return "%s|%s|%s|%s|%s|%s"%[kind,str(payload.get("dish","")),str(payload.get("reason","")),str(payload.get("group","")),source,source_name]
 
 static func push_feed(data: Dictionary,kind: String,payload: Dictionary={},amount := 1,source := "system",source_name := "")->Dictionary:
 	var now: float=float(data.get("clock",0.0))
@@ -125,7 +125,7 @@ static func push_feed(data: Dictionary,kind: String,payload: Dictionary={},amoun
 			return entry
 	var entry: Dictionary={"id":int(data.get("serial",1)),"kind":kind,"source":source,"source_name":source_name,"count":maxi(1,amount),"at":now,"merge_key":key}
 	data.serial=int(data.get("serial",1))+1
-	for field in ["dish","reason","done","total","stations","group","name","record","workers_missing","text"]:
+	for field in ["dish","reason","done","total","stations","group","group_name","name","record","workers_missing","text"]:
 		if payload.has(field): entry[field]=payload[field].duplicate(true) if payload[field] is Array or payload[field] is Dictionary else payload[field]
 	data.feed.push_front(entry)
 	while data.feed.size()>MAX_FEED: data.feed.pop_back()
