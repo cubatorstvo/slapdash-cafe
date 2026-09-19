@@ -29,6 +29,8 @@ var recipes := {}
 var drafts := {}
 var method_sources := {}
 var method_plan := {}
+var active_dishes: Array=[]
+var active_menu_initialized:=false
 var group_training_state := ""
 var model
 var view: Node3D
@@ -80,6 +82,10 @@ func crew_name(role: int) -> String:
 
 func role_count() -> int: return Definition.TYPES[type_id].roles.size()
 func dishes() -> Array: return Definition.TYPES[type_id].dishes
+func dish_active(dish: String) -> bool:
+	if manual_station: return true
+	if not active_menu_initialized: return recipes.has(dish) or method_plan.has(dish)
+	return dish in active_dishes
 func is_team_station() -> bool: return role_count() > 1
 static func model_for_type(value: String):
 	if value == "counter": return Model.new()
@@ -368,7 +374,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts, "method_sources":method_sources, "method_plan":method_plan}
+	return {"staffed":staffed,"equipment":equipment,"manual":manual_station,"slot":slot_index,"type":type_id,"crew":crew,"upgrades":upgrades,"recipes":recipes,"drafts":drafts,"method_sources":method_sources,"method_plan":method_plan,"active_dishes":active_dishes,"active_menu_initialized":active_menu_initialized}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
@@ -394,6 +400,8 @@ func world_entry() -> Dictionary:
 	data.masterclass = masterclass_station
 	data.group_training_state=group_training_state
 	data.method_plan=method_plan.duplicate(true)
+	data.active_dishes=active_dishes.duplicate()
+	data.active_menu_initialized=active_menu_initialized
 	return data
 
 func _build_bell() -> void:
