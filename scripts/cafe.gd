@@ -3,6 +3,7 @@ const Props = preload("res://scripts/props.gd")
 const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
 var sleep_cinematic: Node3D
@@ -509,14 +510,24 @@ func _build_room() -> void:
 	sun.light_color = Color("fff4e2")
 	sun.light_energy = 0.75
 	sun.shadow_enabled = true
-	for x in range(-12, 18):
+	var hall_x_min: float=-11.8
+	var hall_x_max: float=Expansion.HALL_X_MAX
+	for x in range(-12, ceili(hall_x_max)):
 		for z in range(-8, 11):
 			var color := Color("6c7c73") if (x + z) % 2 == 0 else Color("79887b")
 			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
-	Props.collision_box(self, Vector3(30, 0.2, 19), Vector3(3, -0.10, 1.5))
-	Props.solid_box(self, Vector3(30, 4.7, 0.18), Vector3(3, 2.3, -7.6), Color("244c50"))
-	for x in [-11.8,17.8]: Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
+	var hall_width: float=hall_x_max-hall_x_min
+	var hall_center_x: float=(hall_x_min+hall_x_max)*0.5
+	Props.collision_box(self, Vector3(hall_width, 0.2, 19), Vector3(hall_center_x, -0.10, 1.5))
+	Props.solid_box(self, Vector3(hall_width, 4.7, 0.18), Vector3(hall_center_x, 2.3, -7.6), Color("244c50"))
+	for x in [hall_x_min,hall_x_max]: Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
 	Annex.build_shell(self)
+	Props.solid_box(self,Vector3(hall_x_max-Annex.CAFE_X_MAX,4.7,0.18),Vector3((Annex.CAFE_X_MAX+hall_x_max)*0.5,2.3,Annex.CAFE_BACK_Z),Color("2e5355"))
+	for section in Expansion.SECTION_ROWS:
+		var center:=Vector3(35.8,0.012,float(section.z))
+		Props.box(self,Vector3(35.0,0.018,5.35),center,Color("687d73"))
+		var sign:=Props.text(self,str(section.name)+" · подготовленные места",Vector3(35.8,0.07,float(section.z)-2.45),22,Color("e5c98c"))
+		sign.rotation.x=-PI/2
 	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
 	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
 	Props.text(self, "SLAPDASH CAFE", Vector3(0, 3.49, -7.31), 62, Color("f4cc86"))
