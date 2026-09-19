@@ -27,6 +27,8 @@ var crew: Array = []
 var upgrades: Array = []
 var recipes := {}
 var drafts := {}
+var method_sources := {}
+var group_training_state := ""
 var model
 var view: Node3D
 var training = Run.new()
@@ -52,6 +54,7 @@ var was_resting := true
 var upgrade_view: Node3D
 
 func ready_crew() -> bool:
+	if not group_training_state.is_empty(): return false
 	var game = get_parent().game if is_inside_tree() else null
 	if game != null and is_instance_valid(game.laboratory) and game.laboratory.reserves_station(station_id): return false
 	return manual_station or staffed < 0 or staffed >= role_count()
@@ -298,7 +301,7 @@ func refresh(local_peer: int, delta: float) -> void:
 			if role>=staffed:
 				students[role].hide()
 				if is_team_station(): view.actors[role].hide()
-		if not ready_crew():
+		if staffed<role_count():
 			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
 			if type_id=="counter":
 				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
@@ -310,6 +313,15 @@ func refresh(local_peer: int, delta: float) -> void:
 				if is_team_station(): view.actors[role].hide()
 				else:
 					for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+	if not manual_station and not group_training_state.is_empty():
+		var training_text: String={"assigned":"НАЗНАЧЕНО ОБУЧЕНИЕ","gathering":"ЗАКАНЧИВАЕТ И СОБИРАЕТСЯ","walking":"ИДЁТ К ТЕЛЕВИЗОРУ","watching":"СМОТРИТ ХАЙЛАЙТЫ","returning":"ВОЗВРАЩАЕТСЯ"}.get(group_training_state,"ОБУЧЕНИЕ")
+		view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,training_text]
+		if state!="cooking":
+			for student in students: student.hide()
+			if type_id=="counter":
+				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+			else:
+				for actor in view.actors: actor.hide()
 	if is_instance_valid(taster): direct_attention(taster)
 	if get_parent().progress.shift=="night" and not training.active() and not manual_station:
 		for student in students: student.hide()
@@ -350,7 +362,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts}
+	return {"staffed":staffed,"equipment":equipment, "manual": manual_station,"slot": slot_index, "type": type_id, "crew": crew, "upgrades": upgrades, "recipes": recipes, "drafts": drafts, "method_sources":method_sources}
 
 func world_entry() -> Dictionary:
 	var data := save_entry()
@@ -371,6 +383,7 @@ func world_entry() -> Dictionary:
 	data.model = model.snapshot()
 	data.training = training.summary()
 	data.masterclass = masterclass_station
+	data.group_training_state=group_training_state
 	return data
 
 func _build_bell() -> void:

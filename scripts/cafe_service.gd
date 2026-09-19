@@ -4,6 +4,7 @@ const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
+const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
@@ -34,9 +35,14 @@ var chef_station_backup: Node3D
 var masterclass_live_scene: Node3D
 var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
 var remote_movie_record: Dictionary={}
+var staff_training: Node3D
+var table_group_names: Dictionary={}
 
 func _ready() -> void:
 	rng.randomize()
+	staff_training=StaffTrainingSession.new()
+	add_child(staff_training)
+	staff_training.setup(self)
 
 func slot_position(slot_index: int) -> Vector3:
 	if slot_index == 4: return Vector3(10.2, 0, 4.75)
@@ -79,6 +85,7 @@ func training_for(peer: int) -> Node3D:
 	return null
 
 func any_training() -> bool:
+	if is_instance_valid(staff_training) and staff_training.is_active(): return true
 	for station in stations:
 		if station.training.active() or station.pending_teacher > 0: return true
 	return not masterclass_pending.is_empty()
@@ -247,6 +254,7 @@ func masterclass_summaries() -> Array:
 	return result
 
 func start_highlights(id: int, peer: int) -> String:
+	if is_instance_valid(staff_training) and staff_training.is_active(): return "Телевизор занят обучением сотрудников."
 	if "television" not in progress.lounge_items: return "Сначала установи телевизор в комнате отдыха."
 	var record:=masterclass_by_id(id)
 	if record.is_empty(): return "Запись не найдена."
@@ -257,6 +265,13 @@ func start_highlights(id: int, peer: int) -> String:
 	progress.revision+=1
 	trace("highlights_started",{"id":id,"dish":record.dish,"seconds":record.highlight_duration,"peer":peer})
 	return ""
+
+func start_training_movie(value: Dictionary) -> void:
+	var lesson: Dictionary=value.duplicate(true)
+	Masterclasses.ensure_highlights(lesson)
+	remote_movie_record=lesson
+	movie_state={"id":int(lesson.get("id",0)),"playing":true,"elapsed":0.0,"duration":float(lesson.get("highlight_duration",0.0)),"started_by":0}
+	progress.revision+=1
 
 func stop_highlights() -> void:
 	movie_state.playing=false
@@ -273,6 +288,136 @@ func movie_snapshot() -> Dictionary:
 func apply_movie_snapshot(data: Dictionary) -> void:
 	if not data is Dictionary: return
 	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0))}
+
+func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Dictionary:
+	if overrides.has(station.station_id):
+		var override: Dictionary=overrides[station.station_id]
+		if str(override.get("dish",""))==dish: return override
+	if is_instance_valid(staff_training):
+		var pending: Dictionary=staff_training.pending_source(station.station_id,dish)
+		if not pending.is_empty(): return pending
+	if station.method_sources.has(dish): return station.method_sources[dish].duplicate(true)
+	if station.recipes.has(dish): return {"id":0,"name":"Локальный способ","legacy":true}
+	return {}
+
+func _group_signature(station: Node3D,overrides: Dictionary={}) -> String:
+	var parts: Array=[station.type_id]
+	for dish in station.dishes():
+		var source: Dictionary=_method_source(station,str(dish),overrides)
+		var token: String="none"
+		if not source.is_empty(): token="legacy" if bool(source.get("legacy",false)) else str(int(source.get("id",0)))
+		parts.append(str(dish)+"="+token)
+	return "|".join(parts)
+
+func _derive_table_groups(overrides: Dictionary={}) -> Array:
+	var buckets: Dictionary={}
+	for station in stations:
+		if station.manual_station or station.masterclass_station: continue
+		var signature: String=_group_signature(station,overrides)
+		if not buckets.has(signature): buckets[signature]=[]
+		buckets[signature].append(station.station_id)
+	var result: Array=[]
+	for signature in buckets:
+		var ids: Array=buckets[signature]
+		ids.sort()
+		var id_parts: Array=[]
+		for id in ids: id_parts.append(str(id))
+		var group_id: String="-".join(id_parts)
+		var first:=by_id(int(ids[0]))
+		var auto_name: String="%s · столы %s"%[Definition.TYPES[first.type_id].title,", ".join(id_parts)]
+		result.append({"id":group_id,"name":str(table_group_names.get(group_id,auto_name)),"type":first.type_id,"stations":ids,"dishes":first.dishes().duplicate()})
+	result.sort_custom(func(a,b): return int(a.stations[0])<int(b.stations[0]))
+	return result
+
+func table_groups() -> Array:
+	return _derive_table_groups()
+
+func table_group_by_id(group_id: String) -> Dictionary:
+	for group in table_groups():
+		if str(group.id)==group_id: return group
+	return {}
+
+func rename_table_group(group_id: String,value: String) -> String:
+	if table_group_by_id(group_id).is_empty(): return "Группа уже изменилась. Обнови список."
+	var name:=value.strip_edges().left(48)
+	if name.is_empty(): return "Название группы не может быть пустым."
+	table_group_names[group_id]=name
+	progress.revision+=1
+	return ""
+
+func source_label(station_id: int,dish: String) -> String:
+	var station:=by_id(station_id)
+	if station==null: return "—"
+	var source: Dictionary=_method_source(station,dish)
+	if source.is_empty(): return "—"
+	if bool(source.get("legacy",false)): return "Локальный способ"
+	var id: int=int(source.get("id",0))
+	var current:=masterclass_by_id(id)
+	if not current.is_empty(): return str(current.get("name",source.get("name","Запись")))
+	return str(source.get("name","Запись"))+" · Запись удалена"
+
+func station_group_status(station_id: int,dish: String) -> String:
+	var station:=by_id(station_id)
+	if station==null: return "нет стола"
+	if is_instance_valid(staff_training) and staff_training.targets_station(station_id,dish): return staff_training.phase_label()
+	var missing: Array=Definition.missing_equipment(dish,station.equipment)
+	if not missing.is_empty(): return "требуется оборудование"
+	if station.staffed>=0 and station.staffed<station.role_count(): return "требуются работники"
+	if station.recipes.has(dish): return "освоено"
+	return "нет способа"
+
+func compatible_training_station_ids(record_id: int) -> Array:
+	var record:=masterclass_by_id(record_id)
+	if record.is_empty(): return []
+	var result: Array=[]
+	for station in stations:
+		if station.manual_station or station.masterclass_station: continue
+		if station.type_id==str(record.get("source_type","")) and str(record.get("dish","")) in station.dishes(): result.append(station.station_id)
+	return result
+
+func training_selection_error(record_id: int,ids: Array) -> String:
+	if not is_instance_valid(staff_training): return "Система обучения недоступна."
+	if staff_training.is_active(): return "Сначала заверши текущий учебный сеанс."
+	if bool(movie_state.get("playing",false)): return "Телевизор сейчас занят просмотром."
+	if "television" not in progress.lounge_items: return "Сначала установи телевизор в комнате отдыха."
+	var record:=masterclass_by_id(record_id)
+	if record.is_empty(): return "Запись не найдена."
+	if ids.is_empty(): return "Выбери хотя бы один стол."
+	var seen: Array=[]
+	for raw_id in ids:
+		var id: int=int(raw_id)
+		if id in seen: continue
+		seen.append(id)
+		var station:=by_id(id)
+		if station==null or station.manual_station or station.type_id!=str(record.source_type) or str(record.dish) not in station.dishes(): return "В выборе есть несовместимый стол."
+		if station.training.active() or station.pending_teacher>0: return "Станция %d занята другим обучением."%id
+		var missing: Array=Definition.missing_equipment(str(record.dish),station.equipment)
+		if not missing.is_empty(): return "Станция %d: требуется оборудование — %s."%[id,", ".join(missing)]
+		if station.staffed>=0 and station.staffed<station.role_count(): return "Станция %d: сначала заполни вакансии."%id
+		if not station.ready_crew(): return "Станция %d: сотрудник временно занят."%id
+	return ""
+
+func preview_table_groups(record_id: int,ids: Array) -> Array:
+	var record:=masterclass_by_id(record_id)
+	if record.is_empty(): return table_groups()
+	var overrides: Dictionary={}
+	for raw_id in ids:
+		overrides[int(raw_id)]={"id":record_id,"name":str(record.name),"dish":str(record.dish),"pending":true}
+	return _derive_table_groups(overrides)
+
+func start_group_training(record_id: int,ids: Array) -> String:
+	var error:=training_selection_error(record_id,ids)
+	if not error.is_empty(): return error
+	var unique: Array=[]
+	for raw_id in ids:
+		var id: int=int(raw_id)
+		if id not in unique: unique.append(id)
+	unique.sort()
+	var record:=masterclass_by_id(record_id)
+	staff_training.start(record,unique)
+	progress.revision+=1
+	trace("group_training_assigned",{"record":record_id,"dish":record.dish,"stations":unique})
+	return ""
 
 func _archive_legacy_recipes() -> void:
 	for station in stations:
@@ -311,6 +456,7 @@ func advance(delta: float) -> void:
 	if bool(movie_state.get("playing",false)):
 		movie_state.elapsed=minf(float(movie_state.elapsed)+delta,float(movie_state.duration))
 		if float(movie_state.elapsed)>=float(movie_state.duration): movie_state.playing=false
+	if is_instance_valid(staff_training): staff_training.advance(delta)
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
@@ -725,9 +871,10 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 15, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id}
+	return {"format": "station-cafe", "version": 16, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id, "table_group_names":table_group_names.duplicate(true)}
 
 func clear_world() -> void:
+	if is_instance_valid(staff_training): staff_training.reset()
 	if is_instance_valid(chef_station_backup):
 		chef_station_backup.queue_free()
 		chef_station_backup=null
@@ -753,7 +900,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -765,6 +912,7 @@ func load_data(data: Dictionary) -> bool:
 		for member in entry.crew:
 			if not member is Dictionary or not member.get("name") is String: return false
 		if not entry.get("recipes") is Dictionary or not entry.get("drafts") is Dictionary or not entry.get("upgrades") is Array: return false
+		if version>=16 and not entry.get("method_sources",{}) is Dictionary: return false
 		for collection in [entry.recipes, entry.drafts]:
 			for dish in collection:
 				if not dish in Definition.TYPES[entry.type].dishes: return false
@@ -791,10 +939,12 @@ func load_data(data: Dictionary) -> bool:
 		station.apply_upgrades()
 		station.recipes = entry.recipes.duplicate(true)
 		station.drafts = entry.drafts.duplicate(true)
+		station.method_sources=entry.get("method_sources",{}).duplicate(true)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	served = int(data.get("served", 0))
 	revenue = int(data.get("revenue", 0))
 	missed = int(data.get("missed", 0))
+	table_group_names=data.get("table_group_names",{}).duplicate(true) if version>=16 and data.get("table_group_names",{}) is Dictionary else {}
 	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
 	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
 	if version<14: _archive_legacy_recipes()
