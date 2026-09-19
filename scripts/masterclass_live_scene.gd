@@ -18,9 +18,9 @@ func setup(owner_station: Node3D)->void:
 
 func _build_operator()->void:
 	operator=Person.new()
+	operator.color=Color("527988")
 	add_child(operator)
 	operator.caption.text="Оператор · очень важная съёмка"
-	operator.color=Color("527988")
 	var rig:=Node3D.new()
 	operator.add_child(rig)
 	rig.position=Vector3(0.34,1.42,-0.20)

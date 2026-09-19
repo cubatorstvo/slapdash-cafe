@@ -3,6 +3,7 @@ const Visits = preload("res://scripts/cafe_visits.gd")
 const Station = preload("res://scripts/work_station.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Masterclasses = preload("res://scripts/masterclass_library.gd")
+const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
@@ -30,6 +31,9 @@ var next_masterclass_id := 1
 var masterclass_pending: Dictionary={}
 var masterclass_station: Node3D
 var chef_station_backup: Node3D
+var masterclass_live_scene: Node3D
+var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
+var remote_movie_record: Dictionary={}
 
 func _ready() -> void:
 	rng.randomize()
@@ -160,11 +164,16 @@ func _try_begin_masterclass() -> void:
 	masterclass_station=stage
 	masterclass_pending.clear()
 	stage.training.open(dish,peer,"masterclass")
+	masterclass_live_scene=MasterclassLiveScene.new()
+	add_child(masterclass_live_scene)
+	masterclass_live_scene.setup(stage)
 	progress.revision+=1
 	trace("masterclass_started",{"dish":dish,"peer":peer,"type":stage.type_id})
 
 func finish_masterclass_layout(stage: Node3D) -> void:
 	if not masterclass_active() or stage!=masterclass_station: return
+	if is_instance_valid(masterclass_live_scene): masterclass_live_scene.queue_free()
+	masterclass_live_scene=null
 	stations.erase(masterclass_station)
 	remove_child(masterclass_station)
 	masterclass_station.queue_free()
@@ -228,6 +237,34 @@ func masterclass_summaries() -> Array:
 	for record in masterclasses: result.append(Masterclasses.summary(record))
 	return result
 
+func start_highlights(id: int, peer: int) -> String:
+	if "television" not in progress.lounge_items: return "Сначала установи телевизор в комнате отдыха."
+	var record:=masterclass_by_id(id)
+	if record.is_empty(): return "Запись не найдена."
+	Masterclasses.ensure_highlights(record)
+	if float(record.get("highlight_duration",0.0))<=0.0: return "В этой записи нет кадров для фильма."
+	movie_state={"id":id,"playing":true,"elapsed":0.0,"duration":float(record.highlight_duration),"started_by":peer}
+	remote_movie_record={}
+	progress.revision+=1
+	trace("highlights_started",{"id":id,"dish":record.dish,"seconds":record.highlight_duration,"peer":peer})
+	return ""
+
+func stop_highlights() -> void:
+	movie_state.playing=false
+	movie_state.elapsed=float(movie_state.get("duration",0.0))
+	progress.revision+=1
+
+func movie_record() -> Dictionary:
+	if not remote_movie_record.is_empty() and int(remote_movie_record.get("id",0))==int(movie_state.get("id",0)): return remote_movie_record
+	return masterclass_by_id(int(movie_state.get("id",0)))
+
+func movie_snapshot() -> Dictionary:
+	return movie_state.duplicate(true)
+
+func apply_movie_snapshot(data: Dictionary) -> void:
+	if not data is Dictionary: return
+	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0))}
+
 func _archive_legacy_recipes() -> void:
 	for station in stations:
 		if station.manual_station: continue
@@ -262,6 +299,9 @@ func _attach_customer(station: Node3D) -> void:
 func advance(delta: float) -> void:
 	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
 	_try_begin_masterclass()
+	if bool(movie_state.get("playing",false)):
+		movie_state.elapsed=minf(float(movie_state.elapsed)+delta,float(movie_state.duration))
+		if float(movie_state.elapsed)>=float(movie_state.duration): movie_state.playing=false
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_shift(delta)
 	advance_event(delta)
@@ -676,7 +716,7 @@ func save_data() -> Dictionary:
 		entry.recipes = entry.recipes.duplicate()
 		entry.drafts = entry.drafts.duplicate()
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 14, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id}
+	return {"format": "station-cafe", "version": 15, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id}
 
 func clear_world() -> void:
 	if is_instance_valid(chef_station_backup):
@@ -684,6 +724,10 @@ func clear_world() -> void:
 		chef_station_backup=null
 	masterclass_station=null
 	masterclass_pending.clear()
+	if is_instance_valid(masterclass_live_scene): masterclass_live_scene.queue_free()
+	masterclass_live_scene=null
+	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
+	remote_movie_record={}
 	for station in stations:
 		remove_child(station)
 		station.queue_free()
@@ -700,7 +744,7 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
@@ -745,7 +789,9 @@ func load_data(data: Dictionary) -> bool:
 	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
 	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
 	if version<14: _archive_legacy_recipes()
-	for record in masterclasses: next_masterclass_id=maxi(next_masterclass_id,int(record.get("id",0))+1)
+	for record in masterclasses:
+		Masterclasses.ensure_highlights(record)
+		next_masterclass_id=maxi(next_masterclass_id,int(record.get("id",0))+1)
 	open_for_business = data.get("open", true)
 	progress = Progression.new()
 	if data.get("progression") is Dictionary:

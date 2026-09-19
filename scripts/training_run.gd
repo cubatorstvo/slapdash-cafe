@@ -35,7 +35,7 @@ func open(recipe: String, peer: int, mode := "lesson") -> void:
 	participants.fill(0)
 	station.model.reset(dish)
 	station.state = "training"
-	if purpose != "manual" or station.customer_id >= 0: station.ensure_taster()
+	if purpose not in ["manual","masterclass"] or station.customer_id >= 0: station.ensure_taster()
 	configure_order()
 	info = "Выбери роль и напарника. Без напарника — последовательная запись." if purpose!="masterclass" else "Мастер-класс: выбери исполнителей ролей. В соло записывай роли последовательными дублями."
 	revision += 1
