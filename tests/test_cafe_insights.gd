@@ -157,6 +157,7 @@ func run()->void:
 	check(int(large_performance.portions_served)>=1 and int(large_performance.revenue)>=25,"Large group performance remains readable")
 
 	print("7/10: statistics and group UI render the same drill-down data")
+	service.feed_system("batch",{"stations":[2,3]},2)
 	game.office.open("stats")
 	var rendered: String=tree_text(game.office.content)
 	check("ЛЕНТА И СТАТИСТИКА" in rendered and "[СИСТЕМА]" in rendered,"Statistics tab renders system feed")
