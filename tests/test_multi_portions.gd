@@ -123,6 +123,9 @@ func run()->void:
 	var partial_id: int=int(partial.id)
 	settle_at_station(service,partial)
 	var partial_station_id: int=int(partial.station)
+	var other_station=second if partial_station_id==first.station_id else first
+	other_station.state="waiting"
+	other_station.customer_id=999
 	check(service.spawn_customer("sausage",false,false,{},10),"Another ten-portion guest joins the visible queue")
 	var queued: Dictionary={}
 	for customer in service.customers:
@@ -134,6 +137,8 @@ func run()->void:
 		queued.wait_limit=float(queued.order_age)+0.01
 		service.advance(0.02)
 		check(queued.state=="leaving","Queued order leaves after its arrival-based wait expires")
+	other_station.state="idle"
+	other_station.customer_id=-1
 
 	print("6/8: leaving after seven portions preserves seven payments and records three unserved portions")
 	var baseline_revenue: int=service.revenue
