@@ -4,6 +4,7 @@ const M = preload("res://scripts/team_cooking_model.gd")
 const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
+const Insights = preload("res://scripts/cafe_insights.gd")
 const PROTOCOL := "slapdash-cafe-scale-33"
 var game: Node3D
 var transport := "offline"
@@ -704,7 +705,7 @@ func _world(packet: PackedByteArray) -> void:
 	game.service.sync_masterclass_live_scene()
 	for key in ["served","revenue","missed","guests_arrived"]: game.service.set(key,int(data.get(key,0)))
 	game.service.order_stats=data.get("order_stats",game.service.blank_order_stats()).duplicate(true)
-	game.service.analytics=game.service.Insights.normalize(data.get("analytics",{}))
+	game.service.analytics=Insights.normalize(data.get("analytics",{}))
 	game.service.open_for_business = data.open
 	game.service.masterclasses=data.get("masterclasses",[]).duplicate(true)
 	game.service.next_masterclass_id=int(data.get("next_masterclass_id",1))
