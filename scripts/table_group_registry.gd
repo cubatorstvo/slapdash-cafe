@@ -265,7 +265,7 @@ func apply_plan_to_selection(station_ids: Array,dish: String,record_id: int)->Ar
 		for station_id in group.station_ids:
 			if station_id in ids: chosen.append(station_id)
 		if chosen.is_empty(): continue
-		var target_id:=group_id
+		var target_id: String=str(group_id)
 		if chosen.size()<group.station_ids.size():
 			var created:=split(group_id,chosen)
 			if created.is_empty(): continue
