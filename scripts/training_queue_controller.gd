@@ -202,7 +202,7 @@ func _new_batch(course_id: int,station_ids: Array,specs: Array,depends_on: int)-
 	needed_station_ids.sort()
 	var batch: Dictionary={
 		"id":batch_id,"course_id":course_id,"state":"queued","station_ids":needed_station_ids,
-		"lesson_ids":lesson_ids,"current_lesson_id":0,"depends_on":depends_on,"blocked_reason":"",
+		"lesson_ids":lesson_ids,"current_lesson_id":0,"depends_on":depends_on,"blocked_reason":"","last_feed_reason":"",
 		"defer_day":service.progress.day,"close_after_lesson":false,"gathers":0,"movies":0,"returns":0
 	}
 	if needed_station_ids.is_empty() or lesson_ids.is_empty() or lesson_ids.all(func(id):return str(_lesson(int(id)).state)=="completed"): batch.state="completed"
@@ -298,6 +298,41 @@ func _course_intent(course: Dictionary)->Array:
 		merged[key].station_ids.sort()
 		result.append(merged[key])
 	return result
+
+func _course_feed_name(course_id: int)->String:
+	var course:=_course(course_id)
+	if course.is_empty(): return "Курс #%d"%course_id
+	var parts: Array=[]
+	for assignment in _course_intent(course):
+		var dish: String=str(assignment.get("dish",""))
+		var title: String=str(Definition.DISHES.get(dish,dish))
+		if title not in parts: parts.append(title)
+	return " + ".join(parts) if not parts.is_empty() else "Курс #%d"%course_id
+
+func _remaining_course_lessons(course_id: int)->int:
+	var count:=0
+	for lesson in lessons:
+		if int(lesson.get("course_id",0))!=course_id: continue
+		if str(lesson.get("state","")) not in ["completed","cancelled","superseded"]: count+=1
+	return count
+
+func _course_feed_payload(course_id: int,extra: Dictionary={}) -> Dictionary:
+	var course:=_course(course_id)
+	var payload: Dictionary={"course":course_id,"name":_course_feed_name(course_id),"stations":_course_station_ids(course_id),"batches":course.get("batch_ids",[]).size(),"mode":str(course.get("mode","together")),"automatic":bool(course.get("automatic",false))}
+	for key in extra: payload[key]=extra[key]
+	return payload
+
+func linked_course_id(station_ids: Array,dish: String)->int:
+	for lesson in lessons:
+		if str(lesson.get("dish",""))!=dish or str(lesson.get("state","")) not in ["queued","blocked","deferred","active","watching"]: continue
+		for raw_id in station_ids:
+			if int(raw_id) in lesson.get("station_ids",[]): return int(lesson.get("course_id",0))
+	return 0
+
+func _feed_deferred(batch: Dictionary)->void:
+	var course_id: int=int(batch.get("course_id",0))
+	var remaining: int=_remaining_course_lessons(course_id)
+	service.feed_system("training_deferred",_course_feed_payload(course_id,{"batch":int(batch.get("id",0)),"remaining":remaining,"day":service.progress.day+1}),1)
 
 func course_view(course_id: int)->Dictionary:
 	var course:=_course(course_id)
@@ -422,7 +457,9 @@ func _create_auto_course(captured: Array,auto_key: String)->Dictionary:
 	revision+=1
 	service.progress.revision+=1
 	service.trace("automatic_training_queued",{"course":course_id,"auto_key":auto_key,"stations":_course_station_ids(course_id)})
-	service.feed_system("group_training",{"course":course_id,"stations":_course_station_ids(course_id),"automatic":true},_course_station_ids(course_id).size())
+	var group_id: String=str(auto_key.get_slice("|",0))
+	var group: Dictionary=service.table_group_by_id(group_id)
+	service.feed_system("group_training",_course_feed_payload(course_id,{"automatic":true,"group":group_id,"group_name":str(group.get("name",group_id))}),_course_station_ids(course_id).size())
 	return course
 
 func reconcile_automatic_needs()->void:
@@ -525,7 +562,7 @@ func enqueue_course(assignments: Array,mode := "together",command_id := "",peer 
 	revision+=1
 	service.progress.revision+=1
 	service.trace("training_course_queued",{"course":course_id,"mode":mode,"batches":course.batch_ids.duplicate(),"command":command})
-	service.feed_player(int(peer),"group_training",{"course":course_id,"stations":_course_station_ids(course_id)},_course_station_ids(course_id).size())
+	service.feed_player(int(peer),"group_training",_course_feed_payload(course_id),_course_station_ids(course_id).size())
 	return {"error":"","course_id":course_id,"duplicate":false}
 
 func _course_station_ids(course_id: int)->Array:
@@ -612,10 +649,14 @@ func _select_next_batch()->void:
 		if not reason.is_empty():
 			batch.state="blocked"
 			batch.blocked_reason=reason
+			if str(batch.get("last_feed_reason",""))!=reason:
+				batch.last_feed_reason=reason
+				service.feed_system("training_wait",_course_feed_payload(int(batch.course_id),{"batch":int(batch.id),"reason":reason,"stations":batch.station_ids.duplicate()}),1)
 			for lesson in _pending_lessons(batch):
 				if str(lesson.state) in ["queued","blocked"]: lesson.state="blocked"
 			_update_course_state(int(batch.course_id))
 			continue
+		batch.last_feed_reason=""
 		for lesson in _pending_lessons(batch):
 			if str(lesson.state)=="blocked": lesson.state="queued"
 		batch.state="draining"
@@ -733,6 +774,7 @@ func executor_movie_finished(lesson_id: int)->Dictionary:
 			batch.defer_day=service.progress.day+1
 			for pending in _pending_lessons(batch):
 				if str(pending.state) in ["queued","blocked","active"]: pending.state="deferred"
+			_feed_deferred(batch)
 		_clear_batch_stations(batch)
 		active_batch_id=0
 		_update_course_state(int(batch.course_id))
@@ -764,6 +806,7 @@ func executor_return_finished()->void:
 func _update_course_state(course_id: int)->void:
 	var course:=_course(course_id)
 	if course.is_empty(): return
+	var old_state: String=str(course.get("state",""))
 	var states: Array=[]
 	for batch_id in course.get("batch_ids",[]): states.append(str(_batch(int(batch_id)).get("state","completed")))
 	if not states.is_empty() and states.all(func(state):return state in ["completed","cancelled"]):
@@ -772,6 +815,8 @@ func _update_course_state(course_id: int)->void:
 	elif states.any(func(state):return state=="deferred"): course.state="deferred"
 	elif states.any(func(state):return state=="blocked"): course.state="blocked"
 	else: course.state="queued"
+	if str(course.state)=="completed" and old_state!="completed":
+		service.feed_system("training_course_complete",_course_feed_payload(course_id),maxi(1,_course_station_ids(course_id).size()))
 
 func _suspend_lesson_targets(lesson: Dictionary)->void:
 	for station_id in lesson.get("station_ids",[]):
@@ -808,6 +853,7 @@ func cancel_batch(batch_id: int)->String:
 		batch.state="cancelled"
 		_clear_batch_stations(batch)
 	_update_course_state(int(batch.course_id))
+	service.feed_system("training_cancel",_course_feed_payload(int(batch.course_id),{"batch":batch_id,"scope":"batch"}),1)
 	revision+=1
 	service.progress.revision+=1
 	request_auto_reconcile()
@@ -836,6 +882,7 @@ func cancel_course(course_id: int)->String:
 			batch.state="cancelled"
 			_clear_batch_stations(batch)
 	course.state="cancelled"
+	service.feed_system("training_cancel",_course_feed_payload(course_id,{"scope":"course"}),1)
 	revision+=1
 	service.progress.revision+=1
 	request_auto_reconcile()
@@ -869,6 +916,7 @@ func cancel_lesson(lesson_id: int)->String:
 		_clear_batch_stations(batch)
 		if int(batch.id)==active_batch_id: active_batch_id=0
 	_update_course_state(int(lesson.course_id))
+	service.feed_system("training_cancel",_course_feed_payload(int(lesson.course_id),{"lesson":lesson_id,"dish":str(lesson.dish),"scope":"lesson"}),1)
 	revision+=1
 	service.progress.revision+=1
 	request_auto_reconcile()
@@ -879,6 +927,7 @@ func assignment_suspended(station_id: int,dish: String)->bool:
 	return bool(suspended_assignments.get(_assignment_key(station_id,dish,int(current.get("record_id",0)),int(current.get("revision",0))),false))
 
 func _defer_batch(batch: Dictionary)->void:
+	var already_deferred: bool=str(batch.get("state",""))=="deferred" and int(batch.get("defer_day",0))==service.progress.day+1
 	for lesson in _pending_lessons(batch):
 		if str(lesson.state) in ["queued","blocked","active"]: lesson.state="deferred"
 	batch.state="deferred"
@@ -887,6 +936,7 @@ func _defer_batch(batch: Dictionary)->void:
 	_clear_batch_stations(batch)
 	if int(batch.id)==active_batch_id: active_batch_id=0
 	_update_course_state(int(batch.course_id))
+	if not already_deferred: _feed_deferred(batch)
 	revision+=1
 
 func on_shift_closed()->void:
@@ -911,7 +961,9 @@ func on_shift_closed()->void:
 		revision+=1
 	elif phase=="returning":
 		batch.state="completed" if _pending_lessons(batch).is_empty() else "deferred"
-		if str(batch.state)=="deferred": batch.defer_day=service.progress.day+1
+		if str(batch.state)=="deferred":
+			batch.defer_day=service.progress.day+1
+			_feed_deferred(batch)
 		_clear_batch_stations(batch)
 		active_batch_id=0
 		service.staff_training.handoff_to_evening()

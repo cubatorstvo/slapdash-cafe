@@ -540,6 +540,9 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		return
 	if action == "open":
 		if not near_peer(sender, station, 5.0): return
+		if game.service.progress.stars>=1 and not run.active():
+			message_to(sender,"После первой звезды новые способы назначаются через «Обучение и группа» и курсы у телевизора.")
+			return
 		if game.service.request_training(station, str(value.get("dish", "")), sender):
 			message_to(sender, "Станция завершит заказ и начнёт показ." if station.pending_teacher > 0 else "Выбери роли для записи.")
 		return

@@ -41,6 +41,7 @@ var scale_equipment: Array=[]
 var scale_group := ""
 var send_installers := false
 var stats_focus: Dictionary={}
+var course_focus_id:=0
 
 func _ready() -> void:
 	layer = 17
@@ -125,6 +126,7 @@ func open(page := "overview") -> void:
 	group_merge_active=[]
 	group_merge_active_initialized=false
 	stats_focus={}
+	course_focus_id=0
 	panel.show()
 	stamp = ""
 	rebuild()
@@ -190,7 +192,43 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 		if first_station!=null: course_editor.type_id=str(first_station.type_id)
 		_sync_course_group_order()
 	if record_id>0: _course_editor_add_record_internal(record_id)
+	_mark_training_intro_mass_seen()
 	tab="groups"
+	stamp=""
+	rebuild()
+
+func _mark_training_intro_mass_seen() -> void:
+	if game.service.progress.stars<1 or bool(game.service.progress.training_intro_mass_seen): return
+	var type_id: String=str(course_editor.get("type_id",""))
+	if type_id.is_empty() and not group_selected_stations.is_empty():
+		var selected=game.service.by_id(int(group_selected_stations[0]))
+		if selected!=null: type_id=str(selected.type_id)
+	if type_id.is_empty(): return
+	var compatible:=0
+	for station in game.service.stations:
+		if station.manual_station or station.masterclass_station or str(station.type_id)!=type_id: continue
+		compatible+=1
+	if compatible>=2:
+		game.service.progress.training_intro_mass_seen=true
+		game.service.progress.revision+=1
+
+func course_editor_to_chef() -> void:
+	close()
+	game.hud.notice.text="Шеф-станция: E → МАСТЕР-КЛАСС → выбери блюдо и сохрани запись в видеотеку."
+
+func open_problem_group(stations: Array,course_id := 0) -> void:
+	stats_focus={}
+	group_selected_stations=stations.duplicate()
+	group_selected_stations.sort()
+	course_focus_id=course_id
+	tab="groups"
+	stamp=""
+	rebuild()
+
+func open_problem_page(page: String) -> void:
+	stats_focus={}
+	course_focus_id=0
+	tab=page
 	stamp=""
 	rebuild()
 
@@ -460,7 +498,7 @@ func rebuild() -> void:
 					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
 				else: bundle_controls(station,catalog)
 			label(content,"МАСШТАБИРОВАНИЕ · ПОДГОТОВЛЕННЫЕ СЕКЦИИ",20)
-			label(content,"Новые секции дают 14 дополнительных мест: вместе с основным залом кафе вмещает до 20 производственных станций. Один выбранный комплект = одна коробка на конкретное место.",15)
+			label(content,"Новые секции дают 14 дополнительных мест. Всего есть 20 слотов: 1 шеф-станция + максимум 19 производственных мест. Один выбранный комплект = одна коробка на конкретное место.",15)
 			var type_row:=HBoxContainer.new(); content.add_child(type_row)
 			for type_id in ["counter","kitchen","grill_kitchen","solyanka_kitchen"]:
 				var chosen_type: String=type_id
@@ -710,6 +748,8 @@ func course_editor_page(host: bool) -> void:
 			course_editor.type_id=type_id
 	if not course_editor_message.is_empty(): label(content,course_editor_message,15)
 	label(content,"Кухня: "+(str(Definition.TYPES.get(type_id,{}).get("title",type_id)) if not type_id.is_empty() else "выбери столы"),17)
+	var scale: Dictionary=service.production_scale_summary()
+	label(content,"Масштаб кафе: %d/%d производственных мест · работников %d (%d на столах + %d свободных)"%[int(scale.places),int(scale.max_places),int(scale.workers),int(scale.assigned_workers),int(scale.free_workers)],14)
 	if not type_id.is_empty():
 		button(content,"Выбрать все совместимые столы",course_editor_select_all_compatible,host)
 		label(content,"ГРУППЫ И СТОЛЫ",16)
@@ -744,6 +784,7 @@ func course_editor_page(host: bool) -> void:
 		button(row,"↓",func():course_editor_move_record(index,1),host and index<records.size()-1)
 		button(row,"Убрать",func():course_editor_remove_record(index),host)
 	if not type_id.is_empty():
+		button(content,"Снять новый мастер-класс на шеф-станции",course_editor_to_chef,host)
 		label(content,"ДОСТУПНЫЕ ЗАПИСИ",16)
 		for record in service.masterclasses:
 			if str(record.get("source_type",""))!=type_id: continue
@@ -814,7 +855,8 @@ func training_queue_page(host: bool) -> void:
 	for course in views:
 		var mode_label: String="Вместе" if str(course.mode)=="together" else "По группам"
 		var auto_label: String=" · автоматически по плану" if bool(course.get("automatic",false)) else ""
-		label(content,"Курс #%d · %s · %s%s"%[int(course.id),mode_label,str(course.state),auto_label],17)
+		var linked_prefix: String="→ СВЯЗАННЫЙ " if int(course.id)==course_focus_id else ""
+		label(content,"%sКурс #%d · %s · %s%s"%[linked_prefix,int(course.id),mode_label,str(course.state),auto_label],17)
 		for assignment in course.assignments:
 			label(content,"  %s · %s · столы %s"%[Definition.DISHES.get(str(assignment.dish),str(assignment.dish)),str(assignment.name),", ".join(assignment.station_ids.map(func(id):return str(id)))],14)
 		if bool(course.editable): button(content,"Редактировать ожидающий курс",func():course_editor_open(0,int(course.id)),host)
@@ -916,6 +958,19 @@ func stats_page()->void:
 				var scenario: Dictionary=detail
 				var scenario_button:=button(content,"%s · %d случаев · столы %s"%[Definition.DISHES.get(str(detail.get("dish","")),str(detail.get("dish",""))),int(detail.get("count",0)),", ".join(detail.get("stations",[]).map(func(id):return str(id)))],func():set_stats_focus(scenario))
 				scenario_button.tooltip_text="Открыть связанное блюдо, группу, столы и назначенный мастер-класс."
+		var linked_course:=0
+		if not stations.is_empty() and not dish.is_empty() and is_instance_valid(service.training_queue):
+			linked_course=service.training_queue.linked_course_id(stations,dish)
+		if linked_course>0:
+			button(content,"Открыть связанный курс #%d"%linked_course,func():open_problem_group(stations,linked_course))
+		elif not stations.is_empty():
+			button(content,"Открыть связанные столы в группах",func():open_problem_group(stations))
+		if reason=="equipment":
+			button(content,"Перейти к оснащению и покупкам",func():open_problem_page("stations"))
+		elif reason=="workers":
+			button(content,"Перейти к выращиванию работников",func():open_problem_page("laboratory"))
+		elif reason=="no_station":
+			button(content,"Перейти к покупке производственного стола",func():open_problem_page("stations"))
 		button(content,"Закрыть подробности",func():set_stats_focus({}))
 
 func shop_button(item: String, station_id: int, installed := false) -> void:
