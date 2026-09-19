@@ -91,13 +91,18 @@ func run()->void:
 	game.shop.advance(9.0)
 	game.shop._process(0.016)
 	check(game.shop.installers.size()==3,"Arrived three-box order creates three assembler actors")
-	for i in range(60):
+	for i in range(180):
 		game.shop.advance(0.5)
 		game.shop._process(0.016)
+		if delivery_by_station(service,7).is_empty() and delivery_by_station(service,8).is_empty() and delivery_by_station(service,9).is_empty(): break
 	check(delivery_by_station(service,7).is_empty() and delivery_by_station(service,8).is_empty() and delivery_by_station(service,9).is_empty(),"Each assembler completes and removes its own box")
 	check(p.delivery_history.size()>=3 and p.delivery_history.slice(0,3).all(func(entry):return bool(entry.get("installer",false))),"Completed assembler installations remain visible in delivery history")
+	for i in range(180):
+		game.shop.advance(0.5)
+		game.shop._process(0.016)
+		if p.installer_jobs.is_empty(): break
 	game.shop._process(0.016)
-	check(game.shop.installers.is_empty(),"Assemblers leave after installation")
+	check(game.shop.installers.is_empty() and p.installer_jobs.is_empty(),"Assemblers physically leave after installation")
 	for id in [7,8,9]:
 		var station=service.by_id(id)
 		check(station!=null,"Installed station %d exists"%id)
@@ -125,6 +130,7 @@ func run()->void:
 	var positions: Array=[]
 	if is_instance_valid(visual):
 		for i in range(12):
+			game.shop.advance(0.55)
 			game.shop._process(0.55)
 			captions.append(str(visual.actor.caption.text))
 			positions.append(visual.actor.global_position)
@@ -143,8 +149,11 @@ func run()->void:
 
 	print("5/8: assembler finishes as soon as the current kitchen work releases the place")
 	source.state="idle"
-	game.shop.advance(0.1)
-	check(str(waiting.get("installer_state",""))=="installing","Waiting assembler begins installation after the station becomes idle")
+	for i in range(80):
+		game.shop.advance(0.1)
+		game.shop._process(0.016)
+		if str(waiting.get("installer_state",""))=="installing": break
+	check(str(waiting.get("installer_state",""))=="installing","Waiting assembler physically approaches the freed place and begins installation")
 	game.shop.advance(2.0)
 	check("sauce" in source.equipment and delivery_by_station(service,2).is_empty(),"Assembler installs the equipment and leaves the delivery queue")
 
