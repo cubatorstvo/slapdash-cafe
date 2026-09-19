@@ -6,9 +6,11 @@ const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
+const Insights = preload("res://scripts/cafe_insights.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
+const CHEF_WAIT_LIMIT := 60.0
 const SLOT_COUNT := Expansion.SLOT_COUNT
 const SLOT_GAP := 0.6
 const SLOT_ROW_CENTER_X := 3.0
@@ -21,6 +23,7 @@ var missed := 0
 var revenue := 0
 var guests_arrived := 0
 var order_stats: Dictionary=blank_order_stats()
+var analytics: Dictionary=Insights.blank()
 var open_for_business := false
 const Progression = preload("res://scripts/cafe_progression.gd")
 var progress = Progression.new()
@@ -455,6 +458,93 @@ func _attach_customer(station: Node3D) -> void:
 			customer.path.clear()
 			return
 	if station.customer_id >= 0: finish_customer(station.customer_id, false)
+
+func feed_system(kind: String,payload: Dictionary={},amount := 1)->Dictionary:
+	var entry:=Insights.push_feed(analytics,kind,payload,amount)
+	progress.revision+=1
+	return entry
+
+func feed_player(peer: int,kind: String,payload: Dictionary={},amount := 1)->Dictionary:
+	var name: String="Повар"
+	if game!=null and is_instance_valid(game.session):
+		name=str(game.session.members.get(peer,game.session.display_name if peer==1 else "Повар"))
+	var entry:=Insights.push_feed(analytics,kind,payload,amount,"player",name)
+	progress.revision+=1
+	return entry
+
+func feed_text(entry: Dictionary)->String:
+	return Insights.event_text(entry,Definition.DISHES)
+
+func group_id_for_stations(ids: Array)->String:
+	if ids.is_empty(): return ""
+	for group in table_groups():
+		var all_inside:=true
+		for raw_id in ids:
+			if int(raw_id) not in group.stations:
+				all_inside=false
+				break
+		if all_inside: return str(group.id)
+	return ""
+
+func problem_context(dish: String)->Dictionary:
+	var relevant: Array=[]
+	for station in stations:
+		if station.manual_station or station.masterclass_station or dish not in station.dishes(): continue
+		relevant.append(station)
+	if relevant.is_empty(): return {"reason":"no_station","stations":[],"group":""}
+	var ready: Array=[]
+	for station in relevant:
+		if station.recipes.has(dish) and Definition.missing_equipment(dish,station.equipment).is_empty() and (station.staffed<0 or station.staffed>=station.role_count()) and station.group_training_state.is_empty():
+			ready.append(station)
+	if not ready.is_empty():
+		var ids: Array=ready.map(func(station):return station.station_id)
+		if ready.any(func(station):return station.state!="idle" or station.customer_id>=0 or station.pending_teacher>0):
+			return {"reason":"busy","stations":ids,"group":group_id_for_stations(ids)}
+	for station in relevant:
+		if not station.group_training_state.is_empty() or (is_instance_valid(staff_training) and staff_training.targets_station(station.station_id,dish)):
+			var ids: Array=relevant.map(func(item):return item.station_id)
+			return {"reason":"training","stations":ids,"group":group_id_for_stations(ids)}
+	for station in relevant:
+		if station.staffed>=0 and station.staffed<station.role_count():
+			var ids: Array=relevant.map(func(item):return item.station_id)
+			return {"reason":"workers","stations":ids,"group":group_id_for_stations(ids)}
+	for station in relevant:
+		if not Definition.missing_equipment(dish,station.equipment).is_empty():
+			var ids: Array=relevant.map(func(item):return item.station_id)
+			return {"reason":"equipment","stations":ids,"group":group_id_for_stations(ids)}
+	var ids: Array=relevant.map(func(item):return item.station_id)
+	return {"reason":"unlearned","stations":ids,"group":group_id_for_stations(ids)}
+
+func _analytics_loss(customer: Dictionary,reason: String)->void:
+	var normalized: String="unlearned" if reason=="untrained" else reason
+	var context: Dictionary=problem_context(str(customer.dish))
+	if normalized in ["closing","chef_wait","wait"]: context.reason=normalized
+	Insights.loss(analytics,str(customer.dish),str(context.reason),int(customer.get("portions_total",1)),int(customer.get("portions_done",0)),context.get("stations",[]),str(context.get("group","")))
+
+func top_bottleneck()->Dictionary:
+	var reason:=Insights.top_reason(analytics)
+	return {"reason":reason,"label":Insights.reason_label(reason),"suggestion":Insights.suggestion(reason),"count":int(analytics.losses.get(reason,0))} if not reason.is_empty() else {}
+
+func group_performance(group: Dictionary)->Dictionary:
+	var result: Dictionary={"orders_completed":0,"portions_served":0,"revenue":0,"losses":0,"loss_reasons":{},"dishes":{}}
+	for raw_id in group.get("stations",[]):
+		var row: Dictionary=analytics.stations.get(str(int(raw_id)),{})
+		result.orders_completed=int(result.orders_completed)+int(row.get("orders_completed",0))
+		result.portions_served=int(result.portions_served)+int(row.get("portions_served",0))
+		result.revenue=int(result.revenue)+int(row.get("revenue",0))
+		for dish in row.get("dish",{}):
+			if not result.dishes.has(dish): result.dishes[dish]={"orders_completed":0,"portions_served":0,"revenue":0}
+			var target: Dictionary=result.dishes[dish]
+			var detail: Dictionary=row.dish[dish]
+			target.orders_completed=int(target.orders_completed)+int(detail.get("orders_completed",0))
+			target.portions_served=int(target.portions_served)+int(detail.get("portions_served",0))
+			target.revenue=int(target.revenue)+int(detail.get("revenue",0))
+	for detail in analytics.loss_details.values():
+		if str(detail.get("group",""))!=str(group.get("id","")): continue
+		result.losses=int(result.losses)+int(detail.get("count",0))
+		var reason: String=str(detail.get("reason",""))
+		result.loss_reasons[reason]=int(result.loss_reasons.get(reason,0))+int(detail.get("count",0))
+	return result
 
 func portion_count_for_new_order() -> int:
 	if progress.stars<2: return 1
