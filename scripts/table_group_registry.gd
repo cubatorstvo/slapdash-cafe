@@ -271,7 +271,6 @@ func apply_plan_to_selection(station_ids: Array,dish: String,record_id: int)->Ar
 			if created.is_empty(): continue
 			target_id=str(created.id)
 		set_plan(target_id,dish,record_id)
-		if dish not in groups[target_id].active_dishes: groups[target_id].active_dishes.append(dish)
 		affected.append(target_id)
 	return affected
 

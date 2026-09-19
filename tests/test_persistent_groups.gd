@@ -93,6 +93,7 @@ func run()->void:
 	var four:=group_with(service,[2,3,4,5])
 	check(not four.is_empty(),"Four-table group exists")
 	var four_id: String=str(four.id)
+	check(service.set_group_dish_active(four_id,"wine",true).is_empty() and service.set_group_dish_active(four_id,"potato",true).is_empty(),"Existing learned dishes are explicitly active for the production scenario")
 	check(service._apply_group_plan(800,[2,3,4,5]).size()==1 and service._apply_group_plan(900,[2,3,4,5]).size()==1,"Four-table group has two desired dishes")
 	var preview: Array=service.preview_table_groups(901,[2])
 	var preview_source: Dictionary={}

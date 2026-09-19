@@ -606,6 +606,16 @@ func _archive_legacy_recipes() -> void:
 			masterclasses.append(Masterclasses.make_record(next_masterclass_id,str(dish),station.type_id,recipe.tracks,float(recipe.duration),recipe.get("quality",{}),Masterclasses.default_name(str(dish),1,true,station.station_id),true,station.station_id))
 			next_masterclass_id+=1
 
+func local_recipe_learned(station: Node3D,dish: String) -> void:
+	if station==null or station.manual_station or station.masterclass_station or dish not in station.dishes(): return
+	_ensure_groups()
+	var group_id:=group_registry.group_id_for_station(station.station_id)
+	if group_id.is_empty(): return
+	# Legacy local teaching is the pre-first-star onboarding path. It makes the newly
+	# learned dish usable, while course assignments keep menu state independent.
+	group_registry.set_active_dish(group_id,dish,true)
+	_sync_group_intent(group_id)
+
 func request_training(station: Node3D, dish: String, peer: int) -> bool:
 	if station == null or not station.ready_crew() or station.manual_station or not dish in station.dishes() or progress.busy(): return false
 	if station.training.active(): return station.training.lead == peer
