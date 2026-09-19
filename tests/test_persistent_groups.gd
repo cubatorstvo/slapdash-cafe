@@ -133,7 +133,9 @@ func run()->void:
 	check(int(service.desired_source(four_id,"potato").id)==901,"Merged group uses the chosen desired potato record")
 	for id in [2,3,4,5]:
 		check(int(service.by_id(id).method_sources.potato.id)==900 and service.by_id(id).recipes.has("potato"),"Table %d keeps old production knowledge until retraining"%id)
-	check(service.station_group_status(3,"potato").contains("старому"),"Differing tables are visibly awaiting retraining rather than losing production")
+	check(service.station_group_status(3,"potato").contains("выключено"),"Disabled merged menu is visible without deleting old production knowledge")
+	check(service.set_group_dish_active(four_id,"potato",true).is_empty(),"Potato can be re-enabled after an empty-menu merge")
+	check(service.station_group_status(3,"potato").contains("старому"),"Once active, differing tables visibly await retraining while using the old method")
 
 	print("T18: disabling a dish blocks only future assignments and reports the exact reason")
 	check(service.set_group_dish_active(four_id,"sausage",true).is_empty(),"Sausage is active before accepting the order")
