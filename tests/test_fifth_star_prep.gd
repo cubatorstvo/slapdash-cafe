@@ -94,7 +94,7 @@ func run() -> void:
 		tracks.append({"group":role+1,"frames":[real_station.model.zone_snapshot(role)]})
 	real_station.recipes.solyanka={"tracks":tracks,"duration":1.0/60.0,"quality":real_station.model.quality()}
 	var saved: Dictionary = game.service.save_data()
-	check(saved.version==18,"Three-role kitchen advances the station save format to v18")
+	check(saved.version==19,"Three-role kitchen advances the station save format to v18")
 	check(game.service.load_data(saved),"Save with role-three item ownership loads successfully")
 	live = game.service.progress
 	check(game.service.by_id(6)!=null and game.service.by_id(6).recipes.has("solyanka"),"Solyanka recording survives save/load")

@@ -81,10 +81,10 @@ func run()->void:
 	check(service.request_manual(chef,"wine",1),"Normal chef cooking still starts after masterclasses")
 	chef.training.close()
 
-	print("5/6: v18 persists the shared library")
+	print("5/6: v19 persists the shared library")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==18 and saved.masterclasses.size()==1,"Current save writes masterclass library v18")
-	check(service.load_data(saved),"v18 save reloads")
+	check(saved.version==19 and saved.masterclasses.size()==1,"Current save writes masterclass library v19")
+	check(service.load_data(saved),"v19 save reloads")
 	check(service.masterclasses.size()==1 and service.masterclasses[0].name=="Быстрый обед","Library survives save/load")
 
 	print("6/6: v13 working recipes migrate to archive records")

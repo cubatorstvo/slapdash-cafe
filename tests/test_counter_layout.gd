@@ -88,7 +88,7 @@ func run() -> void:
 		assert(is_equal_approx(right_edge - left_edge, game.service.SLOT_GAP), "fixed station slots should keep the configured floor gap")
 		assert(is_equal_approx(right.position.x - left.position.x, station.SLOT_WIDTH + game.service.SLOT_GAP), "slot centers should be equally spaced")
 	var saved: Dictionary = game.service.save_data()
-	assert(saved.version == 18, "slot-based saves should use current format v18")
+	assert(saved.version == 19, "slot-based saves should use current format v19")
 	for index in range(saved.stations.size()):
 		var entry: Dictionary = saved.stations[index]
 		assert(entry.slot == index, "save should identify station contents by slot")
@@ -105,7 +105,7 @@ func run() -> void:
 	assert(game.service.served == 17, "slot migration should preserve cafe progress")
 	for index in range(game.service.stations.size()):
 		assert(game.service.stations[index].position.distance_to(game.service.slot_position(index)) < 0.0001, "legacy saved transforms should be ignored")
-	assert(game.service.save_data().version == 18, "migrated saves should write current format v18")
+	assert(game.service.save_data().version == 19, "migrated saves should write current format v19")
 	print("PASS: movable plates, tray wine, grades, snapshot and scene")
 	game._shutdown_tree(game)
 	game.free()
