@@ -717,6 +717,7 @@ func advance_chef_orders(delta: float) -> void:
 
 func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_data: Dictionary = {}, requested_portions := 0) -> bool:
 	if customers.size() >= 18: return false
+	var organic_order: bool=recipe.is_empty()
 	if recipe.is_empty():
 		var pool: Array = progress.available_dishes()
 		if progress.stars == 0 and by_id(1) != null and "jug" not in by_id(1).equipment: pool.erase("wine")
@@ -727,7 +728,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	if not recipe in Definition.DISHES: return false
 	var portions: int=int(requested_portions)
 	if portions<=0:
-		portions=1 if banquet or chef_guest or not visit_data.is_empty() else portion_count_for_new_order()
+		portions=portion_count_for_new_order() if organic_order and not banquet and not chef_guest and visit_data.is_empty() else 1
 	if portions not in [1,3,5,10]: portions=1
 	if banquet or chef_guest or not visit_data.is_empty(): portions=1
 	var candidates: Array=[]
