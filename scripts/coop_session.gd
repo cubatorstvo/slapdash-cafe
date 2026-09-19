@@ -422,7 +422,8 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			"group_merge":
 				var groups: Array=value.get("groups",[]) if value.get("groups",[]) is Array else []
 				var choices: Dictionary=value.get("choices",{}) if value.get("choices",{}) is Dictionary else {}
-				var active: Array=value.get("active",[]) if value.get("active",[]) is Array else []
+				var active: Variant=value.get("active",null)
+				if active!=null and not active is Array: active=null
 				error=game.service.merge_table_groups(groups,choices,active)
 			"group_active":
 				error=game.service.set_group_dish_active(str(value.get("group","")),str(value.get("dish","")),bool(value.get("enabled",false)))

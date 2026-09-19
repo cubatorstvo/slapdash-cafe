@@ -24,6 +24,7 @@ var group_pending_assignment: Dictionary={}
 var group_selected_groups: Array=[]
 var group_merge_choices: Dictionary={}
 var group_merge_active: Array=[]
+var group_merge_active_initialized:=false
 var lab_branch := "formula"
 var lab_target := 2
 var lab_reserve := 150
@@ -114,6 +115,7 @@ func open(page := "overview") -> void:
 	group_selected_groups=[]
 	group_merge_choices={}
 	group_merge_active=[]
+	group_merge_active_initialized=false
 	stats_focus={}
 	panel.show()
 	stamp = ""
@@ -154,6 +156,7 @@ func set_group_selected(id: String,on: bool) -> void:
 	elif not on: group_selected_groups.erase(id)
 	group_merge_choices={}
 	group_merge_active=[]
+	group_merge_active_initialized=false
 	stamp=""
 	rebuild()
 
@@ -163,6 +166,7 @@ func set_merge_choice(dish: String,record_id: int) -> void:
 	rebuild()
 
 func set_merge_active(dish: String,on: bool) -> void:
+	group_merge_active_initialized=true
 	if on and dish not in group_merge_active: group_merge_active.append(dish)
 	elif not on: group_merge_active.erase(dish)
 	stamp=""
@@ -420,7 +424,8 @@ func rebuild() -> void:
 					label(content,"Выбранные группы относятся к разным кухням.",15)
 				else:
 					var type_id: String=str(merge_preview.type_id)
-					if group_merge_active.is_empty():
+					if not group_merge_active_initialized:
+						group_merge_active_initialized=true
 						for selected_group_id in group_selected_groups:
 							var selected_group: Dictionary=service.table_group_by_id(str(selected_group_id))
 							for dish in selected_group.active_dishes:
@@ -560,7 +565,8 @@ func stats_page()->void:
 		var group_id: String=str(stats_focus.get("group",""))
 		if not group_id.is_empty():
 			var group: Dictionary=service.table_group_by_id(group_id)
-			label(content,"Группа: "+(str(group.get("name",group_id)) if not group.is_empty() else group_id),16)
+			var historical_name: String=str(stats_focus.get("group_name",group_id))
+			label(content,"Группа: "+(str(group.get("name",historical_name)) if not group.is_empty() else historical_name)+" · ID "+group_id,16)
 		var stations: Array=stats_focus.get("stations",[]) if stats_focus.get("stations",[]) is Array else []
 		if not stations.is_empty():
 			label(content,"Столы: "+", ".join(stations.map(func(id):return str(id))),16)
