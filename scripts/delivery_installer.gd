@@ -25,11 +25,10 @@ func apply(parcel: Dictionary,target: Vector3,delta: float)->void:
 	if raw.size()==3: actor.global_position=Vector3(raw[0],raw[1],raw[2])
 	var state:=str(parcel.get("installer_state","waiting_delivery"))
 	parcel_box.visible=state in ["walking","waiting"]
-	actor.caption.text=match state:
-		"walking": "Сборщик · тащит коробку"
-		"waiting": ["Сборщик · ну когда уже?","Сборщик · смотрит на часы","Сборщик · очень хочет домой","Сборщик · сверлит повара взглядом"][int(parcel.get("installer_variant",0)+floor(clock/2.8))%4]
-		"installing": "Сборщик · собирает"
-		_: "Сборщик"
+	if state=="walking": actor.caption.text="Сборщик · тащит коробку"
+	elif state=="waiting": actor.caption.text=["Сборщик · ну когда уже?","Сборщик · смотрит на часы","Сборщик · очень хочет домой","Сборщик · сверлит повара взглядом"][int(parcel.get("installer_variant",0)+floor(clock/2.8))%4]
+	elif state=="installing": actor.caption.text="Сборщик · собирает"
+	else: actor.caption.text="Сборщик"
 	if state=="waiting":
 		var phase:=clock+float(parcel.get("id",0))*0.73
 		var base:=target+Vector3(0,0,2.55)
