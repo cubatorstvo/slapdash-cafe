@@ -65,24 +65,31 @@ jobs:
               game.office.rebuild()
               await process_frame
               await process_frame
-              var target: Control=null
-              var stack: Array=[game.office.content]
-              while not stack.is_empty():
-                  var node=stack.pop_back()
-                  if node is Label and str(node.text)=="ЕДИНЫЙ РЕДАКТОР КУРСА":
-                      target=node
-                      break
-                  for child in node.get_children(): stack.append(child)
+              func find_label(text_value: String)->Control:
+                  var stack: Array=[game.office.content]
+                  while not stack.is_empty():
+                      var node=stack.pop_back()
+                      if node is Label and str(node.text)==text_value: return node
+                      for child in node.get_children(): stack.append(child)
+                  return null
+              var target: Control=find_label("ЕДИНЫЙ РЕДАКТОР КУРСА")
               if target!=null:
                   game.office.scroll.scroll_vertical=maxi(0,int(target.global_position.y-game.office.content.global_position.y)-20)
               await process_frame
               await process_frame
               var image:=root.get_viewport().get_texture().get_image()
-              var error:=image.save_png("/tmp/stage3_course_editor.png")
-              print("VISUAL_SCREENSHOT=",error)
+              var error:=image.save_png("/tmp/stage3_course_editor_top.png")
+              var preview_target: Control=find_label("ПРЕДПРОСМОТР")
+              if preview_target!=null:
+                  game.office.scroll.scroll_vertical=maxi(0,int(preview_target.global_position.y-game.office.content.global_position.y)-180)
+              await process_frame
+              await process_frame
+              var preview_image:=root.get_viewport().get_texture().get_image()
+              var preview_error:=preview_image.save_png("/tmp/stage3_course_editor_preview.png")
+              print("VISUAL_SCREENSHOTS=",error,",",preview_error)
               game._shutdown_tree(game)
               game.free()
-              quit(0 if error==OK else 1)
+              quit(0 if error==OK and preview_error==OK else 1)
           GDSCRIPT
       - name: Import project
         run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit
@@ -91,4 +98,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: stage3-course-editor
-          path: /tmp/stage3_course_editor.png
+          path: |
+            /tmp/stage3_course_editor_top.png
+            /tmp/stage3_course_editor_preview.png
