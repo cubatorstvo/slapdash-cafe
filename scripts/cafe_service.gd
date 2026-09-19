@@ -793,7 +793,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 
 func finish_customer(id: int, accepted: bool) -> void:
 	for customer in customers:
-		if customer.id!=id or customer.state in ["leaving","eating"]: continue
+		if customer.id!=id or customer.state in ["leaving","eating","portion_eating"]: continue
 		if customer.state=="queued": dismiss_queue(customer); return
 		var station: Node3D=by_id(int(customer.get("station",-1)))
 		if int(customer.get("portions_total",1))>1:
