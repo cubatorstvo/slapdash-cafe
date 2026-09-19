@@ -194,6 +194,10 @@ func rebuild() -> void:
 			label(content,"Личная стойка — твои заказы. Купленное оборудование приедет ко входу: забери коробку и установи на отмеченное место.")
 			label(content,"Свободных клонов: %d. Стол, оборудование и работник приобретаются отдельно.\nПосле первой звезды: эксперимент — 20, микроскоп сохраняет формулу, посадка — 60. Вырасти клона, прими запись блюда и дождись его первого заказа."%progress.free_clones)
 			label(content,"Ночью посетителей нет. Все игроки ложатся в общую Шеф-кровать, чтобы начать новый день. Доставки и обустройство доступны днём тоже.")
+			label(content,"ОБСЛУЖИВАНИЕ",19)
+			label(content,"Гости: пришло %d · обслужено %d · ушло %d"%[service.guests_arrived,service.served,service.missed],15)
+			label(content,"Заказы: завершено %d · частично %d · не выполнено %d"%[int(service.order_stats.orders_completed),int(service.order_stats.orders_partial),int(service.order_stats.orders_failed)],15)
+			label(content,"Порции: заказано %d · выдано %d · не получено %d"%[int(service.order_stats.portions_ordered),int(service.order_stats.portions_served),int(service.order_stats.portions_unserved)],15)
 			if progress.journey_auto_served>0:
 				label(content,"Другие пути развития: повысить формулу в лаборатории или улучшить прогноз отдыха. Выбирай то, что сейчас полезнее твоему кафе.",15)
 				button(content,"Формулы и выращивание",func():tab="laboratory";stamp="";rebuild())

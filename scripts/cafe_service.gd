@@ -1058,7 +1058,7 @@ func save_data() -> Dictionary:
 		entry.method_sources=entry.method_sources.duplicate(true)
 		entry.method_plan=entry.method_plan.duplicate(true)
 		entries.append(entry)
-	return {"format": "station-cafe", "version": 17, "progression": progress.snapshot(), "stations": entries, "served": served, "revenue": revenue, "missed": missed, "open": open_for_business, "chef_order_clock": chef_order_clock, "masterclasses":masterclasses.duplicate(true), "next_masterclass_id":next_masterclass_id, "table_group_names":table_group_names.duplicate(true)}
+	return {"format":"station-cafe","version":18,"progression":progress.snapshot(),"stations":entries,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true)}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
@@ -1088,9 +1088,10 @@ func _saved_slot(entry: Dictionary, version: int) -> int:
 
 func load_data(data: Dictionary) -> bool:
 	var version: int = int(data.get("version", 0))
-	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] or not data.get("stations") is Array: return false
+	if data.get("format") != "station-cafe" or not version in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18] or not data.get("stations") is Array: return false
 	if version >= 5 and not data.get("progression") is Dictionary: return false
 	if version>=16 and not data.get("table_group_names",{}) is Dictionary: return false
+	if version>=18 and not data.get("order_stats",{}) is Dictionary: return false
 	var slots: Array = []
 	for entry in data.stations:
 		if not entry is Dictionary or not entry.get("type", "") in Definition.TYPES: return false
@@ -1132,9 +1133,16 @@ func load_data(data: Dictionary) -> bool:
 		station.method_sources=entry.get("method_sources",{}).duplicate(true)
 		station.method_plan=entry.get("method_plan",{}).duplicate(true)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
-	served = int(data.get("served", 0))
-	revenue = int(data.get("revenue", 0))
-	missed = int(data.get("missed", 0))
+	served=int(data.get("served",0))
+	revenue=int(data.get("revenue",0))
+	missed=int(data.get("missed",0))
+	if version>=18:
+		guests_arrived=maxi(0,int(data.get("guests_arrived",served+missed)))
+		order_stats=blank_order_stats()
+		for key in order_stats: order_stats[key]=maxi(0,int(data.get("order_stats",{}).get(key,0)))
+	else:
+		guests_arrived=maxi(0,served+missed)
+		order_stats={"orders_arrived":guests_arrived,"orders_completed":served,"orders_partial":0,"orders_failed":missed,"portions_ordered":guests_arrived,"portions_served":served,"portions_unserved":missed}
 	table_group_names=data.get("table_group_names",{}).duplicate(true) if version>=16 and data.get("table_group_names",{}) is Dictionary else {}
 	masterclasses=data.get("masterclasses",[]).duplicate(true) if version>=14 else []
 	next_masterclass_id=maxi(1,int(data.get("next_masterclass_id",1))) if version>=14 else 1
@@ -1440,11 +1448,17 @@ func queue_point(index: int) -> Vector3:
 
 func assign_customer(station: Node3D, customer: Dictionary) -> void:
 	customer.state="walking"
+	customer.station=station.station_id
+	customer.wait_limit=maxf(float(customer.get("wait_limit",0.0)),order_wait_limit(int(customer.get("portions_total",1)),station,str(customer.dish)))
 	customer.path=[station.to_global(Vector3(0,0,-1.85))]
 	station.customer_order=customer.get("order",{}).duplicate(true)
 	station.order_dish=customer.dish
+	station.order_portions_total=int(customer.get("portions_total",1))
+	station.order_portions_done=int(customer.get("portions_done",0))
+	station.order_paid=int(customer.get("order_paid",0))
 	station.customer_id=customer.id
 	station.state="waiting"
+	_update_multi_caption(customer)
 
 func advance_queue() -> void:
 	var line:=chef_queue()
@@ -1463,5 +1477,6 @@ func dismiss_queue(customer: Dictionary) -> void:
 	customer.state="leaving"
 	customer.path=[Vector3(-8.8,0,4.8),Vector3(17.4,0,1.65)]
 	customer.view.caption.text="До завтра!"
+	_record_failed_order(customer,"busy")
 	if customer.get("banquet",false): progress.banquet_finished+=1
 	Visits.settled(self,customer,false,"D")
