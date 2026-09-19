@@ -16,6 +16,8 @@ jobs:
           - test_multi_portions.gd
           - test_cafe_insights.gd
           - test_counter_layout.gd
+          - test_clone_tempo.gd
+          - test_four_to_five_handoff.gd
           - test_fifth_star_prep.gd
           - test_masterclass_highlights.gd
           - test_masterclasses.gd
