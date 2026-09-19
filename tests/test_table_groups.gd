@@ -60,12 +60,15 @@ func run()->void:
 		station.recipes.wine={"tracks":wine.tracks.duplicate(true),"duration":wine.duration,"quality":wine.quality.duplicate(true)}
 		station.method_sources.wine={"id":800,"name":"Старый бокал"}
 
-	print("1/7: compatible tables form a readable group and partial selection previews a split")
+	print("1/7: explicit group identity is stable and partial selection previews a split")
+	check(service.create_table_group([2,3],"Стойки").is_empty(),"Player explicitly groups the compatible counters")
+	check(service._apply_group_plan(800,[2,3]).size()==1,"Group receives the existing wine method as desired plan")
 	var groups: Array=service.table_groups()
 	var counter_group: Dictionary={}
 	for group in groups:
 		if group.stations==[2,3]: counter_group=group
-	check(not counter_group.is_empty(),"Two compatible counters with identical assignments appear in one group")
+	check(not counter_group.is_empty(),"Explicit counter group is readable")
+	var original_group_id: String=str(counter_group.id)
 	var preview: Array=service.preview_table_groups(900,[2])
 	var preview_sets: Array=[]
 	for group in preview: preview_sets.append(group.stations)
@@ -110,13 +113,21 @@ func run()->void:
 	finish_session(service)
 	check(second.recipes.has("potato") and second.method_sources.potato.id==900,"Second table learns after the shared viewing")
 
-	print("4/7: cross-group assignment recomposes groups while preserving other dishes")
+	print("4/7: matching assignments stay separate until the player explicitly merges groups")
+	groups=service.table_groups()
+	var separated: Array=[]
+	for group in groups:
+		if group.stations==[2] or group.stations==[3]: separated.append(group)
+	check(separated.size()==2,"Identical learned and desired methods do not auto-merge organizational groups")
+	check(service.table_group_by_id(original_group_id).stations==[3],"Original group ID remains with the unselected part after the split")
+	var merge_ids: Array=separated.map(func(group):return str(group.id))
+	check(service.merge_table_groups(merge_ids,{},["wine","potato"]).is_empty(),"Player can explicitly merge the two groups")
 	groups=service.table_groups()
 	counter_group={}
 	for group in groups:
 		if group.stations==[2,3]: counter_group=group
-	check(not counter_group.is_empty(),"Tables merge into one group again when their full assignment maps match")
-	check(service.source_label(2,"wine")=="Старый бокал" and service.source_label(2,"potato")=="Картошка шефа","Group table keeps independent dish-to-record mappings")
+	check(not counter_group.is_empty(),"Explicit merge produces one two-table group")
+	check(service.source_label(2,"wine")=="Старый бокал" and service.source_label(2,"potato")=="Картошка шефа","Merged group keeps independent learned dish mappings")
 
 	print("5/7: groups can be renamed and deleted films remain learned")
 	check(service.rename_table_group(str(counter_group.id),"Картофельная линия").is_empty(),"Current group can be renamed")
@@ -127,18 +138,19 @@ func run()->void:
 
 	print("6/7: equipment and vacancies are explicit readiness states")
 	second.equipment.erase("pan")
-	check(service.station_group_status(3,"potato")=="требуется оборудование","Missing equipment is shown in group readiness")
+	check(service.station_group_status(3,"potato")=="ждёт оснащение","Missing equipment is shown in group readiness")
 	second.equipment.append("pan")
 	second.staffed=0
-	check(service.station_group_status(3,"potato")=="требуются работники","Vacancy is shown in group readiness")
+	check(service.station_group_status(3,"potato")=="нужны сотрудники","Vacancy is shown in group readiness")
 	second.staffed=1
 
-	print("7/7: v19 persists group names, learned source links and working recipes")
+	print("7/7: v20 persists permanent group identity, learned source links and working recipes")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==19 and saved.table_group_names.get(str(counter_group.id),"")=="Картофельная линия","Current save writes group metadata in v19")
-	check(service.load_data(saved),"v19 cafe reloads")
+	check(saved.version==20 and saved.table_group_registry.groups.has(str(counter_group.id)),"Current save writes persistent group registry in v20")
+	var saved_group_id: String=str(counter_group.id)
+	check(service.load_data(saved),"v20 cafe reloads")
 	check(service.by_id(2).recipes.has("potato") and service.by_id(2).method_sources.potato.id==900,"Reload preserves learned full method and deleted source id")
-	check(service.table_group_by_id("2-3").name=="Картофельная линия","Reload preserves group name")
+	check(service.table_group_by_id(saved_group_id).name=="Картофельная линия","Reload preserves permanent group ID and name")
 	check(service.source_label(2,"potato").contains("Запись удалена"),"Deleted-film marker survives reload")
 
 	game._shutdown_tree(game)
