@@ -1,4 +1,4 @@
-name: Training fixes stage 3 diagnostic
+name: Training fixes stage 3 targeted
 on:
   push:
     branches:
@@ -7,9 +7,18 @@ concurrency:
   group: training-fixes-stage3-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  compile:
+  targeted:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - test_course_editor_ui.gd
+          - test_training_queue_core.gd
+          - test_training_queue_night.gd
+          - test_training_queue_versions_save.gd
+          - test_table_groups.gd
     steps:
       - uses: actions/checkout@v4
       - name: Install Godot 4.7.2
@@ -22,5 +31,5 @@ jobs:
           /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --version
       - name: Import project
         run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit
-      - name: Smoke table groups
-        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/test_table_groups.gd
+      - name: Run test
+        run: timeout 180s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/${{ matrix.test }}
