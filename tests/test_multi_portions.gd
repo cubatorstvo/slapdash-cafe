@@ -154,13 +154,13 @@ func run()->void:
 	check(int(service.order_stats.portions_unserved)==baseline_unserved+3,"The missing three portions are reflected in statistics")
 	check(service.by_id(partial_station_id).state=="idle","Partial departure releases the assigned table")
 
-	print("7/8: v18 save preserves portion payments and counters without duplicate accounting")
+	print("7/8: v19 save preserves portion payments and counters without duplicate accounting")
 	var saved_revenue: int=service.revenue
 	var saved_cash: int=p.cash
 	var saved_stats: Dictionary=service.order_stats.duplicate(true)
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==18,"Multi-order save format is v18")
-	check(service.load_data(saved),"v18 cafe reloads")
+	check(saved.version==19,"Insights save format is v19")
+	check(service.load_data(saved),"v19 cafe reloads")
 	check(service.revenue==saved_revenue and service.progress.cash==saved_cash,"Reload preserves already paid portions exactly once")
 	check(service.order_stats==saved_stats,"Guest/order/portion counters survive reload")
 	for i in range(30): service.advance(0.05)
@@ -172,7 +172,7 @@ func run()->void:
 	legacy.erase("guests_arrived")
 	legacy.erase("order_stats")
 	check(service.load_data(legacy),"v17 cafe remains loadable")
-	check(service.save_data().version==18,"Migrated cafe writes the current v18 format")
+	check(service.save_data().version==19,"Migrated cafe writes the current v19 format")
 	check(int(service.order_stats.portions_served)==service.served,"Legacy completed guests migrate as one portion each")
 
 	game._shutdown_tree(game)

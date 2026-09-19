@@ -111,7 +111,7 @@ func run()->void:
 
 	print("6/6: v14 libraries migrate to stage-2 highlight metadata")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==18,"Stage 5 save format is v18")
+	check(saved.version==19,"Stage 6 save format is v19")
 	var old: Dictionary=saved.duplicate(true)
 	old.version=14
 	for old_record in old.masterclasses:
