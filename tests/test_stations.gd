@@ -20,6 +20,10 @@ func feed(station: Node3D, role: int, commands: Array) -> void:
 		if not event.is_empty(): station.training.queue_event(role, event)
 		station.training.advance(DT)
 
+func open_recording(station: Node3D, dish: String, peer: int) -> void:
+	# Low-level recorder harness. Player-facing recordings are created only as masterclasses on the chef station.
+	station.training.open(dish, peer)
+
 func run() -> void:
 	var game = Scene.instantiate()
 	root.add_child(game)
@@ -29,13 +33,13 @@ func run() -> void:
 	game.service.initial_stations(true)
 	game.service.open_for_business = false
 	var service = game.service
-	print("[1/7] Station identity, complete kit, attached crew and local training")
+	print("[1/7] Station identity, complete kit, attached crew and recorder harness")
 	check(service.stations.size() == 4, "Three counters and one team kitchen")
 	var first: Node3D = service.stations[0]
 	var second: Node3D = service.stations[1]
 	var kitchen: Node3D = service.stations[3]
 	check(first.crew.size() == 1 and kitchen.crew.size() == 2, "Crew belongs to station")
-	service.request_training(first, "wine", 1)
+	open_recording(first, "wine", 1)
 	check(first.training.start_pass([1]), "Start one-role pass")
 	first.model.pick_up("pan")
 	check(first.model.held == "pan", "Wine goal still permits pan")
@@ -45,7 +49,7 @@ func run() -> void:
 	first.training.close()
 
 	print("[2/7] Full meat role, independent pasta role, forbidden zones")
-	service.request_training(kitchen, "meal", 1)
+	open_recording(kitchen, "meal", 1)
 	kitchen.training.start_pass([1, 0])
 	check(not kitchen.model.grab(0, "water") and not kitchen.model.grab(0, "pasta_salt_tool"), "Inactive zone cannot be grabbed")
 	var meat := Inputs.new()
@@ -67,16 +71,17 @@ func run() -> void:
 	kitchen.training.keep_pass()
 	check(kitchen.training.tracks[0] == meat_track, "Adding role keeps first track byte-for-byte")
 	check(kitchen.training.accept(), "Whole meal accepted")
+	check(service.set_group_dish_active(service.group_id_for_station(kitchen.station_id),"meal",true).is_empty(),"Test harness activates the recorded meal for production")
 	var old_record: Dictionary = kitchen.recipes.meal.duplicate(true)
 
 	print("[3/7] Replace whole role, keep old recipe on cancellation, linked cooperative take")
-	service.request_training(kitchen, "meal", 1)
+	open_recording(kitchen, "meal", 1)
 	kitchen.training.start_pass([1, 0])
 	check(kitchen.training.pending_tracks[1] == old_record.tracks[1], "Independent other role retained")
 	feed(kitchen, 0, [{"grab": "steak"}])
 	kitchen.training.close()
 	check(kitchen.recipes.meal == old_record, "Cancelled replacement keeps production")
-	service.request_training(kitchen, "meal", 1)
+	open_recording(kitchen, "meal", 1)
 	kitchen.training.start_pass([1, 22])
 	check(kitchen.model.grab(0, "water"), "Simultaneously live roles share both zones")
 	kitchen.training.advance(DT)
@@ -89,7 +94,7 @@ func run() -> void:
 	kitchen.training.close()
 
 	print("[4/7] Single recipe is station-owned, exact replay and customer service")
-	service.request_training(first, "wine", 1)
+	open_recording(first, "wine", 1)
 	first.training.start_pass([1])
 	feed(first, 0, [{"grab": "cup"}])
 	for i in range(90): feed(first, 0, [{"target": [first.model.Layout.TRAY.x, first.model.Layout.TRAY.y], "height": 0.15}])
@@ -114,10 +119,10 @@ func run() -> void:
 	for i in range(3500): service.advance(DT)
 	check(service.served == 1 and service.revenue == 65, "Recorded brigade serves guest")
 
-	print("[5/7] Simultaneous station lessons, pending lesson and real customer")
-	service.request_training(first, "wine", 1)
-	service.request_training(second, "potato", 22)
-	check(first.training.active() and second.training.active(), "Separate stations train concurrently")
+	print("[5/7] Recorder harness isolation and real customer")
+	open_recording(first, "wine", 1)
+	open_recording(second, "potato", 22)
+	check(first.training.active() and second.training.active(), "Independent recorder instances can still be exercised by low-level tests")
 	first.training.close()
 	second.training.close()
 	service.spawn_customer("meal")
@@ -125,10 +130,9 @@ func run() -> void:
 		service.advance(DT)
 		if kitchen.state == "cooking": break
 	check(kitchen.state == "cooking", "Order started")
-	check(service.request_training(kitchen, "meal", 1) and kitchen.pending_teacher == 1, "Teaching waits for current order")
+	check(not kitchen.training.active(), "A production order never schedules a local teaching session")
 	for i in range(2700): service.advance(DT)
-	check(kitchen.training.active() and kitchen.pending_teacher == 0, "Pending lesson starts after order")
-	kitchen.training.close()
+	check(not kitchen.training.active(), "Finishing a production order leaves local recording closed")
 
 	print("[6/7] Fixed station slots, save/load drafts and malformed data rejection")
 	var saved: Dictionary = bytes_to_var(var_to_bytes(service.save_data()))
@@ -147,7 +151,7 @@ func run() -> void:
 	print("[7/7] UI ownership and restart revision")
 	first = service.by_id(1)
 	game.player.global_position = first.to_global(Vector3(0, 0.02, 1.8))
-	game.session.execute_action(1, {"action": "open", "station": 1, "dish": "wine"})
+	open_recording(first, "wine", 1)
 	game.session.execute_action(1, {"action": "pass", "station": 1, "revision": first.training.revision, "participants": [1]})
 	game.bind_training()
 	check(game.player.station == first and game.player.constrained, "FPS records at real station")
@@ -157,5 +161,5 @@ func run() -> void:
 	first.training.close()
 	game.queue_free()
 	await process_frame
-	print("PASS: station ownership, independent roles, recordings, customers, save and UI" if failures == 0 else "FAILED: %d" % failures)
+	print("PASS: station ownership, independent role recordings, customers, save and UI" if failures == 0 else "FAILED: %d" % failures)
 	quit(0 if failures == 0 else 1)

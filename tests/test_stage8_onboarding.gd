@@ -24,32 +24,44 @@ func run()->void:
 	game.new_cafe()
 	var service=game.service
 	var p=service.progress
+	var chef=service.by_id(1)
+	chef.equipment=["rag","plates","sauce","pan","jug","cup"]
+	chef.apply_equipment()
 	var station=service.add_station("counter",1,false)
 	station.staffed=1
 	station.equipment=["rag","plates","sauce","pan","jug","cup"]
 	station.apply_equipment()
 
-	print("Stage8 onboarding 1/3: pre-star local lesson may cross the first-star boundary")
+	print("Stage8 onboarding 1/3: production stations never record cooking methods")
 	p.stars=0
-	check(service.request_training(station,"sausage",1),"Early local station training remains available before first star")
-	check(station.training.active(),"Early local lesson is really active")
-	p.stars=1
-	check(service.request_training(station,"sausage",1),"Already active old lesson remains controllable after gaining first star")
-	station.training.close()
-
-	print("Stage8 onboarding 2/3: post-star new local teaching is rejected by service and host path")
-	check(not service.request_training(station,"sausage",1),"Service rejects a new local lesson after first star")
 	game.player.global_position=station.to_global(Vector3(0,0.02,1.8))
-	game.session.execute_action(1,{"action":"open","station":2,"dish":"sausage"})
-	check(not station.training.active(),"Host-authoritative action path also leaves local lesson closed after first star")
-
-	print("Stage8 onboarding 3/3: station UI directs player into the group/course editor")
+	game.session.execute_action(1,{"action":"open","station":station.station_id,"dish":"sausage"})
+	check(not station.training.active(),"Legacy production-station open action cannot start a recording before the first star")
 	game.menu.show_station(station)
 	var rendered:=tree_text(game.menu.panel)
-	check("Обучение и группа" in rendered and "Обучить здесь" not in rendered,"Production station replaces old local-training action after first star")
+	check("Обучить здесь" not in rendered and "только на Шеф-станции" in rendered,"Pre-star production UI explains the single chef-station recording path")
+	game.menu.close()
+	check(not bool(service.masterclass_access("sausage").available),"Masterclasses remain locked before the first star")
+
+	print("Stage8 onboarding 2/3: first star unlocks recording only at the chef station")
+	p.stars=1
+	check(bool(service.masterclass_access("sausage").available),"First star unlocks a sausage masterclass at the equipped chef station")
+	game.player.global_position=chef.to_global(Vector3(0,0.02,1.8))
+	game.menu.show_station(chef)
+	rendered=tree_text(game.menu.panel)
+	check("Провести мастер-класс" in rendered,"Chef-station UI exposes masterclass recording after the first star")
+	game.menu.close()
+
+	print("Stage8 onboarding 3/3: production stations only assign saved masterclasses")
+	game.player.global_position=station.to_global(Vector3(0,0.02,1.8))
+	game.session.execute_action(1,{"action":"open","station":station.station_id,"dish":"sausage"})
+	check(not station.training.active(),"Legacy host action still cannot create a production-station recording after the first star")
+	game.menu.show_station(station)
+	rendered=tree_text(game.menu.panel)
+	check("Обучение и группа" in rendered and "Обучить здесь" not in rendered,"Production station routes only to group/course assignment")
 	game.menu.close()
 
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: local teaching is pre-star only, active legacy lessons survive the boundary, and post-star UI routes to courses" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: cooking methods are recorded only at the chef station and production tables only assign courses" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)
