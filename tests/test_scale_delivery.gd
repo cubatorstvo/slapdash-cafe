@@ -66,6 +66,7 @@ func run()->void:
 	service.next_masterclass_id=701
 	source.recipes.potato={"tracks":record.tracks.duplicate(true),"duration":record.duration,"quality":record.quality.duplicate(true)}
 	source.method_sources.potato={"id":700,"name":"Картошка для линии"}
+	check(service._apply_group_plan(700,[2]).size()==1,"Source group stores the explicit desired potato plan")
 	var group: Dictionary=service.table_groups().filter(func(value):return value.stations==[2])[0]
 	var before_cash: int=p.cash
 	var expected_unit: int=int(game.shop.ITEMS.counter.price)+int(game.shop.ITEMS.pan.price)+int(game.shop.ITEMS.sauce.price)+int(game.shop.ITEMS.plates.price)
@@ -160,10 +161,10 @@ func run()->void:
 	check("plates" in source.equipment and delivery_by_station(service,2).is_empty(),"Manual installation still updates the station")
 	check(p.delivery_history.any(func(entry):return not bool(entry.get("installer",false)) and str(entry.get("item",""))=="plates"),"Completed manual installation is also recorded with its installation method")
 
-	print("7/8: v19 persists twenty-slot stations and their unlearned lesson plans")
+	print("7/8: v20 persists twenty-slot stations, explicit groups and unlearned lesson plans")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==19,"Scaling save format is v19")
-	check(service.load_data(saved),"v19 scaling cafe reloads")
+	check(saved.version==20,"Scaling save format is v20")
+	check(service.load_data(saved),"v20 scaling cafe reloads")
 	check(service.by_id(7)!=null and int(service.by_id(7).method_plan.get("potato",{}).get("id",0))==700,"New place and planned masterclass survive reload")
 	check(not service.by_id(7).recipes.has("potato"),"Reload does not turn a training plan into learned knowledge")
 
@@ -172,7 +173,7 @@ func run()->void:
 	legacy.version=16
 	for entry in legacy.stations: entry.erase("method_plan")
 	check(service.load_data(legacy),"v16 cafe migrates into the twenty-slot format")
-	check(service.save_data().version==19,"Migrated cafe writes the current v19 format")
+	check(service.save_data().version==20,"Migrated cafe writes the current v20 format")
 
 	game._shutdown_tree(game)
 	game.free()
