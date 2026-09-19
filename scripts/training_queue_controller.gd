@@ -451,6 +451,7 @@ func _select_next_batch()->void:
 			batch.blocked_reason=reason
 			for lesson in _pending_lessons(batch):
 				if str(lesson.state) in ["queued","blocked"]: lesson.state="blocked"
+			_update_course_state(int(batch.course_id))
 			continue
 		for lesson in _pending_lessons(batch):
 			if str(lesson.state)=="blocked": lesson.state="queued"
@@ -458,6 +459,7 @@ func _select_next_batch()->void:
 		batch.blocked_reason=""
 		active_batch_id=int(batch.id)
 		_mark_batch_stations(batch,"draining")
+		_update_course_state(int(batch.course_id))
 		revision+=1
 		service.progress.revision+=1
 		return
