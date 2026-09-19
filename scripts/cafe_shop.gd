@@ -5,9 +5,12 @@ const LabPolicy = preload("res://scripts/laboratory_progression.gd")
 const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
+const Installer = preload("res://scripts/delivery_installer.gd")
 var ITEMS: Dictionary = preload("res://scripts/cafe_catalogue.gd").ITEMS.duplicate(true)
 var game: Node3D
 var boxes := {}
+var installers := {}
 var local_ghost: MeshInstance3D
 var placement_beacon: MeshInstance3D
 var placement_label: Label3D
@@ -81,6 +84,50 @@ func pending(item: String, station_id: int) -> bool:
 		if item in box.get("items",[box.item]) and box.station == station_id: return true
 	return false
 
+func installer_supported(item: String) -> bool:
+	if not ITEMS.has(item): return false
+	return str(ITEMS[item].kind) in ["station","equipment","lounge"]
+
+func type_available(type_id: String) -> bool:
+	var p=game.service.progress
+	if not ITEMS.has(type_id) or ITEMS[type_id].kind!="station" or p.stars<int(ITEMS[type_id].get("star",0)): return false
+	if type_id=="kitchen": return p.expanded
+	if type_id=="grill_kitchen": return p.specialized_expanded
+	if type_id=="solyanka_kitchen": return p.orchestration_expanded
+	return type_id=="counter"
+
+func equipment_catalog(type_id: String) -> Array:
+	var result: Array=[]
+	for item in ITEMS:
+		if ITEMS[item].kind=="equipment" and equipment_allowed(type_id,str(item)): result.append(str(item))
+	result.sort()
+	return result
+
+func group_training_plan(group_id: String,type_id: String) -> Dictionary:
+	if group_id.is_empty(): return {}
+	var group: Dictionary=game.service.table_group_by_id(group_id)
+	if group.is_empty() or str(group.type)!=type_id: return {}
+	var source_station=game.service.by_id(int(group.stations[0]))
+	if source_station==null: return {}
+	var plan: Dictionary={}
+	for dish in source_station.dishes():
+		var source: Dictionary=game.service._method_source(source_station,str(dish))
+		var id: int=int(source.get("id",0))
+		var current: Dictionary=game.service.masterclass_by_id(id)
+		if id>0 and not current.is_empty(): plan[str(dish)]={"id":id,"name":str(current.get("name",source.get("name","Запись")))}
+	return plan
+
+func _delivery_position(id: int) -> Array:
+	return [-10.1+(id%3)*0.65,0.3,4.8+floorf(float(id%9)/3)*0.65]
+
+func _new_delivery(item: String,station_id: int,items: Array,installer: bool,delay: float,extra: Dictionary={}) -> Dictionary:
+	var p=game.service.progress
+	var id: int=p.next_delivery_id
+	p.next_delivery_id+=1
+	var parcel: Dictionary={"id":id,"item":item,"items":items.duplicate(),"station":station_id,"remaining":delay,"owner":0,"position":_delivery_position(id),"installer":installer,"installer_state":"waiting_delivery","installer_position":_delivery_position(id),"installer_age":0.0,"installer_variant":id%4}
+	for key in extra: parcel[key]=extra[key]
+	return parcel
+
 func equipment_allowed(type_id: String, item: String) -> bool:
 	if type_id=="counter": return item in ["sauce","plates","cup","pan","jug","rag","sauce_ramp"]
 	if type_id=="kitchen": return item in ["meat_kit","pasta_kit"]
@@ -88,7 +135,7 @@ func equipment_allowed(type_id: String, item: String) -> bool:
 	if type_id=="solyanka_kitchen": return item in ["fire_kit","stir_kit","salt_kit"]
 	return false
 
-func order(item: String, station_id: int) -> String:
+func order(item: String, station_id: int, with_installer := false) -> String:
 	var p = game.service.progress
 	if not ITEMS.has(item): return "Товар не найден."
 	var spec: Dictionary = ITEMS[item]
@@ -133,9 +180,8 @@ func order(item: String, station_id: int) -> String:
 	if pending(item,station_id): return "Доставка уже заказана."
 	if p.cash < spec.price: return "Не хватает денег."
 	p.cash -= spec.price
-	var id: int = p.next_delivery_id
-	p.next_delivery_id += 1
-	p.deliveries.append({"id":id,"item":item,"station":station_id,"remaining":8.0,"owner":0,"position":[-10.1+(id%3)*0.65,0.3,4.8+floorf(float(id%9)/3)*0.65]})
+	var installer: bool=bool(with_installer) and installer_supported(item)
+	p.deliveries.append(_new_delivery(item,station_id,[item],installer,8.0))
 	p.revision += 1
 	log_event("purchase",{"item":item,"station":station_id,"price":spec.price,"cash":p.cash})
 	return ""
@@ -149,6 +195,18 @@ func parcel_by_id(id: int) -> Dictionary:
 	for parcel in game.service.progress.deliveries:
 		if parcel.id == id: return parcel
 	return {}
+
+func parcel_has_installer(parcel: Dictionary) -> bool:
+	return bool(parcel.get("installer",false))
+
+func station_install_blocked(parcel: Dictionary) -> bool:
+	var spec: Dictionary=ITEMS[parcel.item]
+	if spec.kind=="station": return game.service.by_id(int(parcel.station))!=null
+	if spec.kind=="equipment":
+		var station=game.service.by_id(int(parcel.station))
+		return station==null or station.state not in ["idle","waiting"] or station.customer_id>=0 or station.training.active() or not station.group_training_state.is_empty()
+	if spec.kind=="lounge": return not game.session.sleeping_peers.is_empty()
+	return false
 
 func lab_position(index: int) -> Vector3: return Annex.lab_world(Vector3(-0.85+index*0.85,1.05,8.6))
 func installation_position(parcel: Dictionary) -> Vector3:
@@ -184,8 +242,11 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		if not lab_target.is_empty(): return lab_target
 	for parcel in game.service.progress.deliveries:
 		if parcel.remaining <= 0 and parcel.owner == 0:
-			var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
-			if near_ray(camera,at,0.4): return {"action":"take_parcel","id":parcel.id,"hint":"(E) Взять: "+parcel_name(parcel)}
+			var at_raw: Array=parcel.get("installer_position",parcel.position) if parcel_has_installer(parcel) else parcel.position
+			var at := Vector3(at_raw[0],at_raw[1],at_raw[2])
+			if near_ray(camera,at,0.6):
+				if parcel_has_installer(parcel): return {"action":"installer_owned_parcel","id":parcel.id,"hint":"Этой доставкой займется сборщик"}
+				return {"action":"take_parcel","id":parcel.id,"hint":"(E) Взять: "+parcel_name(parcel)}
 	var p = game.service.progress
 	if p.garland_owned:
 		for index in range(p.garland_points.size()):
@@ -239,7 +300,9 @@ func action(peer: int, data: Dictionary) -> String:
 		return ""
 	var parcel := parcel_by_id(int(data.get("id",-1)))
 	if parcel.is_empty(): return "Коробка уже разобрана."
+	if action_name=="installer_owned_parcel": return "Этой доставкой займется сборщик."
 	if action_name == "take_parcel":
+		if parcel_has_installer(parcel): return "Этой доставкой займется сборщик."
 		if parcel.remaining>0 or parcel.owner!=0 or carried(peer)>=0 or p.garland_builder==peer: return "Освободи руки или дождись доставки."
 		var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
 		if position.distance_to(at)>4.5: return "Подойди к коробке."
@@ -258,47 +321,106 @@ func action(peer: int, data: Dictionary) -> String:
 		parcel.position=[clampf(position.x,-11.1,17.1),0.3,clampf(position.z,-6.8,back)]
 	elif action_name == "install_parcel":
 		if parcel.owner!=peer or position.distance_to(installation_position(parcel))>4.5: return "Поднеси коробку к отмеченному месту."
-		var spec: Dictionary = ITEMS[parcel.item]
-		if spec.kind == "lounge":
-			if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
-			var error:=LoungeProgress.item_error(p,spec)
-			if not error.is_empty(): return error
-			if bool(spec.upgrade): p.lounge_upgrades.append(spec.lounge_id)
-			else: p.lounge_items.append(spec.lounge_id)
-		elif spec.kind == "equipment":
-			var station = game.service.by_id(parcel.station)
-			if station.state not in ["idle","waiting"]: return "Дождись свободной станции."
-			for item in parcel.get("items",[parcel.item]):
-				if item=="sauce_ramp": station.upgrades.append(item)
-				elif item not in station.equipment: station.equipment.append(item)
-			station.apply_equipment(); station.apply_upgrades()
-		elif spec.kind == "station": game.service.add_station(parcel.item,parcel.station-1,false,true)
-		elif spec.kind == "lab_upgrade":
-			if game.laboratory.blocks_sleep() or game.laboratory.calibrator.busy(): return "Сначала заверши работу с приборами."
-			var error:=LabPolicy.error(p,str(parcel.item))
-			if not error.is_empty(): return error
-			p.lab_upgrades.append(parcel.item)
-		elif spec.kind == "lab":
-			var index := int(str(parcel.item).get_slice("_",1))
-			if index!=p.lab_stage: return "Сначала установи предыдущую деталь лаборатории."
-			p.lab_stage+=1
-		elif spec.kind == "garland": p.garland_owned=true; p.garland_builder=peer
-		elif spec.kind == "decor": p.decorations.append(parcel.item); p.popularity+=game.service.Progression.DECOR[parcel.item].popularity
-		p.deliveries.erase(parcel)
+		var install_error: String=_install_parcel(parcel)
+		if not install_error.is_empty(): return install_error
 	else: return "Действие не найдено."
 	p.revision+=1
 	log_event(action_name,{"item":parcel.item,"station":parcel.station})
 	return ""
 
+func _install_parcel(parcel: Dictionary) -> String:
+	var p=game.service.progress
+	var spec: Dictionary=ITEMS[parcel.item]
+	if spec.kind=="lounge":
+		if not game.session.sleeping_peers.is_empty(): return "Сначала все должны встать с кровати."
+		var error:=LoungeProgress.item_error(p,spec)
+		if not error.is_empty(): return error
+		if bool(spec.upgrade): p.lounge_upgrades.append(spec.lounge_id)
+		else: p.lounge_items.append(spec.lounge_id)
+	elif spec.kind=="equipment":
+		var station=game.service.by_id(int(parcel.station))
+		if station==null or station.state not in ["idle","waiting"]: return "Дождись свободной станции."
+		for item in parcel.get("items",[parcel.item]):
+			if item=="sauce_ramp":
+				if item not in station.upgrades: station.upgrades.append(item)
+			elif ITEMS.has(item) and ITEMS[item].kind=="equipment" and item not in station.equipment: station.equipment.append(item)
+		station.apply_equipment(); station.apply_upgrades()
+	elif spec.kind=="station":
+		if game.service.by_id(int(parcel.station))!=null: return "Место пока занято."
+		var station=game.service.add_station(str(parcel.item),int(parcel.station)-1,false,true)
+		if station.type_id=="counter" and "rag" not in station.equipment: station.equipment.append("rag")
+		for item in parcel.get("items",[parcel.item]):
+			if item==parcel.item or not ITEMS.has(item): continue
+			if item=="sauce_ramp":
+				if item not in station.upgrades: station.upgrades.append(item)
+			elif ITEMS[item].kind=="equipment" and item not in station.equipment: station.equipment.append(item)
+		station.method_plan=parcel.get("method_plan",{}).duplicate(true)
+		station.apply_equipment(); station.apply_upgrades()
+		game.service.assign_clones()
+	elif spec.kind=="lab_upgrade":
+		if game.laboratory.blocks_sleep() or game.laboratory.calibrator.busy(): return "Сначала заверши работу с приборами."
+		var error:=LabPolicy.error(p,str(parcel.item))
+		if not error.is_empty(): return error
+		p.lab_upgrades.append(parcel.item)
+	elif spec.kind=="lab":
+		var index:=int(str(parcel.item).get_slice("_",1))
+		if index!=p.lab_stage: return "Сначала установи предыдущую деталь лаборатории."
+		p.lab_stage+=1
+	elif spec.kind=="garland": p.garland_owned=true
+	elif spec.kind=="decor": p.decorations.append(parcel.item); p.popularity+=game.service.Progression.DECOR[parcel.item].popularity
+	p.deliveries.erase(parcel)
+	p.revision+=1
+	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installer":parcel_has_installer(parcel)})
+	return ""
+
+func _advance_installer(parcel: Dictionary,delta: float) -> void:
+	if parcel.remaining>0: return
+	var target:=installation_position(parcel)
+	if not target.is_finite(): return
+	var state:=str(parcel.get("installer_state","waiting_delivery"))
+	if state=="waiting_delivery":
+		parcel.installer_state="walking"
+		parcel.installer_position=parcel.get("position",_delivery_position(int(parcel.id))).duplicate()
+		parcel.installer_age=0.0
+		game.service.progress.revision+=1
+		return
+	var raw: Array=parcel.get("installer_position",parcel.position)
+	var at:=Vector3(raw[0],raw[1],raw[2])
+	var waiting_point:=target+Vector3(0,0,2.15)
+	if state=="walking":
+		at=at.move_toward(waiting_point,delta*3.2)
+		parcel.installer_position=[at.x,at.y,at.z]
+		if at.distance_to(waiting_point)<0.06:
+			parcel.installer_state="waiting" if station_install_blocked(parcel) else "installing"
+			parcel.installer_age=0.0
+			game.service.progress.revision+=1
+	elif state=="waiting":
+		parcel.installer_age=float(parcel.get("installer_age",0.0))+delta
+		if not station_install_blocked(parcel):
+			parcel.installer_state="installing"
+			parcel.installer_age=0.0
+			game.service.progress.revision+=1
+	elif state=="installing":
+		parcel.installer_age=float(parcel.get("installer_age",0.0))+delta
+		parcel.installer_position=[waiting_point.x,waiting_point.y,waiting_point.z]
+		if float(parcel.installer_age)>=1.8:
+			var error:=_install_parcel(parcel)
+			if not error.is_empty():
+				parcel.installer_state="waiting"
+				parcel.installer_age=0.0
+			else:
+				game.service.announce("Сборщик установил: "+parcel_name(parcel) if parcel in game.service.progress.deliveries else "Сборщик закончил установку.")
+
 func advance(delta: float) -> void:
-	for parcel in game.service.progress.deliveries:
+	for parcel in game.service.progress.deliveries.duplicate():
 		if parcel.remaining>0:
 			parcel.remaining=maxf(0,parcel.remaining-delta)
 			if parcel.remaining==0:
 				truck_age=5
 				game.service.progress.revision+=1
-				game.service.announce("Доставка у входа: "+parcel_name(parcel))
-				log_event("delivery_arrived",{"item":parcel.item})
+				game.service.announce(("Сборщик приехал: " if parcel_has_installer(parcel) else "Доставка у входа: ")+parcel_name(parcel))
+				log_event("delivery_arrived",{"item":parcel.item,"installer":parcel_has_installer(parcel)})
+		if parcel in game.service.progress.deliveries and parcel_has_installer(parcel): _advance_installer(parcel,delta)
 
 func _process(delta: float) -> void:
 	if game==null: return
@@ -316,7 +438,7 @@ func _process(delta: float) -> void:
 			var label := Props.text(box,parcel_name(parcel),Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 			boxes[parcel.id]=box
 		var node: Node3D = boxes[parcel.id]
-		node.visible=parcel.remaining<=0
+		node.visible=parcel.remaining<=0 and not parcel_has_installer(parcel)
 		if parcel.owner==0: node.global_position=Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
 		elif parcel.owner==game.session.local_id(): node.global_transform=game.camera.global_transform; node.position+=-game.camera.global_basis.z*0.85-game.camera.global_basis.y*0.28
 		else:
@@ -324,6 +446,16 @@ func _process(delta: float) -> void:
 			if pose.has("position"): node.global_position=Vector3(pose.position[0],pose.position[1]+1.15,pose.position[2])+Vector3(0,0,-0.7).rotated(Vector3.UP,float(pose.get("yaw",0)))
 	for id in boxes.keys():
 		if id not in ids: boxes[id].queue_free(); boxes.erase(id)
+	var installer_ids: Array=[]
+	for parcel in p.deliveries:
+		if not parcel_has_installer(parcel) or parcel.remaining>0: continue
+		installer_ids.append(parcel.id)
+		if not installers.has(parcel.id):
+			var worker:=Installer.new(); add_child(worker); worker.setup(int(parcel.id)); installers[parcel.id]=worker
+		var worker: Node3D=installers[parcel.id]
+		worker.apply(parcel,installation_position(parcel),delta)
+	for id in installers.keys():
+		if id not in installer_ids: installers[id].queue_free(); installers.erase(id)
 	placement_clock += delta
 	local_ghost.hide()
 	placement_beacon.hide()
@@ -363,7 +495,7 @@ func parcel_name(parcel: Dictionary) -> String:
 	for item in parcel.get("items",[parcel.item]): names.append(ITEMS[item].name)
 	return "Комплект · станция %d · %d предметов"%[parcel.station,names.size()] if names.size()>1 else " + ".join(names)
 
-func order_bundle(items: Array, station_id: int) -> String:
+func order_bundle(items: Array, station_id: int, with_installer := false) -> String:
 	var p=game.service.progress
 	var station=game.service.by_id(station_id)
 	if p.stars<1 or station==null or items.is_empty(): return "Комплекты доступны с первой звезды."
@@ -376,11 +508,48 @@ func order_bundle(items: Array, station_id: int) -> String:
 		if not equipment_allowed(station.type_id,item) or p.stars<int(spec.get("star",0)): return "Этот предмет недоступен станции."
 		unique.append(item); total+=int(spec.price)
 	if p.cash<total: return "Не хватает денег на комплект."
-	var error := order(unique[0],station_id)
+	var error := order(unique[0],station_id,with_installer)
 	if not error.is_empty(): return error
 	p.cash-=total-int(ITEMS[unique[0]].price)
 	p.deliveries.back().items=unique
-	log_event("bundle_ordered",{"station":station_id,"items":unique,"price":total})
+	log_event("bundle_ordered",{"station":station_id,"items":unique,"price":total,"installer":bool(with_installer)})
+	return ""
+
+func order_station_batch(type_id: String,station_ids: Array,equipment: Array,group_id: String,with_installers: bool) -> String:
+	var p=game.service.progress
+	if p.busy(): return "Сначала заверши проверку."
+	if not type_available(type_id): return "Этот тип кухни ещё не открыт."
+	if station_ids.is_empty(): return "Выбери хотя бы одно подготовленное место."
+	var unique_ids: Array=[]
+	for raw_id in station_ids:
+		var station_id: int=int(raw_id)
+		if station_id<2 or station_id>Expansion.SLOT_COUNT or station_id in unique_ids: return "Проверь выбранные места."
+		if game.service.by_id(station_id)!=null or pending(type_id,station_id): return "Место %d уже занято или ожидает доставку."%station_id
+		unique_ids.append(station_id)
+	var chosen_equipment: Array=[]
+	var equipment_cost:=0
+	for raw_item in equipment:
+		var item:=str(raw_item)
+		if item in chosen_equipment or not ITEMS.has(item) or ITEMS[item].kind!="equipment" or not equipment_allowed(type_id,item): return "Проверь оснащение комплекта."
+		if p.stars<int(ITEMS[item].get("star",0)): return "Часть оснащения ещё не открыта."
+		chosen_equipment.append(item)
+		equipment_cost+=int(ITEMS[item].price)
+	var group: Dictionary={}
+	if not group_id.is_empty():
+		group=game.service.table_group_by_id(group_id)
+		if group.is_empty() or str(group.type)!=type_id: return "Выбранная группа не подходит этой кухне."
+	var plan:=group_training_plan(group_id,type_id)
+	var unit_price: int=int(ITEMS[type_id].price)+equipment_cost
+	var total: int=unit_price*unique_ids.size()
+	if p.cash<total: return "Не хватает денег на выбранные комплекты."
+	p.cash-=total
+	for index in range(unique_ids.size()):
+		var station_id: int=int(unique_ids[index])
+		var contents: Array=[type_id]
+		contents.append_array(chosen_equipment)
+		p.deliveries.append(_new_delivery(type_id,station_id,contents,bool(with_installers),8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"unit_price":unit_price}))
+	p.revision+=1
+	log_event("station_batch_ordered",{"type":type_id,"stations":unique_ids,"equipment":chosen_equipment,"group":group_id,"installer":with_installers,"price":total})
 	return ""
 
 func reward_sauce() -> void:
