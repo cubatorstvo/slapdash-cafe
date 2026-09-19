@@ -1371,7 +1371,7 @@ func finish_manual(station: Node3D, report: Dictionary) -> void:
 			progress.stars = 1
 			progress.cash += 120
 			progress.phase = "won"
-			progress.result = "Первая звезда! +120. Лаборатория готова: теперь исследуй формулу и вырасти первого работника. Стол, оборудование и клон приобретаются отдельно."
+			progress.result = "Первая звезда! +120. Открыты мастер-классы и видеотека. Покажи блюдо на шеф-станции, сохрани фильм, установи телевизор и назначь запись первому производственному столу. Лаборатория тоже готова для выращивания работников."
 			progress.revision += 1
 			open_for_business = progress.return_open
 			announce(progress.result)

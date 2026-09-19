@@ -3,6 +3,7 @@ extends RefCounted
 const DISH_NAMES := {"sausage":"сосиска в соусе","potato":"картофель","wine":"вино","meal":"мясо с макаронами","burger":"бургер","cheeseburger":"чизбургер","spicy_burger":"острый бургер","solyanka":"солянка"}
 const GEAR := {"sausage":["sauce","plates"],"potato":["pan","plates"],"wine":["jug","cup"],"meal":["meat_kit","pasta_kit"],"burger":["grill_kit","assembly_kit"],"cheeseburger":["grill_kit","assembly_kit"],"spicy_burger":["grill_kit","assembly_kit"],"solyanka":["fire_kit","stir_kit","salt_kit"]}
 const Catalogue=preload("res://scripts/cafe_catalogue.gd")
+const Lounge=preload("res://scripts/lounge_progression.gd")
 const GOODS := {"sauce":"миску соуса","plates":"тарелки","pan":"сковороду","jug":"кувшин","cup":"бокал","meat_kit":"комплект для мяса","pasta_kit":"комплект для макарон","lab_0":"лабораторную колбу","lab_1":"блок питания","lab_2":"стабилизатор","counter":"стол и шкафчик","kitchen":"парную кухню","grill_kit":"общую жарочную поверхность","assembly_kit":"комплект сборки","grill_kitchen":"бургерную кухню","fire_kit":"набор огня и овощей","stir_kit":"мешалку и овощи","salt_kit":"соль и овощи","solyanka_kitchen":"кухню «Солянка»"}
 
 static func step(key: String, title: String, detail: String, place := "computer", station := 0, pot := -1) -> Dictionary:
@@ -66,6 +67,50 @@ static func teach(station, dish: String, quality := false) -> Dictionary:
 					detail="E у станции → «Обучить бригаду · вернуться к заказам». Сохранённый черновик ещё нужно принять."
 	return step("teach_%d_%s"%[station.station_id,dish],title,detail,"station",station.station_id)
 
+static func suitable_masterclass(service, dish: String, quality := false) -> Dictionary:
+	if service==null: return {}
+	var candidates: Array=[]
+	for record in service.masterclasses:
+		if str(record.get("dish",""))!=dish: continue
+		if bool(record.get("archived",false)): continue
+		var report: Dictionary=record.get("quality",{})
+		if quality and str(report.get("grade","D")) not in ["B","A","S"]: continue
+		candidates.append(record)
+	if candidates.is_empty(): return {}
+	candidates.sort_custom(func(a,b):return float(a.get("duration",99999.0))<float(b.get("duration",99999.0)))
+	return candidates[0]
+
+static func television_step(p) -> Dictionary:
+	for parcel in p.deliveries:
+		if "rest_television" in parcel.get("items",[parcel.item]):
+			return step("delivery_tv","Установи телевизор для обучения","Телевизор уже заказан. Дождись доставки и установи его в комнате отдыха; фильмы мастер-классов показываются именно там.","delivery")
+	var price: int=int(Lounge.GOODS.television.price)
+	if p.cash<price: return step("earn_tv","Накопи на телевизор · %d/%d"%[p.cash,price],"Телевизор нужен сотрудникам для просмотра хайлайтов мастер-класса. Пока обслуживай гостей шефом.","station",1)
+	var result:=step("buy_tv","Установи телевизор для обучения · %d"%price,"Компьютер → Комната отдыха → Телевизор. После доставки установи коробку в существующей комнате отдыха.","computer")
+	result.item="rest_television"
+	return result
+
+static func masterclass_training_step(p, station, dish: String, quality: bool, service) -> Dictionary:
+	if service==null: return teach(station,dish,quality)
+	var existing: Dictionary=station.recipes.get(dish,{})
+	var report: Dictionary=existing.get("quality",{})
+	if report.get("present",false) and (not quality or str(report.get("grade","D")) in ["B","A","S"]): return {}
+	if service.masterclass_locked() and service.masterclass_active():
+		return step("masterclass_live_"+dish,"Заверши мастер-класс: "+str(DISH_NAMES[dish]),"На шеф-станции идёт мастер-класс. Заверши принятое приготовление и сохрани запись в видеотеку.","station",1)
+	var record: Dictionary=suitable_masterclass(service,dish,quality)
+	if record.is_empty():
+		var quality_text: String=" на B или лучше" if quality else ""
+		return step("masterclass_"+dish,"Проведи мастер-класс: "+str(DISH_NAMES[dish]),"E у шеф-станции → МАСТЕР-КЛАСС → выбери блюдо. Приготовь%s и сохрани запись: она появится в общей видеотеке."%quality_text,"station",1)
+	if "television" not in p.lounge_items: return television_step(p)
+	if is_instance_valid(service.staff_training) and service.staff_training.targets_station(station.station_id,dish):
+		return step("training_"+dish,"Дождись окончания обучения","Сотрудники закончат текущий заказ, соберутся у телевизора с блокнотами, посмотрят хайлайты и вернутся к столу.","television",station.station_id)
+	var compatible: Array=service.compatible_training_station_ids(int(record.id))
+	var mass: bool=compatible.size()>1
+	var detail: String="Компьютер → Группы столов → выбери стол %d → запись «%s» → Назначить выбранным."%[station.station_id,str(record.get("name","Запись"))]
+	if mass: detail+=" Уже доступно массовое назначение: «Все совместимые» применит этот мастер-класс сразу к нескольким подходящим столам."
+	return step("assign_masterclass_"+dish,"Назначь запись столу: "+str(DISH_NAMES[dish]),detail,"computer",station.station_id)
+
+
 static func grow(p, stations: Array) -> Dictionary:
 	if not p.free_workers.is_empty() and stations.any(func(station):return not station.manual_station and crew_count(station)<station.role_count()):
 		return step("worker_return","Работник возвращается к назначению","Свободный клон займёт вакансию после завершения рекалибровки. Можно заняться другими делами.","laboratory")
@@ -101,7 +146,7 @@ static func grow(p, stations: Array) -> Dictionary:
 		if not equipment.is_empty(): return equipment
 	return step("growing","Клон растёт · можно заняться кафе","Пока таймер идёт, обслуживай заказы или занимайся покупками. Готовый этап дождётся тебя без штрафа.","pot",0,id)
 
-static func next_step(p, stations: Array, served: int, opened: bool) -> Dictionary:
+static func next_step(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	var personal
 	var counters: Array=[]
 	var kitchen
@@ -135,7 +180,7 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 			var dish: String=str(first.recipes.keys()[0]) if not first.recipes.is_empty() else "sausage"
 			var equipment:=equip(p,first,dish)
 			if not equipment.is_empty(): return equipment
-			return teach(first,dish)
+			return masterclass_training_step(p,first,dish,false,service)
 		return step("first_income","Дождись первого заработка клона","Открой кафе и заверши обучение. Клон повторит принятую запись, обслужит гостя и принесёт деньги; шеф свободен для других дел.","station",first.station_id)
 	if p.stars==1:
 		if counters.size()<2:
@@ -155,18 +200,18 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 				if station.recipes.size()<selected.recipes.size(): selected=station
 			var equipment:=equip(p,selected,dish)
 			if not equipment.is_empty(): return equipment
-			return teach(selected,dish,true)
+			return masterclass_training_step(p,selected,dish,true,service)
 		if p.popularity<30: return step("popularity","Подними популярность · %d/30"%p.popularity,"Выбери украшения: вывеска +10, гирлянда +15, зелёный уголок +20. Покупки — в компьютере.")
 		if p.can_attempt(stations,served): return step("second_star","Пригласи делегацию второй звезды","Компьютер → Звёзды. За 4 минуты: 8 подач, 6 оценок B; три гостя заказывают лично шефу.")
 		return step("ready_crews","Дождись готовности двух бригад","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Звёзды.")
 	if p.stars==2:
-		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Третья звезда проверит уже не сам факт автоматизации, а мощность всего кафе.")
+		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Дальше одинаковые столы удобно собирать в группы, покупать комплектами и отдавать бесплатным сборщикам; третья звезда проверит мощность всего кафе.")
 		if kitchen==null: return buy(p,"kitchen",4,"Парная кухня нужна как третья производственная линия перед Большим обедом.")
 		if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
 		var kitchen_equipment:=equip(p,kitchen,"meal")
 		if not kitchen_equipment.is_empty(): return kitchen_equipment
 		var meal_report: Dictionary=kitchen.recipes.get("meal",{}).get("quality",{})
-		if not meal_report.get("present",false) or not meal_report.get("grade","D") in ["B","A","S"]: return teach(kitchen,"meal",true)
+		if not meal_report.get("present",false) or not meal_report.get("grade","D") in ["B","A","S"]: return masterclass_training_step(p,kitchen,"meal",true,service)
 		if p.journey_meals_served<1: return step("first_meal","Получи первый доход от парной кухни","Открой кафе: оба клона повторят совместный рецепт на реальном заказе.","station",kitchen.station_id)
 		for station in counters:
 			if crew_count(station)<station.role_count(): return grow(p,stations)
@@ -196,7 +241,7 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 		if not burger_gear.is_empty(): return burger_gear
 		for dish in p.SPECIALTY_DISHES:
 			var report:Dictionary=specialty.recipes.get(dish,{}).get("quality",{})
-			if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return teach(specialty,dish,true)
+			if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return masterclass_training_step(p,specialty,dish,true,service)
 		if p.fourth_star_specialty_served<1: return step("first_specialty","Проверь общую плиту на реальном заказе","Открой кафе. Запись должна пережить настоящий заказ: котлета и булка не должны одновременно блокировать общую поверхность.","station",specialty.station_id)
 		if p.fourth_star_specialty_served<p.FOURTH_STAR_SPECIALTY_SERVED: return step("specialty_capacity","Дай бургерной поработать · %d/%d"%[p.fourth_star_specialty_served,p.FOURTH_STAR_SPECIALTY_SERVED],"Наблюдай, где запись ждёт общую плиту. При необходимости перезапиши одну роль, сохранив тайминг другой.","station",specialty.station_id)
 		if p.fourth_star_auto_served<p.FOURTH_STAR_AUTO_SERVED: return step("specialty_scale","Проверь весь зал · %d/%d автоподач"%[p.fourth_star_auto_served,p.FOURTH_STAR_AUTO_SERVED],"Четвёртая звезда проверяет не одну кухню, а способность старых и новых линий переживать смену профиля спроса.","station",specialty.station_id)
@@ -210,15 +255,15 @@ static func next_step(p, stations: Array, served: int, opened: bool) -> Dictiona
 		var solyanka_gear:=equip(p,solyanka,"solyanka")
 		if not solyanka_gear.is_empty(): return solyanka_gear
 		var report:Dictionary=solyanka.recipes.get("solyanka",{}).get("quality",{})
-		if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return teach(solyanka,"solyanka",true)
+		if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return masterclass_training_step(p,solyanka,"solyanka",true,service)
 		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Открой кафе. Три клона одновременно повторяют свои записи; следи, чтобы котёл получил минимум 13 вещей, огонь, соль и перемешивание.","station",solyanka.station_id)
 		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к финалу проверяет, что трёхролевая кухня не вытеснила старые производственные линии.","station",solyanka.station_id)
 		if p.can_attempt(stations,served): return step("fifth_star","Начни «День пяти звёзд»","Компьютер → Звёзды. Финальная смена идёт тремя фазами: общий наплыв → критики → общая кульминация. Провал можно повторить бесплатно.","computer")
 		return step("fifth_ready","Подготовь кафе к финальной смене","Полный список условий перед Днём пяти звёзд — Компьютер → Звёзды.","computer")
 	return step("complete","Пять звёзд получены","Кафе завершило основную кампанию.")
 
-static func current(p, stations: Array, served: int, opened: bool) -> Dictionary:
-	var result:=next_step(p,stations,served,opened)
+static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
+	var result:=next_step(p,stations,served,opened,service)
 	result.chapter="ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
 	if p.busy():
 		var inspection_title: String

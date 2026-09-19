@@ -162,7 +162,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.physical_keycode in [KEY_F8,KEY_F9,KEY_F10]:
 			var label: String = {KEY_F8:"скучно",KEY_F9:"непонятно",KEY_F10:"прикольно"}[event.physical_keycode]
-			telemetry.event("player_mark",{"label":label,"day":service.progress.day,"activity":telemetry.activity,"journey":preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business).key,"visit":service.progress.visit.get("phase","")})
+			telemetry.event("player_mark",{"label":label,"day":service.progress.day,"activity":telemetry.activity,"journey":preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business,service).key,"visit":service.progress.visit.get("phase","")})
 			hud.show_toast("В плейтест записано: "+label)
 			return
 		if event.physical_keycode == KEY_B and not office.opened() and not session_paused and not menu.opened() and not awaiting_serving_confirmation():
@@ -390,7 +390,7 @@ func refresh_hud() -> void:
 	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"
-	var next: Dictionary=preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business)
+	var next: Dictionary=preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business,service)
 	hud.goal.text=str(next.title)
 	hud.journey.text=str(next.detail)
 	hud.visit_status.text=service.Visits.status(service.progress) if service.progress.visit.get("phase","") in ["offered","scheduled","active"] else ""
