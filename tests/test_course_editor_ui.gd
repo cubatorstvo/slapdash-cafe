@@ -231,6 +231,26 @@ func run()->void:
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2402,"UI T12 resume creates the required pending lesson")
 	dispose(game)
 
+	print("UI draft: host rejection keeps the course draft and explains why")
+	game=await make_game()
+	service=game.service
+	station=add_counter(service,1)
+	wine=record_for(station,2491,"wine","UI · черновик")
+	service.masterclasses=[wine]
+	game.office.open("groups")
+	game.office.select_group_stations([2])
+	check(press(game.office,"Составить курс из выбранных столов"),"UI draft opens editor")
+	game.office.course_editor_add_record(2491)
+	game.player.global_position=game.shop.computer.global_position+Vector3(20,0,0)
+	check(press(game.office,"Поставить курс в очередь"),"UI draft submit button exists while away from computer")
+	check(not game.office.course_editor.is_empty() and game.office.course_editor.records==[2491],"UI draft survives a rejected host confirmation")
+	check(game.office.course_editor_message.contains("Подойди к компьютеру"),"UI draft shows the concrete host rejection reason")
+	game.player.global_position=game.shop.computer.global_position
+	check(press(game.office,"Поставить курс в очередь"),"UI draft can be confirmed after returning to the computer")
+	await process_frame
+	check(service.training_course_views().size()==1,"UI draft successful retry creates exactly one course")
+	dispose(game)
+
 	print("UI video entry: Add to course opens the same editor")
 	game=await make_game()
 	service=game.service
