@@ -60,10 +60,14 @@ func _load_record(value: Dictionary)->void:
 	stage.station_id=1
 	stage.slot_index=0
 	stage.type_id=str(record.get("source_type","counter"))
-	stage.equipment=Definition.DISH_EQUIPMENT.get(str(record.get("dish","")),[]).duplicate()
+	var config: Dictionary=record.get("scene_config",{}) if record.get("scene_config",{}) is Dictionary else {}
+	stage.equipment=config.get("equipment",Definition.DISH_EQUIPMENT.get(str(record.get("dish","")),[])).duplicate()
+	stage.upgrades=config.get("upgrades",[]).duplicate()
 	world_root.add_child(stage)
 	stage.position=Vector3.ZERO
 	stage.rotation=Vector3.ZERO
+	stage.apply_equipment()
+	stage.apply_upgrades()
 	if is_instance_valid(stage.view.station_label): stage.view.station_label.hide()
 	for node in stage.students: node.hide()
 

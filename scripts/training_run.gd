@@ -60,7 +60,7 @@ func start_pass(assignments: Array) -> bool:
 	group_serial = 1
 	for track in tracks:
 		if not track.is_empty(): group_serial = maxi(group_serial, int(track.group) + 1)
-	for role in live_roles: pending_tracks[role] = {"group": group_serial, "frames": []}
+	for role in live_roles: pending_tracks[role] = {"group": group_serial, "frames": [], "events": []}
 	station.model.reset(dish)
 	if station.role_count() > 1: station.model.live_roles = live_roles.duplicate()
 	configure_order()
@@ -92,7 +92,12 @@ func advance(delta: float) -> void:
 	var commands: Array = []
 	for role in range(station.role_count()):
 		var command: Dictionary = inputs.get(role, {}).duplicate(true) if role in live_roles else {}
-		if events.has(role) and not events[role].is_empty(): command.merge(events[role].pop_front(), true)
+		if events.has(role) and not events[role].is_empty():
+			var queued_event: Dictionary=events[role].pop_front()
+			command.merge(queued_event,true)
+			if records_method() and role in live_roles:
+				if not pending_tracks[role].has("events"): pending_tracks[role].events=[]
+				pending_tracks[role].events.append({"tick":tick,"role":role,"input":queued_event.duplicate(true)})
 		commands.append(command)
 	if station.type_id == "counter":
 		station.apply_single(commands[0], delta)

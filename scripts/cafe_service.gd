@@ -237,7 +237,8 @@ func save_masterclass_from_run(stage: Node3D, dish: String, tracks: Array) -> bo
 	var number:=1
 	for record in masterclasses:
 		if str(record.get("dish",""))==dish and not bool(record.get("archived",false)): number+=1
-	var record:=Masterclasses.make_record(next_masterclass_id,dish,stage.type_id,tracks,stage.Run.duration_ticks(tracks)/60.0,quality,Masterclasses.default_name(dish,number))
+	var scene_config: Dictionary={"equipment":stage.equipment.duplicate(),"upgrades":stage.upgrades.duplicate(),"roles":Definition.TYPES[stage.type_id].roles.duplicate()}
+	var record:=Masterclasses.make_record(next_masterclass_id,dish,stage.type_id,tracks,stage.Run.duration_ticks(tracks)/60.0,quality,Masterclasses.default_name(dish,number),false,stage.station_id,scene_config)
 	next_masterclass_id+=1
 	masterclasses.append(record)
 	progress.revision+=1

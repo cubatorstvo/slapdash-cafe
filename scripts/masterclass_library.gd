@@ -14,19 +14,27 @@ static func default_name(dish: String, number: int, archived := false, station_i
 	if archived: return "Архив · %s · стол %d"%[Definition.DISHES.get(dish,dish),station_id]
 	return "%s · мастер-класс %d"%[Definition.DISHES.get(dish,dish),number]
 
-static func make_record(id: int, dish: String, type_id: String, tracks: Array, duration: float, quality: Dictionary, name: String, archived := false, source_station := 0) -> Dictionary:
+static func make_record(id: int, dish: String, type_id: String, tracks: Array, duration: float, quality: Dictionary, name: String, archived := false, source_station := 0, scene_config: Dictionary={}) -> Dictionary:
 	var stored_tracks: Array=tracks.duplicate(true)
-	return {"id":id,"name":name,"dish":dish,"source_type":type_id,"tracks":stored_tracks,"duration":duration,"quality":quality.duplicate(true),"effectiveness":effectiveness(quality),"archived":archived,"source_station":source_station,"highlight_segments":Highlights.build(stored_tracks),"highlight_duration":Highlights.duration(stored_tracks)}
+	var events: Array=Highlights.extract_events(stored_tracks)
+	return {"id":id,"name":name,"dish":dish,"source_type":type_id,"tracks":stored_tracks,"duration":duration,"quality":quality.duplicate(true),"effectiveness":effectiveness(quality),"archived":archived,"source_station":source_station,"scene_config":scene_config.duplicate(true),"highlight_plan_version":Highlights.PLAN_VERSION,"highlight_events":events,"highlight_segments":Highlights.build(stored_tracks,events),"highlight_duration":Highlights.duration(stored_tracks)}
 
 static func ensure_highlights(record: Dictionary) -> void:
 	if record.get("tracks",[]) is Array:
-		record.highlight_segments=Highlights.build(record.tracks)
+		var needs_rebuild: bool=int(record.get("highlight_plan_version",0))!=Highlights.PLAN_VERSION or not record.get("highlight_events",[]) is Array or not record.get("highlight_segments",[]) is Array
+		if needs_rebuild:
+			var events: Array=Highlights.extract_events(record.tracks)
+			record.highlight_plan_version=Highlights.PLAN_VERSION
+			record.highlight_events=events
+			record.highlight_segments=Highlights.build(record.tracks,events)
 		record.highlight_duration=Highlights.duration(record.tracks)
+	if not record.has("scene_config") or not record.scene_config is Dictionary: record.scene_config={}
 	if not record.has("effectiveness"): record.effectiveness=effectiveness(record.get("quality",{}))
 
 static func summary(record: Dictionary) -> Dictionary:
 	var result:=record.duplicate(true)
 	result.erase("tracks")
+	result.erase("highlight_events")
 	return result
 
 static func movie_payload(record: Dictionary) -> Dictionary:
@@ -58,6 +66,8 @@ static func valid(record: Dictionary) -> bool:
 	if type_id not in Definition.TYPES or dish not in Definition.TYPES[type_id].dishes: return false
 	if not record.get("tracks",[]) is Array or not record.get("quality",{}) is Dictionary: return false
 	if record.has("highlight_segments") and not record.highlight_segments is Array: return false
+	if record.has("highlight_events") and not record.highlight_events is Array: return false
+	if record.has("scene_config") and not record.scene_config is Dictionary: return false
 	var duration=record.get("duration")
 	if not (duration is float or duration is int) or float(duration)<0.0: return false
 	return true
