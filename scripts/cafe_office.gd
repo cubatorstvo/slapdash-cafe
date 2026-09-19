@@ -22,6 +22,10 @@ var confirm_delete_masterclass := -1
 var group_selected_stations: Array=[]
 var group_pending_assignment: Dictionary={}
 var group_command_serial:=1
+var course_editor: Dictionary={}
+var course_editor_message: String=""
+var course_group_order: Array=[]
+var course_command_serial:=1
 var group_selected_groups: Array=[]
 var group_merge_choices: Dictionary={}
 var group_merge_active: Array=[]
@@ -112,6 +116,9 @@ func open(page := "overview") -> void:
 	confirm_reset = false
 	confirm_delete_masterclass = -1
 	group_pending_assignment={}
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
 	group_selected_stations=[]
 	group_selected_groups=[]
 	group_merge_choices={}
@@ -137,6 +144,7 @@ func set_group_station_selected(id: int,on: bool) -> void:
 	elif not on: group_selected_stations.erase(id)
 	group_selected_stations.sort()
 	group_pending_assignment={}
+	if not course_editor.is_empty(): _sync_course_group_order()
 	stamp=""
 	rebuild()
 
@@ -144,6 +152,7 @@ func select_group_stations(ids: Array) -> void:
 	group_selected_stations=ids.duplicate()
 	group_selected_stations.sort()
 	group_pending_assignment={}
+	if not course_editor.is_empty(): _sync_course_group_order()
 	stamp=""
 	rebuild()
 
@@ -151,6 +160,189 @@ func stage_group_assignment(record_id: int) -> void:
 	var command: String="office:%d:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),group_command_serial,record_id]
 	group_command_serial+=1
 	group_pending_assignment={"record":record_id,"stations":group_selected_stations.duplicate(),"command":command}
+	stamp=""
+	rebuild()
+
+func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
+	var previous_selection: Array=group_selected_stations.duplicate()
+	course_editor={"open":true,"records":[],"mode":"together","editing":edit_course_id,"type_id":""}
+	course_editor_message=""
+	course_group_order=[]
+	group_selected_stations=[]
+	if edit_course_id>0:
+		var view: Dictionary=game.service.training_queue.course_view(edit_course_id)
+		if view.is_empty():
+			course_editor_message="Курс не найден."
+		else:
+			course_editor.mode=str(view.get("mode","together"))
+			course_editor.editing=edit_course_id
+			for assignment in view.get("assignments",[]):
+				var rid: int=int(assignment.get("record_id",0))
+				if rid>0: _course_editor_add_record_internal(rid)
+				for raw_id in assignment.get("station_ids",[]):
+					var sid: int=int(raw_id)
+					if sid not in group_selected_stations: group_selected_stations.append(sid)
+			group_selected_stations.sort()
+			course_group_order=view.get("group_order",[]).duplicate()
+	elif record_id<=0 and not previous_selection.is_empty():
+		group_selected_stations=previous_selection
+		var first_station=game.service.by_id(int(group_selected_stations[0]))
+		if first_station!=null: course_editor.type_id=str(first_station.type_id)
+		_sync_course_group_order()
+	if record_id>0: _course_editor_add_record_internal(record_id)
+	tab="groups"
+	stamp=""
+	rebuild()
+
+func course_editor_close() -> void:
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
+	stamp=""
+	rebuild()
+
+func _course_editor_add_record_internal(record_id: int) -> bool:
+	var record: Dictionary=game.service.masterclass_by_id(record_id)
+	if record.is_empty():
+		course_editor_message="Запись не найдена."
+		return false
+	var record_type: String=str(record.get("source_type",""))
+	var current_type: String=str(course_editor.get("type_id",""))
+	if not current_type.is_empty() and current_type!=record_type:
+		course_editor_message="Эта запись относится к другой кухне. Сформируй для неё отдельный курс."
+		return false
+	course_editor.type_id=record_type
+	var records: Array=course_editor.get("records",[])
+	var dish: String=str(record.get("dish",""))
+	for index in range(records.size()):
+		var existing: Dictionary=game.service.masterclass_by_id(int(records[index]))
+		if str(existing.get("dish",""))==dish:
+			records[index]=record_id
+			course_editor.records=records
+			course_editor_message="Версия блюда заменена на «%s»."%str(record.get("name","Запись"))
+			return true
+	records.append(record_id)
+	course_editor.records=records
+	course_editor_message=""
+	return true
+
+func course_editor_add_record(record_id: int) -> void:
+	if course_editor.is_empty(): course_editor={"open":true,"records":[],"mode":"together","editing":0,"type_id":""}
+	_course_editor_add_record_internal(record_id)
+	stamp=""
+	rebuild()
+
+func course_editor_remove_record(index: int) -> void:
+	var records: Array=course_editor.get("records",[])
+	if index>=0 and index<records.size(): records.remove_at(index)
+	course_editor.records=records
+	if records.is_empty(): course_editor.type_id=""
+	course_editor_message=""
+	stamp=""
+	rebuild()
+
+func course_editor_move_record(index: int,delta: int) -> void:
+	var records: Array=course_editor.get("records",[])
+	var target: int=index+delta
+	if index<0 or index>=records.size() or target<0 or target>=records.size(): return
+	var value=records[index]
+	records[index]=records[target]
+	records[target]=value
+	course_editor.records=records
+	stamp=""
+	rebuild()
+
+func course_editor_set_mode(mode: String) -> void:
+	if mode in ["together","by_groups"]: course_editor.mode=mode
+	stamp=""
+	rebuild()
+
+func _course_group_id_for_station(station_id: int) -> String:
+	return game.service.group_id_for_station(station_id)
+
+func _sync_course_group_order() -> void:
+	var valid: Array=[]
+	for raw_id in group_selected_stations:
+		var group_id: String=_course_group_id_for_station(int(raw_id))
+		if not group_id.is_empty() and group_id not in valid: valid.append(group_id)
+	var next: Array=[]
+	for group_id in course_group_order:
+		if group_id in valid and group_id not in next: next.append(group_id)
+	for group_id in valid:
+		if group_id not in next: next.append(group_id)
+	course_group_order=next
+
+func course_editor_select_group(group_id: String,on: bool) -> void:
+	var group: Dictionary=game.service.table_group_by_id(group_id)
+	if group.is_empty(): return
+	if on:
+		for raw_id in group.stations:
+			var station_id: int=int(raw_id)
+			if station_id not in group_selected_stations: group_selected_stations.append(station_id)
+		if group_id not in course_group_order: course_group_order.append(group_id)
+	else:
+		for raw_id in group.stations: group_selected_stations.erase(int(raw_id))
+		course_group_order.erase(group_id)
+	group_selected_stations.sort()
+	_sync_course_group_order()
+	stamp=""
+	rebuild()
+
+func course_editor_select_all_compatible() -> void:
+	var type_id: String=str(course_editor.get("type_id",""))
+	if type_id.is_empty(): return
+	group_selected_stations=[]
+	for station in game.service.stations:
+		if station.manual_station or station.masterclass_station or station.type_id!=type_id: continue
+		group_selected_stations.append(station.station_id)
+	group_selected_stations.sort()
+	_sync_course_group_order()
+	stamp=""
+	rebuild()
+
+func course_editor_move_group(group_id: String,delta: int) -> void:
+	_sync_course_group_order()
+	var index: int=course_group_order.find(group_id)
+	var target: int=index+delta
+	if index<0 or target<0 or target>=course_group_order.size(): return
+	var value=course_group_order[index]
+	course_group_order[index]=course_group_order[target]
+	course_group_order[target]=value
+	stamp=""
+	rebuild()
+
+func course_editor_assignments() -> Array:
+	var result: Array=[]
+	for raw_record_id in course_editor.get("records",[]):
+		result.append({"record_id":int(raw_record_id),"station_ids":group_selected_stations.duplicate()})
+	return result
+
+func course_editor_submit() -> void:
+	var assignments:=course_editor_assignments()
+	var preview: Dictionary=game.service.training_course_preview(assignments,str(course_editor.get("mode","together")),course_group_order)
+	if not str(preview.get("error","")).is_empty():
+		course_editor_message=str(preview.error)
+		stamp=""
+		rebuild()
+		return
+	var editing: int=int(course_editor.get("editing",0))
+	var payload: Dictionary={"assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate()}
+	if editing>0:
+		payload.action="training_course_edit"
+		payload.course=editing
+	else:
+		payload.action="training_course_confirm"
+		payload.command="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
+		course_command_serial+=1
+	game.hud.notice.text=""
+	send(payload)
+	var notice: String=str(game.hud.notice.text)
+	if notice=="Курс поставлен в очередь.":
+		course_editor={}
+		course_editor_message=""
+		course_group_order=[]
+	else:
+		course_editor_message=notice if not notice.is_empty() else "Курс не подтверждён. Проверь актуальный предпросмотр."
 	stamp=""
 	rebuild()
 
@@ -346,6 +538,7 @@ func rebuild() -> void:
 				label(content,str(record.get("name","Запись")),20)
 				label(content,"%s · %.1f с · фильм %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),float(record.get("highlight_duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
 				button(content,"Посмотреть хайлайты на телевизоре",func():send({"action":"masterclass_watch","id":id},true),has_tv and float(record.get("highlight_duration",0.0))>0.0)
+				button(content,"Добавить в курс",func():course_editor_open(id),host)
 				label(content,str(effect.get("explanation","Аккуратное приготовление.")),14)
 				if bool(record.get("archived",false)): label(content,"Архивная запись из прежнего рабочего способа · стол %d"%int(record.get("source_station",0)),14)
 				var row:=HBoxContainer.new(); content.add_child(row)
@@ -450,27 +643,8 @@ func rebuild() -> void:
 					for dish in merge_preview.differences:
 						if int(group_merge_choices.get(str(dish),0))<=0: choices_ready=false
 					button(content,"Объединить выбранные группы",func():send({"action":"group_merge","groups":group_selected_groups.duplicate(),"choices":group_merge_choices.duplicate(true),"active":group_merge_active.duplicate()}),host and choices_ready)
-			label(content,"ЗАПИСИ ДЛЯ ОБУЧЕНИЯ",20)
-			if service.masterclasses.is_empty(): label(content,"В видеотеке пока нет записей.")
-			for record in service.masterclasses:
-				var record_id: int=int(record.get("id",0))
-				var compatible: Array=service.compatible_training_station_ids(record_id)
-				if compatible.is_empty(): continue
-				var chosen_error: String=service.training_selection_error(record_id,group_selected_stations) if not group_selected_stations.is_empty() else "Выбери столы."
-				var row:=HBoxContainer.new(); content.add_child(row)
-				label(row,"%s · %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),str(record.get("name","Запись"))],15).size_flags_horizontal=Control.SIZE_EXPAND_FILL
-				button(row,"Все совместимые",func():select_group_stations(compatible),host)
-				button(row,"Назначить выбранным",func():stage_group_assignment(record_id),host and chosen_error.is_empty())
-				if not group_selected_stations.is_empty() and not chosen_error.is_empty() and group_selected_stations.all(func(id):return id in compatible): label(content,chosen_error,13)
-			if not group_pending_assignment.is_empty():
-				var pending_id: int=int(group_pending_assignment.record)
-				var pending_record: Dictionary=service.masterclass_by_id(pending_id)
-				label(content,"ПРЕДПРОСМОТР ИЗМЕНЕНИЯ ПЛАНА",20)
-				for projected in service.preview_table_groups(pending_id,group_pending_assignment.stations):
-					label(content,"%s · ID %s · столы %s"%[projected.name,projected.id,", ".join(projected.stations.map(func(id):return str(id)))],15)
-				var pending_error: String=service.training_selection_error(pending_id,group_pending_assignment.stations)
-				if not pending_error.is_empty(): label(content,pending_error,15)
-				button(content,"Подтвердить план и обучение · %s"%str(pending_record.get("name","Запись")),func():var payload:=group_pending_assignment.duplicate(true);group_pending_assignment={};send({"action":"group_train","record":int(payload.record),"stations":payload.stations,"command":str(payload.command)}),host and pending_error.is_empty())
+			course_editor_page(host)
+			training_queue_page(host)
 		"laboratory":
 			laboratory_page()
 		"lounge":
@@ -515,6 +689,155 @@ func rebuild() -> void:
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
 	scroll.scroll_vertical = offset
 
+
+func course_editor_page(host: bool) -> void:
+	var service=game.service
+	label(content,"ЕДИНЫЙ РЕДАКТОР КУРСА",20)
+	if course_editor.is_empty():
+		if group_selected_stations.is_empty():
+			label(content,"Отметь столы или выбери целую группу выше, затем составь курс. Из видеотеки сюда можно открыть редактор уже с выбранной записью.",14)
+			return
+		label(content,"Выбраны столы: "+", ".join(group_selected_stations.map(func(id):return str(id))),15)
+		button(content,"Составить курс из выбранных столов",func():course_editor_open(),host)
+		return
+	var type_id: String=str(course_editor.get("type_id",""))
+	if type_id.is_empty() and not group_selected_stations.is_empty():
+		var first_station=service.by_id(int(group_selected_stations[0]))
+		if first_station!=null:
+			type_id=str(first_station.type_id)
+			course_editor.type_id=type_id
+	if not course_editor_message.is_empty(): label(content,course_editor_message,15)
+	label(content,"Кухня: "+(str(Definition.TYPES.get(type_id,{}).get("title",type_id)) if not type_id.is_empty() else "выбери столы"),17)
+	if not type_id.is_empty():
+		button(content,"Выбрать все совместимые столы",course_editor_select_all_compatible,host)
+		label(content,"ГРУППЫ И СТОЛЫ",16)
+		for group in service.table_groups():
+			if str(group.type_id)!=type_id: continue
+			var group_id: String=str(group.id)
+			var all_selected: bool=not group.stations.is_empty() and group.stations.all(func(id):return int(id) in group_selected_stations)
+			var group_toggle:=CheckBox.new(); content.add_child(group_toggle)
+			group_toggle.text="%s · столы %s"%[str(group.name),", ".join(group.stations.map(func(id):return str(id)))]
+			group_toggle.button_pressed=all_selected
+			group_toggle.disabled=not host
+			group_toggle.toggled.connect(func(on):course_editor_select_group(group_id,on))
+		for station in service.stations:
+			if station.manual_station or station.masterclass_station or station.type_id!=type_id: continue
+			var station_id: int=station.station_id
+			var station_toggle:=CheckBox.new(); content.add_child(station_toggle)
+			station_toggle.text="Стол %d · работников %d/%d"%[station_id,station.staffed if station.staffed>=0 else station.role_count(),station.role_count()]
+			station_toggle.button_pressed=station_id in group_selected_stations
+			station_toggle.disabled=not host
+			station_toggle.toggled.connect(func(on):set_group_station_selected(station_id,on))
+	if not group_selected_stations.is_empty():
+		label(content,"Выбрано: %d производственных мест"%group_selected_stations.size(),15)
+	label(content,"УРОКИ КУРСА",17)
+	var records: Array=course_editor.get("records",[])
+	if records.is_empty(): label(content,"Добавь хотя бы одну запись. Для одного блюда в курсе хранится только одна версия.",14)
+	for index in range(records.size()):
+		var record_id: int=int(records[index])
+		var record: Dictionary=service.masterclass_by_id(record_id)
+		var row:=HBoxContainer.new(); content.add_child(row)
+		label(row,"%d. %s · %s"%[index+1,Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),str(record.get("name","Запись"))],15).size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		button(row,"↑",func():course_editor_move_record(index,-1),host and index>0)
+		button(row,"↓",func():course_editor_move_record(index,1),host and index<records.size()-1)
+		button(row,"Убрать",func():course_editor_remove_record(index),host)
+	if not type_id.is_empty():
+		label(content,"ДОСТУПНЫЕ ЗАПИСИ",16)
+		for record in service.masterclasses:
+			if str(record.get("source_type",""))!=type_id: continue
+			var record_id: int=int(record.get("id",0))
+			var dish: String=str(record.get("dish",""))
+			var exact:=0
+			for raw_id in group_selected_stations:
+				var station=service.by_id(int(raw_id))
+				if station!=null and station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id: exact+=1
+			var chosen_same_dish: bool=false
+			for chosen_id in records:
+				var chosen_record: Dictionary=service.masterclass_by_id(int(chosen_id))
+				if str(chosen_record.get("dish",""))==dish: chosen_same_dish=true
+			var quality: Dictionary=record.get("quality",{})
+			var effect: Dictionary=record.get("effectiveness",{})
+			var text: String="%s · %s · %s · %s · %.1f с → фильм %.1f с · освоили %d/%d"%[Definition.DISHES.get(dish,dish),str(record.get("name","Запись")),str(quality.get("grade","D")),str(effect.get("label","Обычная")),float(record.get("duration",0.0)),float(record.get("highlight_duration",0.0)),exact,group_selected_stations.size()]
+			var row:=HBoxContainer.new(); content.add_child(row)
+			label(row,text,14).size_flags_horizontal=Control.SIZE_EXPAND_FILL
+			button(row,"Заменить версию" if chosen_same_dish else "Добавить урок",func():course_editor_add_record(record_id),host)
+	label(content,"СПОСОБ ОТПРАВКИ",17)
+	var mode_row:=HBoxContainer.new(); content.add_child(mode_row)
+	button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="together" else "")+"Вместе",func():course_editor_set_mode("together"),host)
+	button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="by_groups" else "")+"По группам",func():course_editor_set_mode("by_groups"),host)
+	if str(course_editor.get("mode","together"))=="by_groups":
+		_sync_course_group_order()
+		label(content,"ПОРЯДОК ПАРТИЙ",16)
+		for index in range(course_group_order.size()):
+			var group_id: String=str(course_group_order[index])
+			var group: Dictionary=service.table_group_by_id(group_id)
+			var row:=HBoxContainer.new(); content.add_child(row)
+			label(row,"%d. %s"%[index+1,str(group.get("name",group_id))],15).size_flags_horizontal=Control.SIZE_EXPAND_FILL
+			button(row,"↑",func():course_editor_move_group(group_id,-1),host and index>0)
+			button(row,"↓",func():course_editor_move_group(group_id,1),host and index<course_group_order.size()-1)
+	label(content,"ПРЕДПРОСМОТР",17)
+	var assignments:=course_editor_assignments()
+	var preview: Dictionary=service.training_course_preview(assignments,str(course_editor.get("mode","together")),course_group_order) if not assignments.is_empty() and not group_selected_stations.is_empty() else {"error":"Выбери столы и добавь уроки."}
+	var preview_error: String=str(preview.get("error",""))
+	if not preview_error.is_empty():
+		label(content,preview_error,15)
+	else:
+		label(content,"Столов: %d · сотрудников: %d · одновременно уйдёт до %d · фильмы: %.1f с"%[int(preview.places),int(preview.employees),int(preview.simultaneous_out),float(preview.film_total)],16)
+		label(content,"Время фильмов указано отдельно. Дорога, сбор и ожидание уже принятого заказа зависят от текущего состояния кафе.",14)
+		for lesson in preview.lessons:
+			label(content,"%s · %s · освоили %d/%d · фильм %.1f с"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),str(lesson.name),int(lesson.mastered),int(lesson.selected),float(lesson.film)],14)
+		for batch_index in range(preview.batches.size()):
+			var batch: Dictionary=preview.batches[batch_index]
+			var readiness: String="готова" if bool(batch.ready) else "ждёт: "+str(batch.blocked_reason)
+			var group_text: String=" · "+str(batch.get("name","")) if not str(batch.get("name","")).is_empty() else ""
+			label(content,"Партия %d%s · столы %s · %s"%[batch_index+1,group_text,", ".join(batch.stations.map(func(id):return str(id))),readiness],14)
+		label(content,"ИЗМЕНЕНИЯ ГРУПП И ПЛАНОВ",16)
+		for projected in preview.groups:
+			var intersects: bool=projected.stations.any(func(id):return int(id) in group_selected_stations)
+			if not intersects: continue
+			var plan_parts: Array=[]
+			for item in projected.curriculum:
+				var planned: Dictionary=service.masterclass_by_id(int(item.get("record_id",0)))
+				plan_parts.append("%s → %s"%[Definition.DISHES.get(str(item.get("dish_id","")),str(item.get("dish_id",""))),str(planned.get("name","Запись #%d"%int(item.get("record_id",0))))])
+			label(content,"%s · ID %s · столы %s · %s"%[str(projected.name),str(projected.id),", ".join(projected.stations.map(func(id):return str(id))),", ".join(plan_parts) if not plan_parts.is_empty() else "план пуст"],14)
+	var submit_text: String="Сохранить изменения курса" if int(course_editor.get("editing",0))>0 else "Поставить курс в очередь"
+	button(content,submit_text,course_editor_submit,host and preview_error.is_empty())
+	button(content,"Закрыть редактор",course_editor_close)
+
+func training_queue_page(host: bool) -> void:
+	var service=game.service
+	label(content,"ОЧЕРЕДЬ ОБУЧЕНИЯ",20)
+	var views: Array=service.training_course_views()
+	if views.is_empty(): label(content,"Ожидающих и активных курсов нет.",14)
+	for course in views:
+		var mode_label: String="Вместе" if str(course.mode)=="together" else "По группам"
+		label(content,"Курс #%d · %s · %s"%[int(course.id),mode_label,str(course.state)],17)
+		for assignment in course.assignments:
+			label(content,"  %s · %s · столы %s"%[Definition.DISHES.get(str(assignment.dish),str(assignment.dish)),str(assignment.name),", ".join(assignment.station_ids.map(func(id):return str(id)))],14)
+		if bool(course.editable): button(content,"Редактировать ожидающий курс",func():course_editor_open(0,int(course.id)),host)
+		button(content,"Отменить оставшийся курс #%d"%int(course.id),func():send({"action":"training_cancel_course","course":int(course.id)}),host and str(course.state) not in ["completed","cancelled"])
+		for batch in course.batches:
+			var reason: String=" · "+str(batch.blocked_reason) if not str(batch.blocked_reason).is_empty() else ""
+			label(content,"  Партия #%d · %s · столы %s%s"%[int(batch.id),str(batch.state),", ".join(batch.stations.map(func(id):return str(id))),reason],14)
+			if str(batch.state) not in ["completed","cancelled"]:
+				button(content,"Отменить оставшуюся партию #%d"%int(batch.id),func():send({"action":"training_cancel_batch","batch":int(batch.id)}),host)
+			for lesson in batch.lessons:
+				label(content,"    Урок #%d · %s · %s · %s"%[int(lesson.id),Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),str(lesson.name),str(lesson.state)],13)
+				if str(lesson.state) not in ["completed","cancelled","superseded"]:
+					button(content,"Отменить урок #%d · %s"%[int(lesson.id),str(lesson.name)],func():send({"action":"training_cancel_lesson","lesson":int(lesson.id)}),host)
+	var suspended_found:=false
+	for group in service.table_groups():
+		for item in group.curriculum:
+			var dish: String=str(item.get("dish_id",""))
+			for raw_id in group.stations:
+				var station_id: int=int(raw_id)
+				if not service.training_queue.assignment_suspended(station_id,dish): continue
+				if not suspended_found:
+					label(content,"ПРИОСТАНОВЛЕННЫЕ НАЗНАЧЕНИЯ",17)
+					suspended_found=true
+				var desired: Dictionary=service.desired_source(str(group.id),dish)
+				label(content,"Стол %d · %s · назначено %s · обучение отменено"%[station_id,Definition.DISHES.get(dish,dish),str(desired.get("name","Запись"))],14)
+				button(content,"Продолжить обучение · стол %d"%station_id,func():send({"action":"training_resume","station":station_id,"dish":dish}),host)
 
 func set_stats_focus(value: Dictionary)->void:
 	stats_focus=value.duplicate(true)

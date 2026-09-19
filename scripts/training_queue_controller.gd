@@ -103,7 +103,7 @@ func _capture_assignments(assignments: Array)->Array:
 		result.append({"record_id":int(record.id),"record":record.duplicate(true),"dish":str(record.dish),"station_ids":spec.station_ids.duplicate(),"versions":versions})
 	return result
 
-func _signature(assignments: Array,mode: String)->String:
+func _signature(assignments: Array,mode: String,group_order: Array=[])->String:
 	var parts: Array=[mode]
 	for spec in assignments:
 		var ids: Array=spec.station_ids.duplicate()
@@ -111,7 +111,32 @@ func _signature(assignments: Array,mode: String)->String:
 		var versions: Array=[]
 		for station_id in ids: versions.append("%d:%d"%[int(station_id),int(spec.versions.get(str(int(station_id)),0))])
 		parts.append("%d@%s#%s"%[int(spec.record_id),",".join(ids.map(func(v):return str(v))),",".join(versions)])
+	if mode=="by_groups":
+		var order_parts: Array=[]
+		for raw in group_order:
+			if raw is Array:
+				var ids: Array=raw.duplicate()
+				ids.sort()
+				order_parts.append(",".join(ids.map(func(v):return str(int(v)))))
+			else: order_parts.append(str(raw))
+		parts.append("order="+">".join(order_parts))
 	return "|".join(parts)
+
+func _preferred_group_station_sets(group_order: Array,assignments: Array)->Array:
+	if group_order.is_empty(): return []
+	var selected: Array=[]
+	for spec in assignments:
+		for station_id in spec.station_ids:
+			if int(station_id) not in selected: selected.append(int(station_id))
+	var result: Array=[]
+	for raw_group_id in group_order:
+		var group: Dictionary=service.table_group_by_id(str(raw_group_id))
+		if group.is_empty(): continue
+		var subset: Array=[]
+		for station_id in group.stations:
+			if int(station_id) in selected: subset.append(int(station_id))
+		if not subset.is_empty(): result.append(subset)
+	return result
 
 func _existing_signature(signature: String)->Dictionary:
 	for course in courses:
@@ -176,6 +201,159 @@ func _new_batch(course_id: int,station_ids: Array,specs: Array,depends_on: int)-
 	batches.append(batch)
 	return batch
 
+func _intent_from_captured(captured: Array)->Array:
+	var result: Array=[]
+	for spec in captured:
+		result.append({"record_id":int(spec.record_id),"dish":str(spec.dish),"station_ids":spec.station_ids.duplicate(),"versions":spec.versions.duplicate(true)})
+	return result
+
+func _build_course_batches(course: Dictionary,captured: Array,mode: String,preferred_group_order: Array=[])->void:
+	course.batch_ids=[]
+	if mode=="together":
+		var all_ids: Array=[]
+		for spec in captured:
+			for station_id in spec.station_ids:
+				if station_id not in all_ids: all_ids.append(station_id)
+		all_ids.sort()
+		var batch:=_new_batch(int(course.id),all_ids,captured,0)
+		course.batch_ids.append(int(batch.id))
+		return
+	var group_order: Array=[]
+	var group_specs: Dictionary={}
+	for spec in captured:
+		for station_id in spec.station_ids:
+			var group_id: String=service.group_id_for_station(int(station_id))
+			if group_id.is_empty(): continue
+			if group_id not in group_order:
+				group_order.append(group_id)
+				group_specs[group_id]=[]
+	if not preferred_group_order.is_empty():
+		var ordered: Array=[]
+		for raw_preference in preferred_group_order:
+			if raw_preference is Array:
+				for station_id in raw_preference:
+					var actual_group: String=service.group_id_for_station(int(station_id))
+					if actual_group in group_order and actual_group not in ordered:
+						ordered.append(actual_group)
+						break
+			else:
+				var wanted: String=str(raw_preference)
+				if wanted in group_order and wanted not in ordered: ordered.append(wanted)
+		for group_id in group_order:
+			if group_id not in ordered: ordered.append(group_id)
+		group_order=ordered
+	course.group_order=group_order.duplicate()
+	for group_id in group_order:
+		var group: Dictionary=service.table_group_by_id(str(group_id))
+		for spec in captured:
+			var targets: Array=[]
+			for station_id in spec.station_ids:
+				if int(station_id) in group.stations: targets.append(int(station_id))
+			if not targets.is_empty():
+				var copy: Dictionary=spec.duplicate(true)
+				copy.station_ids=targets
+				group_specs[group_id].append(copy)
+	var dependency:=0
+	for group_id in group_order:
+		var group: Dictionary=service.table_group_by_id(str(group_id))
+		var batch:=_new_batch(int(course.id),group.stations,group_specs[group_id],dependency)
+		course.batch_ids.append(int(batch.id))
+		dependency=int(batch.id)
+
+func _retire_pending_course(course: Dictionary)->void:
+	for batch_id in course.get("batch_ids",[]):
+		var batch:=_batch(int(batch_id))
+		if batch.is_empty(): continue
+		for lesson_id in batch.get("lesson_ids",[]):
+			var lesson:=_lesson(int(lesson_id))
+			if str(lesson.get("state","")) not in ["completed","cancelled","superseded"]: lesson.state="superseded"
+		if str(batch.get("state","")) not in ["completed","cancelled"]: batch.state="cancelled"
+		_clear_batch_stations(batch)
+
+func _course_intent(course: Dictionary)->Array:
+	if course.get("assignments",[]) is Array and not course.get("assignments",[]).is_empty(): return course.assignments
+	var order: Array=[]
+	var merged: Dictionary={}
+	for batch_id in course.get("batch_ids",[]):
+		var batch:=_batch(int(batch_id))
+		for lesson_id in batch.get("lesson_ids",[]):
+			var lesson:=_lesson(int(lesson_id))
+			var key: String=str(lesson.get("record_id",0))
+			if key not in merged:
+				order.append(key)
+				merged[key]={"record_id":int(lesson.record_id),"dish":str(lesson.dish),"station_ids":[],"versions":{}}
+			for station_id in lesson.get("station_ids",[]):
+				if int(station_id) not in merged[key].station_ids: merged[key].station_ids.append(int(station_id))
+				merged[key].versions[str(int(station_id))]=int(lesson.get("versions",{}).get(str(int(station_id)),1))
+	var result: Array=[]
+	for key in order:
+		merged[key].station_ids.sort()
+		result.append(merged[key])
+	return result
+
+func course_view(course_id: int)->Dictionary:
+	var course:=_course(course_id)
+	if course.is_empty(): return {}
+	var rows: Array=[]
+	for raw in _course_intent(course):
+		var row: Dictionary=raw.duplicate(true)
+		var record: Dictionary=service.masterclass_by_id(int(row.get("record_id",0)))
+		row.name=str(record.get("name","Запись #%d"%int(row.get("record_id",0))))
+		row.duration=float(record.get("duration",0.0))
+		row.highlight_duration=float(record.get("highlight_duration",0.0))
+		rows.append(row)
+	var batch_rows: Array=[]
+	for batch_id in course.get("batch_ids",[]):
+		var batch:=_batch(int(batch_id))
+		if batch.is_empty(): continue
+		var lesson_rows: Array=[]
+		for lesson_id in batch.get("lesson_ids",[]):
+			var lesson:=_lesson(int(lesson_id))
+			lesson_rows.append({"id":int(lesson.id),"dish":str(lesson.dish),"record_id":int(lesson.record_id),"name":str(lesson.record.get("name","Запись")),"state":str(lesson.state),"stations":lesson.station_ids.duplicate()})
+		batch_rows.append({"id":int(batch.id),"state":str(batch.state),"stations":batch.station_ids.duplicate(),"blocked_reason":str(batch.get("blocked_reason","")),"lessons":lesson_rows})
+	return {"id":int(course.id),"mode":str(course.get("mode","together")),"state":str(course.get("state","queued")),"assignments":rows,"batches":batch_rows,"group_order":course.get("group_order",[]).duplicate(),"editable":str(course.get("state","")) in ["queued","blocked","deferred"] and active_batch_id not in course.get("batch_ids",[])}
+
+func course_views()->Array:
+	var result: Array=[]
+	for course in courses:
+		if str(course.get("state","")) in ["completed","cancelled"]: continue
+		result.append(course_view(int(course.id)))
+	return result
+
+func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[])->String:
+	var course:=_course(course_id)
+	if course.is_empty(): return "Курс не найден."
+	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающий курс."
+	if active_batch_id in course.get("batch_ids",[]): return "Активную учебную партию сначала нужно завершить или отменить."
+	if mode not in ["together","by_groups"]: return "Неизвестный режим курса."
+	var normalized:=_normalize_assignments(assignments)
+	if not str(normalized.error).is_empty(): return str(normalized.error)
+	var preferred_order: Array=_preferred_group_station_sets(group_order,normalized.assignments)
+	_retire_pending_course(course)
+	_apply_plans(normalized.assignments)
+	var captured:=_capture_assignments(normalized.assignments)
+	_supersede_waiting(captured)
+	course.mode=mode
+	course.state="queued"
+	course.peer=int(peer)
+	course.signature=_signature(captured,mode,preferred_order)
+	course.assignments=_intent_from_captured(captured)
+	_build_course_batches(course,captured,mode,preferred_order)
+	_update_course_state(course_id)
+	revision+=1
+	service.progress.revision+=1
+	return ""
+
+func resume_assignment(station_id: int,dish: String,peer := 1)->String:
+	var current:=_current_assignment(station_id,dish)
+	var record_id:=int(current.get("record_id",0))
+	if record_id<=0: return "Для блюда нет назначенной записи."
+	var station=service.by_id(station_id)
+	if station==null: return "Стол не найден."
+	if _actual_matches(station,record_id,dish): return "Этот способ уже освоен."
+	var result:=enqueue_course([{"record_id":record_id,"station_ids":[station_id]}],"together","resume:%d:%s:%d"%[station_id,dish,int(current.get("revision",0))],peer)
+	return str(result.get("error",""))
+
 func migrate_from_plans()->void:
 	for group in service.table_groups():
 		var assignments: Array=[]
@@ -192,16 +370,17 @@ func migrate_from_plans()->void:
 		var command: String="migration:%s:%d"%[str(group.id),int(group.get("plan_revision",1))]
 		enqueue_course(assignments,"together",command,1)
 
-func enqueue_course(assignments: Array,mode := "together",command_id := "",peer := 1)->Dictionary:
+func enqueue_course(assignments: Array,mode := "together",command_id := "",peer := 1,group_order: Array=[])->Dictionary:
 	var command:=str(command_id)
 	if not command.is_empty() and command_courses.has(command):
 		return {"error":"","course_id":int(command_courses[command]),"duplicate":true}
 	if mode not in ["together","by_groups"]: return {"error":"Неизвестный режим курса.","course_id":0}
 	var normalized:=_normalize_assignments(assignments)
 	if not str(normalized.error).is_empty(): return {"error":str(normalized.error),"course_id":0}
+	var preferred_order: Array=_preferred_group_station_sets(group_order,normalized.assignments)
 	_apply_plans(normalized.assignments)
 	var captured:=_capture_assignments(normalized.assignments)
-	var signature:=_signature(captured,mode)
+	var signature:=_signature(captured,mode,preferred_order)
 	var existing:=_existing_signature(signature)
 	if not existing.is_empty():
 		if not command.is_empty(): command_courses[command]=int(existing.id)
@@ -209,43 +388,10 @@ func enqueue_course(assignments: Array,mode := "together",command_id := "",peer 
 	_supersede_waiting(captured)
 	var course_id:=next_course_id
 	next_course_id+=1
-	var course: Dictionary={"id":course_id,"command_id":command,"mode":mode,"state":"queued","batch_ids":[],"signature":signature,"peer":int(peer),"created_day":service.progress.day}
+	var course: Dictionary={"id":course_id,"command_id":command,"mode":mode,"state":"queued","batch_ids":[],"signature":signature,"peer":int(peer),"created_day":service.progress.day,"assignments":_intent_from_captured(captured),"group_order":[]}
 	courses.append(course)
 	if not command.is_empty(): command_courses[command]=course_id
-	if mode=="together":
-		var all_ids: Array=[]
-		for spec in captured:
-			for station_id in spec.station_ids:
-				if station_id not in all_ids: all_ids.append(station_id)
-		all_ids.sort()
-		var batch:=_new_batch(course_id,all_ids,captured,0)
-		course.batch_ids.append(int(batch.id))
-	else:
-		var group_order: Array=[]
-		var group_specs: Dictionary={}
-		for spec in captured:
-			for station_id in spec.station_ids:
-				var group_id: String=service.group_id_for_station(int(station_id))
-				if group_id.is_empty(): continue
-				if group_id not in group_order:
-					group_order.append(group_id)
-					group_specs[group_id]=[]
-		for group_id in group_order:
-			var group: Dictionary=service.table_group_by_id(str(group_id))
-			for spec in captured:
-				var targets: Array=[]
-				for station_id in spec.station_ids:
-					if int(station_id) in group.stations: targets.append(int(station_id))
-				if not targets.is_empty():
-					var copy: Dictionary=spec.duplicate(true)
-					copy.station_ids=targets
-					group_specs[group_id].append(copy)
-		var dependency:=0
-		for group_id in group_order:
-			var group: Dictionary=service.table_group_by_id(str(group_id))
-			var batch:=_new_batch(course_id,group.stations,group_specs[group_id],dependency)
-			course.batch_ids.append(int(batch.id))
-			dependency=int(batch.id)
+	_build_course_batches(course,captured,mode,preferred_order)
 	_update_course_state(course_id)
 	revision+=1
 	service.progress.revision+=1
@@ -339,6 +485,7 @@ func _select_next_batch()->void:
 			batch.blocked_reason=reason
 			for lesson in _pending_lessons(batch):
 				if str(lesson.state) in ["queued","blocked"]: lesson.state="blocked"
+			_update_course_state(int(batch.course_id))
 			continue
 		for lesson in _pending_lessons(batch):
 			if str(lesson.state)=="blocked": lesson.state="queued"
@@ -346,6 +493,7 @@ func _select_next_batch()->void:
 		batch.blocked_reason=""
 		active_batch_id=int(batch.id)
 		_mark_batch_stations(batch,"draining")
+		_update_course_state(int(batch.course_id))
 		revision+=1
 		service.progress.revision+=1
 		return
