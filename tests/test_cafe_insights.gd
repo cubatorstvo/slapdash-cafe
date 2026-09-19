@@ -151,9 +151,15 @@ func run()->void:
 	check(service.stations.size()==20,"Cafe contains one chef station and nineteen production tables")
 	var compatible: Array=service.compatible_training_station_ids(700)
 	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables without auto-merging them")
-	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine all nineteen compatible tables into one managed group")
-	check(service._apply_group_plan(700,compatible).size()==1,"Large explicit group receives one desired record")
-	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Large explicit group keeps sausage active")
+	check(service._apply_group_plan(700,compatible).size()>=1,"All compatible source groups can first receive the same desired record")
+	var prepared_group_ids: Array=[]
+	for station_id in compatible:
+		var prepared_group_id: String=service.group_id_for_station(int(station_id))
+		if prepared_group_id not in prepared_group_ids:
+			prepared_group_ids.append(prepared_group_id)
+			check(service.set_group_dish_active(prepared_group_id,"sausage",true).is_empty(),"Source group keeps sausage active before explicit merge")
+	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine nineteen tables once their plans and menu match")
+	check(int(service.desired_source(service.group_id_for_station(2),"sausage").id)==700,"Large explicit group keeps the shared desired record")
 	var groups: Array=service.table_groups()
 	var large_group: Dictionary={}
 	for value in groups:
