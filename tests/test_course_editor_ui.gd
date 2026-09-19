@@ -144,6 +144,34 @@ func run()->void:
 	check(await run_until(service,func():return str(service.training_queue._batch(int(first_batch.id)).get("state",""))=="completed" and int(service.training_queue.active_batch_id)==int(second_batch.id)),"UI T05 second party starts after first returns")
 	dispose(game)
 
+	print("UI T05 partial: group order survives a preview split")
+	game=await make_game()
+	service=game.service
+	var p1=add_counter(service,1)
+	var p2=add_counter(service,2)
+	var p3=add_counter(service,3)
+	var p4=add_counter(service,4)
+	var p5=add_counter(service,5)
+	potato=record_for(p1,2251,"potato","UI · частичная группа")
+	service.masterclasses=[potato]
+	check(service.create_table_group([2,3,4],"Частичная A").is_empty(),"UI T05 partial group A")
+	check(service.create_table_group([5,6],"Полная B").is_empty(),"UI T05 partial group B")
+	group_a=service.group_id_for_station(2)
+	group_b=service.group_id_for_station(5)
+	game.office.open("groups")
+	game.office.select_group_stations([2,5,6])
+	check(press(game.office,"Составить курс из выбранных столов"),"UI T05 partial opens editor")
+	game.office.course_editor_add_record(2251)
+	game.office.course_editor_set_mode("by_groups")
+	game.office.course_group_order=[group_a,group_b]
+	preview=service.training_course_preview(game.office.course_editor_assignments(),"by_groups",game.office.course_group_order)
+	check(str(preview.error).is_empty() and preview.batches.size()==2 and preview.batches[0].stations==[2] and preview.batches[1].stations==[5,6],"UI T05 partial preview preserves source-group order after split")
+	check(press(game.office,"Поставить курс в очередь"),"UI T05 partial queues split course")
+	await process_frame
+	views=service.training_course_views()
+	check(views.size()==1 and views[0].batches.size()==2 and views[0].batches[0].stations==[2] and views[0].batches[1].stations==[5,6],"UI T05 partial actual queue matches preview order after new group id appears")
+	dispose(game)
+
 	print("UI T13: replace a waiting record by editing the queued course")
 	game=await make_game()
 	service=game.service
