@@ -19,6 +19,8 @@ var next_customer_id := 1
 var served := 0
 var missed := 0
 var revenue := 0
+var guests_arrived := 0
+var order_stats: Dictionary=blank_order_stats()
 var open_for_business := false
 const Progression = preload("res://scripts/cafe_progression.gd")
 var progress = Progression.new()
@@ -38,6 +40,9 @@ var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0
 var remote_movie_record: Dictionary={}
 var staff_training: Node3D
 var table_group_names: Dictionary={}
+
+func blank_order_stats() -> Dictionary:
+	return {"orders_arrived":0,"orders_completed":0,"orders_partial":0,"orders_failed":0,"portions_ordered":0,"portions_served":0,"portions_unserved":0}
 
 func _ready() -> void:
 	rng.randomize()
@@ -451,6 +456,150 @@ func _attach_customer(station: Node3D) -> void:
 			return
 	if station.customer_id >= 0: finish_customer(station.customer_id, false)
 
+func portion_count_for_new_order() -> int:
+	if progress.stars<2: return 1
+	var roll: float=rng.randf()
+	if progress.stars==2: return 3 if roll<0.18 else 1
+	if progress.stars==3: return 5 if roll<0.10 else 3 if roll<0.30 else 1
+	var scale: float=clampf(float(stations.size()-6)/14.0,0.0,1.0)
+	if roll<0.08+0.12*scale: return 10
+	if roll<0.20+0.15*scale: return 5
+	if roll<0.42: return 3
+	return 1
+
+func base_price_for(dish: String) -> int:
+	return 65 if dish=="meal" else 95 if dish in Progression.ORCHESTRATION_DISHES else 80 if dish in Progression.SPECIALTY_DISHES else 25
+
+func order_wait_limit(portions: int,station: Node3D=null,dish := "") -> float:
+	var result: float=18.0+maxi(0,portions-1)*16.0
+	if station!=null and station.recipes.has(dish):
+		result=maxf(result,float(station.recipes[dish].get("duration",0.0))*float(portions)*1.6+8.0)
+	return result
+
+func automatic_station_candidates(dish: String,idle_only := true) -> Array:
+	var result: Array=[]
+	for station in stations:
+		if station.manual_station or station.masterclass_station or not station.ready_crew() or not station.recipes.has(dish): continue
+		if idle_only and (station.state!="idle" or station.pending_teacher>0): continue
+		result.append(station)
+	return result
+
+func auto_queue_point(index: int) -> Vector3:
+	return Vector3(-9.7,0,0.2-index*0.9)
+
+func _update_multi_caption(customer: Dictionary) -> void:
+	if int(customer.get("portions_total",1))<=1 or customer.state=="leaving": return
+	var total: int=int(customer.portions_total)
+	var done: int=int(customer.get("portions_done",0))
+	var paid: int=int(customer.get("order_paid",0))
+	var left: int=maxi(0,ceili(float(customer.get("wait_limit",0.0))-float(customer.get("order_age",0.0))))
+	var suffix: String="Очередь к свободному столу" if customer.state=="auto_queue" else "Ожидание"
+	customer.view.caption.text="%s ×%d\nГотово %d/%d · +%d\n%s · %d с"%[Definition.DISHES[customer.dish],total,done,total,paid,suffix,left]
+
+func _start_automatic_order(station: Node3D,customer: Dictionary) -> void:
+	station.state="cooking"
+	station.order_dish=customer.dish
+	station.order_tick=0.0
+	station.order_tempo=station.crew_tempo()
+	station.order_portions_total=int(customer.get("portions_total",1))
+	station.order_portions_done=int(customer.get("portions_done",0))
+	station.order_paid=int(customer.get("order_paid",0))
+	station.reset_model()
+	customer.state="cooking"
+	customer.automatic_serving=true
+	_update_multi_caption(customer)
+
+func _start_pending_teacher(station: Node3D) -> void:
+	if station==null or station.pending_teacher<=0 or station.state=="serving": return
+	var teacher: int=station.pending_teacher
+	station.pending_teacher=0
+	station.training.open(station.pending_dish,teacher)
+
+func _release_order_station(station: Node3D,customer_id: int) -> void:
+	if station==null or station.customer_id!=customer_id: return
+	station.customer_id=-1
+	station.state="idle"
+	station.order_portions_total=1
+	station.order_portions_done=0
+	station.order_paid=0
+	_start_pending_teacher(station)
+
+func _count_completed_customer(customer: Dictionary,station: Node3D) -> void:
+	served+=1
+	if station.manual_station:
+		progress.manual_served+=1
+		if not progress.starter_reward: game.shop.reward_sauce()
+		if not customer.dish in progress.tutorial_served: progress.tutorial_served.append(customer.dish)
+	elif customer.get("automatic_serving",false):
+		progress.journey_auto_served+=1
+		if customer.dish=="meal": progress.journey_meals_served+=1
+		if progress.stars==2: progress.third_star_auto_served+=1
+		if progress.stars==3:
+			progress.fourth_star_auto_served+=1
+			if customer.dish in Progression.SPECIALTY_DISHES: progress.fourth_star_specialty_served+=1
+		if progress.stars==4:
+			progress.fifth_star_auto_served+=1
+			if customer.dish in Progression.ORCHESTRATION_DISHES: progress.fifth_star_solyanka_served+=1
+		if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
+	progress.record_demand(customer.dish,"served")
+
+func _record_failed_order(customer: Dictionary,reason := "busy") -> void:
+	if bool(customer.get("stats_finalized",false)): return
+	customer.stats_finalized=true
+	order_stats.orders_failed=int(order_stats.orders_failed)+1
+	order_stats.portions_unserved=int(order_stats.portions_unserved)+maxi(0,int(customer.get("portions_total",1))-int(customer.get("portions_done",0)))
+	missed+=1
+	progress.record_demand(str(customer.dish),reason)
+
+func _finish_multi_departure(customer: Dictionary,station: Node3D,reason := "busy") -> void:
+	if bool(customer.get("stats_finalized",false)): return
+	customer.stats_finalized=true
+	var total: int=int(customer.portions_total)
+	var done: int=int(customer.get("portions_done",0))
+	var remaining: int=maxi(0,total-done)
+	if done>0: order_stats.orders_partial=int(order_stats.orders_partial)+1
+	else: order_stats.orders_failed=int(order_stats.orders_failed)+1
+	order_stats.portions_unserved=int(order_stats.portions_unserved)+remaining
+	missed+=1
+	progress.record_demand(str(customer.dish),reason)
+	_release_order_station(station,int(customer.id))
+	customer.state="leaving"
+	customer.path=[Vector3(17.4,0,1.65)]
+	customer.view.playback_speed=1.0
+	customer.view.caption.text="Получено %d/%d · +%d\nОстальное не дождался"%[done,total,int(customer.get("order_paid",0))]
+	trace("multi_order_partial",{"dish":customer.dish,"done":done,"total":total,"paid":int(customer.get("order_paid",0))})
+
+func _complete_multi_order(customer: Dictionary,station: Node3D) -> void:
+	if bool(customer.get("stats_finalized",false)): return
+	customer.stats_finalized=true
+	order_stats.orders_completed=int(order_stats.orders_completed)+1
+	_count_completed_customer(customer,station)
+	_release_order_station(station,int(customer.id))
+	customer.state="leaving"
+	customer.path=[Vector3(17.4,0,1.65)]
+	customer.view.playback_speed=1.0
+	customer.view.caption.text="%d/%d · +%d\nСпасибо!"%[int(customer.portions_done),int(customer.portions_total),int(customer.order_paid)]
+	trace("multi_order_completed",{"dish":customer.dish,"portions":int(customer.portions_total),"paid":int(customer.order_paid)})
+
+func advance_large_order_queue(delta: float) -> void:
+	for customer in customers.duplicate():
+		if int(customer.get("portions_total",1))<=1 or customer.state=="leaving": continue
+		customer.order_age=float(customer.get("order_age",0.0))+delta
+		_update_multi_caption(customer)
+		if float(customer.order_age)>=float(customer.wait_limit) and customer.state!="portion_eating":
+			_finish_multi_departure(customer,by_id(int(customer.get("station",-1))),"busy")
+	var line: Array=customers.filter(func(c):return c.state=="auto_queue")
+	for i in range(line.size()):
+		var customer: Dictionary=line[i]
+		if customer.state!="auto_queue": continue
+		var candidates: Array=automatic_station_candidates(str(customer.dish),true)
+		if not candidates.is_empty():
+			assign_customer(candidates[0],customer)
+		else:
+			var goal:=auto_queue_point(i)
+			if customer.view.position.distance_to(goal)>0.05: customer.path=[goal]
+			_update_multi_caption(customer)
+
 func advance(delta: float) -> void:
 	if game != null and is_instance_valid(game.shop): game.shop.advance(delta)
 	_try_begin_masterclass()
@@ -474,6 +623,7 @@ func advance(delta: float) -> void:
 				spawn_clock = progress.arrival_interval()
 		advance_chef_orders(delta)
 	advance_queue()
+	advance_large_order_queue(delta)
 	for station in stations:
 		station.training.advance(delta)
 		if station.state != "cooking": continue
@@ -484,13 +634,19 @@ func advance(delta: float) -> void:
 			for customer in customers:
 				if customer.id == station.customer_id: customer.view.react(station.model.customer_reaction)
 		if station.order_tick >= station.Run.duration_ticks(record.tracks):
-			finish_customer(station.customer_id, true)
-			if station.pending_teacher > 0 and station.state!="serving":
-				var teacher: int = station.pending_teacher
-				station.pending_teacher = 0
-				station.training.open(station.pending_dish, teacher)
+			finish_customer(station.customer_id,true)
+			_start_pending_teacher(station)
 	for index in range(customers.size() - 1, -1, -1):
 		var customer: Dictionary = customers[index]
+		if customer.state=="portion_eating":
+			customer.eat_age+=delta
+			customer.view.meal_age=customer.eat_age
+			if customer.eat_age>=1.2:
+				var table: Node3D=by_id(int(customer.station))
+				if int(customer.portions_done)>=int(customer.portions_total): _complete_multi_order(customer,table)
+				elif float(customer.order_age)>=float(customer.wait_limit): _finish_multi_departure(customer,table,"busy")
+				elif table!=null: _start_automatic_order(table,customer)
+			continue
 		if customer.state=="eating":
 			customer.eat_age+=delta
 			customer.view.meal_age=customer.eat_age
@@ -510,17 +666,12 @@ func advance(delta: float) -> void:
 			customer.view.queue_free()
 			customers.remove_at(index)
 		elif customer.state in ["walking", "waiting"]:
-			customer.state = "waiting"
-			var station: Node3D = by_id(customer.station)
-			customer.view.rotation.y = station.global_rotation.y + PI
+			customer.state="waiting"
+			var station: Node3D=by_id(int(customer.station))
+			if station==null: continue
+			customer.view.rotation.y=station.global_rotation.y+PI
 			if station.recipes.has(customer.dish) and not station.manual_station:
-				station.state = "cooking"
-				station.order_dish = customer.dish
-				station.order_tick = 0
-				station.order_tempo = station.crew_tempo()
-				station.reset_model()
-				customer.state = "cooking"
-				customer.automatic_serving=true
+				_start_automatic_order(station,customer)
 			elif station.manual_station:
 				var request_text: String=preload("res://scripts/chef_orders.gd").special_request(station.customer_order)
 				if request_text.is_empty(): request_text=Definition.DISHES[customer.dish]
