@@ -1774,7 +1774,6 @@ func load_data(data: Dictionary) -> bool:
 		for record in data.get("masterclasses",[]):
 			if not Masterclasses.valid(record): return false
 	clear_world()
-	suppress_group_autocreate=true
 	for entry in data.stations:
 		var slot_index := _saved_slot(entry, version)
 		var station := add_station(entry.type, slot_index, entry.get("manual", false))
@@ -1802,7 +1801,6 @@ func load_data(data: Dictionary) -> bool:
 			station.customer_order=entry.get("customer_order",{}).duplicate(true)
 			if entry.get("order_model",{}) is Dictionary and not entry.get("order_model",{}).is_empty(): station.model.restore(entry.order_model)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
-	suppress_group_autocreate=false
 	served=int(data.get("served",0))
 	revenue=int(data.get("revenue",0))
 	missed=int(data.get("missed",0))
