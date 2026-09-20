@@ -566,7 +566,7 @@ func _build_room_floor(parent: Node3D,stage: int) -> void:
 	if stage>=3:
 		_floor_rect(parent,Vector2(48.0,8.0),Vector2(0.0,-10.0),Color("667970"))
 	if stage>=4:
-		_floor_rect(parent,Vector2(48.0,10.0),Vector2(0.0,-19.0),Color("748178"))
+		_floor_rect(parent,Vector2(48.0,18.0),Vector2(0.0,-23.0),Color("748178"))
 
 func _build_room_perimeter(parent: Node3D,cells: Dictionary,stage: int) -> void:
 	var final_cells:=Expansion.final_hall_cells()
