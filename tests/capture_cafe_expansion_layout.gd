@@ -1,7 +1,9 @@
 extends SceneTree
 const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 const LoungeProgress=preload("res://scripts/lounge_progression.gd")
-const LabPolicy=preload("res://scripts/laboratory_progression.gd")\nconst LabLayout=preload("res://scripts/laboratory_layout.gd")\nconst LoungeLayout=preload("res://scripts/lounge_layout.gd")
+const LabPolicy=preload("res://scripts/laboratory_progression.gd")
+const LabLayout=preload("res://scripts/laboratory_layout.gd")
+const LoungeLayout=preload("res://scripts/lounge_layout.gd")
 var game: Node3D
 var camera: Camera3D
 var destination:="user://cafe_expansion_preview"
