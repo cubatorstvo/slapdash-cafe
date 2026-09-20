@@ -736,9 +736,13 @@ func _selected_group_types() -> Array:
 	return result
 
 func open_training_workspace() -> void:
-	if group_selected_stations.is_empty(): return
 	training_scope_stations=group_selected_stations.duplicate()
-	var types:=_selected_group_types()
+	if training_scope_stations.is_empty():
+		for station in game.service.stations:
+			if station.manual_station or station.masterclass_station: continue
+			training_scope_stations.append(station.station_id)
+	training_scope_stations.sort()
+	var types:=_training_scope_types()
 	training_type_filter=str(types[0]) if not types.is_empty() else ""
 	course_editor={}
 	course_editor_message=""
@@ -774,8 +778,10 @@ func groups_overview_page(host: bool) -> void:
 		var type_names: Array=[]
 		for type_id in selected_types: type_names.append(str(Definition.TYPES.get(str(type_id),{}).get("title",str(type_id))))
 		label(selection,"Типы: "+", ".join(type_names),13)
-		button(selection_row,"Обучение →",open_training_workspace,host)
+		button(selection_row,"Обучение · %d столов →"%selected_count,open_training_workspace,host)
 		button(selection_row,"Снять выбор",clear_group_selection,host)
+	else:
+		button(selection_row,"Очередь обучения →",open_training_workspace,host)
 
 	if is_instance_valid(service.staff_training) and service.staff_training.is_active():
 		var training_record: Dictionary=service.masterclass_by_id(service.staff_training.record_id)
@@ -1447,6 +1453,22 @@ func _training_schedule_panel(parent: Node,host: bool) -> void:
 	else:
 		label(box,"ТЕКУЩАЯ ОЧЕРЕДЬ",14)
 		for course in views: _training_existing_course_card(box,course,host)
+	var suspended_found:=false
+	for group in game.service.table_groups():
+		for item in group.curriculum:
+			var dish:=str(item.get("dish_id",""))
+			for raw_id in group.stations:
+				var station_id:=int(raw_id)
+				if not game.service.training_queue.assignment_suspended(station_id,dish): continue
+				if not suspended_found:
+					label(box,"ПРИОСТАНОВЛЕНО",14)
+					suspended_found=true
+				var desired: Dictionary=game.service.desired_source(str(group.id),dish)
+				var row:=HBoxContainer.new()
+				box.add_child(row)
+				var paused:=label(row,"Стол %d · %s · %s"%[station_id,Definition.DISHES.get(dish,dish),str(desired.get("name","Запись"))],13)
+				paused.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+				button(row,"Продолжить",func():send({"action":"training_resume","station":station_id,"dish":dish}),host)
 
 func training_workspace_page(host: bool) -> void:
 	var service=game.service
@@ -1456,7 +1478,7 @@ func training_workspace_page(host: bool) -> void:
 	var title:=label(top,"ОБУЧЕНИЕ",23)
 	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	var scope_count:=training_scope_stations.size()
-	label(content,"Выбрано производственных столов: %d. Расписание меняет только обучение; состав групп остаётся прежним."%scope_count,14)
+	label(content,("Выбрано производственных столов: %d."%scope_count if not group_selected_stations.is_empty() else "Показаны все производственные столы: %d."%scope_count)+" Расписание меняет только обучение; состав групп остаётся прежним.",14)
 	if training_scope_stations.is_empty():
 		label(content,"Сначала вернись к группам и выбери хотя бы один стол.",17)
 		return
