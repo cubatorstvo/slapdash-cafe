@@ -111,10 +111,16 @@ static func zone_gate(point: Vector3)->Vector3:
 	return aisle_gate(point)
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
-	var result: Array=[customer_spawn(stage)]
-	if Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
+	var spawn:=customer_spawn(stage)
+	var result: Array=[spawn]
+	# Enter through the left longitudinal aisle before moving toward a station. Going straight
+	# to the room centre would cut through the central production row.
+	var entrance_gate:=Vector3(LEFT_AISLE_X,0.0,spawn.z)
+	if entrance_gate.distance_to(spawn)>0.2: result.append(entrance_gate)
+	var left_transfer:=Vector3(LEFT_AISLE_X,0.0,CHEF_FLOW_POINT.z)
+	if left_transfer.distance_to(Vector3(result.back()))>0.2: result.append(left_transfer)
 	var transfer:=transfer_gate(target)
-	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(transfer)
+	if transfer.distance_to(left_transfer)>0.2: result.append(transfer)
 	var gate:=aisle_gate(target)
 	if gate.distance_to(transfer)>0.2: result.append(gate)
 	result.append(target)
@@ -126,8 +132,12 @@ static func route_to_exit(start: Vector3,stage: int)->Array:
 	if gate.distance_to(start)>0.2: result.append(gate)
 	var transfer:=transfer_gate(start)
 	if transfer.distance_to(gate)>0.2: result.append(transfer)
-	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
-	result.append(customer_exit(stage))
+	var right_transfer:=Vector3(RIGHT_AISLE_X,0.0,CHEF_FLOW_POINT.z)
+	if right_transfer.distance_to(transfer)>0.2: result.append(right_transfer)
+	var exit:=customer_exit(stage)
+	var exit_gate:=Vector3(RIGHT_AISLE_X,0.0,exit.z)
+	if exit_gate.distance_to(Vector3(result.back()))>0.2: result.append(exit_gate)
+	result.append(exit)
 	return result
 
 static func route_to_rear(start: Vector3,target: Vector3)->Array:
@@ -146,7 +156,9 @@ static func cafe_route(start: Vector3,target: Vector3,_stage: int,via_chef := tr
 	if start.distance_to(start_gate)>0.2: result.append(start_gate)
 	var start_transfer:=transfer_gate(start)
 	if start_transfer.distance_to(start_gate)>0.2: result.append(start_transfer)
-	if via_chef and (result.is_empty() or Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2): result.append(CHEF_FLOW_POINT)
+	if via_chef:
+		var cross_start:=Vector3(aisle_x(start.x),0.0,CHEF_FLOW_POINT.z)
+		if result.is_empty() or Vector3(result.back()).distance_to(cross_start)>0.2: result.append(cross_start)
 	var target_transfer:=transfer_gate(target)
 	if result.is_empty() or Vector3(result.back()).distance_to(target_transfer)>0.2: result.append(target_transfer)
 	var target_gate:=aisle_gate(target)
