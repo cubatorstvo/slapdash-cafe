@@ -10,6 +10,8 @@ var training_box: VBoxContainer
 var selected_station := 0
 var recipe_choice: OptionButton
 var assignments: Array = []
+var masterclass_setup_dish := ""
+var masterclass_setup_equipment: Array=[]
 var summary_text: Label
 var game: Node3D
 var net_status: Label
@@ -152,12 +154,34 @@ func show_station(station: Node3D) -> void:
 			_label(training_box,"МАСТЕР-КЛАСС",20)
 			if not game.service.masterclass_pending.is_empty():
 				var pending_dish: String=str(game.service.masterclass_pending.get("dish",""))
+				var pending_equipment: Array=game.service.masterclass_pending.get("equipment",[])
 				_label(training_box,"После уже принятых заказов начнётся: "+str(station.Definition.DISHES.get(pending_dish,pending_dish))+". Новые личные заказы временно не принимаются.",16)
+				if not pending_equipment.is_empty(): _label(training_box,"Оборудование записи: "+game.service.equipment_names(pending_equipment),14)
+			elif not masterclass_setup_dish.is_empty():
+				var setup_dish: String=masterclass_setup_dish
+				var setup_type: String=station.Definition.type_for_dish(setup_dish)
+				_label(training_box,str(station.Definition.DISHES.get(setup_dish,setup_dish)),19)
+				_label(training_box,"Тип кухни: "+str(station.Definition.TYPES.get(setup_type,{}).get("title",setup_type)),15)
+				_label(training_box,"Выбери предметы, которые будут участвовать в этом способе. Запись запомнит именно этот набор; обучать ей можно будет любую кухню того же типа.",14)
+				var options: Array=game.service.masterclass_equipment_options(setup_dish)
+				for option in options:
+					var equipment_id: String=str(option.id)
+					var toggle:=CheckBox.new()
+					toggle.text=str(option.name)
+					toggle.button_pressed=equipment_id in masterclass_setup_equipment
+					toggle.toggled.connect(func(on): toggle_masterclass_equipment(equipment_id,on))
+					training_box.add_child(toggle)
+				if masterclass_setup_equipment.is_empty():
+					_label(training_box,"Выбери хотя бы один доступный предмет.",14)
+				else:
+					_label(training_box,"Требования будущей записи: "+game.service.equipment_names(masterclass_setup_equipment),14)
+					_button(training_box,"Начать запись мастер-класса",submit_masterclass_setup)
+				_button(training_box,"Отмена настройки",cancel_masterclass_setup)
 			else:
 				for option in game.service.masterclass_options():
 					var master_dish: String=str(option.dish)
 					if bool(option.available):
-						_button(training_box,"Провести мастер-класс · "+str(station.Definition.DISHES[master_dish]),func():command_requested.emit({"action":"masterclass_start","station":selected_station,"dish":master_dish}))
+						_button(training_box,"Провести мастер-класс · "+str(station.Definition.DISHES[master_dish]),func():begin_masterclass_setup(master_dish))
 					else:
 						_label(training_box,"○ %s — %s"%[station.Definition.DISHES[master_dish],option.reason],14)
 		_button(training_box, "Вернуться", close)
@@ -242,6 +266,33 @@ func show_station(station: Node3D) -> void:
 	if run.phase != "confirm_finish": _button(training_box, "Закрыть меню · Esc", close)
 	panel.show()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func begin_masterclass_setup(dish: String) -> void:
+	masterclass_setup_dish=dish
+	masterclass_setup_equipment=game.service.masterclass_default_equipment(dish)
+	var station:=game.service.by_id(selected_station)
+	if station!=null: show_station(station)
+
+func toggle_masterclass_equipment(item: String,on: bool) -> void:
+	if on and item not in masterclass_setup_equipment: masterclass_setup_equipment.append(item)
+	elif not on: masterclass_setup_equipment.erase(item)
+	masterclass_setup_equipment.sort()
+	var station:=game.service.by_id(selected_station)
+	if station!=null: show_station(station)
+
+func cancel_masterclass_setup() -> void:
+	masterclass_setup_dish=""
+	masterclass_setup_equipment.clear()
+	var station:=game.service.by_id(selected_station)
+	if station!=null: show_station(station)
+
+func submit_masterclass_setup() -> void:
+	var dish: String=masterclass_setup_dish
+	var equipment: Array=masterclass_setup_equipment.duplicate()
+	masterclass_setup_dish=""
+	masterclass_setup_equipment.clear()
+	command_requested.emit({"action":"masterclass_start","station":selected_station,"dish":dish,"equipment":equipment})
+	close()
 
 func open_training_group() -> void:
 	var station_id:=selected_station
