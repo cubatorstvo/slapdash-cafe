@@ -5,7 +5,8 @@ const TABLE_SKEWS: Array[float] = [-0.09, 0.07, -0.04, 0.11, -0.06]
 const TILE := 2.0
 const WALL_HEIGHT := 3.2
 const WALL_THICKNESS := 0.28
-const PLAYER_SPAWN := Vector3(0.0, 1.0, 13.5)
+const EARLY_ENTRANCE_Z: float = 2.0
+const FINAL_ENTRANCE_Z: float = 16.0
 
 const STAGE_COLORS := {
 	1: Color("ef2b2d"),
@@ -55,7 +56,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _build_unlock_map() -> void:
 	# Fixed Chef plaza, narrower public approach, compact six-metre-deep back rooms.
 	_mark_rect(Rect2i(-3, -7, 6, 6), 1)
-	_mark_rect(Rect2i(-2, -1, 4, 9), 1)
+	_mark_rect(Rect2i(-2, -1, 4, 2), 1)
+	_mark_rect(Rect2i(-2, 1, 4, 7), 4)
 	_mark_rect(Rect2i(-3, -10, 3, 3), 1)
 	_mark_rect(Rect2i(3, -5, 7, 6), 2)
 	_mark_rect(Rect2i(2, -1, 1, 2), 2)
@@ -104,9 +106,7 @@ func _build_environment() -> void:
 	exterior.name = "Exterior"
 	add_child(exterior)
 	_add_box(exterior, "GroundVisual", Vector3(0.0, -0.14, -3.0), Vector3(70.0, 0.24, 70.0), OUTSIDE_COLOR, false)
-	_add_box(exterior, "EntrancePath", Vector3(0.0, -0.055, 20.0), Vector3(5.5, 0.10, 8.0), Color("777d7c"), false)
 	_add_invisible_floor_collider(exterior)
-	_add_zone_sign(exterior, "ВХОД", Vector3(0.0, 2.2, 17.7), Color("e6ecec"), 34)
 
 func _add_invisible_floor_collider(parent: Node3D) -> void:
 	var body := StaticBody3D.new()
@@ -140,7 +140,8 @@ func _cells_for_stage(stage: int) -> Dictionary:
 
 func _build_snapshot(root: Node3D, cells: Dictionary, stage: int) -> void:
 	_build_floor(root, cells)
-	_build_perimeter(root, cells)
+	_build_perimeter(root, cells, stage)
+	_build_entrance(root, stage)
 	_build_back_block_divider(root, stage)
 	_build_wayfinding(root, stage)
 	_build_chef(root)
@@ -169,7 +170,7 @@ func _build_floor(root: Node3D, cells: Dictionary) -> void:
 		tile.material_override = materials[unlock_stage]
 		floor_root.add_child(tile)
 
-func _build_perimeter(root: Node3D, cells: Dictionary) -> void:
+func _build_perimeter(root: Node3D, cells: Dictionary, stage: int) -> void:
 	var walls := Node3D.new()
 	walls.name = "PerimeterWalls"
 	root.add_child(walls)
@@ -180,7 +181,7 @@ func _build_perimeter(root: Node3D, cells: Dictionary) -> void:
 		_collect_boundary(groups, cells, final_cells, c, "W", Vector2i(c.x - 1, c.y), c.x, c.y)
 		_collect_boundary(groups, cells, final_cells, c, "E", Vector2i(c.x + 1, c.y), c.x + 1, c.y)
 		_collect_boundary(groups, cells, final_cells, c, "N", Vector2i(c.x, c.y - 1), c.y, c.x)
-		if not _is_entrance_opening(c):
+		if not _is_entrance_opening(c, stage):
 			_collect_boundary(groups, cells, final_cells, c, "S", Vector2i(c.x, c.y + 1), c.y + 1, c.x)
 	for key in groups:
 		var group: Dictionary = groups[key]
@@ -284,11 +285,20 @@ func _build_back_block_divider(root: Node3D, stage: int) -> void:
 	root.add_child(divider)
 	_add_final_wall(divider, "SharedWall", Vector3(0.0, WALL_HEIGHT * 0.5, -17.0), Vector3(WALL_THICKNESS, WALL_HEIGHT, 6.0))
 
-func _is_entrance_opening(cell: Vector2i) -> bool:
-	return cell.y == 7 and (cell.x == -1 or cell.x == 0)
+func _entrance_z(stage: int) -> float:
+	return FINAL_ENTRANCE_Z if stage == 4 else EARLY_ENTRANCE_Z
+
+func _is_entrance_opening(cell: Vector2i, stage: int) -> bool:
+	var entrance_row: int = int(_entrance_z(stage) / TILE) - 1
+	return cell.y == entrance_row and (cell.x == -1 or cell.x == 0)
+
+func _build_entrance(root: Node3D, stage: int) -> void:
+	var entrance_z: float = _entrance_z(stage)
+	_add_box(root, "EntrancePath", Vector3(0.0, -0.055, entrance_z + 4.0), Vector3(5.5, 0.10, 8.0), Color("777d7c"), false)
+	_add_zone_sign(root, "ВХОД", Vector3(0.0, 2.2, entrance_z + 1.7), Color("e6ecec"), 34)
 
 func _build_wayfinding(root: Node3D, stage: int) -> void:
-	_add_zone_sign(root, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 2.65, 8.0), Color("dce6e8"), 24)
+	_add_zone_sign(root, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 2.65, 8.0 if stage == 4 else 0.0), Color("dce6e8"), 24)
 	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(0.0, 2.65, -12.0), Color("dce6e8"), 22)
 
 func _build_chef(root: Node3D) -> void:
@@ -438,10 +448,11 @@ func _player_is_inside_stage(stage: int) -> bool:
 func _reset_player() -> void:
 	if not is_instance_valid(player):
 		return
+	var spawn_position: Vector3 = Vector3(0.0, 1.0, _entrance_z(current_stage) - 2.5)
 	if player.has_method("reset_pose"):
-		player.call("reset_pose", PLAYER_SPAWN)
+		player.call("reset_pose", spawn_position)
 	else:
-		player.global_position = PLAYER_SPAWN
+		player.global_position = spawn_position
 		player.velocity = Vector3.ZERO
 
 func _set_collisions_enabled(root: Node, enabled: bool) -> void:
