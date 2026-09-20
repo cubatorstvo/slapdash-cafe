@@ -101,7 +101,7 @@ func run()->void:
 	game.office.select_group_stations([2,3])
 	check(press(game.office,"Сгруппировать"),"Two same-type tables can be grouped")
 	await process_frame
-	var groups:=service.table_groups()
+	var groups: Array=service.table_groups()
 	check(groups.size()==1 and groups[0].stations==[2,3],"Manual grouping creates one explicit group")
 	var group_id:=str(groups[0].id)
 	game.office.set_group_all_selected(group_id,true)
@@ -146,7 +146,7 @@ func run()->void:
 		cursor=int(segment.source_end)
 	check(cursor==120,"Uncut short film reaches the final source frame")
 	service.training_queue.reset()
-	var queued:=service.queue_training_course([{"record_id":2101,"station_ids":[2,3]}],"by_groups","ui-fixed-time",1)
+	var queued: Dictionary=service.queue_training_course([{"record_id":2101,"station_ids":[2,3]}],"by_groups","ui-fixed-time",1)
 	check(str(queued.error).is_empty(),"Legacy mode input is accepted but normalized")
 	service.advance(0.1)
 	await process_frame
