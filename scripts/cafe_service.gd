@@ -10,6 +10,7 @@ const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
 const TableGroupRegistry = preload("res://scripts/table_group_registry.gd")
 const Person = preload("res://scripts/customer_view.gd")
+const Catalog = preload("res://scripts/cafe_catalogue.gd")
 const STARTER_TYPES := ["counter", "counter", "counter", "kitchen"]
 const CHEF_QUEUE_LIMIT := 3
 const CHEF_WAIT_LIMIT := 60.0
@@ -39,6 +40,7 @@ var rng := RandomNumberGenerator.new()
 var masterclasses: Array=[]
 var next_masterclass_id := 1
 var masterclass_pending: Dictionary={}
+var masterclass_selected_equipment: Array=[]
 var masterclass_station: Node3D
 var chef_station_backup: Node3D
 var masterclass_live_scene: Node3D
@@ -124,49 +126,86 @@ func sync_masterclass_live_scene() -> void:
 func stable_chef() -> Node3D:
 	return chef_station_backup if is_instance_valid(chef_station_backup) else by_id(1)
 
-func _masterclass_source(dish: String) -> Node3D:
+func _masterclass_type_available(type_id: String) -> bool:
+	if type_id=="counter": return true
+	if type_id=="kitchen": return progress.stars>=2 and progress.expanded
+	if type_id=="grill_kitchen": return progress.stars>=3 and progress.specialized_expanded
+	if type_id=="solyanka_kitchen": return progress.stars>=4 and progress.orchestration_expanded
+	return false
+
+func masterclass_equipment_options(dish: String) -> Array:
 	var type_id: String=Definition.type_for_dish(dish)
-	if type_id=="counter": return stable_chef()
-	for station in stations:
-		if station==masterclass_station or station.manual_station or station.type_id!=type_id: continue
-		if Definition.missing_equipment(dish,station.equipment).is_empty(): return station
-	return null
+	if type_id.is_empty() or not _masterclass_type_available(type_id): return []
+	var chef:=stable_chef()
+	var chef_items: Array=[]
+	if chef!=null:
+		chef_items=chef.equipment.duplicate()
+		for item in chef.upgrades:
+			if item not in chef_items: chef_items.append(item)
+	var result: Array=[]
+	for raw_item in Definition.equipment_for_type(type_id):
+		var item:=str(raw_item)
+		if item=="rag" or not Catalog.ITEMS.has(item): continue
+		var spec: Dictionary=Catalog.ITEMS[item]
+		if str(spec.get("kind",""))!="equipment" or progress.stars<int(spec.get("star",0)): continue
+		if type_id=="counter" and item not in chef_items: continue
+		result.append({"id":item,"name":str(spec.get("name",item))})
+	return result
+
+func masterclass_default_equipment(dish: String) -> Array:
+	var available: Array=[]
+	for option in masterclass_equipment_options(dish): available.append(str(option.id))
+	var result: Array=[]
+	for raw_item in Definition.DISH_EQUIPMENT.get(dish,[]):
+		var item:=str(raw_item)
+		if item in available: result.append(item)
+	return result
+
+func _validated_masterclass_equipment(dish: String,value: Variant) -> Dictionary:
+	if not value is Array: return {"error":"Некорректный набор оборудования.","equipment":[]}
+	var allowed: Array=[]
+	for option in masterclass_equipment_options(dish): allowed.append(str(option.id))
+	var selected: Array=[]
+	for raw_item in value:
+		var item:=str(raw_item)
+		if item in selected: continue
+		if item not in allowed: return {"error":"Оборудование «%s» сейчас недоступно Шефу для этой кухни."%equipment_name(item),"equipment":[]}
+		selected.append(item)
+	if selected.is_empty(): return {"error":"Выбери хотя бы один доступный предмет для мастер-класса.","equipment":[]}
+	return {"error":"","equipment":selected}
 
 func masterclass_access(dish: String) -> Dictionary:
 	if dish not in Definition.DISH_ORDER: return {"available":false,"reason":"Неизвестное блюдо."}
 	if progress.stars<1: return {"available":false,"reason":"Мастер-классы откроются после первой звезды."}
 	var type_id: String=Definition.type_for_dish(dish)
-	if type_id=="counter":
-		var chef:=stable_chef()
-		if chef==null: return {"available":false,"reason":"Шеф-станция недоступна."}
-		var missing: Array=Definition.missing_equipment(dish,chef.equipment)
-		return {"available":missing.is_empty(),"reason":"" if missing.is_empty() else "На шеф-станции не хватает: "+", ".join(missing),"source_type":type_id}
-	var candidates: Array=[]
-	for station in stations:
-		if station!=masterclass_station and not station.manual_station and station.type_id==type_id: candidates.append(station)
-	if candidates.is_empty(): return {"available":false,"reason":"Сначала открой и установи кухню «%s»."%Definition.TYPES[type_id].title,"source_type":type_id}
-	for station in candidates:
-		if Definition.missing_equipment(dish,station.equipment).is_empty(): return {"available":true,"reason":"","source_type":type_id,"source_station":station.station_id}
-	var missing: Array=Definition.missing_equipment(dish,candidates[0].equipment)
-	return {"available":false,"reason":"Оснасти кухню: "+", ".join(missing),"source_type":type_id}
+	if type_id.is_empty(): return {"available":false,"reason":"Для блюда не задан тип кухни."}
+	if not _masterclass_type_available(type_id):
+		return {"available":false,"reason":"Сначала открой кухню «%s»."%Definition.TYPES[type_id].title,"source_type":type_id}
+	if stable_chef()==null: return {"available":false,"reason":"Шеф-станция недоступна.","source_type":type_id}
+	var options:=masterclass_equipment_options(dish)
+	if options.is_empty(): return {"available":false,"reason":"У Шефа пока нет доступных предметов этой кухни.","source_type":type_id}
+	return {"available":true,"reason":"","source_type":type_id,"equipment":options}
 
 func masterclass_options() -> Array:
 	var result: Array=[]
 	for dish in Definition.DISH_ORDER:
 		var access:=masterclass_access(dish)
-		result.append({"dish":dish,"available":bool(access.available),"reason":str(access.reason)})
+		result.append({"dish":dish,"available":bool(access.available),"reason":str(access.reason),"source_type":str(access.get("source_type",Definition.type_for_dish(dish)))})
 	return result
 
-func request_masterclass(dish: String, peer: int) -> String:
+func request_masterclass(dish: String,peer: int,equipment: Variant=null) -> String:
 	if progress.busy(): return "Сначала заверши текущую проверку."
 	if progress.shift in ["night","closing"]: return "Мастер-класс проводится в рабочее время."
 	if masterclass_locked(): return "Мастер-класс уже готовится или идёт."
 	if training_for(peer)!=null: return "Сначала заверши текущий показ."
 	var access:=masterclass_access(dish)
 	if not bool(access.available): return str(access.reason)
-	masterclass_pending={"dish":dish,"peer":peer}
+	var requested: Variant=masterclass_default_equipment(dish) if equipment==null else equipment
+	var checked:=_validated_masterclass_equipment(dish,requested)
+	if not str(checked.error).is_empty(): return str(checked.error)
+	masterclass_pending={"dish":dish,"peer":peer,"equipment":checked.equipment.duplicate()}
 	progress.revision+=1
-	trace("masterclass_requested",{"dish":dish,"peer":peer})
+	trace("masterclass_requested",{"dish":dish,"peer":peer,"equipment":checked.equipment.duplicate()})
 	feed_player(peer,"masterclass",{"dish":dish})
 	_try_begin_masterclass()
 	return ""
@@ -177,11 +216,13 @@ func _try_begin_masterclass() -> void:
 	if chef==null or not chef.manual_station or chef.training.active() or chef.state!="idle" or chef.customer_id>=0 or not chef_queue().is_empty(): return
 	var dish: String=str(masterclass_pending.dish)
 	var peer: int=int(masterclass_pending.peer)
-	var source:=_masterclass_source(dish)
-	if source==null:
+	var checked:=_validated_masterclass_equipment(dish,masterclass_pending.get("equipment",[]))
+	if not str(checked.error).is_empty():
 		masterclass_pending.clear()
+		masterclass_selected_equipment.clear()
 		progress.revision+=1
 		return
+	var selected: Array=checked.equipment.duplicate()
 	chef_station_backup=chef
 	stations.erase(chef)
 	remove_child(chef)
@@ -191,18 +232,22 @@ func _try_begin_masterclass() -> void:
 	stage.slot_index=0
 	stage.station_id=1
 	stage.type_id=Definition.type_for_dish(dish)
-	stage.equipment=source.equipment.duplicate()
-	stage.upgrades=source.upgrades.duplicate()
+	stage.equipment=[]
+	stage.upgrades=[]
+	for item in selected:
+		if str(item)=="sauce_ramp": stage.upgrades.append(str(item))
+		else: stage.equipment.append(str(item))
 	stage.position=slot_position(0)
 	stage.rotation.y=PI
 	add_child(stage)
 	stations.push_front(stage)
 	masterclass_station=stage
+	masterclass_selected_equipment=selected
 	masterclass_pending.clear()
 	stage.training.open(dish,peer,"masterclass")
 	sync_masterclass_live_scene()
 	progress.revision+=1
-	trace("masterclass_started",{"dish":dish,"peer":peer,"type":stage.type_id})
+	trace("masterclass_started",{"dish":dish,"peer":peer,"type":stage.type_id,"equipment":selected.duplicate()})
 
 func finish_masterclass_layout(stage: Node3D) -> void:
 	if not masterclass_active() or stage!=masterclass_station: return
@@ -212,6 +257,7 @@ func finish_masterclass_layout(stage: Node3D) -> void:
 	remove_child(masterclass_station)
 	masterclass_station.queue_free()
 	masterclass_station=null
+	masterclass_selected_equipment.clear()
 	if is_instance_valid(chef_station_backup):
 		add_child(chef_station_backup)
 		stations.push_front(chef_station_backup)
@@ -222,13 +268,14 @@ func finish_masterclass_layout(stage: Node3D) -> void:
 func cancel_masterclass() -> void:
 	if not masterclass_active():
 		masterclass_pending.clear()
+		masterclass_selected_equipment.clear()
 		progress.revision+=1
 		return
 	var stage:=masterclass_station
 	if stage.training.active(): stage.training.close()
 	finish_masterclass_layout(stage)
 
-func save_masterclass_from_run(stage: Node3D, dish: String, tracks: Array) -> bool:
+func save_masterclass_from_run(stage: Node3D,dish: String,tracks: Array) -> bool:
 	if not masterclass_active() or stage!=masterclass_station or tracks.size()!=stage.role_count(): return false
 	for track in tracks:
 		if track.is_empty() or track.get("frames",[]).is_empty(): return false
@@ -237,12 +284,13 @@ func save_masterclass_from_run(stage: Node3D, dish: String, tracks: Array) -> bo
 	var number:=1
 	for record in masterclasses:
 		if str(record.get("dish",""))==dish and not bool(record.get("archived",false)): number+=1
-	var scene_config: Dictionary={"equipment":stage.equipment.duplicate(),"upgrades":stage.upgrades.duplicate(),"roles":Definition.TYPES[stage.type_id].roles.duplicate()}
+	var required: Array=masterclass_selected_equipment.duplicate()
+	var scene_config: Dictionary={"equipment":stage.equipment.duplicate(),"upgrades":stage.upgrades.duplicate(),"roles":Definition.TYPES[stage.type_id].roles.duplicate(),"required_equipment":required.duplicate()}
 	var record:=Masterclasses.make_record(next_masterclass_id,dish,stage.type_id,tracks,stage.Run.duration_ticks(tracks)/60.0,quality,Masterclasses.default_name(dish,number),false,stage.station_id,scene_config)
 	next_masterclass_id+=1
 	masterclasses.append(record)
 	progress.revision+=1
-	trace("masterclass_saved",{"id":record.id,"dish":dish,"seconds":record.duration,"grade":quality.grade})
+	trace("masterclass_saved",{"id":record.id,"dish":dish,"seconds":record.duration,"grade":quality.grade,"equipment":required})
 	return true
 
 func masterclass_by_id(id: int) -> Dictionary:
@@ -527,6 +575,40 @@ func preview_table_groups(record_id: int,ids: Array) -> Array:
 	for group in temp.all(): result.append(_public_group(group))
 	return result
 
+func equipment_name(item: String) -> String:
+	return str(Catalog.ITEMS.get(item,{}).get("name",item))
+
+func equipment_names(items: Array) -> String:
+	var result: Array=[]
+	for raw_item in items: result.append(equipment_name(str(raw_item)))
+	return ", ".join(result)
+
+func station_missing_equipment(station: Node3D,dish: String) -> Array:
+	if station==null or not station.recipes.has(dish): return []
+	return station.missing_recipe_equipment(dish)
+
+func equipment_warnings() -> Array:
+	var result: Array=[]
+	for station in stations:
+		if station.manual_station or station.masterclass_station: continue
+		for raw_dish in station.recipes.keys():
+			var dish:=str(raw_dish)
+			var missing:=station_missing_equipment(station,dish)
+			if not missing.is_empty():
+				result.append({"station":station.station_id,"dish":dish,"missing":missing})
+	result.sort_custom(func(a,b): return int(a.station)<int(b.station) if int(a.station)!=int(b.station) else str(a.dish)<str(b.dish))
+	return result
+
+func equipment_warning_text(limit := 2) -> String:
+	var warnings:=equipment_warnings()
+	if warnings.is_empty(): return ""
+	var lines: Array=[]
+	for index in range(mini(int(limit),warnings.size())):
+		var warning: Dictionary=warnings[index]
+		lines.append("⚠ Кухня %d не может готовить «%s»: нет %s"%[int(warning.station),Definition.DISHES.get(str(warning.dish),str(warning.dish)),equipment_names(warning.missing)])
+	if warnings.size()>int(limit): lines.append("⚠ Ещё проблем с оснащением: %d"%(warnings.size()-int(limit)))
+	return "\n".join(lines)
+
 func source_label(station_id: int,dish: String) -> String:
 	var station:=by_id(station_id)
 	if station==null: return "—"
@@ -565,18 +647,19 @@ func station_group_status(station_id: int,dish: String) -> String:
 		if not queue_state.is_empty(): return queue_state
 	var actual: Dictionary=station.method_sources.get(dish,{})
 	var desired_mastered: bool=not desired.is_empty() and station.recipes.has(dish) and int(actual.get("id",0))==int(desired.record_id)
-	var missing: Array=Definition.missing_equipment(dish,station.equipment)
 	if desired_mastered:
-		if not missing.is_empty(): return "ждёт оснащение"
+		var missing: Array=station.missing_recipe_equipment(dish)
+		if not missing.is_empty(): return "освоено · нет оснащения"
 		if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
 		return "освоено" if active else "освоено · выключено в меню"
 	if not desired.is_empty() and masterclass_by_id(int(desired.record_id)).is_empty(): return "нужна действующая запись для нового обучения"
-	if not missing.is_empty(): return "ждёт оснащение"
 	if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
 	if not desired.is_empty():
 		if station.recipes.has(dish): return "работает по старому · ожидает переобучения" if active else "старый способ · выключено в меню"
 		return "ожидает обучения" if active else "обучение запланировано · блюдо выключено"
-	if station.recipes.has(dish): return "освоено" if active else "освоено · выключено в меню"
+	if station.recipes.has(dish):
+		if not station.missing_recipe_equipment(dish).is_empty(): return "освоено · нет оснащения"
+		return "освоено" if active else "освоено · выключено в меню"
 	return "нет способа" if active else "выключено в меню"
 
 func group_dish_summary(group_id: String,dish: String) -> Dictionary:
@@ -689,13 +772,17 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		elif type_id!=record_type: return {"error":"Один курс содержит записи только одной кухни."}
 		var mastered:=0
 		var waiting: Array=[]
+		var equipment_issues: Array=[]
+		var record_requirements: Array=Masterclasses.required_equipment(record)
 		for station_id in unique:
 			var station=by_id(station_id)
 			if station==null or station.manual_station or station.masterclass_station or station.type_id!=record_type or dish not in station.dishes(): return {"error":"Стол %d несовместим с записью «%s»."%[station_id,str(record.get("name","Запись"))]}
 			if station_id not in selected: selected.append(station_id)
 			if station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id: mastered+=1
 			else: waiting.append(station_id)
-		lessons.append({"record_id":record_id,"dish":dish,"name":str(record.get("name","Запись")),"grade":str(record.get("quality",{}).get("grade","D")),"effectiveness":str(record.get("effectiveness",{}).get("label","Обычная")),"duration":float(record.get("duration",0.0)),"film":float(record.get("highlight_duration",0.0)),"mastered":mastered,"selected":unique.size(),"waiting":waiting})
+			var missing_after: Array=Definition.missing_items(record_requirements,station.equipment,station.upgrades)
+			if not missing_after.is_empty(): equipment_issues.append({"station":station_id,"missing":missing_after})
+		lessons.append({"record_id":record_id,"dish":dish,"name":str(record.get("name","Запись")),"grade":str(record.get("quality",{}).get("grade","D")),"effectiveness":str(record.get("effectiveness",{}).get("label","Обычная")),"duration":float(record.get("duration",0.0)),"film":float(record.get("highlight_duration",0.0)),"mastered":mastered,"selected":unique.size(),"waiting":waiting,"equipment_issues":equipment_issues})
 	selected.sort()
 	var preferred_station_sets: Array=[]
 	for raw_group_id in group_order:
@@ -729,9 +816,7 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		for lesson in lessons:
 			for station_id in lesson.waiting:
 				var station=by_id(int(station_id))
-				var missing: Array=Definition.missing_equipment(str(lesson.dish),station.equipment)
-				if not missing.is_empty(): reasons.append("Стол %d: требуется оборудование — %s"%[station_id,", ".join(missing)])
-				elif station.staffed>=0 and station.staffed<station.role_count(): reasons.append("Стол %d: нужны сотрудники"%station_id)
+				if station.staffed>=0 and station.staffed<station.role_count(): reasons.append("Стол %d: нужны сотрудники"%station_id)
 				elif not station.ready_crew(): reasons.append("Стол %d: сотрудник занят другой активностью"%station_id)
 		batch_rows.append({"stations":all_needed.duplicate(),"blocked_reason":str(reasons[0]) if not reasons.is_empty() else "","ready":reasons.is_empty()})
 	else:
@@ -759,9 +844,7 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 					if station_id not in group.station_ids: continue
 					if station_id not in needed: needed.append(station_id)
 					var station=by_id(int(station_id))
-					var missing: Array=Definition.missing_equipment(str(lesson.dish),station.equipment)
-					if reason.is_empty() and not missing.is_empty(): reason="Стол %d: требуется оборудование — %s"%[station_id,", ".join(missing)]
-					elif reason.is_empty() and station.staffed>=0 and station.staffed<station.role_count(): reason="Стол %d: нужны сотрудники"%station_id
+					if reason.is_empty() and station.staffed>=0 and station.staffed<station.role_count(): reason="Стол %d: нужны сотрудники"%station_id
 					elif reason.is_empty() and not station.ready_crew(): reason="Стол %d: сотрудник занят другой активностью"%station_id
 			if reason.is_empty() and progress.shift!="open": reason="До следующего рабочего дня"
 			if reason.is_empty() and progress.busy(): reason="Сначала завершится проверка кафе"
@@ -869,7 +952,7 @@ func problem_context(dish: String)->Dictionary:
 		return {"reason":"menu_off","stations":ids,"group":group_id_for_stations(ids)}
 	var ready: Array=[]
 	for station in active:
-		if station.recipes.has(dish) and Definition.missing_equipment(dish,station.equipment).is_empty() and (station.staffed<0 or station.staffed>=station.role_count()) and station.group_training_state.is_empty():
+		if station.can_execute(dish) and (station.staffed<0 or station.staffed>=station.role_count()) and station.group_training_state.is_empty():
 			ready.append(station)
 	if not ready.is_empty():
 		var ids: Array=ready.map(func(station):return station.station_id)
@@ -884,7 +967,7 @@ func problem_context(dish: String)->Dictionary:
 			var ids: Array=active.map(func(item):return item.station_id)
 			return {"reason":"workers","stations":ids,"group":group_id_for_stations(ids)}
 	for station in active:
-		if not Definition.missing_equipment(dish,station.equipment).is_empty():
+		if station.recipes.has(dish) and not station.missing_recipe_equipment(dish).is_empty():
 			var ids: Array=active.map(func(item):return item.station_id)
 			return {"reason":"equipment","stations":ids,"group":group_id_for_stations(ids)}
 	var ids: Array=active.map(func(item):return item.station_id)
@@ -946,7 +1029,7 @@ func order_wait_limit(portions: int,station: Node3D=null,dish := "") -> float:
 func automatic_station_candidates(dish: String,idle_only := true) -> Array:
 	var result: Array=[]
 	for station in stations:
-		if station.manual_station or station.masterclass_station or not station.dish_active(dish) or not station.ready_crew() or not station.recipes.has(dish): continue
+		if station.manual_station or station.masterclass_station or not station.dish_active(dish) or not station.ready_crew() or not station.can_execute(dish): continue
 		if idle_only and station.state!="idle": continue
 		result.append(station)
 	return result
@@ -1142,7 +1225,7 @@ func advance(delta: float) -> void:
 			var station: Node3D=by_id(int(customer.station))
 			if station==null: continue
 			customer.view.rotation.y=station.global_rotation.y+PI
-			if station.recipes.has(customer.dish) and not station.manual_station:
+			if not station.manual_station and station.can_execute(str(customer.dish)):
 				_start_automatic_order(station,customer)
 			elif station.manual_station:
 				var request_text: String=preload("res://scripts/chef_orders.gd").special_request(station.customer_order)
@@ -1151,9 +1234,13 @@ func advance(delta: float) -> void:
 				customer.view.caption.text=request_text+" · [E] у стойки"
 			else:
 				customer.wait += delta
-				customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут твоего показа · [E]"
-				if customer.wait >= 14:
-					finish_customer(customer.id,false,"unlearned")
+				var learned_but_missing: Array=station.missing_recipe_equipment(str(customer.dish)) if station.recipes.has(customer.dish) else []
+				if not learned_but_missing.is_empty():
+					customer.view.caption.text=Definition.DISHES[customer.dish]+"\nНе хватает: "+equipment_names(learned_but_missing)
+					if customer.wait>=14: finish_customer(customer.id,false,"equipment")
+				else:
+					customer.view.caption.text = Definition.DISHES[customer.dish] + "\nПовара ждут обучения"
+					if customer.wait >= 14: finish_customer(customer.id,false,"unlearned")
 
 func has_automatic_station() -> bool:
 	for station in stations:
@@ -1211,8 +1298,8 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 		if station.manual_station or not station.dish_active(recipe) or not station.ready_crew(): continue
 		if station.recipes.has(recipe): offered=true
 		if station.state=="idle":
-			if station.recipes.has(recipe): candidates.append(station)
-			elif portions==1: untrained.append(station)
+			if station.can_execute(recipe): candidates.append(station)
+			elif not station.recipes.has(recipe) and portions==1: untrained.append(station)
 	if candidates.is_empty() and portions==1 and not banquet and not chef_guest and visit_data.is_empty(): candidates=untrained
 	if chef_guest:
 		var personal:=by_id(1)
@@ -1659,6 +1746,7 @@ func clear_world() -> void:
 		chef_station_backup=null
 	masterclass_station=null
 	masterclass_pending.clear()
+	masterclass_selected_equipment.clear()
 	if is_instance_valid(masterclass_live_scene): masterclass_live_scene.queue_free()
 	masterclass_live_scene=null
 	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
