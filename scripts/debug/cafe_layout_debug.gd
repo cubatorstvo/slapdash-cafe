@@ -20,9 +20,11 @@ const FLOOR_COLORS := {
 }
 
 const WALL_COLOR := Color("d8d1c2")
-const WALL_TRIM_COLOR := Color("46585d")
+const WALL_CAP_COLOR := Color("46585d")
+const TEMP_PANEL_COLOR := Color("9b815d")
+const TEMP_FRAME_COLOR := Color("3f4747")
+const TEMP_WARNING_COLOR := Color("e3bd36")
 const OUTSIDE_COLOR := Color("56615d")
-const AISLE_COLOR := Color("81969c")
 
 var stage_roots: Array[Node3D] = []
 var stage_cells: Array[Dictionary] = []
@@ -49,18 +51,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_reset_player()
 
 func _build_unlock_map() -> void:
-	# Stage 1: central hall, open rear spine, chef zone, first third of the lab.
 	_mark_rect(Rect2i(-3, -6, 6, 15), 1)
 	_mark_rect(Rect2i(-5, -7, 8, 2), 1)
 	_mark_rect(Rect2i(-5, -12, 3, 5), 1)
 
-	# Stage 2: first five-slot kitchen, first third of lounge and right rear-spine extension.
 	_mark_rect(Rect2i(3, -5, 1, 6), 2)
 	_mark_rect(Rect2i(4, -5, 7, 6), 2)
 	_mark_rect(Rect2i(2, -12, 3, 5), 2)
 	_mark_rect(Rect2i(3, -7, 2, 2), 2)
 
-	# Stage 3: second kitchen plus the middle thirds of lab and lounge.
 	_mark_rect(Rect2i(-11, -5, 7, 6), 3)
 	_mark_rect(Rect2i(-4, -5, 1, 6), 3)
 	_mark_rect(Rect2i(-8, -12, 3, 5), 3)
@@ -68,7 +67,6 @@ func _build_unlock_map() -> void:
 	_mark_rect(Rect2i(-8, -7, 3, 2), 3)
 	_mark_rect(Rect2i(5, -7, 3, 2), 3)
 
-	# Stage 4: remaining lab/lounge thirds, front production sectors and full rear spine.
 	_mark_rect(Rect2i(-11, 1, 7, 6), 4)
 	_mark_rect(Rect2i(-4, 1, 1, 6), 4)
 	_mark_rect(Rect2i(3, 1, 1, 6), 4)
@@ -108,9 +106,21 @@ func _build_environment() -> void:
 	var exterior := Node3D.new()
 	exterior.name = "Exterior"
 	add_child(exterior)
-	_add_box(exterior, "Ground", Vector3(0.0, -0.28, -3.0), Vector3(70.0, 0.4, 70.0), OUTSIDE_COLOR)
-	_add_box(exterior, "EntrancePath", Vector3(0.0, -0.055, 22.0), Vector3(5.5, 0.05, 8.0), Color("777d7c"), false)
-	_add_floor_label(exterior, "ВХОД", Vector3(0.0, 0.02, 19.7), Color("e6ecec"), 34)
+	_add_box(exterior, "GroundVisual", Vector3(0.0, -0.14, -3.0), Vector3(70.0, 0.24, 70.0), OUTSIDE_COLOR, false)
+	_add_box(exterior, "EntrancePath", Vector3(0.0, -0.055, 22.0), Vector3(5.5, 0.10, 8.0), Color("777d7c"), false)
+	_add_invisible_floor_collider(exterior)
+	_add_zone_sign(exterior, "ВХОД", Vector3(0.0, 2.2, 19.7), Color("e6ecec"), 34)
+
+func _add_invisible_floor_collider(parent: Node3D) -> void:
+	var body := StaticBody3D.new()
+	body.name = "FloorCollider"
+	body.position = Vector3(0.0, -0.1, -3.0)
+	parent.add_child(body)
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(120.0, 0.2, 120.0)
+	collision.shape = shape
+	body.add_child(collision)
 
 func _build_stage_snapshots() -> void:
 	for stage in range(1, 5):
@@ -134,7 +144,7 @@ func _cells_for_stage(stage: int) -> Dictionary:
 func _build_snapshot(root: Node3D, cells: Dictionary, stage: int) -> void:
 	_build_floor(root, cells)
 	_build_perimeter(root, cells)
-	_build_circulation_markings(root, cells, stage)
+	_build_wayfinding(root, stage)
 	_build_chef(root)
 	_build_stage_content(root, stage)
 
@@ -142,85 +152,173 @@ func _build_floor(root: Node3D, cells: Dictionary) -> void:
 	var floor_root := Node3D.new()
 	floor_root.name = "ContinuousFloor"
 	root.add_child(floor_root)
+	var materials: Dictionary = {}
+	for stage in range(1, 5):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = FLOOR_COLORS[stage]
+		material.roughness = 0.94
+		materials[stage] = material
 	for cell in cells:
 		var cell_pos: Vector2i = cell
 		var unlock_stage := int(unlock_stage_by_cell[cell_pos])
 		var center := _cell_center(cell_pos)
-		_add_box(floor_root, "Floor_%d_%d" % [cell_pos.x, cell_pos.y], Vector3(center.x, -0.045, center.z), Vector3(TILE, 0.07, TILE), FLOOR_COLORS[unlock_stage], false)
+		var tile := MeshInstance3D.new()
+		tile.name = "Floor_%d_%d" % [cell_pos.x, cell_pos.y]
+		tile.position = Vector3(center.x, 0.002, center.z)
+		var mesh := PlaneMesh.new()
+		mesh.size = Vector2(TILE, TILE)
+		tile.mesh = mesh
+		tile.material_override = materials[unlock_stage]
+		floor_root.add_child(tile)
 
 func _build_perimeter(root: Node3D, cells: Dictionary) -> void:
 	var walls := Node3D.new()
 	walls.name = "PerimeterWalls"
 	root.add_child(walls)
+	var final_cells := _cells_for_stage(4)
+	var groups: Dictionary = {}
 	for cell in cells:
-		var cell_pos: Vector2i = cell
-		var center := _cell_center(cell_pos)
-		var x: int = cell_pos.x
-		var z: int = cell_pos.y
-		if not cells.has(Vector2i(x - 1, z)):
-			_add_wall_segment(walls, "W_%d_%d" % [x, z], Vector3(center.x - TILE * 0.5, WALL_HEIGHT * 0.5, center.z), Vector3(WALL_THICKNESS, WALL_HEIGHT, TILE))
-		if not cells.has(Vector2i(x + 1, z)):
-			_add_wall_segment(walls, "E_%d_%d" % [x, z], Vector3(center.x + TILE * 0.5, WALL_HEIGHT * 0.5, center.z), Vector3(WALL_THICKNESS, WALL_HEIGHT, TILE))
-		if not cells.has(Vector2i(x, z - 1)):
-			_add_wall_segment(walls, "N_%d_%d" % [x, z], Vector3(center.x, WALL_HEIGHT * 0.5, center.z - TILE * 0.5), Vector3(TILE, WALL_HEIGHT, WALL_THICKNESS))
-		if not cells.has(Vector2i(x, z + 1)) and not _is_entrance_opening(cell_pos):
-			_add_wall_segment(walls, "S_%d_%d" % [x, z], Vector3(center.x, WALL_HEIGHT * 0.5, center.z + TILE * 0.5), Vector3(TILE, WALL_HEIGHT, WALL_THICKNESS))
+		var c: Vector2i = cell
+		_collect_boundary(groups, cells, final_cells, c, "W", Vector2i(c.x - 1, c.y), c.x, c.y)
+		_collect_boundary(groups, cells, final_cells, c, "E", Vector2i(c.x + 1, c.y), c.x + 1, c.y)
+		_collect_boundary(groups, cells, final_cells, c, "N", Vector2i(c.x, c.y - 1), c.y, c.x)
+		if not _is_entrance_opening(c):
+			_collect_boundary(groups, cells, final_cells, c, "S", Vector2i(c.x, c.y + 1), c.y + 1, c.x)
+	for key in groups:
+		var group: Dictionary = groups[key]
+		var positions: Array = group.positions
+		positions.sort()
+		if positions.is_empty():
+			continue
+		var run_start := int(positions[0])
+		var previous := run_start
+		for i in range(1, positions.size()):
+			var current := int(positions[i])
+			if current != previous + 1:
+				_build_wall_run(walls, str(group.side), int(group.line), run_start, previous, bool(group.temporary))
+				run_start = current
+			previous = current
+		_build_wall_run(walls, str(group.side), int(group.line), run_start, previous, bool(group.temporary))
+
+func _collect_boundary(groups: Dictionary, cells: Dictionary, final_cells: Dictionary, cell: Vector2i, side: String, neighbor: Vector2i, line: int, position: int) -> void:
+	if cells.has(neighbor):
+		return
+	var temporary := final_cells.has(neighbor)
+	var key := "%s|%d|%d" % [side, line, 1 if temporary else 0]
+	if not groups.has(key):
+		groups[key] = {"side": side, "line": line, "temporary": temporary, "positions": []}
+	groups[key].positions.append(position)
+
+func _build_wall_run(parent: Node3D, side: String, line: int, start: int, finish: int, temporary: bool) -> void:
+	var count := finish - start + 1
+	var length := float(count) * TILE
+	var center: Vector3
+	var size: Vector3
+	var inward := Vector3.ZERO
+	if side == "W" or side == "E":
+		center = Vector3(float(line) * TILE, WALL_HEIGHT * 0.5, (float(start) + float(count) * 0.5) * TILE)
+		size = Vector3(WALL_THICKNESS, WALL_HEIGHT, length)
+		inward = Vector3.RIGHT if side == "W" else Vector3.LEFT
+	else:
+		center = Vector3((float(start) + float(count) * 0.5) * TILE, WALL_HEIGHT * 0.5, float(line) * TILE)
+		size = Vector3(length, WALL_HEIGHT, WALL_THICKNESS)
+		inward = Vector3.BACK if side == "N" else Vector3.FORWARD
+	var node_name := "%s_%d_%d_%d" % [side, line, start, finish]
+	if temporary:
+		_add_temporary_wall(parent, node_name, center, size, inward, side, length)
+	else:
+		_add_final_wall(parent, node_name, center, size)
+
+func _add_final_wall(parent: Node3D, node_name: String, center: Vector3, size: Vector3) -> void:
+	_add_box(parent, node_name, center, size, WALL_COLOR)
+	var cap_size := size
+	cap_size.y = 0.12
+	if size.x < size.z:
+		cap_size.x += 0.08
+	else:
+		cap_size.z += 0.08
+	var cap_center := center
+	cap_center.y = WALL_HEIGHT + 0.06
+	_add_box(parent, node_name + "Cap", cap_center, cap_size, WALL_CAP_COLOR, false)
+
+func _add_temporary_wall(parent: Node3D, node_name: String, center: Vector3, size: Vector3, inward: Vector3, side: String, length: float) -> void:
+	var partition := Node3D.new()
+	partition.name = node_name + "_ExpansionPartition"
+	parent.add_child(partition)
+	_add_box(partition, "Panel", center, size, TEMP_PANEL_COLOR)
+
+	var frame_depth := 0.09
+	var frame_offset := inward * (WALL_THICKNESS * 0.5 + frame_depth * 0.5)
+	var is_vertical := side == "W" or side == "E"
+	var rail_size := Vector3(frame_depth, 0.12, length) if is_vertical else Vector3(length, 0.12, frame_depth)
+	_add_box(partition, "TopRail", center + frame_offset + Vector3(0.0, WALL_HEIGHT * 0.5 - 0.16, 0.0), rail_size, TEMP_FRAME_COLOR, false)
+	_add_box(partition, "BottomRail", center + frame_offset + Vector3(0.0, -WALL_HEIGHT * 0.5 + 0.16, 0.0), rail_size, TEMP_FRAME_COLOR, false)
+
+	var stud_count := maxi(2, int(ceil(length / 2.0)) + 1)
+	for i in range(stud_count):
+		var t := 0.0 if stud_count == 1 else float(i) / float(stud_count - 1)
+		var offset_along := lerpf(-length * 0.5 + 0.08, length * 0.5 - 0.08, t)
+		var stud_center := center + frame_offset
+		var stud_size: Vector3
+		if is_vertical:
+			stud_center.z += offset_along
+			stud_size = Vector3(frame_depth, WALL_HEIGHT - 0.24, 0.10)
+		else:
+			stud_center.x += offset_along
+			stud_size = Vector3(0.10, WALL_HEIGHT - 0.24, frame_depth)
+		_add_box(partition, "Stud_%d" % i, stud_center, stud_size, TEMP_FRAME_COLOR, false)
+
+	var band_depth := 0.07
+	var band_center := center + inward * (WALL_THICKNESS * 0.5 + band_depth * 0.5 + 0.01)
+	band_center.y = 0.62
+	var band_size := Vector3(band_depth, 0.24, maxf(0.4, length - 0.20)) if is_vertical else Vector3(maxf(0.4, length - 0.20), 0.24, band_depth)
+	_add_box(partition, "WarningBand", band_center, band_size, TEMP_WARNING_COLOR, false)
+
+	var sign_position := center + inward * 0.22
+	sign_position.y = 1.85
+	_add_zone_sign(partition, "РАСШИРЕНИЕ", sign_position, Color("fff2b0"), 26)
 
 func _is_entrance_opening(cell: Vector2i) -> bool:
 	return cell.y == 8 and (cell.x == -1 or cell.x == 0)
 
-func _add_wall_segment(parent: Node3D, node_name: String, center: Vector3, size: Vector3) -> void:
-	_add_box(parent, node_name, center, size, WALL_COLOR)
-	var trim_size := size
-	trim_size.y = 0.14
-	var trim_center := center
-	trim_center.y = WALL_HEIGHT - 0.08
-	_add_box(parent, node_name + "Trim", trim_center, trim_size, WALL_TRIM_COLOR, false)
-
-func _build_circulation_markings(root: Node3D, cells: Dictionary, stage: int) -> void:
-	var markings := Node3D.new()
-	markings.name = "CirculationMarkings"
-	root.add_child(markings)
-	_add_box(markings, "MainAisle", Vector3(0.0, 0.005, 4.0), Vector3(3.2, 0.025, 26.0), AISLE_COLOR, false)
-	var rear_min_x := -10.0 if stage == 1 else (-10.0 if stage == 2 else (-16.0 if stage == 3 else -22.0))
-	var rear_max_x := 6.0 if stage == 1 else (10.0 if stage == 2 else (16.0 if stage == 3 else 22.0))
-	_add_box(markings, "RearSpine", Vector3((rear_min_x + rear_max_x) * 0.5, 0.006, -14.0), Vector3(rear_max_x - rear_min_x, 0.027, 2.8), AISLE_COLOR.darkened(0.08), false)
-	_add_floor_label(markings, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 0.04, 8.0), Color("dce6e8"), 26)
-	_add_floor_label(markings, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3((rear_min_x + rear_max_x) * 0.5, 0.04, -14.0), Color("dce6e8"), 23)
+func _build_wayfinding(root: Node3D, stage: int) -> void:
+	_add_zone_sign(root, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 2.65, 8.0), Color("dce6e8"), 24)
+	var rear_x := -2.0 if stage == 1 else 0.0
+	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(rear_x, 2.65, -14.0), Color("dce6e8"), 22)
 
 func _build_chef(root: Node3D) -> void:
 	var chef := Node3D.new()
 	chef.name = "ChefStation"
 	root.add_child(chef)
 	_add_box(chef, "MainCounter", Vector3(0.0, 0.55, -5.1), Vector3(5.6, 1.1, 1.55), Color("bd853b"))
-	_add_box(chef, "CounterTop", Vector3(0.0, 1.15, -5.1), Vector3(5.9, 0.12, 1.75), Color("e2c18b"), false)
+	_add_box(chef, "CounterTop", Vector3(0.0, 1.18, -5.1), Vector3(5.9, 0.14, 1.75), Color("e2c18b"), false)
 	_add_box(chef, "LeftPrep", Vector3(-3.8, 0.45, -5.9), Vector3(1.4, 0.9, 2.4), Color("7c8687"))
 	_add_box(chef, "RightPrep", Vector3(3.8, 0.45, -5.9), Vector3(1.4, 0.9, 2.4), Color("7c8687"))
-	_add_floating_label(chef, "ШЕФ", Vector3(0.0, 2.25, -5.1), STAGE_COLORS[1], 42)
-	_add_floating_label(chef, "за спиной — открытая задняя магистраль", Vector3(0.0, 1.75, -8.0), Color("dbe4e4"), 18)
+	_add_zone_sign(chef, "ШЕФ", Vector3(0.0, 2.3, -5.1), STAGE_COLORS[1], 42)
+	_add_zone_sign(chef, "за спиной — открытая задняя магистраль", Vector3(0.0, 2.05, -8.0), Color("dbe4e4"), 18)
 
 func _build_stage_content(root: Node3D, stage: int) -> void:
-	_add_floor_label(root, "ЛАБОРАТОРИЯ · 1/3", Vector3(-8.0, 0.04, -20.0), STAGE_COLORS[1].lightened(0.22), 28)
+	_add_zone_sign(root, "ЛАБОРАТОРИЯ · 1/3", Vector3(-8.0, 2.35, -20.0), STAGE_COLORS[1].lightened(0.22), 27)
 	_add_lab_props(root, 1)
 	if stage >= 2:
-		_add_floor_label(root, "КУХНЯ 1 · 5 МЕСТ", Vector3(15.0, 0.04, -3.8), STAGE_COLORS[2].lightened(0.2), 28)
+		_add_zone_sign(root, "КУХНЯ 1 · 5 МЕСТ", Vector3(15.0, 2.35, -3.8), STAGE_COLORS[2].lightened(0.2), 27)
 		_add_kitchen_stations(root, Vector3(15.0, 0.0, -3.8), 5, false)
-		_add_floor_label(root, "КОМНАТА ОТДЫХА · 1/3", Vector3(7.0, 0.04, -20.0), STAGE_COLORS[2].lightened(0.2), 25)
+		_add_zone_sign(root, "КОМНАТА ОТДЫХА · 1/3", Vector3(7.0, 2.35, -20.0), STAGE_COLORS[2].lightened(0.2), 24)
 		_add_rest_props(root, 1)
 	if stage >= 3:
-		_add_floor_label(root, "КУХНЯ 2 · МИДГЕЙМ", Vector3(-15.0, 0.04, -3.8), STAGE_COLORS[3].lightened(0.2), 28)
+		_add_zone_sign(root, "КУХНЯ 2 · МИДГЕЙМ", Vector3(-15.0, 2.35, -3.8), STAGE_COLORS[3].lightened(0.2), 27)
 		_add_kitchen_stations(root, Vector3(-15.0, 0.0, -3.8), 7, true)
-		_add_floor_label(root, "ЛАБА · 2/3", Vector3(-13.0, 0.04, -20.0), STAGE_COLORS[3].lightened(0.2), 23)
-		_add_floor_label(root, "ОТДЫХ · 2/3", Vector3(13.0, 0.04, -20.0), STAGE_COLORS[3].lightened(0.2), 23)
+		_add_zone_sign(root, "ЛАБА · 2/3", Vector3(-13.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
+		_add_zone_sign(root, "ОТДЫХ · 2/3", Vector3(13.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
 		_add_lab_props(root, 2)
 		_add_rest_props(root, 2)
 	if stage >= 4:
-		_add_floor_label(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(-15.0, 0.04, 8.0), STAGE_COLORS[4].lightened(0.12), 27)
-		_add_floor_label(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(15.0, 0.04, 8.0), STAGE_COLORS[4].lightened(0.12), 27)
+		_add_zone_sign(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(-15.0, 2.35, 8.0), STAGE_COLORS[4].lightened(0.12), 26)
+		_add_zone_sign(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(15.0, 2.35, 8.0), STAGE_COLORS[4].lightened(0.12), 26)
 		_add_kitchen_stations(root, Vector3(-15.0, 0.0, 8.0), 8, true)
 		_add_kitchen_stations(root, Vector3(15.0, 0.0, 8.0), 8, false)
-		_add_floor_label(root, "ЛАБА · 3/3", Vector3(-19.0, 0.04, -20.0), STAGE_COLORS[4].lightened(0.12), 23)
-		_add_floor_label(root, "ОТДЫХ · 3/3", Vector3(19.0, 0.04, -20.0), STAGE_COLORS[4].lightened(0.12), 23)
+		_add_zone_sign(root, "ЛАБА · 3/3", Vector3(-19.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
+		_add_zone_sign(root, "ОТДЫХ · 3/3", Vector3(19.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
 		_add_lab_props(root, 3)
 		_add_rest_props(root, 3)
 
@@ -254,7 +352,7 @@ func _build_ui() -> void:
 	add_child(layer)
 	var panel := PanelContainer.new()
 	panel.position = Vector2(18.0, 18.0)
-	panel.custom_minimum_size = Vector2(560.0, 0.0)
+	panel.custom_minimum_size = Vector2(590.0, 0.0)
 	layer.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
@@ -277,6 +375,11 @@ func _build_ui() -> void:
 	stage_label = Label.new()
 	stage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(stage_label)
+	var legend := Label.new()
+	legend.text = "Бежевые стены — постоянный периметр · деревянные/жёлтые перегородки — будущие расширения"
+	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legend.modulate = Color(0.95, 0.88, 0.67)
+	column.add_child(legend)
 	var controls := Label.new()
 	controls.text = "WASD — ходить · Shift — бег · Space — прыжок · мышь — обзор\nTab — курсор/UI · 1–4 — этап · R — вернуть игрока ко входу"
 	controls.modulate = Color(0.82, 0.88, 0.9)
@@ -295,10 +398,10 @@ func set_stage(stage: int) -> void:
 		_reset_player()
 	if stage_label:
 		var descriptions := {
-			1: "КРАСНЫЙ · цельное стартовое помещение: Шеф, открытая зона за его столом, задняя магистраль и 1/3 лаборатории.",
-			2: "СИНИЙ · добавлены первая кухня на 5 мест и 1/3 комнаты отдыха. Наружный периметр физически расширился вправо.",
-			3: "ЗЕЛЁНЫЙ · добавлены второй кухонный сектор, средние части лаборатории/отдыха и более длинная задняя магистраль.",
-			4: "ЖЁЛТЫЙ · полный поздний контур: четыре производственных сектора, полная лаборатория и комната отдыха. Максимальный размах ≈ 44 × 42 м.",
+			1: "КРАСНЫЙ · Шеф + 1/3 лаборатории. Закрытые будущие проходы обозначены глухими строительными перегородками.",
+			2: "СИНИЙ · + кухня на 5 мест + 1/3 комнаты отдыха. Временные перегородки переезжают на новый край доступного помещения.",
+			3: "ЗЕЛЁНЫЙ · + второй кухонный сектор + средние части лаборатории и отдыха.",
+			4: "ЖЁЛТЫЙ · полный поздний контур. Временных перегородок больше нет; остаётся только постоянный наружный периметр.",
 		}
 		stage_label.text = descriptions[stage]
 
@@ -335,18 +438,7 @@ func _all_descendants(root: Node) -> Array[Node]:
 func _cell_center(cell: Vector2i) -> Vector3:
 	return Vector3((float(cell.x) + 0.5) * TILE, 0.0, (float(cell.y) + 0.5) * TILE)
 
-func _add_floor_label(parent: Node3D, text_value: String, position: Vector3, color: Color, font_size: int) -> void:
-	var label := Label3D.new()
-	label.text = text_value
-	label.position = position
-	label.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
-	label.font_size = font_size
-	label.outline_size = 6
-	label.modulate = color
-	label.outline_modulate = Color(0.05, 0.06, 0.07, 0.9)
-	parent.add_child(label)
-
-func _add_floating_label(parent: Node3D, text_value: String, position: Vector3, color: Color, font_size: int) -> void:
+func _add_zone_sign(parent: Node3D, text_value: String, position: Vector3, color: Color, font_size: int) -> void:
 	var label := Label3D.new()
 	label.text = text_value
 	label.position = position
