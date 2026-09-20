@@ -156,7 +156,10 @@ func show_station(station: Node3D) -> void:
 				var pending_dish: String=str(game.service.masterclass_pending.get("dish",""))
 				var pending_equipment: Array=game.service.masterclass_pending.get("equipment",[])
 				_label(training_box,"После уже принятых заказов начнётся: "+str(station.Definition.DISHES.get(pending_dish,pending_dish))+". Новые личные заказы временно не принимаются.",16)
+				if not game.service.masterclass_time_available(): _label(training_box,"Запись начнётся, когда снова будет рабочее время.",14)
 				if not pending_equipment.is_empty(): _label(training_box,"Оборудование записи: "+game.service.equipment_names(pending_equipment),14)
+			elif not game.service.masterclass_time_available():
+				_label(training_box,"Мастер-классы проводятся только в рабочее время.",16)
 			elif not masterclass_setup_dish.is_empty():
 				var setup_dish: String=masterclass_setup_dish
 				var setup_type: String=station.Definition.type_for_dish(setup_dish)

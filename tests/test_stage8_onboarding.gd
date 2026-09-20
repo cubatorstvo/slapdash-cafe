@@ -51,6 +51,13 @@ func run()->void:
 	rendered=tree_text(game.menu.panel)
 	check("Провести мастер-класс" in rendered,"Chef-station UI exposes masterclass recording after the first star")
 	game.menu.close()
+	p.shift="closing"
+	check(not bool(service.masterclass_access("sausage").available),"Masterclass access is unavailable outside working hours")
+	game.menu.show_station(chef)
+	rendered=tree_text(game.menu.panel)
+	check("Провести мастер-класс" not in rendered and "только в рабочее время" in rendered,"Chef-station UI hides masterclass buttons outside working hours")
+	game.menu.close()
+	p.shift="morning"
 
 	print("Stage8 onboarding 3/3: production stations only assign saved masterclasses")
 	game.player.global_position=station.to_global(Vector3(0,0.02,1.8))
