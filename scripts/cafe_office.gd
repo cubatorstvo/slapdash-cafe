@@ -826,13 +826,12 @@ func groups_overview_page(host: bool) -> void:
 		var total_orders: int=int(performance.orders_completed)+int(performance.losses)
 		var pct:=Insights.completion_percent(int(performance.orders_completed),total_orders)
 		label(title_box,"%s"%str(group.name),18)
-		var subtitle: String="%s · %d столов · работники %d/%d · заказы %.0f%%"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct]
-		label(title_box,subtitle,13)
 		var issue_count:=_group_equipment_issue_count(group)
-		var right_text: String="%d порций · доход %d"%[int(performance.portions_served),int(performance.revenue)]
-		if issue_count>0: right_text+=" · ⚠ %d"%issue_count
-		if selected_here>0 and not all_selected: right_text+=" · выбрано %d/%d"%[selected_here,group.stations.size()]
-		label(header,right_text,13)
+		var subtitle: String="%s · %d столов · работники %d/%d · заказы %.0f%% · %d порций · доход %d"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct,int(performance.portions_served),int(performance.revenue)]
+		if issue_count>0: subtitle+=" · ⚠ оснащение %d"%issue_count
+		if selected_here>0 and not all_selected: subtitle+=" · выбрано %d/%d"%[selected_here,group.stations.size()]
+		var summary_label:=label(title_box,subtitle,13)
+		summary_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 
 		if not expanded: continue
 
@@ -859,9 +858,9 @@ func groups_overview_page(host: bool) -> void:
 			for raw_dish in station.recipes.keys():
 				if not station.missing_recipe_equipment(str(raw_dish)).is_empty(): missing_count+=1
 			if missing_count>0: state_text="⚠ нет оснащения для %d блюд"%missing_count
-			var station_label:=label(station_row,"Стол %d · %d/%d работников · %s"%[station_id,staff_now,station.role_count(),state_text],14)
+			var station_text: String="Стол %d · %d/%d работников · %s · %d заказов · %d порций · доход %d"%[station_id,staff_now,station.role_count(),state_text,int(station_stats.get("orders_completed",0)),int(station_stats.get("portions_served",0)),int(station_stats.get("revenue",0))]
+			var station_label:=label(station_row,station_text,14)
 			station_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-			label(station_row,"%d заказов · %d порций · %d"%[int(station_stats.get("orders_completed",0)),int(station_stats.get("portions_served",0)),int(station_stats.get("revenue",0))],13)
 
 		label(card,"МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ",14)
 		for raw_dish in group.dishes:
