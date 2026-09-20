@@ -1674,6 +1674,23 @@ func videos_page(host: bool) -> void:
 			button(edits, "Отмена", func():confirm_delete_masterclass=-1;rebuild())
 		else: button(edits, "Удалить…", func():confirm_delete_masterclass=id;rebuild(), host)
 
+func _equipment_purchase_counts(station: Node3D) -> Dictionary:
+	var available := 0
+	var locked := 0
+	var station_id: int = station.station_id
+	for item in game.shop.equipment_catalog(station.type_id):
+		var spec: Dictionary = game.shop.ITEMS[item]
+		if game.service.progress.stars < int(spec.get("star", 0)):
+			locked += 1
+		elif item not in station.equipment and item not in station.upgrades and _item_parcel(item, station_id).is_empty():
+			available += 1
+	return {"available":available, "locked":locked}
+
+func _equipment_picker_text(station: Node3D) -> String:
+	var title: String = ("Шеф" if station.manual_station else "Стол %d" % station.station_id) + " · " + str(Definition.TYPES.get(station.type_id,{}).get("title",station.type_id))
+	var counts: Dictionary = _equipment_purchase_counts(station)
+	return "%s    К покупке: %d · закрыто: %d" % [title, int(counts.available), int(counts.locked)]
+
 func shop_page(host: bool) -> void:
 	var categories := HFlowContainer.new()
 	categories.add_theme_constant_override("h_separation", 6)
@@ -1700,7 +1717,7 @@ func shop_page(host: bool) -> void:
 			var selected_index: int = 0
 			for station in game.service.stations:
 				var id: int = station.station_id
-				picker.add_item(("Шеф" if station.manual_station else "Стол %d" % id) + " · " + str(Definition.TYPES.get(station.type_id,{}).get("title",station.type_id)), id)
+				picker.add_item(_equipment_picker_text(station), id)
 				if id == shop_station_id: selected_index = picker.item_count - 1
 			if picker.item_count == 0:
 				label(content, "Сначала установи стол из категории «Новые столы».", 16)
