@@ -112,7 +112,7 @@ static func build(tracks: Array, supplied_events: Array=[])->Array:
 
 static func _build_uncut(total: int,events: Array)->Array:
 	if total<=0: return []
-	var segment_count:=clampi(ceili(float(total)/(FPS*6.0)),2 if total>=roundi(FPS*4.0) else 1,4)
+	var segment_count:=clampi(ceili(float(total)/(FPS*6.0)),2 if total>=2 else 1,4)
 	var result: Array=[]
 	var cursor:=0
 	for index in range(segment_count):
