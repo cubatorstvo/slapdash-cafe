@@ -64,7 +64,7 @@ func build(root_game: Node3D) -> void:
 	var plants := Node3D.new()
 	add_child(plants)
 	decor.plants = plants
-	for point in [Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(6.8,-2.7)]:
+	for point in [Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(22.2,-4.2)]:
 		Props.cylinder(plants, 0.38, 0.55, Vector3(point.x, 0.275, point.y), Color("cd9167"), 0.45)
 		for i in range(4):
 			var leaf := Props.ball(plants, 0.3, Vector3(point.x + sin(i*1.7)*0.3, 0.95+i*0.20, point.y), Color("84ad78"))
