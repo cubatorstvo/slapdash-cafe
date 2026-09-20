@@ -20,6 +20,7 @@ func setup(value_meta: Dictionary,title: String,subtitle := "",payload: Dictiona
 	subtitle_text=subtitle
 	mouse_filter=Control.MOUSE_FILTER_STOP
 	mouse_default_cursor_shape=Control.CURSOR_POINTING_HAND
+	size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	custom_minimum_size.y=54
 	var column:=VBoxContainer.new()
 	column.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -58,7 +59,7 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	preview.add_theme_stylebox_override("panel",Style.box(Color("355354"),10,10))
 	var text:=Label.new()
 	var count: int=int(drag_payload.get("count",1))
-	text.text=title_text if count<=1 else "%d выбранных урока"%count
+	text.text=title_text if count<=1 else "Выбрано: %d"%count
 	text.add_theme_font_size_override("font_size",15)
 	preview.add_child(text)
 	set_drag_preview(preview)
