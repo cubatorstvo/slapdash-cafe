@@ -33,6 +33,10 @@ jobs:
           chmod +x "$GODOT_BIN"
           "$GODOT_BIN" --version
 
+      - name: Import project assets
+        run: |
+          "$GODOT_BIN" --headless --path . --import
+
       - name: Run layout regression
         run: |
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_expansion_layout.gd
