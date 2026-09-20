@@ -62,5 +62,6 @@ func run()->void:
 		var front:=Expansion.entrance_z(stage)
 		await shot("stage_%d_overview"%stage,Vector3(31,35,front-16),Vector3(0,0.7,7.5),55.0)
 		await shot("stage_%d_player_flow"%stage,Vector3(0,2.0,front+1.2),Vector3(0,1.0,7.0),74.0)
+		await shot("stage_%d_rear_top"%stage,Vector3(0,34,17),Vector3(0,0.0,23),46.0)
 	game._shutdown_tree(game); game.free()
 	quit()
