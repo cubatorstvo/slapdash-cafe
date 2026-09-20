@@ -169,14 +169,14 @@ static func _post_star_training_intro(p, stations: Array, service) -> Dictionary
 	if target.is_empty():
 		var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0)))
 		var station_id: int=int(compatible[0]) if not compatible.is_empty() else int(production[0].station_id)
-		return step("training_intro_course","3/5 · Составь первый курс","E у производственного стола → «Обучение и группа». Добавь запись «%s», выбери стол и поставь курс в очередь."%str(record.get("name","Запись")),"station",station_id)
+		return step("training_intro_course","3/5 · Добавь первое обучение","Открой компьютер → «Группы столов» → выбери столы → «Обучение». Добавь «%s» в расписание."%str(record.get("name","Запись")),"station",station_id)
 	if not _course_target_learned(service,target):
 		var station_id: int=int(target.get("station_id",0))
 		var status: String=service.training_queue.station_status(station_id,str(target.get("dish","")))
 		var suffix: String=" Сейчас: "+status+"." if not status.is_empty() else ""
-		return step("training_intro_wait","4/5 · Дождись окончания первого курса","Курс уже поставлен. Бригада закончит принятый заказ, дойдёт до телевизора, посмотрит фильм и вернётся к столу."+suffix,"television",station_id)
+		return step("training_intro_wait","4/5 · Дождись окончания обучения","Блюдо уже в расписании. Учебная партия закончит принятый заказ, дойдёт до телевизора, посмотрит фильм и вернётся к столу."+suffix,"television",station_id)
 	if p.journey_auto_served<1:
-		return step("training_intro_first_work","4/5 · Увидь обученную бригаду в работе","Открой кафе и дождись реального заказа этого стола. Постановка курса сама по себе не считается обучением: нужен завершённый фильм и фактическая работа бригады.","station",int(target.get("station_id",0)))
+		return step("training_intro_first_work","4/5 · Увидь обученную бригаду в работе","Открой кафе и дождись реального заказа этого стола. Добавление блюда в расписание само по себе не считается обучением: нужен завершённый фильм и фактическая работа бригады.","station",int(target.get("station_id",0)))
 	if not bool(p.training_intro_mass_seen):
 		var type_id: String=str(record.get("source_type",""))
 		var compatible_count:=0
@@ -186,7 +186,7 @@ static func _post_star_training_intro(p, stations: Array, service) -> Dictionary
 			compatible_count+=1
 			if first_id==0: first_id=int(station.station_id)
 		if compatible_count>=2:
-			return step("training_intro_mass","5/5 · Попробуй массовое назначение","Открой «Обучение и группа» у совместимого стола. В редакторе доступны «Выбрать все совместимые столы» и два режима: «Вместе» или «По группам».","station",first_id)
+			return step("training_intro_mass","5/5 · Назначь обучение нескольким столам","В компьютере выбери несколько совместимых столов или целую группу и добавь блюдо в расписание. Система сама отправит их партиями примерно по 20% столов.","station",first_id)
 	return {}
 
 static func grow(p, stations: Array) -> Dictionary:
