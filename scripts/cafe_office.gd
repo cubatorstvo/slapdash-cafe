@@ -201,7 +201,7 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 	if edit_course_id>0:
 		var view: Dictionary=game.service.training_queue.course_view(edit_course_id)
 		if view.is_empty():
-			course_editor_message="Курс не найден."
+			course_editor_message="Обучение не найдено."
 		else:
 			course_editor.mode=str(view.get("mode","together"))
 			course_editor.editing=edit_course_id
@@ -291,7 +291,7 @@ func _course_editor_add_record_internal(record_id: int) -> bool:
 	var record_type: String=str(record.get("source_type",""))
 	var current_type: String=str(course_editor.get("type_id",""))
 	if not current_type.is_empty() and current_type!=record_type:
-		course_editor_message="Эта запись относится к другой кухне. Сформируй для неё отдельный курс."
+		course_editor_message="Эта запись относится к другой кухне. Переключи тип кухни в расписании."
 		return false
 	course_editor.type_id=record_type
 	var records: Array=course_editor.get("records",[])
@@ -422,12 +422,12 @@ func course_editor_submit() -> void:
 	game.hud.notice.text=""
 	send(payload)
 	var notice: String=str(game.hud.notice.text)
-	if notice=="Курс поставлен в очередь.":
+	if notice=="Обучение добавлено в расписание.":
 		course_editor={}
 		course_editor_message=""
 		course_group_order=[]
 	else:
-		course_editor_message=notice if not notice.is_empty() else "Курс не подтверждён. Проверь актуальный предпросмотр."
+		course_editor_message=notice if not notice.is_empty() else "Изменение расписания не подтверждено. Проверь актуальное состояние."
 	stamp=""
 	rebuild()
 
@@ -1560,10 +1560,10 @@ func course_editor_page(host: bool) -> void:
 	label(content,"ЕДИНЫЙ РЕДАКТОР КУРСА",20)
 	if course_editor.is_empty():
 		if group_selected_stations.is_empty():
-			label(content,"Отметь столы или выбери целую группу выше, затем составь курс. Из видеотеки сюда можно открыть редактор уже с выбранной записью.",14)
+			label(content,"Отметь столы или выбери целую группу выше, затем добавь блюда в расписание обучения.",14)
 			return
 		label(content,"Выбраны столы: "+", ".join(group_selected_stations.map(func(id):return str(id))),15)
-		button(content,"Составить курс из выбранных столов",func():course_editor_open(),host)
+		button(content,"Открыть расписание обучения",func():course_editor_open(),host)
 		return
 	var type_id: String=str(course_editor.get("type_id",""))
 	if type_id.is_empty() and not group_selected_stations.is_empty():
@@ -1599,7 +1599,7 @@ func course_editor_page(host: bool) -> void:
 		label(content,"Выбрано: %d производственных мест"%group_selected_stations.size(),15)
 	label(content,"УРОКИ КУРСА",17)
 	var records: Array=course_editor.get("records",[])
-	if records.is_empty(): label(content,"Добавь хотя бы одну запись. Для одного блюда в курсе хранится только одна версия.",14)
+	if records.is_empty(): label(content,"Добавь хотя бы одну запись. Для одного блюда в расписании хранится только одна версия.",14)
 	for index in range(records.size()):
 		var record_id: int=int(records[index])
 		var record: Dictionary=service.masterclass_by_id(record_id)
@@ -1670,7 +1670,7 @@ func course_editor_page(host: bool) -> void:
 				var planned: Dictionary=service.masterclass_by_id(int(item.get("record_id",0)))
 				plan_parts.append("%s → %s"%[Definition.DISHES.get(str(item.get("dish_id","")),str(item.get("dish_id",""))),str(planned.get("name","Запись #%d"%int(item.get("record_id",0))))])
 			label(content,"%s · ID %s · столы %s · %s"%[str(projected.name),str(projected.id),", ".join(projected.stations.map(func(id):return str(id))),", ".join(plan_parts) if not plan_parts.is_empty() else "план пуст"],14)
-	var submit_text: String="Сохранить изменения курса" if int(course_editor.get("editing",0))>0 else "Поставить курс в очередь"
+	var submit_text: String="Сохранить расписание" if int(course_editor.get("editing",0))>0 else "Добавить в расписание"
 	button(content,submit_text,course_editor_submit,host and preview_error.is_empty())
 	button(content,"Закрыть редактор",course_editor_close)
 
@@ -1678,16 +1678,16 @@ func training_queue_page(host: bool) -> void:
 	var service=game.service
 	label(content,"ОЧЕРЕДЬ ОБУЧЕНИЯ",20)
 	var views: Array=service.training_course_views()
-	if views.is_empty(): label(content,"Ожидающих и активных курсов нет.",14)
+	if views.is_empty(): label(content,"Расписание обучения пусто.",14)
 	for course in views:
 		var mode_label: String="Вместе" if str(course.mode)=="together" else "По группам"
 		var auto_label: String=" · автоматически по плану" if bool(course.get("automatic",false)) else ""
 		var linked_prefix: String="→ СВЯЗАННЫЙ " if int(course.id)==course_focus_id else ""
-		label(content,"%sКурс #%d · %s · %s%s"%[linked_prefix,int(course.id),mode_label,str(course.state),auto_label],17)
+		label(content,"%sОбучение #%d · %s%s"%[linked_prefix,int(course.id),str(course.state),auto_label],17)
 		for assignment in course.assignments:
 			label(content,"  %s · %s · столы %s"%[Definition.DISHES.get(str(assignment.dish),str(assignment.dish)),str(assignment.name),", ".join(assignment.station_ids.map(func(id):return str(id)))],14)
-		if bool(course.editable): button(content,"Редактировать ожидающий курс",func():course_editor_open(0,int(course.id)),host)
-		button(content,"Отменить оставшийся курс #%d"%int(course.id),func():send({"action":"training_cancel_course","course":int(course.id)}),host and str(course.state) not in ["completed","cancelled"])
+		if bool(course.editable): button(content,"Редактировать ожидающее обучение",func():course_editor_open(0,int(course.id)),host)
+		button(content,"Отменить обучение #%d"%int(course.id),func():send({"action":"training_cancel_course","course":int(course.id)}),host and str(course.state) not in ["completed","cancelled"])
 		for batch in course.batches:
 			var reason: String=" · "+str(batch.blocked_reason) if not str(batch.blocked_reason).is_empty() else ""
 			label(content,"  Партия #%d · %s · столы %s%s"%[int(batch.id),str(batch.state),", ".join(batch.stations.map(func(id):return str(id))),reason],14)
@@ -1789,7 +1789,7 @@ func stats_page()->void:
 		if not stations.is_empty() and not dish.is_empty() and is_instance_valid(service.training_queue):
 			linked_course=service.training_queue.linked_course_id(stations,dish)
 		if linked_course>0:
-			button(content,"Открыть связанный курс #%d"%linked_course,func():open_problem_group(stations,linked_course))
+			button(content,"Открыть связанное обучение #%d"%linked_course,func():open_problem_group(stations,linked_course))
 		elif not stations.is_empty():
 			button(content,"Открыть связанные столы в группах",func():open_problem_group(stations))
 		if reason=="equipment":
