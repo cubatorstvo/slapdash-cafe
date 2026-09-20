@@ -166,11 +166,24 @@ func _ready() -> void:
 		wall.hide()
 		walls.append(wall)
 	apply_equipment()
+	apply_upgrades()
 	reset_model()
 
 func apply_equipment() -> void:
 	if type_id == "counter" and "rag" not in equipment: equipment.append("rag")
 	model.equipment = equipment.duplicate()
+
+func recipe_requirements(dish: String) -> Array:
+	var recipe: Variant=recipes.get(dish,{})
+	if recipe is Dictionary and recipe.get("required_equipment",null) is Array:
+		return recipe.required_equipment.duplicate()
+	return Definition.DISH_EQUIPMENT.get(dish,[]).duplicate()
+
+func missing_recipe_equipment(dish: String) -> Array:
+	return Definition.missing_items(recipe_requirements(dish),equipment,upgrades)
+
+func can_execute(dish: String) -> bool:
+	return recipes.has(dish) and missing_recipe_equipment(dish).is_empty()
 
 func reset_model() -> void:
 	model.reset(dishes()[0])
@@ -399,9 +412,11 @@ func world_entry() -> Dictionary:
 	data.customer_order = customer_order
 	data.recipe_times = {}
 	data.recipe_quality = {}
+	data.recipe_requirements = {}
 	for key in recipes:
 		data.recipe_times[key] = recipes[key].duration
 		data.recipe_quality[key] = recipes[key].get("quality", {})
+		data.recipe_requirements[key] = recipe_requirements(str(key))
 	data.state = state
 	data.order_tempo = order_tempo
 	data.model = model.snapshot()
