@@ -1,8 +1,7 @@
 extends RefCounted
 ## Deterministic event-driven highlight edit built only from accepted source frames.
-const RATIO:=0.30
 const FPS:=60.0
-const PLAN_VERSION:=3
+const PLAN_VERSION:=4
 const TRAINING_WATCH_SECONDS:=30.0
 const MAX_SEGMENTS:=8
 const PRE_EVENT_TICKS:=24
@@ -21,7 +20,7 @@ static func film_ticks(tracks: Array)->int:
 	var total:=source_ticks(tracks)
 	if total<=0: return 0
 	if float(total)/FPS<=TRAINING_WATCH_SECONDS: return total
-	return maxi(1,roundi(total*RATIO))
+	return roundi(TRAINING_WATCH_SECONDS*FPS)
 
 static func duration(tracks: Array)->float:
 	return film_ticks(tracks)/FPS
