@@ -8,6 +8,12 @@ func check(ok: bool,message: String)->void:
 		failures+=1
 		printerr("FAIL: ",message)
 
+func tree_text(node: Node)->String:
+	var result: String=""
+	if node is Label or node is Button: result+=str(node.text)+"\n"
+	for child in node.get_children(): result+=tree_text(child)
+	return result
+
 func repeated(value: Dictionary,count: int)->Array:
 	var out: Array=[]
 	for i in range(count): out.append(value.duplicate(true))
@@ -84,7 +90,7 @@ func run()->void:
 	service.masterclasses=[wine,potato,sausage]
 	check(service.create_table_group([2,3],"UI линия").is_empty(),"UI T04 explicit group exists")
 	game.office.open("groups")
-	var overview_text:=tree_text(game.office.content)
+	var overview_text: String=tree_text(game.office.content)
 	check("UI линия" in overview_text and "Стол 2 ·" not in overview_text and "Стол 3 ·" not in overview_text,"UI T04 groups start collapsed and show only aggregate rows")
 	var group_id_overview: String=service.group_id_for_station(2)
 	game.office.toggle_group_expanded(group_id_overview)
