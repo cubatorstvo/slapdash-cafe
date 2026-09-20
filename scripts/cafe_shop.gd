@@ -49,7 +49,7 @@ func setup(owner_game: Node3D) -> void:
 	# A visible computer replaces the abstract cafe board.
 	computer = Node3D.new()
 	add_child(computer)
-	computer.position = Vector3(-5.0,0,10.9)
+	computer.position = Vector3(-7.0,0,13.1)
 	computer.rotation.y=0.0
 	Props.solid_box(computer,Vector3(1.65,0.12,0.9),Vector3(0,0.86,0),Color("99765b"))
 	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
@@ -75,7 +75,7 @@ func setup(owner_game: Node3D) -> void:
 func refresh_layout() -> void:
 	if game==null: return
 	var stage:=Expansion.stage_for_progress(game.service.progress)
-	computer.position=Vector3(-5.0,0,10.9)
+	computer.position=Vector3(-7.0,0,13.1)
 	for parcel in game.service.progress.deliveries:
 		if int(parcel.get("owner",0))!=0 or float(parcel.get("remaining",0.0))<=0.0: continue
 		var at:=Expansion.delivery_position(stage,int(parcel.get("id",0)))
