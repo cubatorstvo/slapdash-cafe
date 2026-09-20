@@ -17,6 +17,8 @@ func run() -> void:
 	check(Annex.rest_spot(0).position.z>Annex.CAFE_BACK_Z,"Clone rest spots are behind cafe")
 	check(Annex.REST_AREA>100.0,"Rest room is roughly triple the previous area")
 	check(Annex.player_bed_center(3).x<Annex.REST_X_MAX,"Shared chef bed fits inside the room")
+	game.service.progress.stars=1
+	game._refresh_cafe_layout(true)
 	game.player.global_position=Annex.REST_DOOR_CAFE
 	game.annex.advance_doors(0.30)
 	check(game.annex.door_openness("rest")>0.9,"Rest door opens for approaching player")

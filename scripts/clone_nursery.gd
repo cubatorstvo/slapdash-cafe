@@ -1,4 +1,6 @@
 extends Node3D
+const Annex=preload("res://scripts/cafe_annex.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 ## Host-owned pots persist through saves. Tools and pulling are session-local.
 const Policy=preload("res://scripts/laboratory_progression.gd")
 const Layout=preload("res://scripts/laboratory_layout.gd")
@@ -264,8 +266,9 @@ func exit_route(identity: int, origin: Vector3) -> Array:
 		for i in range(station.crew.size()):
 			if int(station.crew[i].get("clone_id",0))==identity: role=i
 		var home: Vector3=station.to_global(Vector3(station.role_home_x(role),0,1.85))
-		route.append(Vector3(-1.1,0,9.75)); route.append(Vector3(-1.1,0,7.8))
-		route.append(Vector3(home.x,0,7.8)); route.append(home)
+		route.append(Annex.LAB_DOOR_ROOM); route.append(Annex.LAB_DOOR_CAFE)
+		for point in Expansion.cafe_route(Annex.LAB_DOOR_CAFE,home,Expansion.stage_for_progress(game.service.progress),true):
+			if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
 		break
 	return route
 

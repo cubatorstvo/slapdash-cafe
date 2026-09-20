@@ -1,29 +1,35 @@
 extends RefCounted
 ## Shared staged geometry: meshes, collisions, leisure anchors and routes use the same layout.
+const SHIFT := Vector3(-2.9,0,3.4)
 const ROOM_STAGES := [
-	{"id":"small","back_z":18.5},
-	{"id":"medium","back_z":22.0},
-	{"id":"large","back_z":27.0}
+	{"id":"small","right_x":6.3},
+	{"id":"medium","right_x":12.3},
+	{"id":"large","right_x":14.9}
 ]
-const MAX_BACK_Z := 27.0
-const AISLE_X := 10.4
-const ENTRANCE := Vector3(10.4,0,11.45)
-const BEDS_Z := 25.7
+const MAX_BACK_Z := 30.4
+const AISLE_X := 5.0
+const ENTRANCE := Vector3(5.0,0,14.85)
+const BEDS_Z := 29.1
 const GRID_STEP := 0.40
 const WALK_MARGIN := 0.34
+const LEFT_X := 0.0
+const FRONT_Z := 14.0
 
-static func back_z(tier: int) -> float:
-	return float(ROOM_STAGES[clampi(tier,0,2)].back_z)
+static func back_z(_tier: int) -> float:
+	return MAX_BACK_Z
+
+static func right_x(tier: int) -> float:
+	return float(ROOM_STAGES[clampi(tier,0,2)].right_x)
 
 static func bed_center(tier: int) -> Vector3:
-	return Vector3(AISLE_X,0.48,back_z(tier)-1.3)
+	return Vector3(minf(7.5,right_x(tier)-1.5),0.48,back_z(tier)-1.3)
 
 static func offsets(tier: int) -> Dictionary:
 	if tier==0:
-		return {"rocking_chair":Vector3(0,0,-2),"beanbag":Vector3(0,0,-2.1),"bookcase":Vector3(0,0,-8),"floor_lamp":Vector3(0,0,-2.1)}
+		return {"television":Vector3(-0.8,0,1.2),"rocking_chair":Vector3(0,0,-2),"beanbag":Vector3(0,0,-2.1),"bookcase":Vector3(0,0,-8),"floor_lamp":Vector3(0,0,-2.1)}
 	if tier==1:
-		return {"bookcase":Vector3(0,0,-8),"board_games":Vector3(7.3,0,-2.5),"tea_station":Vector3(-7.2,0,-2),"snack_fridge":Vector3(0,0,-2.05)}
-	return {}
+		return {"television":Vector3(-0.8,0,1.2),"bookcase":Vector3(0,0,-8),"board_games":Vector3(6.8,0,-2.5),"tea_station":Vector3(-7.2,0,-2),"arcade":Vector3(-2.5,0,0),"snack_fridge":Vector3(-2.5,0,-2.05)}
+	return {"television":Vector3(-0.8,0,1.2)}
 
 static func catalogue(tier := 2, owned: Array = []) -> Array:
 	var result: Array=[]
@@ -31,14 +37,14 @@ static func catalogue(tier := 2, owned: Array = []) -> Array:
 	for spec in _base_catalogue():
 		var required: int=["small","medium","large"].find(spec.stage)
 		if required>tier or (not owned.is_empty() and spec.id not in owned): continue
-		spec.position+=Vector3(shifts.get(spec.id,Vector3.ZERO))
+		spec.position+=SHIFT+Vector3(shifts.get(spec.id,Vector3.ZERO))
 		result.append(spec)
 	return result
 
 static func item_position(id: String, tier: int) -> Vector3:
 	for spec in catalogue(tier):
 		if spec.id==id: return spec.position
-	return Vector3(AISLE_X,0,12.0)
+	return Vector3(AISLE_X,0,FRONT_Z+1.4)
 
 static func _base_catalogue() -> Array:
 	return [
@@ -70,8 +76,8 @@ static func activity_slots(tier := 2, owned: Array = []) -> Array:
 	for spot in _base_slots():
 		if spot.item not in installed: continue
 		var shift: Vector3=shifts.get(spot.item,Vector3.ZERO)
-		spot.position+=shift
-		spot.approach+=shift
+		spot.position+=SHIFT+shift
+		spot.approach+=SHIFT+shift
 		result.append(spot)
 	return result
 
@@ -122,14 +128,11 @@ static func obstacles(tier := 2, owned: Array = []) -> Array:
 		if ids[i] not in installed: continue
 		var shift: Vector3=shifts.get(ids[i],Vector3.ZERO)
 		var rect: Rect2=result[i]
-		rect.position+=Vector2(shift.x,shift.z)
+		rect.position+=Vector2(SHIFT.x+shift.x,SHIFT.z+shift.z)
 		shifted.append(rect)
-	if tier==2:
-		shifted.append(Rect2(3.15,23.48,6.10,0.14))
-		shifted.append(Rect2(11.55,23.48,6.00,0.14))
 	if "plants" in installed:
-		shifted.append(Rect2(8.56,11.26,0.48,0.48))
-		shifted.append(Rect2(16.81,back_z(tier)-1.54,0.48,0.48))
+		shifted.append(Rect2(8.56+SHIFT.x,11.26+SHIFT.z,0.48,0.48))
+		shifted.append(Rect2(minf(16.81+SHIFT.x,right_x(tier)-0.55),back_z(tier)-1.54,0.48,0.48))
 	var bed:=bed_center(tier)
 	shifted.append(Rect2(bed.x-1.325,bed.z-0.625,2.65,1.25))
 	return shifted
@@ -145,25 +148,24 @@ static func obstacle_heights(tier: int, owned: Array) -> Array:
 	for i in range(ids.size()):
 		if ids[i] not in installed: continue
 		result.append(2.0 if i in [5,8,11,15] else 0.44 if i in [16,17,18,19] else 0.70 if i in [20,21] else 0.85)
-	if tier==2: result.append(2.0); result.append(2.0)
 	if "plants" in installed: result.append(0.85); result.append(0.85)
 	result.append(0.54)
 	return result
 
 static func walkable(point: Vector3, blockers: Array, tier := 2) -> bool:
-	if point.x<3.34 or point.x>17.36 or point.z<11.18 or point.z>back_z(tier)-0.48: return false
+	if point.x<LEFT_X+0.44 or point.x>right_x(tier)-0.44 or point.z<FRONT_Z+0.48 or point.z>back_z(tier)-0.48: return false
 	for rect: Rect2 in blockers:
 		if rect.grow(WALK_MARGIN).has_point(Vector2(point.x,point.z)): return false
 	return true
 
 static func grid_point(cell: Vector2i) -> Vector3:
-	return Vector3(3.4+cell.x*GRID_STEP,0,11.25+cell.y*GRID_STEP)
+	return Vector3(LEFT_X+0.50+cell.x*GRID_STEP,0,FRONT_Z+0.65+cell.y*GRID_STEP)
 
 static func nearest_cell(point: Vector3, blockers: Array, tier := 2) -> Vector2i:
 	var best := Vector2i(-1,-1)
 	var distance := INF
-	for x in range(35):
-		for z in range(39):
+	for x in range(38):
+		for z in range(42):
 			var cell := Vector2i(x,z)
 			var candidate := grid_point(cell)
 			var next_distance := point.distance_squared_to(candidate)
@@ -185,7 +187,7 @@ static func path_between(start_point: Vector3, target: Vector3, tier := 2, owned
 		cursor+=1
 		for offset in [Vector2i.LEFT,Vector2i.RIGHT,Vector2i.UP,Vector2i.DOWN]:
 			var next: Vector2i=cell+offset
-			if next.x<0 or next.x>=35 or next.y<0 or next.y>=39 or previous.has(next): continue
+			if next.x<0 or next.x>=38 or next.y<0 or next.y>=42 or previous.has(next): continue
 			if not walkable(grid_point(next),blockers,tier): continue
 			previous[next]=cell
 			frontier.append(next)
@@ -217,11 +219,11 @@ static func training_viewer_spots(count: int, tier := 2, owned: Array = []) -> A
 	if wanted==0: return []
 	var blockers:=obstacles(tier,owned)
 	var candidates: Array=[]
-	var television:=Vector3(6.5,0,11.3)
-	var z:=11.75
+	var television:=item_position("television",tier)
+	var z:=FRONT_Z+0.75
 	while z<=back_z(tier)-0.55:
-		var x:=3.75
-		while x<=17.05:
+		var x:=LEFT_X+0.85
+		while x<=right_x(tier)-0.55:
 			var point:=Vector3(x,0,z)
 			if point.distance_to(ENTRANCE)>1.25 and walkable(point,blockers,tier):
 				candidates.append(point)
@@ -258,7 +260,7 @@ static func training_viewer_spots(count: int, tier := 2, owned: Array = []) -> A
 static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionary:
 	var blockers:=obstacles(tier,owned)
 	var ring: Array=[]
-	for center_z in [14.0,16.6,19.2,21.8,24.3]:
+	for center_z in [17.4,20.0,22.6,25.2,27.7]:
 		if center_z>back_z(tier)-1.25: continue
 		var center:=Vector3(AISLE_X,0,center_z)
 		for spoke in range(6):
@@ -275,15 +277,15 @@ static func overflow_slot(index: int, tier := 2, owned: Array = []) -> Dictionar
 		var activity: String=["Перекидывается мячиком","Болтает на ковре","Смеётся в кружке","Слушает байку"][index%4]
 		return slot("overflow_%d"%index,"floor",point,base,yaw,"floor",activity)
 	var candidates: Array=[]
-	for z in range(12,24):
-		for x in [9.1,11.5,16.4]:
+	for z in range(15,30):
+		for x in [maxf(LEFT_X+0.9,AISLE_X-1.3),AISLE_X,minf(right_x(tier)-0.7,AISLE_X+3.1)]:
 			var point:=Vector3(x,0,float(z)+0.25)
 			if walkable(point,blockers,tier): candidates.append(point)
 	if candidates.is_empty(): candidates.append(ENTRANCE)
 	var base: Vector3=candidates[index%candidates.size()]
 	var layer: int=int(index/candidates.size())
 	var point:=base+Vector3(0,layer*0.34,0)
-	var toward:=Vector3(AISLE_X,0,clampf(base.z,12.5,back_z(tier)-1.3))-base
+	var toward:=Vector3(minf(AISLE_X,right_x(tier)-1.0),0,clampf(base.z,FRONT_Z+1.0,back_z(tier)-1.3))-base
 	var yaw: float=atan2(-toward.x,-toward.z) if toward.length()>0.05 else float(index%4)*PI/2.0
 	return slot("overflow_%d"%index,"floor",point,base,yaw,"floor","Болтает на ковре")
 

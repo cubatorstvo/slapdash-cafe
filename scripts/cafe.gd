@@ -14,6 +14,8 @@ var shop: Node3D
 var telemetry: Node
 var daylight: DirectionalLight3D
 var room_environment: WorldEnvironment
+var room_shell: Node3D
+var layout_stage := 1
 var save_writer: Node
 var office: CanvasLayer
 var development: Node3D
@@ -53,7 +55,7 @@ func _ready() -> void:
 	_build_room()
 	player = Player.new()
 	add_child(player)
-	player.position = Vector3(-6.0, 0.02, 5.0)
+	player.position = Expansion.player_spawn(1)
 	camera = player.camera
 	camera.rotation.x = -0.2
 	hud = preload("res://scripts/cafe_hud.gd").new()
@@ -111,6 +113,8 @@ func _ready() -> void:
 	add_child(telemetry)
 	telemetry.begin(self)
 	load_cafe()
+	_refresh_cafe_layout(true)
+	player.position = Expansion.player_spawn(layout_stage)
 	event_phase_seen = service.progress.phase
 	development.refresh()
 	hud.office_requested.connect(func(): office.open())
@@ -363,6 +367,7 @@ func _physics_process(delta: float) -> void:
 	var station := local_station()
 	if station != null and station.training.phase == "recording" and local_role >= 0: session.send_input(station, build_motion(station, delta))
 	if not session.is_guest(): service.advance(delta)
+	_refresh_cafe_layout()
 	session.advance(delta)
 	service.refresh_views(delta)
 	refresh_hud()
@@ -516,43 +521,125 @@ func _build_room() -> void:
 	sun.light_color = Color("fff4e2")
 	sun.light_energy = 0.75
 	sun.shadow_enabled = true
-	var hall_x_min: float=-11.8
-	var hall_x_max: float=Expansion.HALL_X_MAX
-	for x in range(-12, ceili(hall_x_max)):
-		for z in range(-8, 11):
-			var color := Color("6c7c73") if (x + z) % 2 == 0 else Color("79887b")
-			Props.box(self, Vector3(0.995, 0.09, 0.995), Vector3(x + 0.5, -0.05, z + 0.5), color)
-	var hall_width: float=hall_x_max-hall_x_min
-	var hall_center_x: float=(hall_x_min+hall_x_max)*0.5
-	Props.collision_box(self, Vector3(hall_width, 0.2, 19), Vector3(hall_center_x, -0.10, 1.5))
-	Props.solid_box(self, Vector3(hall_width, 4.7, 0.18), Vector3(hall_center_x, 2.3, -7.6), Color("244c50"))
-	for x in [hall_x_min,hall_x_max]: Props.solid_box(self, Vector3(0.18, 4.7, 18.2), Vector3(x, 2.3, 1.5), Color("2e5355"))
-	Annex.build_shell(self)
-	Props.solid_box(self,Vector3(hall_x_max-Annex.CAFE_X_MAX,4.7,0.18),Vector3((Annex.CAFE_X_MAX+hall_x_max)*0.5,2.3,Annex.CAFE_BACK_Z),Color("2e5355"))
-	for section in Expansion.SECTION_ROWS:
-		var center:=Vector3(35.8,0.012,float(section.z))
-		Props.box(self,Vector3(35.0,0.018,5.35),center,Color("687d73"))
-		var sign:=Props.text(self,str(section.name)+" · подготовленные места",Vector3(35.8,0.07,float(section.z)-2.45),22,Color("e5c98c"))
-		sign.rotation.x=-PI/2
-	Props.box(self, Vector3(14, 0.10, 0.22), Vector3(0, 1.2, -7.45), Color("bb8d5e"))
-	Props.box(self, Vector3(5.7, 0.85, 0.1), Vector3(0, 3.4, -7.40), Color("183237"))
-	Props.text(self, "SLAPDASH CAFE", Vector3(0, 3.49, -7.31), 62, Color("f4cc86"))
-	Props.text(self, "ПОКАЗЫВАЙ. Я ПОВТОРЮ.", Vector3(0, 2.85, -7.31), 25, Color("a5c8b6"))
-	for x in [-5.1, 5.1]:
-		Props.box(self, Vector3(1.6, 1.35, 0.13), Vector3(x, 2.7, -7.35), Color("edcb89"))
-		Props.box(self, Vector3(1.37, 1.12, 0.07), Vector3(x, 2.7, -7.26), Color("9cc9c5"))
-		Props.box(self, Vector3(0.05, 1.18, 0.06), Vector3(x, 2.7, -7.20), Color("edcb89"))
-		Props.cylinder(self, 0.28, 0.44, Vector3(x, 0.22, -4.9), Color("bb7c56"), 0.35)
-		for index in range(5):
-			var leaf := Props.ball(self, 0.22, Vector3(x + sin(index * 1.4) * 0.18, 0.8 + index * 0.12, -4.9), Color("649b71"))
-			leaf.scale = Vector3(0.8, 1.7, 0.8)
-	Props.box(self, Vector3(2.0, 0.018, 0.65), Vector3(0, 0.006, 7.1), Color("c09b63"))
+	_build_room_shell(1)
 
-	for x in [-11.2, 17.2]:
-		var sign := Props.text(self, "ВХОД" if x < 0 else "ВЫХОД", Vector3(x, 2.8, 1.6), 28, Color("f3cc85"))
-		sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+func _refresh_cafe_layout(force := false) -> void:
+	if not is_instance_valid(service): return
+	var wanted:=Expansion.stage_for_progress(service.progress)
+	if not force and wanted==layout_stage: return
+	layout_stage=wanted
+	_build_room_shell(layout_stage)
+	if is_instance_valid(annex): annex.refresh_shell()
+	if is_instance_valid(shop): shop.refresh_layout()
+	if is_instance_valid(development): development.refresh()
 
+func _build_room_shell(stage: int) -> void:
+	if is_instance_valid(room_shell): room_shell.free()
+	room_shell=Node3D.new()
+	room_shell.name="CafeLayoutShell"
+	add_child(room_shell)
+	layout_stage=stage
+	# Exterior sits safely below the walkable floor so no coplanar surfaces flicker.
+	Props.box(room_shell,Vector3(72.0,0.22,76.0),Vector3(0,-0.22,2.0),Color("56615d"))
+	Props.collision_box(room_shell,Vector3(90.0,0.20,90.0),Vector3(0,-0.18,0))
+	var cells:=Expansion.hall_cells_for_stage(stage)
+	var floor_colors: Dictionary={1:Color("6c7c73"),2:Color("70827a"),3:Color("667970"),4:Color("748178")}
+	for raw_cell in cells:
+		var cell: Vector2i=raw_cell
+		var center:=Expansion.cell_center(cell)
+		var unlock:=int(cells[cell])
+		Props.box(room_shell,Vector3(1.98,0.09,1.98),Vector3(center.x,-0.05,center.z),floor_colors[unlock])
+		Props.collision_box(room_shell,Vector3(2.0,0.20,2.0),Vector3(center.x,-0.10,center.z))
+	_build_room_perimeter(room_shell,cells,stage)
+	var entrance_z:=Expansion.entrance_z(stage)
+	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.45),Color("777d7c"))
+	var entrance:=Props.text(room_shell,"ВХОД",Vector3(0,2.75,entrance_z+0.22),28,Color("f3cc85"))
+	entrance.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	var chef_sign:=Props.text(room_shell,"ШЕФ",Vector3(0,3.15,8.5),30,Color("f4cc86"))
+	chef_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	var flow:=Props.text(room_shell,"ГЛАВНЫЙ ПРОХОД",Vector3(0,0.025,-4.0 if stage>=4 else 0.0),19,Color("c09b63"))
+	flow.rotation.x=-PI/2
 
+func _build_room_perimeter(parent: Node3D,cells: Dictionary,stage: int) -> void:
+	var final_cells:=Expansion.final_hall_cells()
+	var groups: Dictionary={}
+	for raw_cell in cells:
+		var c: Vector2i=raw_cell
+		_collect_room_boundary(groups,cells,final_cells,c,"W",Vector2i(c.x-1,c.y),c.x,c.y,stage)
+		_collect_room_boundary(groups,cells,final_cells,c,"E",Vector2i(c.x+1,c.y),c.x+1,c.y,stage)
+		_collect_room_boundary(groups,cells,final_cells,c,"N",Vector2i(c.x,c.y-1),c.y,c.x,stage)
+		_collect_room_boundary(groups,cells,final_cells,c,"S",Vector2i(c.x,c.y+1),c.y+1,c.x,stage)
+	for key in groups:
+		var group: Dictionary=groups[key]
+		var positions: Array=group.positions
+		positions.sort()
+		if positions.is_empty(): continue
+		var run_start:=int(positions[0])
+		var previous:=run_start
+		for i in range(1,positions.size()):
+			var current:=int(positions[i])
+			if current!=previous+1:
+				_build_room_wall_run(parent,str(group.side),int(group.line),run_start,previous,bool(group.temporary))
+				run_start=current
+			previous=current
+		_build_room_wall_run(parent,str(group.side),int(group.line),run_start,previous,bool(group.temporary))
+
+func _collect_room_boundary(groups: Dictionary,cells: Dictionary,final_cells: Dictionary,cell: Vector2i,side: String,neighbor: Vector2i,line: int,position: int,stage: int) -> void:
+	if cells.has(neighbor): return
+	# The annex owns only the rear-wall span occupied by rooms. The hall shell keeps
+	# the remaining prototype boundary, so unopened space never gets floating wall wings.
+	if side=="S" and is_equal_approx(float(line)*Expansion.TILE,Expansion.HALL_BACK_Z):
+		var segment_center_x: float=(float(position)+0.5)*Expansion.TILE
+		var p = service.progress if is_instance_valid(service) else null
+		if segment_center_x>=Annex.back_wall_left(p) and segment_center_x<=Annex.back_wall_right(p): return
+	var entrance_line:=roundi(Expansion.entrance_z(stage)/Expansion.TILE)
+	if side=="N" and line==entrance_line and cell.x in [-1,0]: return
+	var temporary:=final_cells.has(neighbor)
+	var key:="%s|%d|%d"%[side,line,1 if temporary else 0]
+	if not groups.has(key): groups[key]={"side":side,"line":line,"temporary":temporary,"positions":[]}
+	groups[key].positions.append(position)
+
+func _build_room_wall_run(parent: Node3D,side: String,line: int,start: int,finish: int,temporary: bool) -> void:
+	var count:=finish-start+1
+	var length:=float(count)*Expansion.TILE
+	var center: Vector3
+	var size: Vector3
+	var inward:=Vector3.ZERO
+	if side in ["W","E"]:
+		center=Vector3(float(line)*Expansion.TILE,2.35,(float(start)+float(count)*0.5)*Expansion.TILE)
+		size=Vector3(0.22,4.7,length)
+		inward=Vector3.RIGHT if side=="W" else Vector3.LEFT
+	else:
+		center=Vector3((float(start)+float(count)*0.5)*Expansion.TILE,2.35,float(line)*Expansion.TILE)
+		size=Vector3(length,4.7,0.22)
+		inward=Vector3.BACK if side=="N" else Vector3.FORWARD
+	if temporary: _build_expansion_partition(parent,center,size,inward,side,length)
+	else: Props.solid_box(parent,size,center,Color("2e5355"))
+
+func _build_expansion_partition(parent: Node3D,center: Vector3,size: Vector3,inward: Vector3,side: String,length: float) -> void:
+	var panel_color:=Color("9b815d")
+	var frame_color:=Color("3f4747")
+	Props.solid_box(parent,size,center,panel_color)
+	var vertical:=side in ["W","E"]
+	var offset:=inward*0.17
+	var rail_size:=Vector3(0.08,0.12,length) if vertical else Vector3(length,0.12,0.08)
+	Props.box(parent,rail_size,center+offset+Vector3(0,2.12,0),frame_color)
+	Props.box(parent,rail_size,center+offset-Vector3(0,2.12,0),frame_color)
+	var studs:=maxi(2,int(ceil(length/2.0))+1)
+	for i in range(studs):
+		var t:=float(i)/float(studs-1)
+		var along:=lerpf(-length*0.5+0.10,length*0.5-0.10,t)
+		var at:=center+offset
+		var stud_size: Vector3
+		if vertical:
+			at.z+=along; stud_size=Vector3(0.08,4.35,0.10)
+		else:
+			at.x+=along; stud_size=Vector3(0.10,4.35,0.08)
+		Props.box(parent,stud_size,at,frame_color)
+	var band_size:=Vector3(0.06,0.24,maxf(0.4,length-0.25)) if vertical else Vector3(maxf(0.4,length-0.25),0.24,0.06)
+	Props.box(parent,band_size,center+inward*0.19+Vector3(0,-1.72,0),Color("e3bd36"))
+	var sign:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.24+Vector3(0,-0.35,0),22,Color("fff2b0"))
+	sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 
 func new_cafe() -> void:
 	if is_instance_valid(session): session.clear_sleeping()
@@ -572,7 +659,9 @@ func new_cafe() -> void:
 	bound_revision = -1
 	last_menu_revision = ""
 	development_stamp = ""
-	player.position = Vector3(-6.0, 0.02, 5.0)
+	layout_stage=Expansion.stage_for_progress(service.progress)
+	_build_room_shell(layout_stage)
+	player.position = Expansion.player_spawn(layout_stage)
 	player.velocity = Vector3.ZERO
 	development.refresh()
 	save_cafe()

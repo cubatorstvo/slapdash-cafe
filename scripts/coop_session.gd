@@ -5,6 +5,7 @@ const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const PROTOCOL := "slapdash-cafe-scale-37"
 var game: Node3D
 var transport := "offline"
@@ -152,7 +153,8 @@ func _register(value: String, version: String) -> void:
 		return
 	handshakes.erase(sender)
 	members[sender] = game.steam.peer_name(sender) if transport == "steam" else value.strip_edges().left(24)
-	player_poses[sender] = {"position": [-7.0, 0.02, 6.0], "yaw": 0.0, "pitch": -0.15}
+	var spawn:=Expansion.player_spawn(Expansion.stage_for_progress(game.service.progress))
+	player_poses[sender] = {"position": [spawn.x, spawn.y, spawn.z], "yaw": 0.0, "pitch": -0.15}
 	broadcast_roster()
 	if bool(game.service.movie_state.get("playing",false)): _send_movie_record(sender)
 
@@ -330,7 +332,7 @@ func capture_player() -> Dictionary:
 
 func clean_pose(pose: Dictionary) -> Dictionary:
 	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
-	return {"lab_pull":pose.get("lab_pull",false)==true, "lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], -20, 20), clampf(pose.position[1], 0, 4), clampf(pose.position[2], -20, 28)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
+	return {"lab_pull":pose.get("lab_pull",false)==true, "lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], Expansion.HALL_X_MIN-1.0, Expansion.HALL_X_MAX+1.0), clampf(pose.position[1], 0, 4), clampf(pose.position[2], Expansion.FINAL_ENTRANCE_Z-3.0, 31.5)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 3)
 func _presence(pose: Dictionary) -> void:

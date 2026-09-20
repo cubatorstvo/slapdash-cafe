@@ -49,8 +49,8 @@ func setup(owner_game: Node3D) -> void:
 	# A visible computer replaces the abstract cafe board.
 	computer = Node3D.new()
 	add_child(computer)
-	computer.position = Vector3(-10.7,0,-4.6)
-	computer.rotation.y=PI/2
+	computer.position = Vector3(-5.0,0,10.9)
+	computer.rotation.y=0.0
 	Props.solid_box(computer,Vector3(1.65,0.12,0.9),Vector3(0,0.86,0),Color("99765b"))
 	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
 	Props.box(computer,Vector3(0.95,0.65,0.2),Vector3(0,1.3,-0.15),Color("d8c9a3"))
@@ -71,6 +71,16 @@ func setup(owner_game: Node3D) -> void:
 	for x in [-0.65,0.65]:
 		for z in [-0.55,0.9]: Props.ball(truck,0.23,Vector3(x,0.28,z),Color("263536"))
 	truck.hide()
+
+func refresh_layout() -> void:
+	if game==null: return
+	var stage:=Expansion.stage_for_progress(game.service.progress)
+	computer.position=Vector3(-5.0,0,10.9)
+	for parcel in game.service.progress.deliveries:
+		if int(parcel.get("owner",0))!=0 or float(parcel.get("remaining",0.0))<=0.0: continue
+		var at:=Expansion.delivery_position(stage,int(parcel.get("id",0)))
+		parcel.position=[at.x,0.3,at.z]
+
 
 func computer_hit(camera: Camera3D) -> bool:
 	var ray := camera.project_ray_normal(camera.get_viewport().get_visible_rect().size/2)
@@ -138,7 +148,8 @@ func group_training_plan(group_id: String,type_id: String) -> Dictionary:
 	return plan
 
 func _delivery_position(id: int) -> Array:
-	return [-10.1+(id%3)*0.65,0.3,4.8+floorf(float(id%9)/3)*0.65]
+	var at:=Expansion.delivery_position(Expansion.stage_for_progress(game.service.progress),id)
+	return [at.x,at.y,at.z]
 
 func _new_delivery(item: String,station_id: int,items: Array,installer: bool,delay: float,extra: Dictionary={}) -> Dictionary:
 	var p=game.service.progress
@@ -160,10 +171,10 @@ func installer_job_by_id(id: int) -> Dictionary:
 	return {}
 
 func _installer_spawn(id: int)->Vector3:
-	return Vector3(-11.35,0.0,2.45+float(posmod(id,4))*0.28)
+	return Expansion.installer_spawn(Expansion.stage_for_progress(game.service.progress),id)
 
 func _installer_exit(job: Dictionary)->Vector3:
-	return Vector3(-12.55,0.0,2.35+float(posmod(int(job.get("id",0)),4))*0.30)
+	return Expansion.installer_exit(Expansion.stage_for_progress(game.service.progress),int(job.get("id",0)))
 
 func _ensure_installer_job(parcel: Dictionary) -> Dictionary:
 	if not parcel_has_installer(parcel): return {}
@@ -213,7 +224,8 @@ func installer_approach_position(parcel: Dictionary)->Vector3:
 			var station_approach: Vector3=station.to_global(Vector3(0,0,2.85))
 			return Vector3(station_approach.x,0.0,station_approach.z)
 		var base: Vector3=game.service.slot_position(int(parcel.get("station",1))-1)
-		return Vector3(base.x,0.0,base.z-2.85)
+		var offset:=Vector3(0,0,2.85).rotated(Vector3.UP,Expansion.rotation_y(int(parcel.get("station",1))-1))
+		return Vector3(base.x+offset.x,0.0,base.z+offset.z)
 	var target: Vector3=installation_position(parcel)
 	return Vector3(target.x,0.0,target.z) if target.is_finite() else Vector3.INF
 
@@ -235,15 +247,8 @@ func _append_route_point(route: Array,point: Vector3)->void:
 	if route.is_empty() or Vector3(route.back()).distance_to(floor_point)>0.05: route.append(floor_point)
 
 func _cafe_route(start_point: Vector3,target: Vector3)->Array:
-	var start: Vector3=Vector3(start_point.x,0.0,start_point.z)
-	var finish: Vector3=Vector3(target.x,0.0,target.z)
-	if start.distance_to(finish)<5.5: return [finish]
-	var route: Array=[]
-	var aisle_z: float=8.75
-	_append_route_point(route,Vector3(start.x,0,aisle_z))
-	_append_route_point(route,Vector3(finish.x,0,aisle_z))
-	_append_route_point(route,finish)
-	return route
+	var stage:=Expansion.stage_for_progress(game.service.progress)
+	return Expansion.cafe_route(Vector3(start_point.x,0,start_point.z),Vector3(target.x,0,target.z),stage,true)
 
 func _installer_route(start_point: Vector3,target: Vector3,parcel: Dictionary,leaving := false)->Array:
 	if not target.is_finite(): return []
@@ -469,7 +474,7 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 			var raw: Array = p.garland_points[index]
 			if near_ray(camera,Vector3(raw[0],raw[1],raw[2]),0.24): return {"action":"garland_remove","index":index,"hint":"(E) Снять"}
 	if p.garland_builder == peer:
-		for z in [-7.35,10.35]:
+		for z in [Annex.CAFE_BACK_Z]:
 			var dir := -camera.global_basis.z
 			if absf(dir.z)<0.001: continue
 			var distance: float = (float(z)-camera.global_position.z)/dir.z
@@ -533,8 +538,9 @@ func action(peer: int, data: Dictionary) -> String:
 	elif action_name == "drop_parcel":
 		if parcel.owner!=peer: return "Коробка не у тебя."
 		parcel.owner=0
-		var back: float=Layout.back_z(p.lounge_tier)-0.8 if position.x>Annex.DIVIDER_X else LabLayout.back(p.lab_tier)-0.8 if position.x>LabLayout.left(p.lab_tier) else 9.7
-		parcel.position=[clampf(position.x,-11.1,17.1),0.3,clampf(position.z,-6.8,back)]
+		var back: float=Layout.back_z(p.lounge_tier)-0.8 if position.x>Annex.DIVIDER_X else LabLayout.back(p.lab_tier)-0.8 if position.x>LabLayout.left(p.lab_tier) else Annex.CAFE_BACK_Z-0.4
+		var front:=Expansion.entrance_z(Expansion.stage_for_progress(p))-1.0
+		parcel.position=[clampf(position.x,Expansion.HALL_X_MIN+0.8,Expansion.HALL_X_MAX-0.8),0.3,clampf(position.z,front,back)]
 	elif action_name == "install_parcel":
 		if parcel.owner!=peer or position.distance_to(installation_position(parcel))>4.5: return "Поднеси коробку к отмеченному месту."
 		var install_error: String=_install_parcel(parcel)
@@ -770,7 +776,8 @@ func _process(delta: float) -> void:
 		if id!=p.garland_builder: garland_reels[id].queue_free(); garland_reels.erase(id)
 	truck_age=maxf(0,truck_age-delta)
 	truck.visible=truck_age>0
-	truck.position=Vector3(-10.8,0,2.5+(5-truck_age)*0.8)
+	var truck_base:=Expansion.installer_spawn(Expansion.stage_for_progress(p),0)
+	truck.position=Vector3(truck_base.x-0.8,0,truck_base.z-(5-truck_age)*0.8)
 
 func parcel_name(parcel: Dictionary) -> String:
 	var names: PackedStringArray=[]
@@ -806,7 +813,7 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 	var unique_ids: Array=[]
 	for raw_id in station_ids:
 		var station_id: int=int(raw_id)
-		if station_id<=Expansion.BASE_SLOT_COUNT or station_id>Expansion.SLOT_COUNT or station_id in unique_ids: return "Проверь выбранные места."
+		if station_id<=Expansion.BASE_SLOT_COUNT or station_id>Expansion.SLOT_COUNT or station_id in unique_ids or not Expansion.slot_available(station_id-1,Expansion.stage_for_progress(p)): return "Проверь выбранные места."
 		if game.service.by_id(station_id)!=null or pending(type_id,station_id): return "Место %d уже занято или ожидает доставку."%station_id
 		unique_ids.append(station_id)
 	var chosen_equipment: Array=[]

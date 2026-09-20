@@ -3,6 +3,7 @@ extends Node3D
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const LoungeLayout=preload("res://scripts/lounge_layout.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 const Masterclasses=preload("res://scripts/masterclass_library.gd")
 var service: Node3D
 var active:=false
@@ -86,16 +87,14 @@ func _viewer_spot(index: int)->Vector3:
 	return Vector3(fallback.approach)
 
 func _route(home_world: Vector3,target_world: Vector3)->Array:
-	var home: Vector3=service.to_local(home_world)
-	var door_cafe:=service.to_local(Annex.REST_DOOR_CAFE)
-	var door_room:=service.to_local(Annex.REST_DOOR_ROOM)
-	var target:=service.to_local(target_world)
-	var route: Array=[home,Vector3(home.x,0,8.9),door_cafe,door_room]
+	var route_world: Array=Expansion.route_to_rear(home_world,Annex.REST_DOOR_CAFE)
+	route_world.append(Annex.REST_DOOR_ROOM)
 	var p=service.progress
 	var inside: Array=LoungeLayout.path_between(Annex.REST_DOOR_ROOM,target_world,int(p.lounge_tier),p.lounge_items)
 	for point in inside:
-		var local:=service.to_local(point)
-		if Vector3(route.back()).distance_to(local)>0.03: route.append(local)
+		if Vector3(route_world.back()).distance_to(point)>0.03: route_world.append(point)
+	var route: Array=[]
+	for point in route_world: route.append(service.to_local(point))
 	return route
 
 func _ready_to_leave()->bool:
@@ -257,7 +256,7 @@ func advance(delta: float)->void:
 				if queue_owned and is_instance_valid(service.training_queue): service.training_queue.executor_watching(lesson_id)
 				revision+=1
 		"watching":
-			var tv:=service.to_local(Vector3(6.5,1.55,11.3))
+			var tv:=service.to_local(LoungeLayout.item_position("television",service.progress.lounge_tier)+Vector3(0,1.55,0))
 			var keys: Array=actors.keys()
 			for index in range(keys.size()):
 				var actor=actors[keys[index]]
@@ -324,7 +323,7 @@ func apply_snapshot(data: Dictionary)->void:
 		actor.caption.text=str(entry.get("name","Клон"))+(" · конспектирует" if entry.get("watching",false) else " · на обучение")
 		actor.notebook.show()
 		if entry.get("watching",false):
-			var tv:=service.to_local(Vector3(6.5,1.55,11.3))
+			var tv:=service.to_local(LoungeLayout.item_position("television",service.progress.lounge_tier)+Vector3(0,1.55,0))
 			actor.observe(tv,tv+Vector3(0.35,0,0),0.016,index)
 	for key in actors.keys():
 		if key not in keep:

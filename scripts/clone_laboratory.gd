@@ -4,6 +4,8 @@ const Props=preload("res://scripts/props.gd")
 const Policy=preload("res://scripts/laboratory_progression.gd")
 const Layout=preload("res://scripts/laboratory_layout.gd")
 const Lounge=preload("res://scripts/lounge_layout.gd")
+const Annex=preload("res://scripts/cafe_annex.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 const BALANCE_SECONDS := 6.0
 const BUTTON := Vector3(0,1.12,7.85)
 const SAMPLE := Vector3(0.98,1.10,7.98)
@@ -338,8 +340,10 @@ func route_to_chair(identity: int) -> Array:
 		for assignment in game.evening.plan():
 			if int(assignment.worker.id)==identity: approach=assignment.spot.approach; break
 		route=Lounge.approach_path(approach,game.service.progress.lounge_tier,game.service.progress.lounge_items)
-		route.reverse(); route.push_front(origin); route.append(Vector3(10.4,0,9.75))
-		route.append(Vector3(-1.1,0,9.75)); route.append(Layout.ENTRY)
+		route.reverse(); route.push_front(origin); route.append(Annex.REST_DOOR_ROOM); route.append(Annex.REST_DOOR_CAFE)
+		for point in Expansion.cafe_route(Annex.REST_DOOR_CAFE,Annex.LAB_DOOR_CAFE,Expansion.stage_for_progress(game.service.progress),true):
+			if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
+		route.append(Annex.LAB_DOOR_ROOM); route.append(Layout.ENTRY)
 	else:
 		for option in game.service.clone_options():
 			if int(option.id)!=identity or int(option.station)==0: continue
@@ -348,7 +352,8 @@ func route_to_chair(identity: int) -> Array:
 			for i in range(station.crew.size()):
 				if int(station.crew[i].get("clone_id",0))==identity: role=i
 			origin=station.to_global(Vector3(station.role_home_x(role),0,1.85))
-			route=[origin,Vector3(origin.x,0,7.8),Vector3(-1.1,0,7.8),Vector3(-1.1,0,9.75),Layout.ENTRY]
+			route=Expansion.route_to_rear(origin,Annex.LAB_DOOR_CAFE)
+			route.append(Annex.LAB_DOOR_ROOM); route.append(Layout.ENTRY)
 			break
 	var start: Vector3=Layout.ENTRY if not route.is_empty() else origin
 	route.append_array(Layout.path(start,Layout.CHAIR+Vector3(0,0,-1.0),game.service.progress))

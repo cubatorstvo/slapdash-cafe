@@ -82,7 +82,7 @@ func add_station(type_id: String, slot_index: int, manual := false, bare := fals
 	station.station_id = slot_index + 1
 	station.type_id = type_id
 	station.position = slot_position(slot_index)
-	station.rotation.y = PI
+	station.rotation.y = Expansion.rotation_y(slot_index)
 	add_child(station)
 	stations.append(station)
 	assign_clones()
@@ -979,7 +979,7 @@ func automatic_station_candidates(dish: String,idle_only := true) -> Array:
 	return result
 
 func auto_queue_point(index: int) -> Vector3:
-	return Vector3(-9.7,0,0.2-index*0.9)
+	return Vector3(-3.6,0,0.4-index*0.82)
 
 func _update_multi_caption(customer: Dictionary) -> void:
 	if int(customer.get("portions_total",1))<=1 or customer.state=="leaving": return
@@ -1054,7 +1054,7 @@ func _finish_multi_departure(customer: Dictionary,station: Node3D,reason := "bus
 	progress.record_demand(str(customer.dish),"busy" if reason in ["busy","wait","closing","chef_wait"] else "untrained")
 	_release_order_station(station,int(customer.id))
 	customer.state="leaving"
-	customer.path=[Vector3(17.4,0,1.65)]
+	customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 	customer.view.playback_speed=1.0
 	customer.view.caption.text="Получено %d/%d · +%d\nОстальное не дождался"%[done,total,int(customer.get("order_paid",0))]
 	trace("multi_order_partial",{"dish":customer.dish,"done":done,"total":total,"paid":int(customer.get("order_paid",0))})
@@ -1067,7 +1067,7 @@ func _complete_multi_order(customer: Dictionary,station: Node3D) -> void:
 	_count_completed_customer(customer,station)
 	_release_order_station(station,int(customer.id))
 	customer.state="leaving"
-	customer.path=[Vector3(17.4,0,1.65)]
+	customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 	customer.view.playback_speed=1.0
 	customer.view.caption.text="%d/%d · +%d\nСпасибо!"%[int(customer.portions_done),int(customer.portions_total),int(customer.order_paid)]
 	trace("multi_order_completed",{"dish":customer.dish,"portions":int(customer.portions_total),"paid":int(customer.order_paid)})
@@ -1153,7 +1153,7 @@ func advance(delta: float) -> void:
 			customer.eat_age+=delta
 			customer.view.meal_age=customer.eat_age
 			if customer.eat_age>=1.2:
-				customer.state="leaving"; customer.path=[Vector3(17.4,0,1.65)]
+				customer.state="leaving"; customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 				var table: Node3D=by_id(customer.station)
 				if table!=null and table.customer_id==customer.id:
 					table.customer_id=-1; table.state="idle"
@@ -1255,7 +1255,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 	var person:=Person.new()
 	person.color=Color("d6b56b") if banquet else [Color("ae7381"),Color("839fbb"),Color("c6a66b"),Color("91aa78")][next_customer_id%4]
 	add_child(person)
-	person.position=Vector3(-11.4,0,1.65)
+	person.position=Expansion.customer_spawn(Expansion.stage_for_progress(progress))
 	person.caption.text=Definition.DISHES[recipe]+(" ×%d"%portions if portions>1 else "")
 	var data: Dictionary={"id":next_customer_id,"order_id":next_order_id,"view":person,"station":station.station_id if station!=null else -1,"dish":recipe,"state":"walking","wait":0.0,"path":[],"banquet":banquet,"chef_order":chef_guest and not banquet,"portions_total":portions,"portions_done":0,"order_paid":0,"order_age":0.0,"wait_limit":order_wait_limit(portions,station,recipe),"stats_finalized":false}
 	next_order_id+=1
@@ -1274,7 +1274,7 @@ func spawn_customer(recipe := "", banquet := false, chef_guest := false, visit_d
 			_update_multi_caption(data)
 		else:
 			data.state="leaving"
-			data.path=[Vector3(-9.6,0,2.6),Vector3(17.4,0,1.65)]
+			data.path=Expansion.route_to_exit(person.position,Expansion.stage_for_progress(progress)).slice(1)
 			person.caption.text+="\n"+Insights.reason_label(str(problem.reason))
 			_record_failed_order(data,str(problem.reason))
 			if banquet: progress.banquet_finished+=1
@@ -1353,7 +1353,7 @@ func finish_customer(id: int, accepted: bool, failure_reason := "", portion_numb
 		customer.view.playback_speed=1.0
 		customer.view.caption.text="%s · +%d\nСпасибо!"%[report.grade,payment] if paid else "Загляну позже"
 		if paid and report.get("style_count",0)>0: customer.view.caption.text+="\nЛовкая подача · +20%"
-		customer.path=[Vector3(17.4,0,1.65)]
+		customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 		station.customer_id=-1
 		if not station.training.active(): station.state="idle"
 		if accepted:
@@ -1606,7 +1606,7 @@ func _restore_customer(data: Dictionary) -> bool:
 	var person:=Person.new()
 	person.color=data.get("color",Color("a66c76"))
 	add_child(person)
-	person.position=data.get("position",Vector3(-11.4,0,1.65))
+	person.position=data.get("position",Expansion.customer_spawn(Expansion.stage_for_progress(progress)))
 	person.rotation.y=float(data.get("yaw",0.0))
 	person.playback_speed=float(data.get("playback_speed",1.0))
 	person.mouth_amount=float(data.get("mouth_amount",0.0))
@@ -2034,9 +2034,14 @@ func night_action(action: String, _data: Dictionary, _peer: int) -> String:
 	if action == "next_day": return "Для нового дня всем нужно лечь в Шеф-кровать."
 	return "Закажи детали у компьютера и установи их из коробки."
 
-static func valid_wall_point(point: Vector3) -> bool:
+func valid_wall_point(point: Vector3) -> bool:
 	if point.y < 1.4 or point.y > 3.7: return false
-	return (absf(point.z + 7.35) < 0.08 or absf(point.z - 10.35) < 0.08) and point.x >= -11.5 and point.x <= 17.5
+	if absf(point.z-preload("res://scripts/cafe_annex.gd").CAFE_BACK_Z)>0.12: return false
+	if point.x<Expansion.HALL_X_MIN+0.5 or point.x>Expansion.HALL_X_MAX-0.5: return false
+	var annex=preload("res://scripts/cafe_annex.gd")
+	if absf(point.x-annex.LAB_DOOR_X)<annex.DOOR_WIDTH*0.62: return false
+	if Expansion.stage_for_progress(progress)>=2 and absf(point.x-annex.REST_DOOR_X)<annex.DOOR_WIDTH*0.62: return false
+	return true
 
 func trace(kind: String, data := {}) -> void:
 	if game != null and is_instance_valid(game.telemetry): game.telemetry.event(kind,data)
@@ -2149,7 +2154,8 @@ func assign_customer(station: Node3D, customer: Dictionary) -> void:
 	customer.state="walking"
 	customer.station=station.station_id
 	customer.wait_limit=maxf(float(customer.get("wait_limit",0.0)),order_wait_limit(int(customer.get("portions_total",1)),station,str(customer.dish)))
-	customer.path=[station.to_global(Vector3(0,0,-1.85))]
+	var target:=station.to_global(Vector3(0,0,-1.85))
+	customer.path=Expansion.cafe_route(customer.view.position,target,Expansion.stage_for_progress(progress),true)
 	station.customer_order=customer.get("order",{}).duplicate(true)
 	station.order_dish=customer.dish
 	station.order_portions_total=int(customer.get("portions_total",1))
@@ -2181,7 +2187,7 @@ func advance_queue(delta: float) -> void:
 func dismiss_queue(customer: Dictionary,reason := "busy") -> void:
 	if customer.state=="leaving": return
 	customer.state="leaving"
-	customer.path=[Vector3(-8.8,0,4.8),Vector3(17.4,0,1.65)]
+	customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 	customer.view.caption.text="До завтра · "+Insights.reason_label(str(reason))
 	_record_failed_order(customer,str(reason))
 	if customer.get("banquet",false): progress.banquet_finished+=1
