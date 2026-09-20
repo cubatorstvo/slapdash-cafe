@@ -40,9 +40,16 @@ jobs:
       - name: Targeted layout regressions
         run: |
           "$GODOT_BIN" --headless --path . --script res://tests/test_product_layout_geometry.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_physical_layout.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_expansion_layout.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_annex.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_delivery_installers.gd
+
+      - name: Affected cafe regressions
+        run: |
+          for test in test_staff_lounge.gd test_first_star.gd test_third_star.gd; do
+            timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/$test"
+          done
 
       - name: Runtime smoke
         shell: bash
