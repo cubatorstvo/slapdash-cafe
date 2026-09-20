@@ -7,14 +7,14 @@ const TILE:=2.0
 const HALL_X_MIN:=-24.0
 const HALL_X_MAX:=24.0
 const HALL_BACK_Z:=14.0
-const STAGE_ENTRANCE_Z: Array[float]=[-6.0,-6.0,-14.0,-24.0]
+const STAGE_ENTRANCE_Z: Array[float]=[-6.0,-6.0,-14.0,-32.0]
 const CHEF_POSITION:=Vector3(0.0,0.0,8.0)
-# Legacy name used by route callers: this is now the central transverse aisle, not a point at the Chef table.
+# The entrance-to-Chef promenade stays completely clear; production lives in left/right banks.
 const CHEF_FLOW_POINT:=Vector3(0.0,0.0,-4.0)
 const REAR_SPINE_POINT:=Vector3(0.0,0.0,12.2)
-const AISLE_XS: Array[float]=[-13.5,-4.5,4.5,13.5]
-const LEFT_AISLE_X:=-4.5
-const RIGHT_AISLE_X:=4.5
+const AISLE_XS: Array[float]=[-13.5,0.0,13.5]
+const LEFT_AISLE_X:=-13.5
+const RIGHT_AISLE_X:=13.5
 const MARKET_POSITION:=Vector3(-7.0,0.0,13.1)
 const DECOR_SIGN_POSITION:=Vector3(1.5,2.8,13.84)
 const DECOR_PLANT_POINTS: Array[Vector2]=[Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(22.2,-4.2)]
@@ -30,11 +30,11 @@ const SECTION_ROWS: Array=[
 const SLOT_POSITIONS: Array[Vector3]=[
 	Vector3(0.0,0.0,8.0),
 	Vector3(-18.0,0.0,8.0),Vector3(-9.0,0.0,8.0),Vector3(9.0,0.0,8.0),Vector3(18.0,0.0,8.0),
-	Vector3(0.0,0.0,0.0),
-	Vector3(-18.0,0.0,0.0),Vector3(-9.0,0.0,0.0),Vector3(9.0,0.0,0.0),Vector3(18.0,0.0,0.0),
-	Vector3(-9.0,0.0,-8.0),Vector3(0.0,0.0,-8.0),Vector3(9.0,0.0,-8.0),
-	Vector3(-18.0,0.0,-8.0),Vector3(18.0,0.0,-8.0),
-	Vector3(-18.0,0.0,-16.0),Vector3(-9.0,0.0,-16.0),Vector3(0.0,0.0,-16.0),Vector3(9.0,0.0,-16.0),Vector3(18.0,0.0,-16.0)
+	Vector3(-9.0,0.0,0.0),
+	Vector3(9.0,0.0,0.0),Vector3(-18.0,0.0,0.0),Vector3(18.0,0.0,0.0),
+	Vector3(-18.0,0.0,-8.0),Vector3(-9.0,0.0,-8.0),Vector3(9.0,0.0,-8.0),Vector3(18.0,0.0,-8.0),
+	Vector3(-18.0,0.0,-16.0),Vector3(-9.0,0.0,-16.0),Vector3(9.0,0.0,-16.0),Vector3(18.0,0.0,-16.0),
+	Vector3(-18.0,0.0,-24.0),Vector3(-9.0,0.0,-24.0),Vector3(9.0,0.0,-24.0)
 ]
 
 static func stage_for_progress(p)->int:
@@ -122,16 +122,10 @@ static func zone_gate(point: Vector3)->Vector3:
 	return aisle_gate(point)
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
-	var spawn:=customer_spawn(stage)
-	var result: Array=[spawn]
-	# Enter through the left longitudinal aisle before moving toward a station. Going straight
-	# to the room centre would cut through the central production row.
-	var entrance_gate:=Vector3(LEFT_AISLE_X,0.0,spawn.z)
-	if entrance_gate.distance_to(spawn)>0.2: result.append(entrance_gate)
-	var left_transfer:=Vector3(LEFT_AISLE_X,0.0,CHEF_FLOW_POINT.z)
-	if left_transfer.distance_to(Vector3(result.back()))>0.2: result.append(left_transfer)
+	var result: Array=[customer_spawn(stage)]
+	if Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
 	var transfer:=transfer_gate(target)
-	if transfer.distance_to(left_transfer)>0.2: result.append(transfer)
+	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(transfer)
 	var gate:=aisle_gate(target)
 	if gate.distance_to(transfer)>0.2: result.append(gate)
 	result.append(target)
@@ -143,12 +137,8 @@ static func route_to_exit(start: Vector3,stage: int)->Array:
 	if gate.distance_to(start)>0.2: result.append(gate)
 	var transfer:=transfer_gate(start)
 	if transfer.distance_to(gate)>0.2: result.append(transfer)
-	var right_transfer:=Vector3(RIGHT_AISLE_X,0.0,CHEF_FLOW_POINT.z)
-	if right_transfer.distance_to(transfer)>0.2: result.append(right_transfer)
-	var exit:=customer_exit(stage)
-	var exit_gate:=Vector3(RIGHT_AISLE_X,0.0,exit.z)
-	if exit_gate.distance_to(Vector3(result.back()))>0.2: result.append(exit_gate)
-	result.append(exit)
+	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
+	result.append(customer_exit(stage))
 	return result
 
 static func route_to_rear(start: Vector3,target: Vector3)->Array:
@@ -185,8 +175,8 @@ static func hall_cells_for_stage(stage: int)->Dictionary:
 	_mark_rect(plan,Rect2i(-12,-3,24,10),2)
 	# Stage 3: extend toward the street for the second production bank.
 	_mark_rect(plan,Rect2i(-12,-7,24,14),3)
-	# Stage 4: final front hall, lobby and last production row.
-	_mark_rect(plan,Rect2i(-12,-12,24,19),4)
+	# Stage 4: final front hall, broad lobby and two last production rows.
+	_mark_rect(plan,Rect2i(-12,-16,24,23),4)
 	var cells: Dictionary={}
 	for cell in plan:
 		var unlock:=int(plan[cell])
