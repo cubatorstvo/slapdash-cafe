@@ -1318,7 +1318,14 @@ func training_workspace_page(host: bool) -> void:
 		label(content,"Сначала выбери столы одного типа.",17)
 		return
 	var targets:=_training_target_stations()
-	label(content,"Столы: "+", ".join(targets.map(func(id):return str(id)))+" · один общий заход на каждый мастер-класс.",14)
+	var assigned_workers:=0
+	var worker_capacity:=0
+	for raw_id in targets:
+		var station: Node3D=service.by_id(int(raw_id))
+		if station==null: continue
+		worker_capacity+=station.role_count()
+		assigned_workers+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	label(content,"%d столов · работников %d/%d · один общий заход на каждый мастер-класс."%[targets.size(),assigned_workers,worker_capacity],14)
 	var columns:=BoxContainer.new()
 	columns.vertical = get_viewport().get_visible_rect().size.x < 1100
 	columns.add_theme_constant_override("separation",12)
