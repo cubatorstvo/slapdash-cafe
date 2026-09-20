@@ -38,13 +38,13 @@ func _initialize()->void:
 	run.call_deferred()
 
 func run()->void:
-	print("1/5: all twenty station footprints have product-scale breathing room")
+	print("1/6: all twenty station footprints have product-scale breathing room")
 	for a in range(Expansion.SLOT_COUNT):
 		for b in range(a+1,Expansion.SLOT_COUNT):
 			var clearance:=station_clearance(Expansion.position(a),Expansion.position(b))
 			check(clearance>=1.75,"Slots %d and %d need >=1.75 m clearance, got %.2f"%[a+1,b+1,clearance])
 
-	print("2/5: main service aisles and the transverse aisle stay outside station footprints")
+	print("2/6: main service aisles and the transverse aisle stay outside station footprints")
 	for slot in range(Expansion.SLOT_COUNT):
 		var center:=Expansion.position(slot)
 		for aisle_x in Expansion.AISLE_XS:
@@ -52,7 +52,7 @@ func run()->void:
 				check(point_clear_of_station(Vector3(float(aisle_x),0,z),center),"Service aisle %.1f intersects slot %d"%[float(aisle_x),slot+1])
 		check(point_clear_of_station(Expansion.CHEF_FLOW_POINT,center),"Central transverse aisle intersects slot %d"%(slot+1))
 
-	print("3/5: every slot footprint and working side is supported by its unlock-stage floor")
+	print("3/6: every slot footprint and working side is supported by its unlock-stage floor")
 	for slot in range(Expansion.SLOT_COUNT):
 		var stage:=Expansion.unlock_stage_for_slot(slot)
 		var center:=Expansion.position(slot)
@@ -66,7 +66,7 @@ func run()->void:
 		for point in points:
 			check(hall_contains(point,stage),"Slot %d footprint point %s is outside stage %d floor"%[slot+1,str(point),stage])
 
-	print("4/5: staged entrances move forward with expansions and keep a useful lobby")
+	print("4/6: staged entrances move forward with expansions and keep a useful lobby")
 	check(is_equal_approx(Expansion.entrance_z(1),Expansion.entrance_z(2)),"First-star expansion keeps the original entrance")
 	check(Expansion.entrance_z(3)<Expansion.entrance_z(2)-6.0,"Third stage moves the front wall forward")
 	check(Expansion.entrance_z(4)<Expansion.entrance_z(3)-8.0,"Final stage adds a deeper front lobby")
@@ -74,7 +74,7 @@ func run()->void:
 		check(hall_contains(Expansion.player_spawn(stage),stage),"Player spawn is supported at stage %d"%stage)
 		check(hall_contains(Expansion.customer_spawn(stage),stage),"Customer spawn is supported at stage %d"%stage)
 
-	print("5/5: traffic uses the aisles instead of cutting through other stations")
+	print("5/6: traffic uses the aisles instead of cutting through other stations")
 	for slot in range(Expansion.SLOT_COUNT):
 		var stage:=Expansion.unlock_stage_for_slot(slot)
 		var center:=Expansion.position(slot)
@@ -83,6 +83,16 @@ func run()->void:
 		check(route_clear_of_other_slots(Expansion.route_from_entrance(customer,stage),slot,stage),"Entrance route cuts through another station for slot %d"%(slot+1))
 		check(route_clear_of_other_slots(Expansion.route_to_exit(customer,stage),slot,stage),"Exit route cuts through another station for slot %d"%(slot+1))
 		check(route_clear_of_other_slots(Expansion.route_to_rear(worker,Vector3(0,0,13.1)),slot,stage),"Rear route cuts through another station for slot %d"%(slot+1))
+
+	print("6/6: permanent fixtures stay grounded and clear of every production footprint")
+	for slot in range(Expansion.SLOT_COUNT):
+		var center:=Expansion.position(slot)
+		check(point_clear_of_station(Expansion.MARKET_POSITION,center,0.85),"Market computer intersects production slot %d"%(slot+1))
+		for plant in Expansion.DECOR_PLANT_POINTS:
+			check(point_clear_of_station(Vector3(plant.x,0,plant.y),center,0.50),"Cafe plant intersects production slot %d"%(slot+1))
+	for stage in range(1,5):
+		for id in range(1,10):
+			check(is_equal_approx(Expansion.delivery_position(stage,id).y,0.25),"Delivery box base height drifted at stage %d"%stage)
 
 	print("PASS: spacious station grid, clear aisles and staged floor geometry" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)
