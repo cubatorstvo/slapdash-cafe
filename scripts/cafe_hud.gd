@@ -14,6 +14,7 @@ var visit_status: Label
 var goal: Label
 var clock: Label
 var clone_status: Label
+var equipment_warning: Label
 var supplies: Label
 var controls: Label
 var prompt: Label
@@ -50,6 +51,9 @@ func _ready() -> void:
 	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	goal = _label(order,"",20)
 	clone_status = _label(order,"",14,CafeStyle.MINT)
+	equipment_warning = _label(order,"",14,Color("f0b06b"))
+	equipment_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	equipment_warning.max_lines_visible = 2
 	journey = _label(order,"",15,CafeStyle.CREAM)
 	journey.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	journey.max_lines_visible = 2
