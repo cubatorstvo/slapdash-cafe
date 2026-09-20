@@ -44,13 +44,12 @@ var masterclass_selected_equipment: Array=[]
 var masterclass_station: Node3D
 var chef_station_backup: Node3D
 var masterclass_live_scene: Node3D
-var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
+var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false}
 var remote_movie_record: Dictionary={}
 var staff_training: Node3D
 var training_queue: Node
 var table_group_names: Dictionary={} # v19 migration only
 var group_registry=TableGroupRegistry.new()
-var suppress_group_autocreate:=false
 
 func blank_order_stats() -> Dictionary:
 	return {"orders_arrived":0,"orders_completed":0,"orders_partial":0,"orders_failed":0,"portions_ordered":0,"portions_served":0,"portions_unserved":0}
@@ -86,9 +85,6 @@ func add_station(type_id: String, slot_index: int, manual := false, bare := fals
 	station.rotation.y = PI
 	add_child(station)
 	stations.append(station)
-	if not manual and not suppress_group_autocreate:
-		group_registry.ensure_station(station,Definition.TYPES)
-		_sync_station_group_intent(station)
 	assign_clones()
 	return station
 
@@ -334,7 +330,7 @@ func start_highlights(id: int, peer: int) -> String:
 	if record.is_empty(): return "Запись не найдена."
 	Masterclasses.ensure_highlights(record)
 	if float(record.get("highlight_duration",0.0))<=0.0: return "В этой записи нет кадров для фильма."
-	movie_state={"id":id,"playing":true,"elapsed":0.0,"duration":float(record.highlight_duration),"started_by":peer}
+	movie_state={"id":id,"playing":true,"elapsed":0.0,"duration":float(record.highlight_duration),"started_by":peer,"loop":false}
 	remote_movie_record={}
 	progress.revision+=1
 	trace("highlights_started",{"id":id,"dish":record.dish,"seconds":record.highlight_duration,"peer":peer})
@@ -344,7 +340,7 @@ func start_training_movie(value: Dictionary) -> void:
 	var lesson: Dictionary=value.duplicate(true)
 	Masterclasses.ensure_highlights(lesson)
 	remote_movie_record=lesson
-	movie_state={"id":int(lesson.get("id",0)),"playing":true,"elapsed":0.0,"duration":float(lesson.get("highlight_duration",0.0)),"started_by":0}
+	movie_state={"id":int(lesson.get("id",0)),"playing":true,"elapsed":0.0,"duration":Masterclasses.TRAINING_WATCH_SECONDS,"started_by":0,"loop":float(lesson.get("highlight_duration",0.0))<Masterclasses.TRAINING_WATCH_SECONDS}
 	progress.revision+=1
 
 func stop_highlights() -> void:
@@ -361,7 +357,7 @@ func movie_snapshot() -> Dictionary:
 
 func apply_movie_snapshot(data: Dictionary) -> void:
 	if not data is Dictionary: return
-	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0))}
+	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0)),"loop":bool(data.get("loop",false))}
 
 func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Dictionary:
 	if overrides.has(station.station_id):
@@ -382,7 +378,7 @@ func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Di
 	return {}
 
 func request_auto_training_reconcile() -> void:
-	if is_instance_valid(training_queue): training_queue.request_auto_reconcile()
+	pass
 
 func _sync_station_group_intent(station: Node3D) -> void:
 	if station==null or station.manual_station or station.masterclass_station: return
@@ -390,31 +386,17 @@ func _sync_station_group_intent(station: Node3D) -> void:
 	if group.is_empty(): return
 	station.active_dishes=group.get("active_dishes",[]).duplicate()
 	station.active_menu_initialized=true
-	var desired: Dictionary={}
-	for item in group.get("curriculum",[]):
-		var dish:=str(item.get("dish_id",""))
-		var record_id:=int(item.get("record_id",0))
-		if dish.is_empty() or record_id<=0: continue
-		var record:=masterclass_by_id(record_id)
-		var previous: Dictionary=station.method_plan.get(dish,{})
-		desired[dish]={"id":record_id,"name":str(record.get("name",previous.get("name","Запись #%d"%record_id))),"group":str(group.id),"revision":int(item.get("revision",1))}
-	station.method_plan=desired
 
 func _sync_group_intent(group_id: String) -> void:
 	var group: Dictionary=group_registry.by_id(group_id)
 	if group.is_empty(): return
 	for raw_id in group.station_ids: _sync_station_group_intent(by_id(int(raw_id)))
-	request_auto_training_reconcile()
 
 func _sync_all_group_intent() -> void:
 	for group in group_registry.all(): _sync_group_intent(str(group.id))
 
 func _ensure_groups() -> void:
-	for station in stations:
-		if station.manual_station or station.masterclass_station: continue
-		if group_registry.group_id_for_station(station.station_id).is_empty():
-			group_registry.ensure_station(station,Definition.TYPES)
-			_sync_station_group_intent(station)
+	pass
 
 func _public_group(group: Dictionary) -> Dictionary:
 	if group.is_empty(): return {}
@@ -1783,7 +1765,7 @@ func clear_world() -> void:
 	masterclass_selected_equipment.clear()
 	if is_instance_valid(masterclass_live_scene): masterclass_live_scene.queue_free()
 	masterclass_live_scene=null
-	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0}
+	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false}
 	remote_movie_record={}
 	table_group_names.clear()
 	group_registry.reset()
@@ -1913,7 +1895,7 @@ func load_data(data: Dictionary) -> bool:
 	if version>=20:
 		if not group_registry.restore(data.get("table_group_registry",{}),Definition.TYPES): return false
 	else:
-		group_registry.migrate_legacy(stations,table_group_names,Definition.TYPES)
+		group_registry.reset()
 	_ensure_groups()
 	_sync_all_group_intent()
 	open_for_business = data.get("open", true)
