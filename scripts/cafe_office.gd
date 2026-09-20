@@ -1012,6 +1012,7 @@ func _queue_key_index(key: String) -> int:
 	return int(parts[1]) if parts.size()>=2 else -1
 
 func _training_queue_click(meta: Dictionary,ctrl: bool,shift: bool) -> void:
+	if not bool(meta.get("selectable",true)): return
 	var course_id:=int(meta.get("course_id",0))
 	var index:=int(meta.get("index",-1))
 	if index<0: return
@@ -1366,6 +1367,25 @@ func toggle_training_preview() -> void:
 	stamp=""
 	rebuild()
 
+func _schedule_entry_status(course: Dictionary,record_id: int) -> String:
+	var total:=0
+	var completed:=0
+	var running:=false
+	var wait_reason: String=""
+	for batch in course.get("batches",[]):
+		for lesson in batch.get("lessons",[]):
+			if int(lesson.get("record_id",0))!=record_id: continue
+			total+=1
+			var state:=str(lesson.get("state",""))
+			if state in ["completed","superseded"]: completed+=1
+			if state=="active" or str(batch.get("state","")) in ["draining","gathering","watching","returning"]: running=true
+			if wait_reason.is_empty() and not str(batch.get("blocked_reason","")).is_empty(): wait_reason=str(batch.blocked_reason)
+	if total<=0: return str(course.get("state","в очереди"))
+	if completed>=total: return "готово"
+	if running: return "идёт · партия %d/%d"%[mini(total,completed+1),total]
+	if not wait_reason.is_empty(): return "ждёт: %s · %d/%d"%[wait_reason,completed,total]
+	return "в очереди · %d/%d партий"%[completed,total]
+
 func _training_library_panel(parent: Node,host: bool) -> void:
 	var service=game.service
 	var box:=_section_card(parent,Color("253f41"))
@@ -1436,59 +1456,40 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) -> void:
 	var service=game.service
 	var course_id:=int(course.id)
-	var box:=_section_card(parent,Color("294647"))
-	var header:=HBoxContainer.new()
-	box.add_child(header)
-	var expanded:=bool(training_course_expanded.get(course_id,course_id==course_focus_id or str(course.state)=="active"))
-	var expand:=Button.new()
-	expand.text="▾" if expanded else "▸"
-	expand.custom_minimum_size=Vector2(38,36)
-	expand.pressed.connect(func():toggle_training_course_expanded(course_id))
-	header.add_child(expand)
-	var mode_label: String="вместе" if str(course.mode)=="together" else "по группам"
-	var station_ids:=_course_station_ids(course)
 	var course_type:=_course_type_id(course)
 	var course_type_name:=str(Definition.TYPES.get(course_type,{}).get("title",course_type))
-	var title:=label(header,"Курс #%d · %d уроков · %d столов"%[course_id,course.assignments.size(),station_ids.size()],16)
-	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	label(header,"%s · %s · %s"%[course_type_name,mode_label,str(course.state)],13)
-	if not expanded: return
+	var can_edit_course: bool=bool(course.get("editable",false)) and course_type==training_type_filter
 	for index in range(course.assignments.size()):
 		var assignment: Dictionary=course.assignments[index]
 		var record_id:=int(assignment.get("record_id",0))
 		var record: Dictionary=service.masterclass_by_id(record_id)
 		var key:=_queue_key(course_id,index)
-		var subtitle: String=str(record.get("name",assignment.get("name","Запись")))+" · столы "+", ".join(assignment.get("station_ids",[]).map(func(id):return str(id)))
-		var can_drag: bool=bool(course.editable) and course_type==training_type_filter
-		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if can_drag else {}
-		var row: Variant=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":can_drag},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
-		row.drop_enabled=can_drag
-	if bool(course.editable) and course_type==training_type_filter:
-		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
-	var action_row:=HBoxContainer.new()
-	box.add_child(action_row)
-	if bool(course.editable):
-
-		button(action_row,"Настройки курса",func():course_editor_open(0,course_id),host)
-	if str(course.state) not in ["completed","cancelled"]:
-		button(action_row,"Отменить курс",func():send({"action":"training_cancel_course","course":course_id}),host)
-	for batch in course.batches:
-		if str(batch.get("blocked_reason","")).is_empty(): continue
-		label(box,"⚠ Ждёт: "+str(batch.blocked_reason),13)
+		var table_count:=assignment.get("station_ids",[]).size()
+		var batch_size:=service.training_queue.balanced_batch_size(table_count)
+		var status_text:=_schedule_entry_status(course,record_id)
+		var subtitle: String="%s · %s · %d столов · по %d за раз · %s"%[str(record.get("name",assignment.get("name","Запись"))),course_type_name,table_count,batch_size,status_text]
+		if course_id==course_focus_id: subtitle="→ "+subtitle
+		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if can_edit_course else {}
+		var row: Variant=_training_make_drag_row(parent,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":can_edit_course,"selectable":can_edit_course},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
+		row.drop_enabled=can_edit_course
+	if str(course.get("state",""))=="active":
+		button(parent,"Отменить текущее обучение",func():send({"action":"training_cancel_course","course":course_id}),host)
 
 func _training_schedule_panel(parent: Node,host: bool) -> void:
 	var box:=_section_card(parent,Color("203b3c"))
 	var top:=HBoxContainer.new()
 	box.add_child(top)
-	var heading_label:=label(top,"РАСПИСАНИЕ",18)
+	var heading_label:=label(top,"РАСПИСАНИЕ ОБУЧЕНИЯ",18)
 	heading_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	if not training_queue_selection.is_empty(): button(top,"Убрать выбранные",training_remove_queue_selection,host)
+	label(box,"Блюда идут сверху вниз. Каждое блюдо автоматически обучается партиями примерно по 20% выбранных столов.",13)
 	training_queue_rows={}
 	_training_draft_card(box,host)
 	var views: Array=game.service.training_course_views()
-	if views.is_empty(): label(box,"Очередь пуста.",14)
+	if views.is_empty():
+		label(box,"Очередь пуста.",14)
 	else:
-		label(box,"ТЕКУЩАЯ ОЧЕРЕДЬ",14)
+		label(box,"ОЧЕРЕДЬ",14)
 		for course in views: _training_existing_course_card(box,course,host)
 	var suspended_found:=false
 	for group in game.service.table_groups():
