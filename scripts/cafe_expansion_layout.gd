@@ -12,6 +12,7 @@ const CHEF_POSITION:=Vector3(0.0,0.0,9.0)
 # Legacy name used by route callers: this is now the central transverse aisle, not a point at the Chef table.
 const CHEF_FLOW_POINT:=Vector3(0.0,0.0,-3.0)
 const REAR_SPINE_POINT:=Vector3(0.0,0.0,12.2)
+const AISLE_XS: Array[float]=[-13.5,-4.5,4.5,13.5]
 const LEFT_AISLE_X:=-4.5
 const RIGHT_AISLE_X:=4.5
 const STAGE_NAMES:=['Красный','Синий','Зелёный','Жёлтый']
@@ -99,7 +100,14 @@ static func slot_label(station_id: int)->String:
 	return "%s · место %d"%[section_for(slot),station_id]
 
 static func aisle_x(point_x: float)->float:
-	return LEFT_AISLE_X if point_x<0.0 else RIGHT_AISLE_X
+	var best: float=AISLE_XS[0]
+	var distance:=absf(point_x-best)
+	for candidate in AISLE_XS:
+		var candidate_distance:=absf(point_x-candidate)
+		if candidate_distance<distance:
+			best=candidate
+			distance=candidate_distance
+	return best
 
 static func aisle_gate(point: Vector3)->Vector3:
 	return Vector3(aisle_x(point.x),0.0,point.z)
