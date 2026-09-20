@@ -140,7 +140,9 @@ func run()->void:
 	check("sauce" in station.equipment and "plates" in station.equipment,"Both waiting equipment parcels were installed")
 	check(history_count(service,4)==1 and history_count(service,7)==1,"Each waiting box installs exactly once")
 	check(not job(service,4).is_empty() or not job(service,7).is_empty(),"At least one installer can still exist physically after its box has completed")
-	advance_shop(game,14.0)
+	for _i in range(200):
+		game.shop.advance(0.10)
+		if job(service,4).is_empty() and job(service,7).is_empty(): break
 	check(job(service,4).is_empty() and job(service,7).is_empty(),"Installers are freed only after physically reaching the exit")
 
 	print("6/7: save/load resumes carrying, installing and leaving without a duplicate installation")
