@@ -739,7 +739,7 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 	mode="together"
 	group_order=[]
 	_ensure_groups()
-	if assignments.is_empty(): return {"error":"Добавь хотя бы одно блюдо в расписание."}
+	if assignments.is_empty(): return {"error":"Добавь хотя бы одно блюдо в очередь."}
 	var type_id: String=""
 	var selected: Array=[]
 	var lessons: Array=[]
@@ -757,11 +757,11 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		unique.sort()
 		if unique.is_empty(): return {"error":"Выбери хотя бы один стол."}
 		var dish: String=str(record.get("dish",""))
-		if dish in seen_dishes: return {"error":"В расписании может быть только одна версия одного блюда."}
+		if dish in seen_dishes: return {"error":"В очереди может быть только одна версия одного блюда."}
 		seen_dishes.append(dish)
 		var record_type: String=str(record.get("source_type",""))
 		if type_id.is_empty(): type_id=record_type
-		elif type_id!=record_type: return {"error":"Одно расписание редактируется для одного типа кухни."}
+		elif type_id!=record_type: return {"error":"Одна очередь обучения редактируется для одного типа кухни."}
 		var mastered:=0
 		var waiting: Array=[]
 		var equipment_issues: Array=[]
@@ -776,19 +776,7 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 			if not missing_after.is_empty(): equipment_issues.append({"station":station_id,"missing":missing_after})
 		lessons.append({"record_id":record_id,"dish":dish,"name":str(record.get("name","Запись")),"grade":str(record.get("quality",{}).get("grade","D")),"effectiveness":str(record.get("effectiveness",{}).get("label","Обычная")),"duration":float(record.get("duration",0.0)),"film":float(record.get("highlight_duration",0.0)),"mastered":mastered,"selected":unique.size(),"waiting":waiting,"equipment_issues":equipment_issues})
 	selected.sort()
-	var preferred_station_sets: Array=[]
-	for raw_group_id in group_order:
-		var source_group: Dictionary=table_group_by_id(str(raw_group_id))
-		if source_group.is_empty(): continue
-		var subset: Array=[]
-		for station_id in source_group.stations:
-			if int(station_id) in selected: subset.append(int(station_id))
-		if not subset.is_empty(): preferred_station_sets.append(subset)
-	var temp=TableGroupRegistry.new()
-	if not temp.restore(group_registry.snapshot(),Definition.TYPES): return {"error":"Не удалось построить предпросмотр групп."}
-	for lesson in lessons: temp.apply_plan_to_selection(selected,str(lesson.dish),int(lesson.record_id))
-	var projected: Array=[]
-	for group in temp.all(): projected.append(_public_group(group))
+	var projected: Array=table_groups()
 	var employees:=0
 	for station_id in selected:
 		var station=by_id(int(station_id))
@@ -798,77 +786,18 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		for station_id in lesson.waiting:
 			if station_id not in all_needed: all_needed.append(station_id)
 	all_needed.sort()
-	var batch_rows: Array=[]
-	if mode=="balanced":
-		for lesson in lessons:
-			var waiting_ids: Array=lesson.waiting.duplicate()
-			waiting_ids.sort()
-			var batch_size:=maxi(1,roundi(float(maxi(1,int(lesson.selected)))*0.20))
-			var offset:=0
-			while offset<waiting_ids.size():
-				var chunk: Array=waiting_ids.slice(offset,mini(offset+batch_size,waiting_ids.size()))
-				var reason: String=""
-				if progress.shift!="open": reason="До следующего рабочего дня"
-				elif progress.busy(): reason="Сначала завершится проверка кафе"
-				elif "television" not in progress.lounge_items: reason="Нет телевизора"
-				elif bool(movie_state.get("playing",false)): reason="Телевизор занят"
-				if reason.is_empty():
-					for station_id in chunk:
-						var station=by_id(int(station_id))
-						if station.staffed>=0 and station.staffed<station.role_count():
-							reason="Стол %d: нужны сотрудники"%station_id
-							break
-						if not station.ready_crew():
-							reason="Стол %d: сотрудник занят другой активностью"%station_id
-							break
-				batch_rows.append({"dish":str(lesson.dish),"stations":chunk,"blocked_reason":reason,"ready":reason.is_empty()})
-				offset+=batch_size
-	elif mode=="together":
-		var reasons: Array=[]
-		if progress.shift!="open": reasons.append("До следующего рабочего дня")
-		if progress.busy(): reasons.append("Сначала завершится проверка кафе")
-		if "television" not in progress.lounge_items: reasons.append("Нет телевизора")
-		elif bool(movie_state.get("playing",false)): reasons.append("Телевизор занят")
-		for lesson in lessons:
-			for station_id in lesson.waiting:
-				var station=by_id(int(station_id))
-				if station.staffed>=0 and station.staffed<station.role_count(): reasons.append("Стол %d: нужны сотрудники"%station_id)
-				elif not station.ready_crew(): reasons.append("Стол %d: сотрудник занят другой активностью"%station_id)
-		batch_rows.append({"stations":all_needed.duplicate(),"blocked_reason":str(reasons[0]) if not reasons.is_empty() else "","ready":reasons.is_empty()})
-	else:
-		var actual_group_order: Array=[]
-		for station_id in selected:
-			var group_id: String=temp.group_id_for_station(int(station_id))
-			if not group_id.is_empty() and group_id not in actual_group_order: actual_group_order.append(group_id)
-		if not preferred_station_sets.is_empty():
-			var preferred: Array=[]
-			for station_set in preferred_station_sets:
-				for station_id in station_set:
-					var wanted: String=temp.group_id_for_station(int(station_id))
-					if wanted in actual_group_order and wanted not in preferred:
-						preferred.append(wanted)
-						break
-			for group_id in actual_group_order:
-				if group_id not in preferred: preferred.append(group_id)
-			actual_group_order=preferred
-		for group_id in actual_group_order:
-			var group: Dictionary=temp.by_id(str(group_id))
-			var needed: Array=[]
-			var reason: String=""
-			for lesson in lessons:
-				for station_id in lesson.waiting:
-					if station_id not in group.station_ids: continue
-					if station_id not in needed: needed.append(station_id)
-					var station=by_id(int(station_id))
-					if reason.is_empty() and station.staffed>=0 and station.staffed<station.role_count(): reason="Стол %d: нужны сотрудники"%station_id
-					elif reason.is_empty() and not station.ready_crew(): reason="Стол %d: сотрудник занят другой активностью"%station_id
-			if reason.is_empty() and progress.shift!="open": reason="До следующего рабочего дня"
-			if reason.is_empty() and progress.busy(): reason="Сначала завершится проверка кафе"
-			if reason.is_empty() and "television" not in progress.lounge_items: reason="Нет телевизора"
-			elif reason.is_empty() and bool(movie_state.get("playing",false)): reason="Телевизор занят"
-			batch_rows.append({"group":str(group_id),"name":str(group.name),"stations":needed,"blocked_reason":reason,"ready":reason.is_empty()})
-	var max_out:=0
-	for batch in batch_rows: max_out=maxi(max_out,batch.stations.size())
+	var reasons: Array=[]
+	if progress.shift!="open": reasons.append("До следующего рабочего дня")
+	if progress.busy(): reasons.append("Сначала завершится проверка кафе")
+	if "television" not in progress.lounge_items: reasons.append("Нет телевизора")
+	elif bool(movie_state.get("playing",false)): reasons.append("Телевизор занят")
+	for station_id in all_needed:
+		var station=by_id(int(station_id))
+		if station==null: continue
+		if station.staffed>=0 and station.staffed<station.role_count(): reasons.append("Стол %d: нужны сотрудники"%station_id)
+		elif not station.ready_crew(): reasons.append("Стол %d: сотрудник занят другой активностью"%station_id)
+	var batch_rows: Array=[{"stations":all_needed.duplicate(),"blocked_reason":str(reasons[0]) if not reasons.is_empty() else "","ready":reasons.is_empty()}]
+	var max_out:=all_needed.size()
 	var total_film:=Masterclasses.TRAINING_WATCH_SECONDS*lessons.size()
 	return {"error":"","type_id":type_id,"stations":selected,"employees":employees,"places":selected.size(),"lessons":lessons,"groups":projected,"batches":batch_rows,"simultaneous_out":max_out,"film_total":total_film,"mode":mode}
 
