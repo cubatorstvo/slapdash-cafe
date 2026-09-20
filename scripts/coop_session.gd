@@ -5,7 +5,7 @@ const Avatar = preload("res://scripts/cook_avatar.gd")
 const Person = preload("res://scripts/customer_view.gd")
 const MasterclassLibrary = preload("res://scripts/masterclass_library.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
-const PROTOCOL := "slapdash-cafe-scale-36"
+const PROTOCOL := "slapdash-cafe-scale-37"
 var game: Node3D
 var transport := "offline"
 var synced := false
@@ -475,7 +475,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if chef==null or not near_peer(sender,chef,5.0):
 			message_to(sender,"Подойди к шеф-станции.")
 			return
-		var error: String=game.service.request_masterclass(str(value.get("dish","")),sender)
+		var error: String=game.service.request_masterclass(str(value.get("dish","")),sender,value.get("equipment",null))
 		if not error.is_empty(): message_to(sender,error)
 		elif game.service.masterclass_active(): message_to(sender,"Мастер-класс готов. Выбери исполнителей ролей.")
 		else: message_to(sender,"Мастер-класс запланирован после уже принятых заказов шефа. Новые личные заказы приостановлены.")
@@ -726,8 +726,9 @@ func _world(packet: PackedByteArray) -> void:
 		station.order_dish = str(entry.get("order_dish", ""))
 		station.recipes = {}
 		var qualities: Dictionary = entry.get("recipe_quality", {})
+		var requirements: Dictionary=entry.get("recipe_requirements",{})
 		for key in entry.known:
-			station.recipes[key] = {"duration": entry.recipe_times[key], "quality": qualities.get(key, {})}
+			station.recipes[key] = {"duration": entry.recipe_times[key], "quality": qualities.get(key, {}), "required_equipment":requirements.get(key,station.Definition.DISH_EQUIPMENT.get(key,[])).duplicate()}
 		station.model.restore(entry.model)
 		station.apply_equipment()
 		station.training.apply_summary(entry.training)
