@@ -56,48 +56,98 @@ var training_queue_anchor:=-1
 var training_queue_rows: Dictionary={}
 var training_course_expanded: Dictionary={}
 var training_preview_expanded:=false
+var navigation: Dictionary = {}
+var shop_category: String = "equipment"
+var shop_station_id: int = 1
+var details_open: Dictionary = {}
+var delivery_labels: Array[Dictionary] = []
+var stats_feed_limit: int = 12
+var last_page: String = ""
+const PAGE_NAMES: Dictionary = {"overview":"Обзор кафе", "groups":"Столы и обучение", "stations":"Интернет-магазин", "videos":"Мастер-классы", "laboratory":"Лаборатория", "lounge":"Комната отдыха", "stats":"Статистика", "star":"Звёзды", "settings":"Сохранение и помощь"}
+
 
 func _ready() -> void:
 	layer = 17
 	panel = PanelContainer.new()
 	add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 100
-	panel.offset_right = -100
-	panel.offset_top = 164
-	panel.offset_bottom = -40
+	panel.offset_left = 28
+	panel.offset_right = -28
+	panel.offset_top = 32
+	panel.offset_bottom = -32
 	panel.theme = Style.make()
-	panel.add_theme_stylebox_override("panel", Style.box(Color("203b3c"), 20, 22))
+	panel.theme.default_font_size = 16
+	panel.theme.set_color("font_disabled_color", "Button", Color("9ba9a3"))
+	panel.theme.set_color("font_color", "CheckBox", Style.CREAM)
+	panel.theme.set_color("font_disabled_color", "CheckBox", Color("9ba9a3"))
+	panel.add_theme_stylebox_override("panel", Style.box(Color("172e30"), 18, 18))
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 14)
 	panel.add_child(column)
 	var top := HBoxContainer.new()
 	column.add_child(top)
-	heading = label(top, "МОЁ КАФЕ", 26)
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button(top, "Вернуться · Esc", close)
-	status = label(column, "", 18)
-	timer = label(column, "", 19)
-	timer.add_theme_color_override("font_color", Style.GOLD)
-	var tabs := HBoxContainer.new()
-	column.add_child(tabs)
-	for entry in [["overview","Кафе"],["stats","Лента / статистика"],["stations","Интернет-магазин"],["videos","Видеотека"],["groups","Группы столов"],["laboratory","Лаборатория"],["lounge","Комната отдыха"],["deliveries","Доставки"],["star","Звёзды"]]:
+	var brand := label(top, "ТЯП-ЛЯП / КАФЕ", 22)
+	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button(top, "Вернуться в кафе · Esc", close)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 20)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(body)
+	var side_scroll := ScrollContainer.new()
+	side_scroll.custom_minimum_size.x = 208
+	side_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(side_scroll)
+	var side := VBoxContainer.new()
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.add_theme_constant_override("separation", 5)
+	side_scroll.add_child(side)
+	for entry in [["overview","Обзор кафе"],["groups","Столы и обучение"],["stations","Интернет-магазин"],["videos","Мастер-классы"],["laboratory","Лаборатория"],["lounge","Комната отдыха"],["star","Звёзды"],["stats","Статистика"],["settings","Сохранение и помощь"]]:
 		var key: String = entry[0]
-		button(tabs, entry[1], func(): tab = key; stamp = ""; rebuild())
+		var nav := button(side, entry[1], func(): navigate(key))
+		nav.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		nav.toggle_mode = true
+		navigation[key] = nav
+	var main := VBoxContainer.new()
+	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main.add_theme_constant_override("separation", 8)
+	body.add_child(main)
+	heading = label(main, "Обзор кафе", 26)
+	status = label(main, "", 15)
+	status.add_theme_color_override("font_color", Style.MINT)
+	timer = label(main, "", 16)
+	timer.add_theme_color_override("font_color", Style.GOLD)
 	scroll = ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	column.add_child(scroll)
+	main.add_child(scroll)
 	content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 14)
+	content.add_theme_constant_override("separation", 12)
 	scroll.add_child(content)
 	panel.hide()
+
+func navigate(page: String) -> void:
+	tab = "stations" if page in ["deliveries", "decor", "night"] else page
+	stamp = ""
+	rebuild()
+
+func open_shop(category: String) -> void:
+	shop_category = category
+	navigate("stations")
+
+func _fold(parent: Node, key: String, title: String) -> VBoxContainer:
+	var expanded: bool = bool(details_open.get(key, false))
+	var toggle := button(parent, ("▾ " if expanded else "▸ ") + title, func(): details_open[key] = not expanded; rebuild())
+	toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	if not expanded: return null
+	return _section_card(parent)
 
 func label(parent: Node, text: String, size := 17) -> Label:
 	var node := Label.new()
 	node.text = text
-	node.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	node.autowrap_mode = TextServer.AUTOWRAP_WORD
+	if parent is HBoxContainer: node.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if parent is HFlowContainer: node.autowrap_mode = TextServer.AUTOWRAP_OFF
 	node.add_theme_font_size_override("font_size", size)
 	parent.add_child(node)
 	return node
@@ -105,7 +155,11 @@ func label(parent: Node, text: String, size := 17) -> Label:
 func button(parent: Node, text: String, callback: Callable, enabled := true) -> Button:
 	var node := Button.new()
 	node.text = text
-	node.custom_minimum_size.y = 44
+	node.custom_minimum_size = Vector2(100, 40)
+	node.clip_text = true
+	node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	node.tooltip_text = text
+	if parent is HFlowContainer: node.custom_minimum_size.x = maxf(100.0, float(text.length()) * 8.5 + 26.0)
 	node.disabled = not enabled
 	node.pressed.connect(func():
 		if is_instance_valid(game.feedback): game.feedback.play_ui("click")
@@ -122,7 +176,7 @@ func metric(parent: Node,text: String,tooltip: String,callback := Callable()) ->
 
 func opened() -> bool: return panel.visible
 func open(page := "overview") -> void:
-	tab = page
+	tab = "stations" if page in ["deliveries", "decor", "night"] else page
 	lab_target=int(game.service.progress.lab_production.target)
 	lab_reserve=int(game.service.progress.lab_production.reserve)
 	game.menu.close()
@@ -154,6 +208,8 @@ func open(page := "overview") -> void:
 	training_queue_rows={}
 	training_course_expanded={}
 	training_preview_expanded=false
+	details_open.clear()
+	last_page = ""
 	panel.show()
 	stamp = ""
 	rebuild()
@@ -476,9 +532,11 @@ func toggle_scale_equipment(id: String,on: bool) -> void:
 
 func _process(_delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
+	_refresh_delivery_labels()
 	var progress = game.service.progress
 	status.text = "Деньги: %d    Популярность: %d    Звёзды: %d / 5    Гости: %s" % [progress.cash, progress.popularity, progress.stars, "приходят" if game.service.open_for_business else "приём закрыт"]
 	timer.text = "%s · %d:%02d" % ["Личный показ" if progress.phase == "showcase" else progress.inspection_name(), ceili(progress.remaining) / 60, ceili(progress.remaining) % 60] if progress.phase in ["showcase", "service"] else ""
+	timer.visible = not timer.text.is_empty()
 	if tab=="laboratory" and is_instance_valid(lab_live_status):
 		var nursery=game.laboratory.nursery
 		var calibration=game.laboratory.calibrator
@@ -493,7 +551,12 @@ func _process(_delta: float) -> void:
 		rebuild()
 
 func rebuild() -> void:
-	var offset := scroll.scroll_vertical
+	var offset: int = scroll.scroll_vertical if last_page == tab else 0
+	last_page = tab
+	heading.text = str(PAGE_NAMES.get(tab, "Интернет-магазин"))
+	for key in navigation:
+		navigation[key].set_pressed_no_signal(key == tab)
+	delivery_labels.clear()
 	for child in content.get_children(): content.remove_child(child); child.queue_free()
 	var service = game.service
 	var progress = service.progress
@@ -501,139 +564,15 @@ func rebuild() -> void:
 	if not host: label(content,"Покупки подтверждает хозяин кафе. Коробки можно распаковывать вместе.",15)
 	match tab:
 		"overview":
-			var goal: Dictionary=preload("res://scripts/cafe_journey.gd").current(progress,service.stations,service.served,service.open_for_business,service)
-			label(content,str(goal.chapter),16)
-			label(content,str(goal.title),22)
-			label(content,str(goal.detail),17)
-			var marker_toggle:=CheckBox.new(); content.add_child(marker_toggle)
-			marker_toggle.text="Показывать ориентир следующего шага"
-			marker_toggle.button_pressed=game.journey_markers
-			marker_toggle.toggled.connect(func(on):game.journey_markers=on)
-			button(content,"Закончить смену" if service.open_for_business else "Открыть кафе",func():send({"action":"business"},true),host and not progress.busy() and progress.shift in ["morning","open"])
-			label(content,"Личная стойка — твои заказы. Купленное оборудование приедет ко входу: забери коробку и установи на отмеченное место.")
-			label(content,"Свободных клонов: %d. Стол, оборудование и работник приобретаются отдельно.\nПосле первой звезды: эксперимент — 20, микроскоп сохраняет формулу, посадка — 60. Вырасти клона, прими запись блюда и дождись его первого заказа."%progress.free_clones)
-			label(content,"Ночью посетителей нет. Все игроки ложатся в общую Шеф-кровать, чтобы начать новый день. Доставки и обустройство доступны днём тоже.")
-			label(content,"ОБСЛУЖИВАНИЕ",19)
-			label(content,"Гости: пришло %d · обслужено %d · ушло %d"%[service.guests_arrived,service.served,service.missed],15)
-			label(content,"Заказы: завершено %d · частично %d · не выполнено %d"%[int(service.order_stats.orders_completed),int(service.order_stats.orders_partial),int(service.order_stats.orders_failed)],15)
-			label(content,"Порции: заказано %d · выдано %d · не получено %d"%[int(service.order_stats.portions_ordered),int(service.order_stats.portions_served),int(service.order_stats.portions_unserved)],15)
-			var completion: float=Insights.completion_percent(int(service.order_stats.orders_completed),int(service.order_stats.orders_arrived))
-			label(content,"%d из %d заказов выполнено · %.0f%% · доход %d"%[int(service.order_stats.orders_completed),int(service.order_stats.orders_arrived),completion,service.revenue],16)
-			var bottleneck: Dictionary=service.top_bottleneck()
-			if not bottleneck.is_empty(): label(content,"Сейчас мешает: %s (%d). %s"%[bottleneck.label,bottleneck.count,bottleneck.suggestion],15)
-			button(content,"Открыть ленту и подробную статистику",func():tab="stats";stamp="";rebuild())
-			if progress.journey_auto_served>0:
-				label(content,"Другие пути развития: повысить формулу в лаборатории или улучшить прогноз отдыха. Выбирай то, что сейчас полезнее твоему кафе.",15)
-				button(content,"Формулы и выращивание",func():tab="laboratory";stamp="";rebuild())
-				button(content,"Комната отдыха и прогноз бонуса",func():tab="lounge";stamp="";rebuild())
-			visit_card()
-			button(content,"Сохранить кафе",func():send({"action":"save"}),host)
-			button(content,"Папка плейтеста",func():OS.shell_open(ProjectSettings.globalize_path(game.telemetry.folder)))
-			label(content,"Отметки для плейтеста: F8 — скучно, F9 — непонятно, F10 — прикольно. События пишутся локально.",15)
-			if confirm_reset:
-				button(content,"Подтвердить новое прохождение",func():send({"action":"new_cafe"},true),host and not service.any_training() and not progress.busy())
-			else: button(content,"Новое прохождение…",func():confirm_reset=true;rebuild())
+			overview_page(host)
+		"settings":
+			settings_page(host)
 		"stats":
 			stats_page()
-		"stations", "decor", "night":
-			label(content,"ТЯП-ЛЯП МАРКЕТ · доставка в коробках",23)
-			label(content,"Цена указана за комплект. Выбери станцию; коробка покажет её место установки. Продукты на станции возобновляются на каждый заказ.",15)
-			for station in service.stations:
-				label(content,"ТВОЯ СТОЙКА" if station.manual_station else "СТАНЦИЯ %d" % station.station_id,20)
-				var catalog: Array = ["sauce","plates","cup","pan","jug","sauce_ramp"] if station.type_id=="counter" else ["grill_kit","assembly_kit"] if station.type_id=="grill_kitchen" else ["fire_kit","stir_kit","salt_kit"] if station.type_id=="solyanka_kitchen" else ["meat_kit","pasta_kit"]
-				if progress.stars<1:
-					for item in catalog: shop_button(item,station.station_id,item in station.equipment or item in station.upgrades)
-				else: bundle_controls(station,catalog)
-			label(content,"МАСШТАБИРОВАНИЕ · ПОДГОТОВЛЕННЫЕ СЕКЦИИ",20)
-			label(content,"Новые секции дают 14 дополнительных мест. Всего есть 20 слотов: 1 шеф-станция + максимум 19 производственных мест. Один выбранный комплект = одна коробка на конкретное место.",15)
-			var type_row:=HBoxContainer.new(); content.add_child(type_row)
-			for type_id in ["counter","kitchen","grill_kitchen","solyanka_kitchen"]:
-				var chosen_type: String=type_id
-				var available: bool=game.shop.type_available(type_id)
-				button(type_row,("✓ " if scale_type==type_id else "")+Definition.TYPES[type_id].title,func():set_scale_type(chosen_type),host and available)
-			if not game.shop.type_available(scale_type): scale_type="counter"
-			label(content,"МЕСТА УСТАНОВКИ",17)
-			var free_slots: Array=Expansion.free_slot_ids(service)
-			for section in Expansion.SECTION_ROWS:
-				var row:=HBoxContainer.new(); content.add_child(row)
-				label(row,str(section.name),15)
-				for slot_index in section.slots:
-					var station_id: int=int(slot_index)+1
-					var free: bool=station_id in free_slots and not game.shop.pending(scale_type,station_id)
-					if not free: scale_slots.erase(station_id)
-					var check:=CheckBox.new(); row.add_child(check)
-					check.text=str(station_id)+(" · занято" if not free else "")
-					check.button_pressed=free and station_id in scale_slots
-					check.disabled=not host or not free
-					check.toggled.connect(func(on):toggle_scale_slot(station_id,on))
-			label(content,"ОСНАЩЕНИЕ КАЖДОЙ КОРОБКИ",17)
-			for item in game.shop.equipment_catalog(scale_type):
-				var spec: Dictionary=game.shop.ITEMS[item]
-				var available: bool=progress.stars>=int(spec.get("star",0))
-				if not available: scale_equipment.erase(item)
-				var check:=CheckBox.new(); content.add_child(check)
-				check.text=str(spec.name)+" · %d"%int(spec.price)+(" · звезда %d"%int(spec.get("star",0)) if not available else "")
-				check.button_pressed=available and item in scale_equipment
-				check.disabled=not host or not available
-				var equip_id: String=item
-				check.toggled.connect(func(on):toggle_scale_equipment(equip_id,on))
-			label(content,"ГРУППА И УЧЕБНЫЙ ПЛАН",17)
-			button(content,("✓ " if scale_group.is_empty() else "")+"Без группы",func():scale_group="";stamp="";rebuild(),host)
-			for group in service.table_groups():
-				if str(group.type)!=scale_type: continue
-				var group_id: String=str(group.id)
-				button(content,("✓ " if scale_group==group_id else "")+str(group.name),func():scale_group=group_id;stamp="";rebuild(),host)
-			var installer_toggle:=CheckBox.new(); content.add_child(installer_toggle)
-			installer_toggle.text="Прислать сборщиков · бесплатно"
-			installer_toggle.button_pressed=send_installers
-			installer_toggle.disabled=not host
-			installer_toggle.toggled.connect(func(on):send_installers=on;stamp="";rebuild())
-			var unit_price: int=int(game.shop.ITEMS[scale_type].price)
-			for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
-			var total_price: int=unit_price*scale_slots.size()
-			label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d%s"%[scale_slots.size(),unit_price,total_price," · сборщики +0" if send_installers else ""],18)
-			if not scale_group.is_empty():
-				var plan: Dictionary=game.shop.group_training_plan(scale_group,scale_type)
-				label(content,"Учебный план: "+(", ".join(plan.keys().map(func(dish):return Definition.DISHES.get(str(dish),str(dish)))) if not plan.is_empty() else "у группы нет доступных фильмов"),15)
-			button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":scale_group,"installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
-			label(content,"РАСШИРЕНИЕ КУХНИ",20)
-			shop_button("counter",0,service.by_id(2)!=null and service.by_id(3)!=null)
-			button(content,"Расширение зала · 180",func():send({"action":"buy","kind":"expansion"}),host and progress.stars>=2 and not progress.expanded and progress.cash>=180)
-			shop_button("kitchen",0,service.by_id(4)!=null)
-			label(content,"СПЕЦИАЛИЗАЦИЯ",20)
-			button(content,"Открыть специализированный сектор · %d"%progress.SPECIALTY_EXPANSION_PRICE,func():send({"action":"buy","kind":"specialty_expansion"}),host and progress.stars>=3 and not progress.specialized_expanded and progress.cash>=progress.SPECIALTY_EXPANSION_PRICE)
-			shop_button("grill_kitchen",0,service.by_id(5)!=null)
-			button(content,"Открыть сектор оркестрации · %d"%progress.ORCHESTRATION_EXPANSION_PRICE,func():send({"action":"buy","kind":"orchestration_expansion"}),host and progress.stars>=4 and not progress.orchestration_expanded and progress.cash>=progress.ORCHESTRATION_EXPANSION_PRICE)
-			shop_button("solyanka_kitchen",0,service.by_id(6)!=null)
-			label(content,"ЛАБОРАТОРИЯ",20)
-			for i in range(3): shop_button("lab_%d"%i,0,i<progress.lab_stage)
-			button(content,"Формулы, выращивание и рекалибровка →",func():tab="laboratory";stamp="";rebuild())
-			label(content,"ОБУСТРОЙСТВО",20)
-			for item in ["sign","plants","lights"]: shop_button(item,0,item in progress.decorations or (item=="lights" and progress.garland_owned))
+		"stations", "decor", "night", "deliveries":
+			shop_page(host)
 		"videos":
-			label(content,"ВИДЕОТЕКА МАСТЕР-КЛАССОВ",23)
-			label(content,"Хайлайты собраны из реальных кадров принятого приготовления и идут ровно 30% исходного времени. Запуск происходит на телевизоре комнаты отдыха.",15)
-			var has_tv: bool="television" in progress.lounge_items
-			if not has_tv: label(content,"Для просмотра установи телевизор в комнате отдыха.",15)
-			if service.masterclasses.is_empty(): label(content,"Пока нет записей. Проведи мастер-класс у шеф-станции.")
-			for record in service.masterclasses:
-				var id: int=int(record.get("id",0))
-				var quality: Dictionary=record.get("quality",{})
-				var effect: Dictionary=record.get("effectiveness",{})
-				label(content,str(record.get("name","Запись")),20)
-				label(content,"%s · %.1f с · фильм %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),float(record.get("highlight_duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
-				button(content,"Посмотреть хайлайты на телевизоре",func():send({"action":"masterclass_watch","id":id},true),has_tv and float(record.get("highlight_duration",0.0))>0.0)
-				button(content,"Добавить в обучение",func():course_editor_open(id),host)
-				label(content,str(effect.get("explanation","Аккуратное приготовление.")),14)
-				if bool(record.get("archived",false)): label(content,"Архивная запись из прежнего рабочего способа · стол %d"%int(record.get("source_station",0)),14)
-				var row:=HBoxContainer.new(); content.add_child(row)
-				var edit:=LineEdit.new(); row.add_child(edit); edit.text=str(record.get("name","")); edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL; edit.editable=host
-				button(row,"Переименовать",func():send({"action":"masterclass_rename","id":id,"name":edit.text}),host)
-				if confirm_delete_masterclass==id:
-					button(row,"Подтвердить удаление",func():send({"action":"masterclass_delete","id":id});confirm_delete_masterclass=-1,host)
-					button(row,"Отмена",func():confirm_delete_masterclass=-1;stamp="";rebuild(),host)
-				else:
-					button(row,"Удалить…",func():confirm_delete_masterclass=id;stamp="";rebuild(),host)
+			videos_page(host)
 		"groups":
 			if groups_mode=="training": training_workspace_page(host)
 			else: groups_overview_page(host)
@@ -641,21 +580,6 @@ func rebuild() -> void:
 			laboratory_page()
 		"lounge":
 			lounge_page()
-		"deliveries":
-			label(content,"ДОСТАВКИ",23)
-			if progress.deliveries.is_empty() and progress.delivery_history.is_empty(): label(content,"Доставок пока нет.")
-			for parcel in progress.deliveries:
-				var state := "В пути" if parcel.remaining>0 else ("Сборщик несёт" if parcel.get("installer_state","")=="walking" else "Сборщик ждёт" if parcel.get("installer_state","")=="waiting" else "Сборщик устанавливает" if parcel.get("installer_state","")=="installing" else "Сборщик назначен") if bool(parcel.get("installer",false)) else "Несёт игрок" if parcel.owner>0 else "Доставлено · ждёт ручной установки"
-				var method: String="сборщик" if bool(parcel.get("installer",false)) else "вручную"
-				label(content,game.shop.parcel_name(parcel)+" · "+method+" · "+state+(" · место %d"%parcel.station if parcel.station>0 else ""))
-				var plan_note: String=game.shop.parcel_plan_note(parcel)
-				if not plan_note.is_empty(): label(content,plan_note,14)
-			if not progress.delivery_history.is_empty():
-				label(content,"ЗАВЕРШЕНО",19)
-				for completed in progress.delivery_history:
-					var method: String="сборщик" if bool(completed.get("installer",false)) else "вручную"
-					var completed_name: String=game.shop.parcel_name(completed)
-					label(content,"%s · %s · установка завершена%s"%[completed_name,method," · место %d"%int(completed.get("station",0)) if int(completed.get("station",0))>0 else ""],14)
 		"star":
 			var star_title := "ПЕРВАЯ ЗВЕЗДА · дегустация" if progress.stars==0 else "ВТОРАЯ ЗВЕЗДА · делегация" if progress.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · Большой обед" if progress.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · Три волны" if progress.stars==3 else "ПЯТАЯ ЗВЕЗДА · День пяти звёзд" if progress.stars==4 else "КАФЕ · 5★"
 			label(content,star_title,23)
@@ -681,7 +605,7 @@ func rebuild() -> void:
 				var invite_text := "Пригласить дегустатора" if progress.stars==0 else "Пригласить делегацию" if progress.stars==1 else "Начать Большой обед" if progress.stars==2 else "Начать испытание «Три волны»"
 				button(content,invite_text,func():send({"action":"banquet"},true),host and progress.can_attempt(service.stations,service.served) and not service.any_training() and not service.Visits.busy(progress))
 			if progress.busy(): button(content,"Прервать проверку",func():send({"action":"cancel_banquet"}),host)
-	scroll.scroll_vertical = offset
+	scroll.set_deferred("scroll_vertical", offset)
 
 
 
@@ -777,7 +701,7 @@ func groups_overview_page(host: bool) -> void:
 	label(content,"Выбери группу целиком или отдельные столы. Здесь только состояние производства; обучение открывается отдельным экраном.",15)
 
 	var selection:=_section_card(content,Color("244143"))
-	var selection_row:=HBoxContainer.new()
+	var selection_row:=HFlowContainer.new()
 	selection.add_child(selection_row)
 	var selected_count:=group_selected_stations.size()
 	var selection_text: String="Ничего не выбрано" if selected_count==0 else "Выбрано столов: %d"%selected_count
@@ -827,13 +751,14 @@ func groups_overview_page(host: bool) -> void:
 		var pct:=Insights.completion_percent(int(performance.orders_completed),total_orders)
 		label(title_box,"%s"%str(group.name),18)
 		var issue_count:=_group_equipment_issue_count(group)
-		var subtitle: String="%s · %d столов · работники %d/%d · заказы %.0f%% · %d порций · доход %d"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct,int(performance.portions_served),int(performance.revenue)]
+		var subtitle: String="%s · %d столов · работники %d/%d · выполнено %.0f%%"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct]
 		if issue_count>0: subtitle+=" · ⚠ оснащение %d"%issue_count
 		if selected_here>0 and not all_selected: subtitle+=" · выбрано %d/%d"%[selected_here,group.stations.size()]
 		var summary_label:=label(title_box,subtitle,13)
-		summary_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		summary_label.autowrap_mode=TextServer.AUTOWRAP_WORD
 
 		if not expanded: continue
+		label(card, "Порций: %d · доход: %d" % [int(performance.portions_served), int(performance.revenue)], 15)
 
 		var active_names: Array=[]
 		for dish in group.active_dishes: active_names.append(str(Definition.DISHES.get(str(dish),str(dish))))
@@ -1523,7 +1448,7 @@ func training_workspace_page(host: bool) -> void:
 	var types:=_training_scope_types()
 	if training_type_filter.is_empty() and not types.is_empty(): training_type_filter=str(types[0])
 	if types.size()>1:
-		var type_row:=HBoxContainer.new()
+		var type_row:=HFlowContainer.new()
 		content.add_child(type_row)
 		label(type_row,"Тип кухни:",14)
 		for raw_type in types:
@@ -1539,7 +1464,8 @@ func training_workspace_page(host: bool) -> void:
 		assigned_workers+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
 	label(content,"%s · %d столов · работников %d/%d · столы %s"%[str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter)),targets.size(),assigned_workers,worker_capacity,", ".join(targets.map(func(id):return str(id)))],14)
 
-	var columns:=HBoxContainer.new()
+	var columns:=BoxContainer.new()
+	columns.vertical = get_viewport().get_visible_rect().size.x < 1100
 	columns.add_theme_constant_override("separation",12)
 	columns.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
@@ -1589,7 +1515,7 @@ func stats_page()->void:
 
 	label(content,"СИСТЕМНАЯ ЛЕНТА",19)
 	if service.analytics.feed.is_empty(): label(content,"Событий пока нет. Потери, обучение и сборщики появятся здесь.",15)
-	for entry in service.analytics.feed:
+	for entry in service.analytics.feed.slice(0, stats_feed_limit):
 		var source: String="[ИГРОК · %s] "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "[СИСТЕМА] "
 		var text: String=source+service.feed_text(entry)
 		var event_button:=button(content,text,func():set_stats_focus(entry))
@@ -1598,6 +1524,8 @@ func stats_page()->void:
 		if not reason.is_empty(): tip+="\n"+Insights.suggestion(reason)
 		event_button.tooltip_text=tip
 
+	if service.analytics.feed.size() > stats_feed_limit:
+		button(content,"Показать ещё события",func():stats_feed_limit += 12;rebuild())
 	if not stats_focus.is_empty():
 		label(content,"ПОДРОБНОСТИ",20)
 		var reason: String=str(stats_focus.get("reason",""))
@@ -1647,62 +1575,57 @@ func stats_page()->void:
 func shop_button(item: String, station_id: int, installed := false) -> void:
 	var p = game.service.progress
 	var spec: Dictionary = game.shop.ITEMS[item]
-	var waiting: bool = game.shop.pending(item,station_id)
-	var gate: int = int(spec.get("star",0))
-	var prerequisite: bool = spec.kind!="lab_upgrade" or LabPolicy.error(p,item).is_empty()
-	var suffix := " · установлено" if installed else " · доставка заказана" if waiting else " · звезда %d"%gate if p.stars<gate else " · %d"%spec.price
-	if not prerequisite: suffix=" · сначала лаборатория / усилитель"
-	button(content,spec.name+suffix,func():send({"action":"buy","kind":"item","item":item,"station":station_id,"installers":send_installers}),not game.session.is_guest() and not installed and not waiting and prerequisite and p.stars>=gate and p.cash>=spec.price and not p.busy())
+	var gate: int = int(spec.get("star", 0))
+	var reason: String = ""
+	if p.stars < gate: reason = "Нужна звезда %d" % gate
+	elif spec.kind == "lab_upgrade": reason = LabPolicy.error(p, item)
+	elif spec.kind == "lounge": reason = Lounge.item_error(p, spec)
+	elif spec.kind == "station" and not game.shop.type_available(item): reason = "Сначала расширь зал"
+	_product_row(content, item, station_id, installed, reason)
 
 func bundle_controls(station: Node3D, catalog: Array) -> void:
-	var id: int=station.station_id
-	if not selections.has(id): selections[id]=[]
-	var total := 0
+	var id: int = station.station_id
+	if not selections.has(id): selections[id] = []
+	var total: int = 0
 	for item in catalog:
-		var spec: Dictionary=game.shop.ITEMS[item]
-		var unavailable: bool=item in station.equipment or item in station.upgrades or game.shop.pending(item,id) or game.service.progress.stars<int(spec.get("star",0))
+		var spec: Dictionary = game.shop.ITEMS[item]
+		var installed: bool = item in station.equipment or item in station.upgrades
+		var reason: String = "Нужна звезда %d" % int(spec.get("star", 0)) if game.service.progress.stars < int(spec.get("star", 0)) else ""
+		var unavailable: bool = installed or not _item_parcel(item, id).is_empty() or not reason.is_empty()
 		if unavailable: selections[id].erase(item)
-		var check := CheckBox.new(); content.add_child(check)
-		check.text=spec.name+" · %d"%spec.price+(" · установлено / недоступно" if unavailable else "")
-		check.disabled=unavailable or game.session.is_guest()
-		check.button_pressed=item in selections[id]
-		if check.button_pressed: total+=int(spec.price)
+		var row := _product_row(content, item, id, installed, reason, true)
+		var check := CheckBox.new()
+		check.custom_minimum_size = Vector2(36, 36)
+		check.tooltip_text = "Добавить в комплект: " + str(spec.name)
+		row.add_child(check)
+		row.move_child(check, 0)
+		check.disabled = unavailable or game.session.is_guest()
+		check.button_pressed = item in selections[id]
+		if check.button_pressed: total += int(spec.price)
 		check.toggled.connect(func(on):
 			if on: selections[id].append(item)
 			else: selections[id].erase(item)
 			rebuild())
-	button(content,"Заказать комплект · %d"%total,func():send({"action":"buy_bundle","station":id,"items":selections[id].duplicate(),"installers":send_installers}),total>0 and game.service.progress.cash>=total and not game.service.progress.busy() and not game.session.is_guest())
+	if total > 0:
+		button(content, "Заказать выбранное · %d" % total, func(): send({"action":"buy_bundle", "station":id, "items":selections[id].duplicate(), "installers":send_installers}), game.service.progress.cash >= total and not game.service.progress.busy() and not game.session.is_guest())
 
 func lounge_page() -> void:
 	var p=game.service.progress
 	var forecast:=Lounge.report(p,game.evening.workers().size())
 	var host: bool=not game.session.is_guest()
-	var installer_toggle:=CheckBox.new(); content.add_child(installer_toggle)
-	installer_toggle.text="Прислать сборщика для новых предметов · бесплатно"
-	installer_toggle.button_pressed=send_installers
-	installer_toggle.disabled=not host
-	installer_toggle.toggled.connect(func(on):send_installers=on;stamp="";rebuild())
 	label(content,"КОМНАТА ОТДЫХА · "+str(Lounge.STAGES[p.lounge_tier].name),23)
 	label(content,"Сегодня: +%d%% к темпу всех клонов. Завтра: +%d%%."%[roundi((p.rest_multiplier-1.0)*100),roundi(float(forecast.bonus)*100)],20)
 	label(content,"Мест: %d · клонов: %d · уют: +%d%%. Бонус делится на всю команду, максимум +30%%. Если мест не хватает, общий бонус меньше."%[forecast.places,forecast.workers,roundi(float(forecast.comfort)*100)])
 	label(content,"На ночь каждый выбирает одно развлечение. Кровать шефов общая; смешные места сна клонов на темп не влияют. Покупки начнут помогать со следующего утра.",15)
-	if p.lounge_tier<2:
-		var next: Dictionary=Lounge.STAGES[p.lounge_tier+1]
-		var suffix: String=" · нужна звезда %d"%next.star if p.stars<int(next.star) else " · %d"%next.price
-		button(content,"Расширить: "+str(next.name)+suffix,func():send({"action":"buy","kind":"lounge_expansion"}),host and p.stars>=int(next.star) and p.cash>=int(next.price) and not p.busy() and game.session.sleeping_peers.is_empty())
-	label(content,"МЕБЕЛЬ И УЮТ · доставка в коробках",20)
-	for id in Lounge.GOODS:
-		var spec: Dictionary=game.shop.ITEMS["rest_"+id]
-		lounge_button("rest_"+id,spec,id in p.lounge_items)
-		if id in p.lounge_items and float(Lounge.GOODS[id].quality)>0:
-			lounge_button("rest_upgrade_"+id,game.shop.ITEMS["rest_upgrade_"+id],id in p.lounge_upgrades)
+	button(content,"Выбрать мебель и улучшения →",func():open_shop("lounge"))
+	button(content,"Расширить помещение →",func():open_shop("rooms"),p.lounge_tier<2)
+	var furniture := _fold(content, "lounge-owned", "Установленная мебель · %d" % p.lounge_items.size())
+	if furniture != null:
+		if p.lounge_items.is_empty(): label(furniture, "Мебель пока не установлена.", 16)
+		for id in p.lounge_items: label(furniture, str(Lounge.GOODS[id].name) + (" · улучшено" if id in p.lounge_upgrades else ""), 16)
 
-func lounge_button(item: String, spec: Dictionary, installed: bool) -> void:
-	var p=game.service.progress
-	var error:=Lounge.item_error(p,spec)
-	var waiting: bool=game.shop.pending(item,0)
-	var suffix: String=" · установлено" if installed else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
-	button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0,"installers":send_installers}),not game.session.is_guest() and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
+func lounge_button(item: String, _spec: Dictionary, installed: bool) -> void:
+	shop_button(item, 0, installed)
 
 func laboratory_page() -> void:
 	var p=game.service.progress
@@ -1710,35 +1633,25 @@ func laboratory_page() -> void:
 	label(content,"БИОЛАБОРАТОРИЯ · "+str(LabPolicy.STAGES[p.lab_tier].name),23)
 	label(content,"Рабочая формула: %d%% · версия %d · предел оборудования: %d%%"%[roundi(p.lab_formula_tempo*100),p.lab_formula_version,roundi(LabPolicy.formula_range(p).y*100)],20)
 	lab_live_status=label(content,"")
-	if p.lab_tier<2:
-		var next: Dictionary=LabPolicy.STAGES[p.lab_tier+1]
-		button(content,"Расширить: "+str(next.name)+" · %d · звезда %d"%[next.price,next.star],func():send({"action":"buy","kind":"lab_expansion"}),host and p.cash>=int(next.price) and p.stars>=int(next.star) and not p.busy() and game.session.sleeping_peers.is_empty())
-	var branches:=HBoxContainer.new(); content.add_child(branches)
+	button(content,"Оборудование лаборатории →",func():open_shop("lab"))
+	var branches:=HFlowContainer.new(); content.add_child(branches)
 	for entry in [["formula","Формула"],["growing","Выращивание"],["calibration","Рекалибровка"]]:
 		var key: String=entry[0]
-		button(branches,str(entry[1]),func():lab_branch=key;rebuild())
+		button(branches,("✓ " if lab_branch==key else "")+str(entry[1]),func():lab_branch=key;rebuild())
 	match lab_branch:
 		"formula":
 			label(content,"Собери стол, создай раствор и отнеси образец в микроскоп. Лучшая формула сохраняется сразу. Эксперимент — 20; риск порчи действует при падении ниже зелёной зоны.",16)
-			for i in range(3): shop_button("lab_%d"%i,0,i<p.lab_stage)
+
 		"growing":
 			label(content,"Земля → капля (60) → вода → рост → удобрение в рот → рост → извлечение. Готовые этапы спокойно ждут. Темп фиксируется при добавлении капли.",16)
 			label(content,"Горшков: %d · скорость выращивания: %d%% · по %d с на каждый этап"%[LabPolicy.pot_count(p),roundi(LabPolicy.growth_speed(p)*100),ceili(75.0/LabPolicy.growth_speed(p))],18)
 		"calibration":
 			label(content,"Кресло открывается с первой звездой. Нажимай в ритм шести импульсов: хорошее прохождение даёт весь изученный предел, слабое сохраняет прежний темп. Попытка — 10.",16)
 			label(content,"Автоматика берёт отстающих по одному после завершения заказа, постепенно повышает темп и возвращает на прежнюю станцию. Приготовление на этой станции ждёт сотрудника.",16)
-	for id in LabPolicy.ITEMS:
-		if LabPolicy.ITEMS[id].branch!=lab_branch: continue
-		var spec: Dictionary=game.shop.ITEMS[id]
-		var error:=LabPolicy.error(p,id)
-		var waiting: bool=game.shop.pending(id,0)
-		var suffix: String=" · установлено" if id in p.lab_upgrades else " · в доставке" if waiting else " · "+error if not error.is_empty() else " · %d"%spec.price
-		var item: String=id
-		button(content,str(spec.name)+suffix,func():send({"action":"buy","kind":"item","item":item,"station":0}),host and error.is_empty() and not waiting and p.cash>=int(spec.price) and not p.busy())
 	if "lab_production" in p.lab_upgrades or "lab_cal_auto" in p.lab_upgrades:
 		label(content,"АВТОМАТИКА И ОБЩИЙ ДЕНЕЖНЫЙ РЕЗЕРВ",20)
-		var row:=HBoxContainer.new(); content.add_child(row)
-		label(row,"Свободных клонов:")
+		var row:=HFlowContainer.new(); content.add_child(row)
+		label(row,"Запас свободных клонов:")
 		var target_spin:=SpinBox.new(); row.add_child(target_spin); target_spin.min_value=0; target_spin.max_value=20; target_spin.value=lab_target; target_spin.editable=host
 		target_spin.value_changed.connect(func(value):lab_target=int(value))
 		label(row,"Оставлять денег:")
@@ -1773,3 +1686,327 @@ func visit_card() -> void:
 		button(content,"Отменить визит",func():send({"action":"visit_cancel","id":id}),host)
 	else:
 		label(content,"Следующее предложение появится не раньше дня %d. Можно продолжать развитие кафе."%p.visit_next_day,15)
+
+
+
+func _shop_batch(host: bool) -> void:
+	var service = game.service
+	var progress = service.progress
+	label(content, "Новые столы", 21)
+	label(content, "Выбери тип кухни, места и оснащение. Каждый стол приедет отдельным комплектом.", 15)
+	var type_row:=HFlowContainer.new(); content.add_child(type_row)
+	for type_id in ["counter","kitchen","grill_kitchen","solyanka_kitchen"]:
+		var chosen_type: String=type_id
+		var available: bool=game.shop.type_available(type_id)
+		button(type_row,("✓ " if scale_type==type_id else "")+Definition.TYPES[type_id].title,func():set_scale_type(chosen_type),host and available)
+	if not game.shop.type_available(scale_type): scale_type="counter"
+	label(content,"1. Выбери свободные места",18)
+	var free_slots: Array=Expansion.free_slot_ids(service)
+	for section in Expansion.SECTION_ROWS:
+		var row:=HFlowContainer.new(); content.add_child(row)
+		label(row,str(section.name),15)
+		for slot_index in section.slots:
+			var station_id: int=int(slot_index)+1
+			var free: bool=station_id in free_slots and _station_parcel(station_id).is_empty()
+			if not free: scale_slots.erase(station_id)
+			var check:=CheckBox.new(); row.add_child(check)
+			check.text="Место %d"%station_id+(" · занято" if not free else "")
+			check.button_pressed=free and station_id in scale_slots
+			check.disabled=not host or not free
+			check.toggled.connect(func(on):toggle_scale_slot(station_id,on))
+	label(content,"2. Оснащение каждого стола",18)
+	for item in game.shop.equipment_catalog(scale_type):
+		var spec: Dictionary=game.shop.ITEMS[item]
+		var available: bool=progress.stars>=int(spec.get("star",0))
+		if not available: scale_equipment.erase(item)
+		var check:=CheckBox.new(); content.add_child(check)
+		check.text=str(spec.name)+" · %d"%int(spec.price)+(" · звезда %d"%int(spec.get("star",0)) if not available else "")
+		check.button_pressed=available and item in scale_equipment
+		check.disabled=not host or not available
+		var equip_id: String=item
+		check.toggled.connect(func(on):toggle_scale_equipment(equip_id,on))
+	label(content,"3. Добавить в группу",18)
+	button(content,("✓ " if scale_group.is_empty() else "")+"Без группы",func():scale_group="";stamp="";rebuild(),host)
+	for group in service.table_groups():
+		if str(group.get("type_id", ""))!=scale_type: continue
+		var group_id: String=str(group.id)
+		button(content,("✓ " if scale_group==group_id else "")+str(group.name),func():scale_group=group_id;stamp="";rebuild(),host)
+	var unit_price: int=int(game.shop.ITEMS[scale_type].price)
+	for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
+	var total_price: int=unit_price*scale_slots.size()
+	label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d%s"%[scale_slots.size(),unit_price,total_price," · сборщики +0" if send_installers else ""],18)
+	if not scale_group.is_empty():
+		var plan: Dictionary=game.shop.group_training_plan(scale_group,scale_type)
+		label(content,"Учебный план: "+(", ".join(plan.keys().map(func(dish):return Definition.DISHES.get(str(dish),str(dish)))) if not plan.is_empty() else "у группы нет доступных фильмов"),15)
+	button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":scale_group,"installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
+
+func overview_page(host: bool) -> void:
+	var service = game.service
+	var p = service.progress
+	var goal: Dictionary = preload("res://scripts/cafe_journey.gd").current(p, service.stations, service.served, service.open_for_business, service)
+	var card := _section_card(content, Color("304943"))
+	label(card, "СЛЕДУЮЩИЙ ШАГ · " + str(goal.chapter), 14)
+	label(card, str(goal.title), 22)
+	label(card, str(goal.detail), 16)
+	var actions := HFlowContainer.new()
+	card.add_child(actions)
+	button(actions, "Закончить смену" if service.open_for_business else "Открыть кафе", func():send({"action":"business"},true), host and not p.busy() and p.shift in ["morning","open"])
+	button(actions, "Условия следующей звезды →", func():navigate("star"))
+	label(content, "За смену", 20)
+	label(content, "Гости обслужены: %d · ушли: %d · доход: %d" % [service.served, service.missed, service.revenue], 17)
+	label(content, "Свободные клоны: %d · заказы в магазине: %d" % [p.free_clones, p.deliveries.size()], 16)
+	var bottleneck: Dictionary = service.top_bottleneck()
+	if not bottleneck.is_empty():
+		var problem := _section_card(content, Color("4b4235"))
+		label(problem, str(bottleneck.label), 18)
+		label(problem, str(bottleneck.suggestion), 16)
+		button(problem, "Разобраться →", func():navigate("stats"))
+	visit_card()
+
+func settings_page(host: bool) -> void:
+	button(content, "Сохранить кафе", func():send({"action":"save"}), host)
+	var marker_toggle := CheckBox.new()
+	content.add_child(marker_toggle)
+	marker_toggle.text = "Показывать ориентир следующего шага"
+	marker_toggle.button_pressed = game.journey_markers
+	marker_toggle.toggled.connect(func(on):game.journey_markers=on)
+	var help := _fold(content, "pc-help", "Как устроено кафе")
+	if help != null:
+		label(help, "Готовь и записывай мастер-классы за столом Шефа. В разделе «Столы и обучение» выбери столы и открой очередь обучения.", 16)
+		label(help, "Столы и оснащение покупаются в интернет-магазине, клоны выращиваются в лаборатории. Статус заказа указан рядом с товаром. Доставленную коробку установи на отмеченное место или дождись сборщика.", 16)
+		label(help, "После закрытия смены все игроки ложатся в общую Шеф-кровать. Установленная мебель улучшает отдых клонов со следующего утра.", 16)
+	var testing := _fold(content, "pc-playtest", "Инструменты плейтеста")
+	if testing != null:
+		button(testing, "Открыть папку плейтеста", func():OS.shell_open(ProjectSettings.globalize_path(game.telemetry.folder)))
+		label(testing, "F8 — скучно · F9 — непонятно · F10 — прикольно. Отметки сохраняются локально.", 15)
+	var reset := _fold(content, "pc-reset", "Новое прохождение…")
+	if reset != null:
+		label(reset, "Начать кафе заново с потерей текущего прогресса.", 16)
+		if confirm_reset:
+			button(reset, "Начать заново — подтвердить", func():send({"action":"new_cafe"},true), host and not game.service.any_training() and not game.service.progress.busy())
+			button(reset, "Отмена", func():confirm_reset=false;rebuild())
+		else: button(reset, "Сбросить прогресс…", func():confirm_reset=true;rebuild(), host)
+
+func videos_page(host: bool) -> void:
+	var service = game.service
+	var has_tv: bool = "television" in service.progress.lounge_items
+	label(content, "Сохранённые способы приготовления. Добавляй их в обучение или смотри на телевизоре комнаты отдыха.", 16)
+	if service.masterclasses.is_empty():
+		label(content, "Пока нет мастер-классов. Запиши первое блюдо за столом Шефа.", 18)
+		return
+	for record in service.masterclasses:
+		var id: int = int(record.get("id", 0))
+		var card := _section_card(content)
+		label(card, str(record.get("name", "Запись")), 19)
+		label(card, "%s · качество %s · %.1f с" % [Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))), str(record.get("quality",{}).get("grade","D")), float(record.get("duration",0.0))], 15)
+		var actions := HFlowContainer.new()
+		card.add_child(actions)
+		button(actions, "Добавить в обучение →", func():course_editor_open(id), host)
+		var watch := button(actions, "Смотреть на ТВ", func():send({"action":"masterclass_watch","id":id},true), has_tv and float(record.get("highlight_duration",0.0))>0.0)
+		if not has_tv: watch.tooltip_text = "Сначала установи телевизор: Интернет-магазин → Мебель."
+		var detail := _fold(card, "record-%d" % id, "Подробности и название")
+		if detail == null: continue
+		label(detail, str(record.get("effectiveness",{}).get("explanation","")), 15)
+		if bool(record.get("archived",false)): label(detail, "Архивная запись", 15)
+		var edit := LineEdit.new()
+		edit.text = str(record.get("name",""))
+		edit.editable = host
+		edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		detail.add_child(edit)
+		var edits := HFlowContainer.new()
+		detail.add_child(edits)
+		button(edits, "Переименовать", func():send({"action":"masterclass_rename","id":id,"name":edit.text}), host)
+		if confirm_delete_masterclass == id:
+			button(edits, "Подтвердить удаление", func():send({"action":"masterclass_delete","id":id});confirm_delete_masterclass=-1, host)
+			button(edits, "Отмена", func():confirm_delete_masterclass=-1;rebuild())
+		else: button(edits, "Удалить…", func():confirm_delete_masterclass=id;rebuild(), host)
+
+func shop_page(host: bool) -> void:
+	var categories := HFlowContainer.new()
+	categories.add_theme_constant_override("h_separation", 6)
+	content.add_child(categories)
+	for entry in [["equipment","Оснащение"],["tables","Новые столы"],["rooms","Расширения"],["lab","Лаборатория"],["lounge","Мебель"],["decor","Декор"]]:
+		var key: String = entry[0]
+		var choice := button(categories, str(entry[1]), func():shop_category=key;scroll.scroll_vertical=0;rebuild())
+		choice.toggle_mode = true
+		choice.set_pressed_no_signal(shop_category == key)
+	var installer := CheckBox.new()
+	installer.text = "Сборка при доставке · бесплатно"
+	installer.tooltip_text = "Сборщики устанавливают столы, кухонное оснащение и мебель. Остальные коробки устанавливай вручную."
+	installer.button_pressed = send_installers
+	installer.disabled = not host
+	installer.toggled.connect(func(on):send_installers=on)
+	content.add_child(installer)
+	match shop_category:
+		"equipment":
+			label(content, "Оснащение стола", 21)
+			var picker := OptionButton.new()
+			picker.custom_minimum_size.y = 42
+			picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			content.add_child(picker)
+			var selected_index: int = 0
+			for station in game.service.stations:
+				var id: int = station.station_id
+				picker.add_item(("Шеф" if station.manual_station else "Стол %d" % id) + " · " + str(Definition.TYPES.get(station.type_id,{}).get("title",station.type_id)), id)
+				if id == shop_station_id: selected_index = picker.item_count - 1
+			if picker.item_count == 0:
+				label(content, "Сначала установи стол из категории «Новые столы».", 16)
+				return
+			picker.select(selected_index)
+			shop_station_id = picker.get_item_id(selected_index)
+			picker.item_selected.connect(func(index):shop_station_id=picker.get_item_id(index);rebuild())
+			var station = game.service.by_id(shop_station_id)
+			label(content, "Отметь нужные предметы и закажи одним комплектом.", 15)
+			bundle_controls(station, game.shop.equipment_catalog(station.type_id))
+		"tables": _shop_tables(host)
+		"rooms": _shop_rooms(host)
+		"lab":
+			label(content, "Оборудование лаборатории", 21)
+			var branches := HFlowContainer.new()
+			content.add_child(branches)
+			for entry in [["formula","Формула"],["growing","Выращивание"],["calibration","Рекалибровка"]]:
+				var branch: String = str(entry[0])
+				var choose := button(branches, str(entry[1]), func():lab_branch=branch;rebuild())
+				choose.toggle_mode = true
+				choose.set_pressed_no_signal(lab_branch == branch)
+			if lab_branch == "formula":
+				for i in range(3): shop_button("lab_%d" % i, 0, i < game.service.progress.lab_stage)
+			for id in LabPolicy.ITEMS:
+				if str(LabPolicy.ITEMS[id].branch) == lab_branch: shop_button(id, 0, id in game.service.progress.lab_upgrades)
+		"lounge":
+			label(content, "Мебель и улучшения", 21)
+			for id in Lounge.GOODS:
+				shop_button("rest_"+id, 0, id in game.service.progress.lounge_items)
+				if id in game.service.progress.lounge_items and float(Lounge.GOODS[id].quality)>0:
+					shop_button("rest_upgrade_"+id, 0, id in game.service.progress.lounge_upgrades)
+		"decor":
+			label(content, "Декор кафе", 21)
+			for item in ["sign","plants","lights"]: shop_button(item, 0, item in game.service.progress.decorations or (item=="lights" and game.service.progress.garland_owned))
+	_refresh_delivery_labels()
+
+func _shop_rooms(host: bool) -> void:
+	var p = game.service.progress
+	label(content, "Расширение помещений", 21)
+	for spec in [
+		{"name":"Зал", "kind":"expansion", "owned":p.expanded, "price":180, "star":2},
+		{"name":"Специализированный сектор", "kind":"specialty_expansion", "owned":p.specialized_expanded, "price":p.SPECIALTY_EXPANSION_PRICE, "star":3},
+		{"name":"Сектор оркестрации", "kind":"orchestration_expansion", "owned":p.orchestration_expanded, "price":p.ORCHESTRATION_EXPANSION_PRICE, "star":4}]:
+		_expansion_row(spec, host, false)
+	if p.lab_tier<2:
+		var next: Dictionary = LabPolicy.STAGES[p.lab_tier+1]
+		_expansion_row({"name":"Лаборатория · "+str(next.name),"kind":"lab_expansion","owned":false,"price":next.price,"star":next.star}, host, true)
+	else: label(content,"Лаборатория полностью расширена",16)
+	if p.lounge_tier<2:
+		var next: Dictionary = Lounge.STAGES[p.lounge_tier+1]
+		_expansion_row({"name":"Отдых · "+str(next.name),"kind":"lounge_expansion","owned":false,"price":next.price,"star":next.star}, host, true)
+	else: label(content,"Комната отдыха полностью расширена",16)
+
+func _expansion_row(spec: Dictionary, host: bool, sleep_gate: bool) -> void:
+	var p = game.service.progress
+	var card := _section_card(content)
+	var row := HBoxContainer.new()
+	card.add_child(row)
+	label(row, str(spec.name), 17)
+	var reason: String = "Открыто" if bool(spec.owned) else "Нужна звезда %d"%int(spec.star) if p.stars<int(spec.star) else "Дождись пробуждения игроков" if sleep_gate and not game.session.sleeping_peers.is_empty() else "Заверши проверку" if p.busy() else "Не хватает %d"%(int(spec.price)-p.cash) if p.cash<int(spec.price) else ""
+	var action := button(row, "Открыто" if spec.owned else "Расширить · %d"%int(spec.price), func():send({"action":"buy","kind":str(spec.kind)}), host and reason.is_empty())
+	action.custom_minimum_size.x = 200
+	if not reason.is_empty() and not spec.owned: label(card,reason,14)
+
+func _station_parcel(station_id: int) -> Dictionary:
+	for parcel in game.service.progress.deliveries:
+		if int(parcel.get("station",0)) == station_id: return parcel
+	return {}
+
+func _item_parcel(item: String, station_id: int) -> Dictionary:
+	for parcel in game.service.progress.deliveries:
+		if int(parcel.get("station",0)) == station_id and item in parcel.get("items",[parcel.get("item","")]): return parcel
+	return {}
+
+func _parcel_status(parcel: Dictionary) -> String:
+	if float(parcel.get("remaining",0.0)) > 0.0: return "Доставляется"
+	var job: Dictionary = game.shop.installer_job_for_delivery(int(parcel.get("id",0)))
+	var phase: String = str(job.get("phase",parcel.get("installer_state","")))
+	if phase == "installing": return "Устанавливается"
+	return "Ожидает установки"
+
+func _delivery_tooltip(parcel: Dictionary) -> String:
+	var parts: Array[String] = []
+	if float(parcel.get("remaining",0.0)) > 0: parts.append("До прибытия: %d с"%ceili(float(parcel.remaining)))
+	elif int(parcel.get("owner",0)) > 0: parts.append("Коробку несёт игрок к месту установки.")
+	elif bool(parcel.get("installer",false)):
+		var job: Dictionary = game.shop.installer_job_for_delivery(int(parcel.get("id",0)))
+		var phase: String = str(job.get("phase",parcel.get("installer_state","")))
+		parts.append("Сборщик устанавливает заказ." if phase=="installing" else "Сборщик ждёт освобождения места." if phase=="waiting" else "Сборщик идёт с заказом к месту установки.")
+	else: parts.append("Забери коробку у входа и установи на отмеченное место.")
+	var note: String = game.shop.parcel_plan_note(parcel)
+	if not note.is_empty(): parts.append(note)
+	return "\n".join(parts)
+
+func _product_row(parent: Node, item: String, station_id: int, installed: bool, reason: String, selection := false) -> HBoxContainer:
+	var p = game.service.progress
+	var spec: Dictionary = game.shop.ITEMS[item]
+	var parcel: Dictionary = _item_parcel(item, station_id)
+	var card := _section_card(parent)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	card.add_child(row)
+	var title := label(row, str(spec.name), 17)
+	title.tooltip_text = str(spec.name)
+	var state := label(row, "", 15)
+	state.custom_minimum_size.x = 205
+	state.size_flags_horizontal = Control.SIZE_FILL
+	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var state_text: String = "Установлено" if installed else reason if not reason.is_empty() else "%d"%int(spec.price)
+	state.text = _parcel_status(parcel) if not parcel.is_empty() else state_text
+	state.add_theme_color_override("font_color", Style.GOLD if not parcel.is_empty() else Style.MINT if installed else Style.CREAM)
+	delivery_labels.append({"label":state,"item":item,"station":station_id,"fallback":state_text})
+	if not selection and not installed and parcel.is_empty():
+		var enabled: bool = not installed and parcel.is_empty() and reason.is_empty() and p.cash>=int(spec.price) and not p.busy() and not game.session.is_guest()
+		var buy := button(row, "Купить · %d"%int(spec.price), func():send({"action":"buy","kind":"item","item":item,"station":station_id,"installers":send_installers}), enabled)
+		buy.custom_minimum_size.x = 155
+		if not enabled: buy.tooltip_text = "Покупки доступны хозяину кафе" if game.session.is_guest() else "Уже установлено" if installed else _delivery_tooltip(parcel) if not parcel.is_empty() else reason if not reason.is_empty() else "Заверши проверку" if p.busy() else "Не хватает %d"%(int(spec.price)-p.cash)
+	return row
+
+func _refresh_delivery_labels() -> void:
+	for entry in delivery_labels:
+		var node: Label = entry.label
+		if not is_instance_valid(node): continue
+		var parcel: Dictionary = game.shop.parcel_by_id(int(entry.parcel_id)) if entry.has("parcel_id") else _item_parcel(str(entry.item),int(entry.station))
+		node.text = str(entry.fallback) if parcel.is_empty() else _parcel_status(parcel)
+		node.tooltip_text = "" if parcel.is_empty() else _delivery_tooltip(parcel)
+
+func _pending_table_rows() -> void:
+	for parcel in game.service.progress.deliveries:
+		var item: String = str(parcel.get("item",""))
+		if str(game.shop.ITEMS.get(item,{}).get("kind","")) != "station" or int(parcel.get("station",0))<=Expansion.BASE_SLOT_COUNT: continue
+		var card := _section_card(content)
+		var row := HBoxContainer.new()
+		card.add_child(row)
+		label(row, "%s · место %d"%[game.shop.parcel_name(parcel),int(parcel.station)], 16)
+		var state := label(row, _parcel_status(parcel), 15)
+		state.custom_minimum_size.x = 205
+		state.size_flags_horizontal = Control.SIZE_FILL
+		state.add_theme_color_override("font_color", Style.GOLD)
+		delivery_labels.append({"label":state,"parcel_id":int(parcel.id),"fallback":"Установлено"})
+
+func _shop_tables(host: bool) -> void:
+	label(content, "Столы основного зала", 21)
+	label(content, "Стол и оснащение покупаются отдельно. Работников можно вырастить в лаборатории.", 15)
+	for entry in [[2,"counter"],[3,"counter"],[4,"kitchen"],[5,"grill_kitchen"],[6,"solyanka_kitchen"]]:
+		var id: int = int(entry[0])
+		var item: String = str(entry[1])
+		var spec: Dictionary = game.shop.ITEMS[item]
+		var reason: String = ""
+		if game.service.progress.stars<int(spec.get("star",0)): reason="Нужна звезда %d"%int(spec.get("star",0))
+		elif not game.shop.type_available(item): reason="Сначала расширь зал"
+		elif id==3 and game.service.by_id(2)==null and _station_parcel(2).is_empty(): reason="Сначала закажи стол 2"
+		var row := _product_row(content,item,id,game.service.by_id(id)!=null,reason)
+		var name_label: Label = row.get_child(0)
+		name_label.text = "Стол %d · %s"%[id,str(spec.name)]
+	var extras := _fold(content,"shop-batch","Дополнительные секции · заказать несколько столов")
+	if extras != null:
+		var outer: VBoxContainer = content
+		content = extras
+		_shop_batch(host)
+		content = outer
+	_pending_table_rows()
