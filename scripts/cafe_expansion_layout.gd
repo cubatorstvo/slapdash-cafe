@@ -7,10 +7,10 @@ const TILE:=2.0
 const HALL_X_MIN:=-24.0
 const HALL_X_MAX:=24.0
 const HALL_BACK_Z:=14.0
-const STAGE_ENTRANCE_Z: Array[float]=[-4.0,-4.0,-12.0,-22.0]
-const CHEF_POSITION:=Vector3(0.0,0.0,9.0)
+const STAGE_ENTRANCE_Z: Array[float]=[-6.0,-6.0,-14.0,-24.0]
+const CHEF_POSITION:=Vector3(0.0,0.0,8.0)
 # Legacy name used by route callers: this is now the central transverse aisle, not a point at the Chef table.
-const CHEF_FLOW_POINT:=Vector3(0.0,0.0,-3.0)
+const CHEF_FLOW_POINT:=Vector3(0.0,0.0,-4.0)
 const REAR_SPINE_POINT:=Vector3(0.0,0.0,12.2)
 const AISLE_XS: Array[float]=[-13.5,-4.5,4.5,13.5]
 const LEFT_AISLE_X:=-4.5
@@ -25,13 +25,13 @@ const SECTION_ROWS: Array=[
 # Rows are 8 m apart; columns are 9 m apart. With a 6.6 x 5.72 m station training
 # footprint this leaves >=2.28 m between rows and >=2.4 m between columns.
 const SLOT_POSITIONS: Array[Vector3]=[
-	Vector3(0.0,0.0,9.0),
-	Vector3(-18.0,0.0,9.0),Vector3(-9.0,0.0,9.0),Vector3(9.0,0.0,9.0),Vector3(18.0,0.0,9.0),
-	Vector3(0.0,0.0,1.0),
-	Vector3(-18.0,0.0,1.0),Vector3(-9.0,0.0,1.0),Vector3(9.0,0.0,1.0),Vector3(18.0,0.0,1.0),
-	Vector3(-9.0,0.0,-7.0),Vector3(0.0,0.0,-7.0),Vector3(9.0,0.0,-7.0),
-	Vector3(-18.0,0.0,-7.0),Vector3(18.0,0.0,-7.0),
-	Vector3(-18.0,0.0,-15.0),Vector3(-9.0,0.0,-15.0),Vector3(0.0,0.0,-15.0),Vector3(9.0,0.0,-15.0),Vector3(18.0,0.0,-15.0)
+	Vector3(0.0,0.0,8.0),
+	Vector3(-18.0,0.0,8.0),Vector3(-9.0,0.0,8.0),Vector3(9.0,0.0,8.0),Vector3(18.0,0.0,8.0),
+	Vector3(0.0,0.0,0.0),
+	Vector3(-18.0,0.0,0.0),Vector3(-9.0,0.0,0.0),Vector3(9.0,0.0,0.0),Vector3(18.0,0.0,0.0),
+	Vector3(-9.0,0.0,-8.0),Vector3(0.0,0.0,-8.0),Vector3(9.0,0.0,-8.0),
+	Vector3(-18.0,0.0,-8.0),Vector3(18.0,0.0,-8.0),
+	Vector3(-18.0,0.0,-16.0),Vector3(-9.0,0.0,-16.0),Vector3(0.0,0.0,-16.0),Vector3(9.0,0.0,-16.0),Vector3(18.0,0.0,-16.0)
 ]
 
 static func stage_for_progress(p)->int:
@@ -44,7 +44,7 @@ static func entrance_z(stage: int)->float:
 	return STAGE_ENTRANCE_Z[clampi(stage,1,4)-1]
 
 static func player_spawn(stage: int)->Vector3:
-	return Vector3(0.0,0.02,entrance_z(stage)+2.6)
+	return Vector3(0.0,0.02,entrance_z(stage)+1.4)
 
 static func customer_spawn(stage: int)->Vector3:
 	return Vector3(-1.25,0.0,entrance_z(stage)+0.85)
@@ -177,13 +177,13 @@ static func cafe_route(start: Vector3,target: Vector3,_stage: int,via_chef := tr
 static func hall_cells_for_stage(stage: int)->Dictionary:
 	var plan: Dictionary={}
 	# Stage 1: intimate Chef room and entry corridor.
-	_mark_rect(plan,Rect2i(-4,-2,8,9),1)
+	_mark_rect(plan,Rect2i(-4,-3,8,10),1)
 	# Stage 2: full-width rear hall for the first production row.
-	_mark_rect(plan,Rect2i(-12,-2,24,9),2)
+	_mark_rect(plan,Rect2i(-12,-3,24,10),2)
 	# Stage 3: extend toward the street for the second production bank.
-	_mark_rect(plan,Rect2i(-12,-6,24,13),3)
+	_mark_rect(plan,Rect2i(-12,-7,24,14),3)
 	# Stage 4: final front hall, lobby and last production row.
-	_mark_rect(plan,Rect2i(-12,-11,24,18),4)
+	_mark_rect(plan,Rect2i(-12,-12,24,19),4)
 	var cells: Dictionary={}
 	for cell in plan:
 		var unlock:=int(plan[cell])
