@@ -197,7 +197,7 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 	course_editor={"open":true,"records":[],"mode":"together","editing":edit_course_id,"type_id":""}
 	course_editor_message=""
 	course_group_order=[]
-	group_selected_stations=[]
+	training_scope_stations=previous_selection
 	if edit_course_id>0:
 		var view: Dictionary=game.service.training_queue.course_view(edit_course_id)
 		if view.is_empty():
@@ -205,21 +205,29 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 		else:
 			course_editor.mode=str(view.get("mode","together"))
 			course_editor.editing=edit_course_id
+			training_scope_stations=[]
 			for assignment in view.get("assignments",[]):
 				var rid: int=int(assignment.get("record_id",0))
 				if rid>0: _course_editor_add_record_internal(rid)
 				for raw_id in assignment.get("station_ids",[]):
 					var sid: int=int(raw_id)
-					if sid not in group_selected_stations: group_selected_stations.append(sid)
-			group_selected_stations.sort()
+					if sid not in training_scope_stations: training_scope_stations.append(sid)
+			training_scope_stations.sort()
+			group_selected_stations=training_scope_stations.duplicate()
 			course_group_order=view.get("group_order",[]).duplicate()
-	elif record_id<=0 and not previous_selection.is_empty():
+	elif not previous_selection.is_empty():
 		group_selected_stations=previous_selection
-		var first_station=game.service.by_id(int(group_selected_stations[0]))
-		if first_station!=null: course_editor.type_id=str(first_station.type_id)
-		_sync_course_group_order()
-	if record_id>0: _course_editor_add_record_internal(record_id)
+		training_scope_stations=previous_selection.duplicate()
+	if record_id>0:
+		_course_editor_add_record_internal(record_id)
+		var record: Dictionary=game.service.masterclass_by_id(record_id)
+		if not record.is_empty(): training_type_filter=str(record.get("source_type",""))
+	if training_type_filter.is_empty() and not training_scope_stations.is_empty():
+		var first_station=game.service.by_id(int(training_scope_stations[0]))
+		if first_station!=null: training_type_filter=str(first_station.type_id)
+	if not training_type_filter.is_empty(): course_editor.type_id=training_type_filter
 	_mark_training_intro_mass_seen()
+	groups_mode="training"
 	tab="groups"
 	stamp=""
 	rebuild()
@@ -247,7 +255,9 @@ func open_problem_group(stations: Array,course_id := 0) -> void:
 	stats_focus={}
 	group_selected_stations=stations.duplicate()
 	group_selected_stations.sort()
+	training_scope_stations=group_selected_stations.duplicate()
 	course_focus_id=course_id
+	groups_mode="training" if course_id>0 else "overview"
 	tab="groups"
 	stamp=""
 	rebuild()
@@ -615,101 +625,8 @@ func rebuild() -> void:
 				else:
 					button(row,"Удалить…",func():confirm_delete_masterclass=id;stamp="";rebuild(),host)
 		"groups":
-			label(content,"ГРУППЫ ПРОИЗВОДСТВЕННЫХ СТОЛОВ",23)
-			label(content,"Группа теперь постоянна: название и ID не меняются из-за рецепта. План показывает, чему столы должны научиться; существующий способ продолжает работать до завершённого переобучения.",15)
-			if is_instance_valid(service.staff_training) and service.staff_training.is_active():
-				var training_record: Dictionary=service.masterclass_by_id(service.staff_training.record_id)
-				var training_name: String=str(training_record.get("name",service.staff_training.record.get("name","Запись")))
-				label(content,"УЧЕБНЫЙ СЕАНС · %s · %s · столы %s"%[training_name,service.staff_training.phase_label(),", ".join(service.staff_training.station_ids.map(func(id):return str(id)))],17)
-			for group in service.table_groups():
-				var group_id: String=str(group.id)
-				var group_pick:=CheckBox.new(); content.add_child(group_pick)
-				group_pick.text="Группа: %s · ID %s"%[str(group.name),group_id]
-				group_pick.button_pressed=group_id in group_selected_groups
-				group_pick.disabled=not host
-				group_pick.toggled.connect(func(on):set_group_selected(group_id,on))
-				var station_parts: Array=[]
-				for raw_id in group.stations:
-					var station_id: int=int(raw_id)
-					var station=service.by_id(station_id)
-					var worker_text: String="%d/%d работников"%[station.staffed if station.staffed>=0 else station.role_count(),station.role_count()]
-					station_parts.append("стол %d · %s"%[station_id,worker_text])
-				label(content,", ".join(station_parts),15)
-				var rename_row:=HBoxContainer.new(); content.add_child(rename_row)
-				var group_edit:=LineEdit.new(); rename_row.add_child(group_edit); group_edit.text=str(group.name); group_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL; group_edit.editable=host
-				button(rename_row,"Переименовать",func():send({"action":"group_rename","group":group_id,"name":group_edit.text}),host)
-				button(content,"Выбрать всю группу",func():select_group_stations(group.stations),host)
-				for raw_id in group.stations:
-					var station_id: int=int(raw_id)
-					var check:=CheckBox.new(); content.add_child(check)
-					check.text="Стол %d"%station_id
-					check.button_pressed=station_id in group_selected_stations
-					check.disabled=not host
-					check.toggled.connect(func(on):set_group_station_selected(station_id,on))
-				var selected_here: Array=group.stations.filter(func(id):return id in group_selected_stations)
-				if not selected_here.is_empty() and selected_here.size()<group.stations.size():
-					button(content,"Разделить: выбранные столы → новая группа",func():send({"action":"group_split","group":group_id,"stations":selected_here.duplicate()}),host)
-				if not group_selected_stations.is_empty():
-					button(content,"Изменить состав: выбранные столы → эта группа",func():send({"action":"group_members","group":group_id,"stations":group_selected_stations.duplicate()}),host)
-				label(content,"АКТИВНОЕ МЕНЮ И УЧЕБНЫЙ ПЛАН",17)
-				for dish in group.dishes:
-					var dish_id: String=str(dish)
-					var active_toggle:=CheckBox.new(); content.add_child(active_toggle)
-					active_toggle.text=Definition.DISHES.get(dish_id,dish_id)+" · принимать новые заказы"
-					active_toggle.button_pressed=dish_id in group.active_dishes
-					active_toggle.disabled=not host
-					active_toggle.toggled.connect(func(on):send({"action":"group_active","group":group_id,"dish":dish_id,"enabled":on}))
-					var summary: Dictionary=service.group_dish_summary(group_id,dish_id)
-					var state_parts: Array=[]
-					for state in summary.get("states",{}): state_parts.append("%d · %s"%[int(summary.states[state]),str(state)])
-					label(content,"%s → %s → %d из %d освоили%s"%[Definition.DISHES.get(dish_id,dish_id),str(summary.get("desired","не назначено")),int(summary.get("mastered",0)),int(summary.get("total",group.stations.size())),"; "+", ".join(state_parts) if not state_parts.is_empty() else ""],15)
-					for raw_id in group.stations:
-						var station_id: int=int(raw_id)
-						label(content,"   стол %d · сейчас: %s · %s"%[station_id,service.source_label(station_id,dish_id),service.station_group_status(station_id,dish_id)],13)
-				var performance: Dictionary=service.group_performance(group)
-				var total_group: int=int(performance.orders_completed)+int(performance.losses)
-				var group_pct: float=Insights.completion_percent(int(performance.orders_completed),total_group)
-				var perf_line:=label(content,"Результат: %d из %d заказов · %.0f%% · %d порций · доход %d"%[int(performance.orders_completed),total_group,group_pct,int(performance.portions_served),int(performance.revenue)],15)
-				perf_line.tooltip_text="Статистика закреплена за постоянным ID группы и не меняет организационную группу при смене способа."
-			if group_selected_stations.is_empty():
-				label(content,"Выбери столы галочками или кнопкой группы.",16)
-			else:
-				label(content,"Выбраны столы: "+", ".join(group_selected_stations.map(func(id):return str(id))),18)
-				button(content,"Создать группу из выбранных",func():send({"action":"group_create","stations":group_selected_stations.duplicate()}),host)
-			label(content,"ОБЪЕДИНЕНИЕ ГРУПП",20)
-			if group_selected_groups.size()<2:
-				label(content,"Отметь минимум две группы одной кухни. При разных планах выбери итоговую запись для каждого блюда.",14)
-			else:
-				var merge_preview: Dictionary=service.preview_group_merge(group_selected_groups)
-				if merge_preview.is_empty():
-					label(content,"Выбранные группы относятся к разным кухням.",15)
-				else:
-					var type_id: String=str(merge_preview.type_id)
-					if not group_merge_active_initialized:
-						group_merge_active_initialized=true
-						for selected_group_id in group_selected_groups:
-							var selected_group: Dictionary=service.table_group_by_id(str(selected_group_id))
-							for dish in selected_group.active_dishes:
-								if dish not in group_merge_active: group_merge_active.append(dish)
-					label(content,"Итоговое активное меню:",15)
-					for dish in Definition.TYPES[type_id].dishes:
-						var dish_id: String=str(dish)
-						var toggle:=CheckBox.new(); content.add_child(toggle); toggle.text=Definition.DISHES.get(dish_id,dish_id); toggle.button_pressed=dish_id in group_merge_active; toggle.disabled=not host
-						toggle.toggled.connect(func(on):set_merge_active(dish_id,on))
-					for dish in merge_preview.differences:
-						var dish_id: String=str(dish)
-						label(content,"Разный план: "+str(Definition.DISHES.get(dish_id,dish_id)),15)
-						for raw_record_id in merge_preview.differences[dish]:
-							var record_id: int=int(raw_record_id)
-							if record_id<=0: continue
-							var record: Dictionary=service.masterclass_by_id(record_id)
-							button(content,("✓ " if int(group_merge_choices.get(dish_id,0))==record_id else "")+str(record.get("name","Запись #%d"%record_id)),func():set_merge_choice(dish_id,record_id),host)
-					var choices_ready: bool=true
-					for dish in merge_preview.differences:
-						if int(group_merge_choices.get(str(dish),0))<=0: choices_ready=false
-					button(content,"Объединить выбранные группы",func():send({"action":"group_merge","groups":group_selected_groups.duplicate(),"choices":group_merge_choices.duplicate(true),"active":group_merge_active.duplicate()}),host and choices_ready)
-			course_editor_page(host)
-			training_queue_page(host)
+			if groups_mode=="training": training_workspace_page(host)
+			else: groups_overview_page(host)
 		"laboratory":
 			laboratory_page()
 		"lounge":
