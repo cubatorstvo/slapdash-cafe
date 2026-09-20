@@ -1421,7 +1421,7 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 	var box:=_section_card(parent,Color("294647"))
 	var header:=HBoxContainer.new()
 	box.add_child(header)
-	var expanded:=bool(training_course_expanded.get(course_id,course_id==course_focus_id or str(course.state) in ["gathering","watching","returning"]))
+	var expanded:=bool(training_course_expanded.get(course_id,course_id==course_focus_id or str(course.state)=="active"))
 	var expand:=Button.new()
 	expand.text="▾" if expanded else "▸"
 	expand.custom_minimum_size=Vector2(38,36)
@@ -1442,11 +1442,12 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if bool(course.editable) else {}
 		var row: Variant=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":bool(course.editable)},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
 		row.drop_enabled=bool(course.editable)
+	var action_row:=HBoxContainer.new()
+	box.add_child(action_row)
 	if bool(course.editable):
 		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
-		var action_row:=HBoxContainer.new()
-		box.add_child(action_row)
 		button(action_row,"Настройки курса",func():course_editor_open(0,course_id),host)
+	if str(course.state) not in ["completed","cancelled"]:
 		button(action_row,"Отменить курс",func():send({"action":"training_cancel_course","course":course_id}),host)
 	for batch in course.batches:
 		if str(batch.get("blocked_reason","")).is_empty(): continue
