@@ -7,6 +7,7 @@ const Style=preload("res://scripts/cafe_theme.gd")
 var meta: Dictionary={}
 var drag_payload: Dictionary={}
 var selected:=false
+var context_highlight:=false
 var drop_enabled:=true
 var title_text:=""
 var subtitle_text:=""
@@ -46,10 +47,17 @@ func setup(value_meta: Dictionary,title: String,subtitle := "",payload: Dictiona
 
 func set_selected(value: bool) -> void:
 	selected=value
+	_refresh_style()
+
+func set_context_highlight(value: bool) -> void:
+	context_highlight=value
+	_refresh_style()
+
+func _refresh_style() -> void:
 	var box:=Style.box(Color("315052") if selected else Color("294647"),10,10)
-	if selected:
+	if selected or context_highlight:
 		box.set_border_width_all(2)
-		box.border_color=Style.GOLD
+		box.border_color=Style.GOLD if selected else Style.MINT
 	add_theme_stylebox_override("panel",box)
 
 func _gui_input(event: InputEvent) -> void:
