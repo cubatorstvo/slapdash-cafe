@@ -93,7 +93,7 @@ func run()->void:
 		var to_lab:=Expansion.route_to_rear(Expansion.CHEF_POSITION,Annex.LAB_DOOR_CAFE)
 		check(to_lab.has(Expansion.REAR_SPINE_POINT) and Vector3(to_lab.back()).distance_to(Annex.LAB_DOOR_CAFE)<0.05,"Lab route crosses rear spine at stage %d"%stage)
 		if stage>=2:
-			var lounge_target:=Lounge.rest_spot(0,p.lounge_tier,p.lounge_items).position
+			var lounge_target: Vector3=Vector3(Lounge.rest_spot(0,p.lounge_tier,p.lounge_items).position)
 			var lounge_path:=Lounge.path_between(Annex.REST_DOOR_ROOM,lounge_target,p.lounge_tier,p.lounge_items)
 			check(lounge_path.size()>=2,"Lounge has a walkable path from its door at stage %d"%stage)
 
