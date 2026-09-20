@@ -22,10 +22,12 @@ static func make(paper := false) -> Theme:
 		t.set_color("font_color", type, text)
 		t.set_color("font_hover_color", type, INK)
 		t.set_color("font_pressed_color", type, INK)
+		t.set_color("font_hover_pressed_color", type, INK)
 	for type in ["Button", "OptionButton"]:
 		t.set_stylebox("normal", type, box(Color("e4d7bb") if paper else Color("355354"), 10, 12))
 		t.set_stylebox("hover", type, box(GOLD, 10, 12))
 		t.set_stylebox("pressed", type, box(MINT, 10, 12))
+		t.set_stylebox("hover_pressed", type, box(GOLD, 10, 12))
 		var focus := box(Color(0,0,0,0), 10, 12)
 		focus.set_border_width_all(2)
 		focus.border_color = MINT
