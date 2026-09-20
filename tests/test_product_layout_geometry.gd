@@ -47,9 +47,9 @@ func run()->void:
 	print("2/5: main service aisles and the transverse aisle stay outside station footprints")
 	for slot in range(Expansion.SLOT_COUNT):
 		var center:=Expansion.position(slot)
-		for z in [-15.0,-7.0,1.0,9.0]:
-			check(point_clear_of_station(Vector3(Expansion.LEFT_AISLE_X,0,z),center),"Left service aisle intersects slot %d"%(slot+1))
-			check(point_clear_of_station(Vector3(Expansion.RIGHT_AISLE_X,0,z),center),"Right service aisle intersects slot %d"%(slot+1))
+		for aisle_x in Expansion.AISLE_XS:
+			for z in [-15.0,-7.0,1.0,9.0]:
+				check(point_clear_of_station(Vector3(float(aisle_x),0,z),center),"Service aisle %.1f intersects slot %d"%[float(aisle_x),slot+1])
 		check(point_clear_of_station(Expansion.CHEF_FLOW_POINT,center),"Central transverse aisle intersects slot %d"%(slot+1))
 
 	print("3/5: every slot footprint and working side is supported by its unlock-stage floor")
