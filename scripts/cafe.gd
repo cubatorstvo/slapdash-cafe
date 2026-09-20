@@ -647,7 +647,7 @@ func _build_expansion_partition(parent: Node3D,center: Vector3,size: Vector3,inw
 	var band_size:=Vector3(0.06,0.24,maxf(0.4,length-0.25)) if vertical else Vector3(maxf(0.4,length-0.25),0.24,0.06)
 	Props.box(parent,band_size,center+inward*0.19+Vector3(0,-1.72,0),Color("e3bd36"))
 	var sign:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.24+Vector3(0,-0.35,0),22,Color("fff2b0"))
-	sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	sign.rotation.y=atan2(inward.x,inward.z)
 
 func new_cafe() -> void:
 	if is_instance_valid(session): session.clear_sleeping()
