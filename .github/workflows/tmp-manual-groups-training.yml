@@ -5,6 +5,10 @@ on:
     branches:
       - fix/manual-groups-training-queue
 
+concurrency:
+  group: tmp-manual-groups-training-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   regression:
     runs-on: ubuntu-latest
