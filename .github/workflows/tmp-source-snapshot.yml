@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          base64 -d .tmp/layout.patch.gz.b64 | gzip -d > /tmp/layout.patch
+          cat .tmp/layout.patch.part00 .tmp/layout.patch.part01 .tmp/layout.patch.part02 .tmp/layout.patch.part03 .tmp/layout.patch.part04 | base64 -d | gzip -d > /tmp/layout.patch
           if patch --dry-run -p1 < /tmp/layout.patch >/dev/null 2>&1; then
             patch -p1 < /tmp/layout.patch
             git config user.name "github-actions[bot]"
