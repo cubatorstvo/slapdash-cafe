@@ -221,6 +221,14 @@ func run()->void:
 	await process_frame
 	var edited_view: Dictionary=service.training_queue.course_view(course_id)
 	check(edited_view.assignments.size()==2 and int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 edited course persists the new lesson order")
+	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[1]},{"zone":"course","course_id":course_id,"index":0},false)
+	await process_frame
+	edited_view=service.training_queue.course_view(course_id)
+	check(int(edited_view.assignments[0].record_id)==2302 and int(edited_view.assignments[1].record_id)==2303,"UI T13 drag reorders lessons inside an existing waiting course")
+	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[0]},{"zone":"course","course_id":course_id,"index":1},true)
+	await process_frame
+	edited_view=service.training_queue.course_view(course_id)
+	check(int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 existing queue can be reordered back by drag")
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2302,"UI T13 queue now points to the new record version")
 	dispose(game)
 
