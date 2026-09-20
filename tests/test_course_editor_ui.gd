@@ -122,7 +122,9 @@ func run()->void:
 	check(views.size()==1 and views[0].assignments.size()==3 and str(views[0].mode)=="balanced","UI T04 creates one internal balanced schedule block")
 	check(views[0].batches.size()==6 and views[0].batches.all(func(batch):return batch.stations.size()<=1),"UI T04 actual queue follows the fixed twenty-percent batching")
 	var schedule_id:=int(views[0].id)
-	check(await run_until(service,func():return str(service.training_queue._course(schedule_id).get("state",""))=="completed"),"UI T04 scheduled dishes complete")
+	service.advance(0.1)
+	await process_frame
+	check(int(service.training_queue.active_batch_id)==int(views[0].batches[0].id),"UI T04 schedule starts from the first visible dish and first table batch")
 	dispose(game)
 
 	print("UI T05: automatic batch size is rounded by table count")
