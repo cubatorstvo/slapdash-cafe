@@ -14,6 +14,7 @@ var visit_status: Label
 var goal: Label
 var clock: Label
 var clone_status: Label
+var equipment_warning: Label
 var supplies: Label
 var controls: Label
 var prompt: Label
@@ -37,7 +38,7 @@ func _ready() -> void:
 	top.offset_left = 26
 	top.offset_right = -26
 	top.offset_top = 22
-	top.offset_bottom = 150
+	top.offset_bottom = 190
 	var row := HBoxContainer.new()
 	top.add_child(row)
 	row.add_theme_constant_override("separation", 24)
@@ -50,6 +51,9 @@ func _ready() -> void:
 	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	goal = _label(order,"",20)
 	clone_status = _label(order,"",14,CafeStyle.MINT)
+	equipment_warning = _label(order,"",14,Color("f0b06b"))
+	equipment_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	equipment_warning.max_lines_visible = 2
 	journey = _label(order,"",15,CafeStyle.CREAM)
 	journey.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	journey.max_lines_visible = 2
@@ -66,8 +70,8 @@ func _ready() -> void:
 	event_feed_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	event_feed_panel.offset_left=26
 	event_feed_panel.offset_right=560
-	event_feed_panel.offset_top=164
-	event_feed_panel.offset_bottom=270
+	event_feed_panel.offset_top=204
+	event_feed_panel.offset_bottom=310
 	event_feed_text=_label(event_feed_panel,"",14,CafeStyle.CREAM)
 	event_feed_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	event_feed_text.max_lines_visible=4
@@ -76,8 +80,8 @@ func _ready() -> void:
 	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	recipe_panel.offset_left = -346
 	recipe_panel.offset_right = -26
-	recipe_panel.offset_top = 164
-	recipe_panel.offset_bottom = 164
+	recipe_panel.offset_top = 204
+	recipe_panel.offset_bottom = 204
 	recipe_panel.custom_minimum_size = Vector2(320, 0)
 	recipe_scroll = ScrollContainer.new()
 	recipe_panel.add_child(recipe_scroll)

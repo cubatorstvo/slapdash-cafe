@@ -2,6 +2,7 @@ extends Node
 ## Host-authoritative owner of staff courses, batches and lessons.
 ## Physical walking/watching remains in staff_training_session.gd.
 const Definition=preload("res://scripts/station_definition.gd")
+const Masterclasses=preload("res://scripts/masterclass_library.gd")
 var service: Node3D
 var courses: Array=[]
 var batches: Array=[]
@@ -619,10 +620,8 @@ func _batch_block_reason(batch: Dictionary)->String:
 		for station_id in lesson.station_ids:
 			var station=service.by_id(int(station_id))
 			if station==null: return "Стол %d больше не существует"%int(station_id)
-			var missing: Array=Definition.missing_equipment(str(lesson.dish),station.equipment)
-			if not missing.is_empty(): return "Стол %d: требуется оборудование — %s"%[int(station_id),", ".join(missing)]
 			if station.staffed>=0 and station.staffed<station.role_count(): return "Стол %d: нужны сотрудники"%int(station_id)
-			if station.training.active() or station.pending_teacher>0: return "Стол %d занят другим обучением"%int(station_id)
+			if station.training.active(): return "Стол %d занят другим обучением"%int(station_id)
 			if not station.group_training_state.is_empty(): return "Стол %d занят другой учебной партией"%int(station_id)
 			if not station.ready_crew(): return "Стол %d: сотрудник занят другой активностью"%int(station_id)
 			if not _record_valid_for_station(record,station): return "Стол %d несовместим с уроком"%int(station_id)
@@ -672,7 +671,7 @@ func _batch_idle(batch: Dictionary)->bool:
 	for station_id in batch.get("station_ids",[]):
 		var station=service.by_id(int(station_id))
 		if station==null: return false
-		if station.state!="idle" or station.customer_id>=0 or station.training.active() or station.pending_teacher>0: return false
+		if station.state!="idle" or station.customer_id>=0 or station.training.active(): return false
 	return true
 
 func _next_lesson(batch: Dictionary)->Dictionary:
@@ -744,7 +743,7 @@ func _apply_lesson(lesson: Dictionary)->void:
 	for station_id in lesson.station_ids:
 		var station=service.by_id(int(station_id))
 		if station==null: continue
-		station.recipes[str(lesson.dish)]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true)}
+		station.recipes[str(lesson.dish)]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true),"required_equipment":Masterclasses.required_equipment(record)}
 		station.method_sources[str(lesson.dish)]={"id":int(lesson.record_id),"name":str(record.get("name","Запись"))}
 		station.drafts.erase(str(lesson.dish))
 	lesson.applied=true

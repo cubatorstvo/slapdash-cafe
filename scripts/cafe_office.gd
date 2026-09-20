@@ -829,6 +829,8 @@ func course_editor_page(host: bool) -> void:
 		label(content,"Время фильмов указано отдельно. Дорога, сбор и ожидание уже принятого заказа зависят от текущего состояния кафе.",14)
 		for lesson in preview.lessons:
 			label(content,"%s · %s · освоили %d/%d · фильм %.1f с"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),str(lesson.name),int(lesson.mastered),int(lesson.selected),float(lesson.film)],14)
+			for issue in lesson.get("equipment_issues",[]):
+				label(content,"⚠ Стол %d после обучения не сможет готовить: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],13)
 		for batch_index in range(preview.batches.size()):
 			var batch: Dictionary=preview.batches[batch_index]
 			var readiness: String="готова" if bool(batch.ready) else "ждёт: "+str(batch.blocked_reason)

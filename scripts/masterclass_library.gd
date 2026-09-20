@@ -14,10 +14,26 @@ static func default_name(dish: String, number: int, archived := false, station_i
 	if archived: return "Архив · %s · стол %d"%[Definition.DISHES.get(dish,dish),station_id]
 	return "%s · мастер-класс %d"%[Definition.DISHES.get(dish,dish),number]
 
-static func make_record(id: int, dish: String, type_id: String, tracks: Array, duration: float, quality: Dictionary, name: String, archived := false, source_station := 0, scene_config: Dictionary={}) -> Dictionary:
+static func _compatible_required(type_id: String,items: Array) -> Array:
+	var result: Array=[]
+	for raw_item in items:
+		var item:=str(raw_item)
+		if Definition.equipment_allowed(type_id,item) and item not in result: result.append(item)
+	return result
+
+static func make_record(id: int,dish: String,type_id: String,tracks: Array,duration: float,quality: Dictionary,name: String,archived := false,source_station := 0,scene_config: Dictionary={}) -> Dictionary:
 	var stored_tracks: Array=tracks.duplicate(true)
 	var events: Array=Highlights.extract_events(stored_tracks)
-	return {"id":id,"name":name,"dish":dish,"source_type":type_id,"tracks":stored_tracks,"duration":duration,"quality":quality.duplicate(true),"effectiveness":effectiveness(quality),"archived":archived,"source_station":source_station,"scene_config":scene_config.duplicate(true),"highlight_plan_version":Highlights.PLAN_VERSION,"highlight_events":events,"highlight_segments":Highlights.build(stored_tracks,events),"highlight_duration":Highlights.duration(stored_tracks)}
+	var stored_scene: Dictionary=scene_config.duplicate(true)
+	var required: Array=[]
+	if stored_scene.get("required_equipment",null) is Array:
+		required=_compatible_required(type_id,stored_scene.required_equipment)
+	elif stored_scene.get("equipment",null) is Array:
+		required=_compatible_required(type_id,stored_scene.equipment)
+	else:
+		required=Definition.DISH_EQUIPMENT.get(dish,[]).duplicate()
+	stored_scene.required_equipment=required.duplicate()
+	return {"id":id,"name":name,"dish":dish,"source_type":type_id,"tracks":stored_tracks,"duration":duration,"quality":quality.duplicate(true),"effectiveness":effectiveness(quality),"archived":archived,"source_station":source_station,"scene_config":stored_scene,"required_equipment":required,"highlight_plan_version":Highlights.PLAN_VERSION,"highlight_events":events,"highlight_segments":Highlights.build(stored_tracks,events),"highlight_duration":Highlights.duration(stored_tracks)}
 
 static func ensure_highlights(record: Dictionary) -> void:
 	if record.get("tracks",[]) is Array:
@@ -31,8 +47,18 @@ static func ensure_highlights(record: Dictionary) -> void:
 	if not record.has("scene_config") or not record.scene_config is Dictionary: record.scene_config={}
 	if not record.has("effectiveness"): record.effectiveness=effectiveness(record.get("quality",{}))
 
+static func required_equipment(record: Dictionary) -> Array:
+	var type_id: String=str(record.get("source_type",""))
+	if record.get("required_equipment",null) is Array: return _compatible_required(type_id,record.required_equipment)
+	var scene: Variant=record.get("scene_config",{})
+	if scene is Dictionary:
+		if scene.get("required_equipment",null) is Array: return _compatible_required(type_id,scene.required_equipment)
+		if scene.get("equipment",null) is Array: return _compatible_required(type_id,scene.equipment)
+	return Definition.DISH_EQUIPMENT.get(str(record.get("dish","")),[]).duplicate()
+
 static func summary(record: Dictionary) -> Dictionary:
 	var result:=record.duplicate(true)
+	result.required_equipment=required_equipment(record)
 	result.erase("tracks")
 	result.erase("highlight_events")
 	return result
@@ -68,6 +94,9 @@ static func valid(record: Dictionary) -> bool:
 	if record.has("highlight_segments") and not record.highlight_segments is Array: return false
 	if record.has("highlight_events") and not record.highlight_events is Array: return false
 	if record.has("scene_config") and not record.scene_config is Dictionary: return false
+	var required: Array=required_equipment(record)
+	for item in required:
+		if not item is String or not Definition.equipment_allowed(type_id,str(item)): return false
 	var duration=record.get("duration")
 	if not (duration is float or duration is int) or float(duration)<0.0: return false
 	return true

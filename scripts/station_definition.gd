@@ -8,6 +8,12 @@ const TYPES := {
 }
 const DISHES := {"wine": "Бокал вина", "potato": "Жареный картофель", "sausage": "Сосиска в соусе", "meal": "Стейк с макаронами", "burger":"Бургер", "cheeseburger":"Чизбургер", "spicy_burger":"Острый бургер", "solyanka":"Солянка"}
 const DISH_ORDER := ["wine","potato","sausage","meal","burger","cheeseburger","spicy_burger","solyanka"]
+const EQUIPMENT_BY_TYPE := {
+	"counter":["sauce","plates","cup","pan","jug","rag","sauce_ramp"],
+	"kitchen":["meat_kit","pasta_kit"],
+	"grill_kitchen":["grill_kit","assembly_kit"],
+	"solyanka_kitchen":["fire_kit","stir_kit","salt_kit"]
+}
 const DISH_EQUIPMENT := {
 	"wine":["jug","cup"],
 	"potato":["pan","plates"],
@@ -41,8 +47,17 @@ static func type_for_dish(dish: String) -> String:
 		if dish in TYPES[type_id].dishes: return type_id
 	return ""
 
-static func missing_equipment(dish: String, equipment: Array) -> Array:
+static func equipment_for_type(type_id: String) -> Array:
+	return EQUIPMENT_BY_TYPE.get(type_id,[]).duplicate()
+
+static func equipment_allowed(type_id: String,item: String) -> bool:
+	return item in EQUIPMENT_BY_TYPE.get(type_id,[])
+
+static func missing_items(required: Array,equipment: Array,upgrades: Array=[]) -> Array:
 	var result: Array=[]
-	for item in DISH_EQUIPMENT.get(dish,[]):
-		if item not in equipment: result.append(item)
+	for item in required:
+		if item not in equipment and item not in upgrades: result.append(item)
 	return result
+
+static func missing_equipment(dish: String,equipment: Array,upgrades: Array=[]) -> Array:
+	return missing_items(DISH_EQUIPMENT.get(dish,[]),equipment,upgrades)

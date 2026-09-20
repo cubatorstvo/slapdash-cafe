@@ -3,6 +3,7 @@ extends Node3D
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const LoungeLayout=preload("res://scripts/lounge_layout.gd")
+const Masterclasses=preload("res://scripts/masterclass_library.gd")
 var service: Node3D
 var active:=false
 var phase:=""
@@ -100,7 +101,7 @@ func _route(home_world: Vector3,target_world: Vector3)->Array:
 func _ready_to_leave()->bool:
 	for id in station_ids:
 		var station=service.by_id(int(id))
-		if station==null or station.state!="idle" or station.customer_id>=0 or station.training.active() or station.pending_teacher>0: return false
+		if station==null or station.state!="idle" or station.customer_id>=0 or station.training.active(): return false
 	return true
 
 func _spawn_actors()->void:
@@ -174,7 +175,7 @@ func _complete_legacy()->void:
 	for id in station_ids:
 		var station=service.by_id(int(id))
 		if station==null: continue
-		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true)}
+		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true),"required_equipment":Masterclasses.required_equipment(record)}
 		station.method_sources[dish]={"id":record_id,"name":str(record.get("name","Запись"))}
 		station.method_plan.erase(dish)
 		station.drafts.erase(dish)
