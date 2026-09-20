@@ -2,7 +2,8 @@ extends RefCounted
 ## Deterministic event-driven highlight edit built only from accepted source frames.
 const RATIO:=0.30
 const FPS:=60.0
-const PLAN_VERSION:=2
+const PLAN_VERSION:=3
+const TRAINING_WATCH_SECONDS:=30.0
 const MAX_SEGMENTS:=8
 const PRE_EVENT_TICKS:=24
 const POST_EVENT_TICKS:=48
@@ -17,7 +18,10 @@ static func source_ticks(tracks: Array)->int:
 	return longest
 
 static func film_ticks(tracks: Array)->int:
-	return maxi(1,roundi(source_ticks(tracks)*RATIO)) if source_ticks(tracks)>0 else 0
+	var total:=source_ticks(tracks)
+	if total<=0: return 0
+	if float(total)/FPS<=TRAINING_WATCH_SECONDS: return total
+	return maxi(1,roundi(total*RATIO))
 
 static func duration(tracks: Array)->float:
 	return film_ticks(tracks)/FPS
@@ -53,8 +57,9 @@ static func build(tracks: Array, supplied_events: Array=[])->Array:
 	var total:=source_ticks(tracks)
 	var target:=film_ticks(tracks)
 	if total<=0 or target<=0: return []
-	var segment_limit: int=_segment_limit(target)
 	var events: Array=supplied_events.duplicate(true) if not supplied_events.is_empty() else extract_events(tracks)
+	if float(total)/FPS<=TRAINING_WATCH_SECONDS: return _build_uncut(total,events)
+	var segment_limit: int=_segment_limit(target)
 	var selected:=PackedByteArray()
 	selected.resize(total)
 	selected.fill(0)
@@ -103,6 +108,22 @@ static func build(tracks: Array, supplied_events: Array=[])->Array:
 		var actual:=finish-start
 		result.append({"kind":kind,"camera":camera,"source_start":start,"source_end":finish,"film_start":film_cursor,"film_end":film_cursor+actual,"transition_ticks":mini(6,maxi(0,actual/4)),"event_tick":int(event.get("tick",-1)),"event_role":int(event.get("role",-1)),"event_object":str(event.get("object",""))})
 		film_cursor+=actual
+	return result
+
+static func _build_uncut(total: int,events: Array)->Array:
+	if total<=0: return []
+	var segment_count:=clampi(ceili(float(total)/(FPS*6.0)),2 if total>=roundi(FPS*4.0) else 1,4)
+	var result: Array=[]
+	var cursor:=0
+	for index in range(segment_count):
+		var finish:=roundi(float(total)*float(index+1)/float(segment_count))
+		finish=clampi(finish,cursor+1,total)
+		var event:=_best_event_for_range(events,cursor,finish)
+		var kind:=str(event.get("kind","motion")) if not event.is_empty() else "motion"
+		var camera:=_camera_for_kind(kind,index)
+		var length:=finish-cursor
+		result.append({"kind":kind,"camera":camera,"source_start":cursor,"source_end":finish,"film_start":cursor,"film_end":finish,"transition_ticks":mini(6,maxi(0,length/4)),"event_tick":int(event.get("tick",-1)),"event_role":int(event.get("role",-1)),"event_object":str(event.get("object",""))})
+		cursor=finish
 	return result
 
 static func _segment_limit(target: int)->int:
