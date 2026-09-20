@@ -92,7 +92,10 @@ func sync(state: Dictionary,value: Dictionary)->void:
 	screen.material_override=movie_material
 	var segments: Array=record.get("highlight_segments",[])
 	if segments.is_empty(): return
-	var film_tick:=clampi(floori(float(state.get("elapsed",0.0))*60.0),0,maxi(0,roundi(float(state.get("duration",0.0))*60.0)-1))
+	var film_length_ticks: int=int(segments.back().get("film_end",0)) if not segments.is_empty() else 0
+	if film_length_ticks<=0: return
+	var raw_tick:=floori(float(state.get("elapsed",0.0))*Highlights.FPS)
+	var film_tick:=posmod(raw_tick,film_length_ticks) if bool(state.get("loop",false)) else clampi(raw_tick,0,film_length_ticks-1)
 	var frame: Dictionary=Highlights.source_tick(segments,film_tick)
 	if frame.is_empty(): return
 	_camera(int(frame.camera))

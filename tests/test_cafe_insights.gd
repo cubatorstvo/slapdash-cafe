@@ -69,7 +69,7 @@ func run()->void:
 	service.masterclasses=[record]
 	service.next_masterclass_id=701
 	check(service.create_table_group([2,3],"Сервисная линия").is_empty(),"Two counters form an explicit service group")
-	check(service._apply_group_plan(700,[2,3]).size()==1,"Explicit service group receives its desired sausage record")
+	check(service._apply_group_plan(700,[2,3]).size()==2,"Both tables in the explicit service group receive their desired sausage record directly")
 	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Service group has sausage explicitly enabled for diagnostics")
 	var service_group: Dictionary=service.table_groups().filter(func(value):return value.stations==[2,3])[0]
 	var service_group_id: String=str(service_group.id)
@@ -151,7 +151,7 @@ func run()->void:
 	check(str(goal.key)=="training_intro_first_work" and int(goal.station)==2,"Learned course still requires seeing the trained station work")
 	p.journey_auto_served=1
 	goal=Journey.current(p,service.stations,service.served,true,service)
-	check(str(goal.key)=="training_intro_mass" and str(goal.detail).contains("20%") and not str(goal.detail).contains("По группам"),"Second compatible table explains automatic twenty-percent table batches")
+	check(str(goal.key)=="training_intro_mass" and str(goal.detail).contains("один общий просмотр") and not str(goal.detail).contains("20%"),"Second compatible table explains one shared training pass")
 	game.office.open("groups")
 	game.office.select_group_stations([2])
 	game.office.course_editor_open()
@@ -169,14 +169,9 @@ func run()->void:
 	check(int(scale_summary.max_places)==19 and int(scale_summary.places)==19 and int(scale_summary.workers)==19,"Scale summary reports nineteen production places and nineteen assigned workers, excluding chef station")
 	var compatible: Array=service.compatible_training_station_ids(700)
 	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables without auto-merging them")
-	check(service._apply_group_plan(700,compatible).size()>=1,"All compatible source groups can first receive the same desired record")
-	var prepared_group_ids: Array=[]
-	for station_id in compatible:
-		var prepared_group_id: String=service.group_id_for_station(int(station_id))
-		if prepared_group_id not in prepared_group_ids:
-			prepared_group_ids.append(prepared_group_id)
-			check(service.set_group_dish_active(prepared_group_id,"sausage",true).is_empty(),"Source group keeps sausage active before explicit merge")
-	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine nineteen tables once their plans and menu match")
+	check(service._apply_group_plan(700,compatible).size()==19,"All compatible tables receive the same desired record directly")
+	check(service.table_groups().size()==1 and service.table_group_by_id(service_group_id).stations==[2,3],"Mass training intent does not create or alter groups")
+	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine nineteen tables when desired")
 	check(int(service.desired_source(service.group_id_for_station(2),"sausage").id)==700,"Large explicit group keeps the shared desired record")
 	var groups: Array=service.table_groups()
 	var large_group: Dictionary={}
@@ -213,12 +208,12 @@ func run()->void:
 	check("Открыть связанное обучение #" in rendered,"Problem card offers a direct link to the concrete pending training entry")
 	game.office.open_problem_group([2],int(linked.get("course_id",0)))
 	rendered=tree_text(game.office.content)
-	check("→ " in rendered and "Сетевая сосиска" in rendered,"Problem link opens the flat schedule and highlights the linked training row")
+	check("Сосиска в соусе, столы 2" in rendered,"Problem link opens the flat queue at the linked table")
 	game.office.groups_mode="overview"
 	game.office.group_expanded[str(large_group.id)]=true
 	game.office.tab="groups"; game.office.stamp=""; game.office.rebuild()
 	rendered=tree_text(game.office.content)
-	check("МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ" in rendered and "Сетевая сосиска" in rendered,"Expanded group cards render desired masterclass and active-menu state beside service results")
+	check("МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ" in rendered and "Сосиска в соусе" in rendered,"Expanded group cards render menu and learned-state information beside service results")
 	game.office.close()
 
 	print("8/10: feed aggregation window separates later identical events")

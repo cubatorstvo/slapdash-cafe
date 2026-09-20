@@ -393,7 +393,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error: String=game.service.Visits.action(game.service,action,int(value.get("id",-1)))
 		if not error.is_empty(): message_to(sender,error)
 		return
-	if action in ["group_rename","group_train","group_create","group_split","group_members","group_merge","group_active","training_course_confirm","training_course_edit","training_cancel_course","training_cancel_batch","training_cancel_lesson","training_resume"]:
+	if action in ["group_rename","group_train","group_create","group_dissolve","group_active","training_course_confirm","training_course_edit","training_cancel_course","training_cancel_lesson","training_resume"]:
 		if sender!=1:
 			message_to(sender,"Группами столов управляет хозяин кафе.")
 			return
@@ -413,12 +413,12 @@ func execute_action(sender: int, value: Dictionary) -> void:
 				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
 				var command: String=str(value.get("command","course:%d:%d"%[sender,game.service.training_queue.next_course_id]))
 				var group_order: Array=value.get("group_order",[]) if value.get("group_order",[]) is Array else []
-				var result: Dictionary=game.service.queue_training_course(assignments,str(value.get("mode","together")),command,sender,group_order)
+				var result: Dictionary=game.service.queue_training_course(assignments,"together",command,sender,[])
 				error=str(result.get("error",""))
 			"training_course_edit":
 				var assignments: Array=value.get("assignments",[]) if value.get("assignments",[]) is Array else []
 				var group_order: Array=value.get("group_order",[]) if value.get("group_order",[]) is Array else []
-				error=game.service.edit_training_course(int(value.get("course",0)),assignments,str(value.get("mode","together")),sender,group_order)
+				error=game.service.edit_training_course(int(value.get("course",0)),assignments,"together",sender,[])
 			"training_resume":
 				error=game.service.resume_training_assignment(int(value.get("station",0)),str(value.get("dish","")),sender)
 			"training_cancel_course":
@@ -430,24 +430,15 @@ func execute_action(sender: int, value: Dictionary) -> void:
 			"group_create":
 				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
 				error=game.service.create_table_group(ids,str(value.get("name","")))
-			"group_split":
-				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
-				error=game.service.split_table_group(str(value.get("group","")),ids)
-			"group_members":
-				var ids: Array=value.get("stations",[]) if value.get("stations",[]) is Array else []
-				error=game.service.set_table_group_members(str(value.get("group","")),ids)
-			"group_merge":
+			"group_dissolve":
 				var groups: Array=value.get("groups",[]) if value.get("groups",[]) is Array else []
-				var choices: Dictionary=value.get("choices",{}) if value.get("choices",{}) is Dictionary else {}
-				var active: Variant=value.get("active",null)
-				if active!=null and not active is Array: active=null
-				error=game.service.merge_table_groups(groups,choices,active)
+				error=game.service.dissolve_table_groups(groups)
 			"group_active":
 				error=game.service.set_group_dish_active(str(value.get("group","")),str(value.get("dish","")),bool(value.get("enabled",false)))
 		if not error.is_empty(): message_to(sender,error)
 		else:
 			game.save_cafe()
-			var success: String="Обучение добавлено в расписание." if action in ["group_train","training_course_confirm"] else "Расписание обучения обновлено." if action=="training_course_edit" else "Обучение возвращено в расписание." if action=="training_resume" else "Расписание обучения обновлено." if action.begins_with("training_") else "Группы столов обновлены."
+			var success: String="Обучение добавлено в очередь." if action in ["group_train","training_course_confirm"] else "Очередь обучения обновлена." if action=="training_course_edit" else "Обучение возвращено в очередь." if action=="training_resume" else "Очередь обучения обновлена." if action.begins_with("training_") else "Группы столов обновлены."
 			message_to(sender,success)
 		return
 	if action in ["masterclass_rename","masterclass_delete"]:
