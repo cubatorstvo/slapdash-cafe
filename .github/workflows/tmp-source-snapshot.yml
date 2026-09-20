@@ -3,7 +3,7 @@ name: Temporary source snapshot
 on:
   push:
     branches:
-      - sol/cafe-product-layout
+      - work/restore-zoned-layout
     paths:
       - ".github/workflows/tmp-source-snapshot.yml"
   workflow_dispatch:
