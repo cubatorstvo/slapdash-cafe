@@ -623,7 +623,7 @@ func rebuild() -> void:
 				label(content,str(record.get("name","Запись")),20)
 				label(content,"%s · %.1f с · фильм %.1f с · качество %s · эффектность: %s"%[Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish",""))),float(record.get("duration",0.0)),float(record.get("highlight_duration",0.0)),str(quality.get("grade","D")),str(effect.get("label","Обычная"))],16)
 				button(content,"Посмотреть хайлайты на телевизоре",func():send({"action":"masterclass_watch","id":id},true),has_tv and float(record.get("highlight_duration",0.0))>0.0)
-				button(content,"Добавить в курс",func():course_editor_open(id),host)
+				button(content,"Добавить в обучение",func():course_editor_open(id),host)
 				label(content,str(effect.get("explanation","Аккуратное приготовление.")),14)
 				if bool(record.get("archived",false)): label(content,"Архивная запись из прежнего рабочего способа · стол %d"%int(record.get("source_station",0)),14)
 				var row:=HBoxContainer.new(); content.add_child(row)
@@ -1082,7 +1082,7 @@ func _draft_record_ids() -> Array:
 
 func _ensure_draft() -> void:
 	if not course_editor.is_empty(): return
-	course_editor={"open":true,"records":[],"mode":"together","editing":0,"type_id":training_type_filter}
+	course_editor={"open":true,"records":[],"mode":"balanced","editing":0,"type_id":training_type_filter}
 	course_editor_message=""
 	course_group_order=[]
 
@@ -1135,6 +1135,13 @@ func _course_type_id(course: Dictionary) -> String:
 		if not record.is_empty(): return str(record.get("source_type",""))
 	return ""
 
+func _editable_schedule_course(type_id: String) -> Dictionary:
+	var views: Array=game.service.training_course_views()
+	for index in range(views.size()-1,-1,-1):
+		var view: Dictionary=views[index]
+		if bool(view.get("editable",false)) and _course_type_id(view)==type_id: return view
+	return {}
+
 func _assignments_with_records(course: Dictionary,record_ids: Array,new_station_ids: Array=[]) -> Array:
 	var existing_by_id: Dictionary={}
 	for assignment in course.get("assignments",[]): existing_by_id[int(assignment.get("record_id",0))]=assignment.duplicate(true)
@@ -1148,7 +1155,7 @@ func _assignments_with_records(course: Dictionary,record_ids: Array,new_station_
 	return result
 
 func _send_course_edit(course: Dictionary,assignments: Array) -> void:
-	send({"action":"training_course_edit","course":int(course.id),"assignments":assignments,"mode":str(course.mode),"group_order":course.get("group_order",[]).duplicate()})
+	send({"action":"training_course_edit","course":int(course.id),"assignments":assignments,"mode":"balanced","group_order":[]})
 
 func _training_reorder_course(course_id: int,indices: Array,target_index: int) -> void:
 	var course: Dictionary=game.service.training_queue.course_view(course_id)
@@ -1318,7 +1325,7 @@ func _draft_assignments() -> Array:
 func training_submit_draft() -> void:
 	if course_editor.is_empty() or _draft_record_ids().is_empty(): return
 	var assignments:=_draft_assignments()
-	var preview: Dictionary=game.service.training_course_preview(assignments,str(course_editor.get("mode","together")),course_group_order)
+	var preview: Dictionary=game.service.training_course_preview(assignments,"balanced",[])
 	if not str(preview.get("error","")).is_empty():
 		course_editor_message=str(preview.error)
 		stamp=""
@@ -1327,19 +1334,25 @@ func training_submit_draft() -> void:
 	var editing:=int(course_editor.get("editing",0))
 	game.hud.notice.text=""
 	if editing>0:
-		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate()})
+		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":"balanced","group_order":[]})
 	else:
-		var command: String="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
-		course_command_serial+=1
-		send({"action":"training_course_confirm","assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate(),"command":command})
+		var existing: Dictionary=_editable_schedule_course(training_type_filter)
+		if not existing.is_empty():
+			var ids:=_insert_record_ids(_course_record_ids(existing),_draft_record_ids(),_course_record_ids(existing).size())
+			_send_course_edit(existing,_assignments_with_records(existing,ids,_training_target_stations()))
+		else:
+			var command: String="office-schedule:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
+			course_command_serial+=1
+			send({"action":"training_course_confirm","assignments":assignments,"mode":"balanced","group_order":[],"command":command})
 	var notice:=str(game.hud.notice.text)
-	if notice=="Курс поставлен в очередь.":
+	if notice in ["Обучение добавлено в расписание.","Расписание обучения обновлено."]:
 		course_editor={}
 		course_editor_message=""
 		course_group_order=[]
 		training_queue_selection=[]
+		training_library_selection=[]
 	else:
-		course_editor_message=notice if not notice.is_empty() else "Курс не подтверждён. Проверь актуальное расписание."
+		course_editor_message=notice if not notice.is_empty() else "Изменение не принято. Проверь актуальное расписание."
 	stamp=""
 	rebuild()
 
@@ -1372,7 +1385,7 @@ func _training_library_panel(parent: Node,host: bool) -> void:
 			var subtitle: String="%s · качество %s · %s · фильм %.1f с"%[str(record.get("name","Запись")),str(quality.get("grade","D")),str(effect.get("label","Обычная")),float(record.get("highlight_duration",0.0))]
 			_training_make_drag_row(box,{"zone":"library","record_id":record_id},str(Definition.DISHES.get(dish,dish)),subtitle,{"kind":"masterclass_records","record_ids":[record_id],"count":1},record_id in training_library_selection)
 	if not training_library_selection.is_empty():
-		button(box,"Добавить выбранные в новый курс →",training_add_selected_to_draft,host)
+		button(box,"Добавить выбранные →",training_add_selected_to_draft,host)
 
 func _training_drop_tail(parent: Node,zone: String,course_id: int,index: int,text_value: String) -> void:
 	var target=TrainingDragRow.new()
@@ -1386,9 +1399,10 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 	var box:=_section_card(parent,Color("30494a"))
 	var records:=_draft_record_ids()
 	var editing:=int(course_editor.get("editing",0)) if not course_editor.is_empty() else 0
-	label(box,"РЕДАКТИРОВАНИЕ КУРСА #%d"%editing if editing>0 else "НОВЫЙ КУРС",17)
+	label(box,"ИЗМЕНИТЬ РАСПИСАНИЕ" if editing>0 else "ДОБАВИТЬ В РАСПИСАНИЕ",17)
 	var targets:=_training_target_stations()
-	label(box,"%d столов · %s"%[targets.size(),str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter))],13)
+	var batch_size:=game.service.training_queue.balanced_batch_size(targets.size()) if not targets.is_empty() else 0
+	label(box,"%d столов · автоматически по %d за раз (~20%%)"%[targets.size(),batch_size],13)
 	if records.is_empty():
 		_training_drop_tail(box,"draft",0,0,"Перетащи сюда одно или несколько блюд")
 	else:
@@ -1398,29 +1412,25 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 			var key:=_queue_key(0,index)
 			var subtitle: String=str(record.get("name","Запись"))+" · фильм %.1f с"%float(record.get("highlight_duration",0.0))
 			_training_make_drag_row(box,{"zone":"draft","course_id":0,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish","")))),subtitle,{"kind":"queue_lessons","course_id":0,"indices":[index],"count":1},key in training_queue_selection,key)
-		_training_drop_tail(box,"draft",0,records.size(),"В конец курса")
-		var mode_row:=HBoxContainer.new()
-		box.add_child(mode_row)
-		label(mode_row,"Запуск:",13)
-		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="together" else "")+"Вместе",func():course_editor_set_mode("together"),host)
-		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="by_groups" else "")+"По группам",func():course_editor_set_mode("by_groups"),host)
-		var preview: Dictionary=service.training_course_preview(_draft_assignments(),str(course_editor.get("mode","together")),course_group_order)
+		_training_drop_tail(box,"draft",0,records.size(),"В конец списка")
+		var preview: Dictionary=service.training_course_preview(_draft_assignments(),"balanced",[])
 		var error:=str(preview.get("error",""))
 		if not error.is_empty():
 			label(box,error,13)
 		else:
 			var warning_count:=0
 			for lesson in preview.lessons: warning_count+=lesson.get("equipment_issues",[]).size()
-			var summary: String="%d сотрудников · фильмы %.1f с · одновременно уйдёт до %d"%[int(preview.employees),float(preview.film_total),int(preview.simultaneous_out)]
-			if warning_count>0: summary+=" · ⚠ оснащение: %d"%warning_count
+			var summary: String="За раз уйдёт до %d столов · суммарно фильмов %.1f с"%[int(preview.simultaneous_out),float(preview.film_total)]
+			if warning_count>0: summary+=" · ⚠ без нужного оснащения: %d"%warning_count
 			label(box,summary,13)
 			button(box,"▾ Подробности" if training_preview_expanded else "▸ Подробности",toggle_training_preview)
 			if training_preview_expanded:
 				for lesson in preview.lessons:
-					label(box,"%s · освоили %d/%d · %.1f с"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.mastered),int(lesson.selected),float(lesson.film)],13)
+					var lesson_batch_size:=game.service.training_queue.balanced_batch_size(int(lesson.selected))
+					label(box,"%s · %d столов · по %d за раз · освоили %d/%d"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.selected),lesson_batch_size,int(lesson.mastered),int(lesson.selected)],13)
 					for issue in lesson.get("equipment_issues",[]):
 						label(box,"⚠ Стол %d после обучения: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],12)
-			button(box,"Сохранить изменения" if editing>0 else "Поставить в очередь",training_submit_draft,host)
+			button(box,"Сохранить" if editing>0 else "Добавить в расписание",training_submit_draft,host)
 	if not course_editor_message.is_empty(): label(box,course_editor_message,13)
 
 func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) -> void:
