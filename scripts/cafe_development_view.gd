@@ -51,8 +51,8 @@ func build(root_game: Node3D) -> void:
 	add_child(sign)
 	decor.sign = sign
 	# Wall decor belongs on the permanent rear wall, clear of every production footprint.
-	Props.box(sign, Vector3(3.2, 1.0, 0.12), Vector3(1.5, 2.8, 13.84), Color("d4a268"))
-	Props.text(sign, "МЫ ПОЧТИ УМЕЕМ", Vector3(1.5, 2.85, 13.77), 33, Color("243f40"))
+	Props.box(sign, Vector3(3.2, 1.0, 0.12), Expansion.DECOR_SIGN_POSITION, Color("d4a268"))
+	Props.text(sign, "МЫ ПОЧТИ УМЕЕМ", Expansion.DECOR_SIGN_POSITION+Vector3(0,0.05,-0.07), 33, Color("243f40"))
 	var lights := Node3D.new()
 	add_child(lights)
 	decor.lights = lights
@@ -64,7 +64,7 @@ func build(root_game: Node3D) -> void:
 	var plants := Node3D.new()
 	add_child(plants)
 	decor.plants = plants
-	for point in [Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(22.2,-4.2)]:
+	for point in Expansion.DECOR_PLANT_POINTS:
 		Props.cylinder(plants, 0.38, 0.55, Vector3(point.x, 0.275, point.y), Color("cd9167"), 0.45)
 		for i in range(4):
 			var leaf := Props.ball(plants, 0.3, Vector3(point.x + sin(i*1.7)*0.3, 0.95+i*0.20, point.y), Color("84ad78"))
