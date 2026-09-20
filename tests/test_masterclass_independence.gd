@@ -40,11 +40,11 @@ func run()->void:
 	p.expanded=true
 	var kitchen_options:=option_ids(service.masterclass_equipment_options("meal"))
 	check("meat_kit" in kitchen_options and "pasta_kit" in kitchen_options,"Unlocked cuisine exposes its chef masterclass kit")
-	var production_kitchens:=service.stations.filter(func(station):return not station.manual_station and station.type_id=="kitchen")
+	var production_kitchens: Array=service.stations.filter(func(station):return not station.manual_station and station.type_id=="kitchen")
 	check(production_kitchens.is_empty(),"Fixture has no installed production kitchen")
-	var bad:=service.request_masterclass("meal",1,["grill_kit"])
+	var bad: String=service.request_masterclass("meal",1,["grill_kit"])
 	check(not bad.is_empty(),"Chef rejects equipment from another or still-locked cuisine")
-	var error:=service.request_masterclass("meal",1,["meat_kit"])
+	var error: String=service.request_masterclass("meal",1,["meat_kit"])
 	check(error.is_empty(),"Chef starts the meal masterclass without an installed production kitchen")
 	var stage=service.masterclass_station
 	check(stage!=null and stage.type_id=="kitchen","Chef station temporarily takes the cuisine type")
