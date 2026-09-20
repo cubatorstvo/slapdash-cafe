@@ -194,7 +194,7 @@ func stage_group_assignment(record_id: int) -> void:
 
 func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 	var previous_selection: Array=group_selected_stations.duplicate()
-	course_editor={"open":true,"records":[],"mode":"together","editing":edit_course_id,"type_id":""}
+	course_editor={"open":true,"records":[],"mode":"balanced","editing":edit_course_id,"type_id":""}
 	course_editor_message=""
 	course_group_order=[]
 	training_scope_stations=previous_selection
@@ -203,7 +203,7 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 		if view.is_empty():
 			course_editor_message="Обучение не найдено."
 		else:
-			course_editor.mode=str(view.get("mode","together"))
+			course_editor.mode="balanced"
 			course_editor.editing=edit_course_id
 			training_scope_stations=[]
 			for assignment in view.get("assignments",[]):
