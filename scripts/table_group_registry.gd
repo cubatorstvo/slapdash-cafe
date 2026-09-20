@@ -212,6 +212,12 @@ func split(id: String,selected_ids: Array)->Dictionary:
 		candidate=str(source.name)+" · %d"%suffix
 	return create_group(selected,str(source.type_id),candidate,source)
 
+func dissolve(id: String)->Array:
+	if not groups.has(id): return []
+	var station_ids: Array=groups[id].station_ids.duplicate()
+	groups.erase(id)
+	return station_ids
+
 func set_members(id: String,station_ids: Array,type_id: String)->String:
 	if not groups.has(id): return "Группа не найдена."
 	if str(groups[id].type_id)!=type_id: return "Можно объединять только столы одной кухни."
