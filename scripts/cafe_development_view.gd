@@ -2,6 +2,7 @@ extends Node3D
 const Props = preload("res://scripts/props.gd")
 const P = preload("res://scripts/cafe_progression.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 var game: Node3D
 var board: Node3D
 var decor := {}
@@ -27,6 +28,7 @@ func build(root_game: Node3D) -> void:
 		var marker := Node3D.new()
 		add_child(marker)
 		marker.position = game.service.slot_position(i)
+		marker.rotation.y=Expansion.rotation_y(i)
 		Props.box(marker, Vector3(5.5, 0.015, 3.6), Vector3(0, 0.015, 0), Color("61716a"))
 		var label := Props.text(marker, "", Vector3(0, 1.3, 0), 27, Color("e7c591"))
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -75,7 +77,7 @@ func refresh() -> void:
 	var progress = game.service.progress
 	for id in decor: decor[id].visible = id in progress.decorations
 	for i in range(slots.size()):
-		slots[i].node.visible = game.service.by_id(i + 1) == null
+		slots[i].node.visible = game.service.by_id(i + 1) == null and Expansion.slot_available(i,Expansion.stage_for_progress(progress))
 		if i < 3:
 			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[E] Компьютер · 120"
 		elif i == 3:
@@ -84,9 +86,9 @@ func refresh() -> void:
 			slots[i].label.text = "СПЕЦИАЛИЗАЦИЯ\nТретья звезда" if not progress.specialized_expanded else "ОБЩАЯ ЖАРОЧНАЯ\n[E] Компьютер · 380"
 		else:
 			slots[i].label.text = "ОРКЕСТРАЦИЯ\nЧетвёртая звезда" if not progress.orchestration_expanded else "СОЛЯНКА · ТРИ РОЛИ\n[E] Компьютер · 520"
-	ribbon.visible = not progress.expanded
-	specialty_ribbon.visible = not progress.specialized_expanded
-	orchestration_ribbon.visible = not progress.orchestration_expanded
+	ribbon.visible = false
+	specialty_ribbon.visible = false
+	orchestration_ribbon.visible = false
 	var stars_text := PackedStringArray()
 	for i in range(5): stars_text.append("★" if i < progress.stars else "☆")
 	star_label.text = " ".join(stars_text)
@@ -152,7 +154,7 @@ func night_target(camera: Camera3D) -> Dictionary:
 			if entry.action == "lab_begin" and game.service.progress.lab_stage < 3: result.hint += " · %d" % P.LAB_PRICES[game.service.progress.lab_stage]
 			return result
 	if game.service.progress.garland_builder == game.session.local_id() and not game.service.progress.garland_complete:
-		for z in [-7.35, 10.35]:
+		for z in [Annex.CAFE_BACK_Z]:
 			if absf(direction.z) < 0.001: continue
 			var distance: float = (z - origin.z) / direction.z
 			var point: Vector3 = origin + direction * distance

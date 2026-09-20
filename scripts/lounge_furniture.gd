@@ -323,52 +323,48 @@ func rug(at: Vector3, size: Vector2, color: Color) -> void:
 
 func build_interior() -> void:
 	var back:=Layout.back_z(tier)
-	var depth:=back-10.6
-	var middle: float=(10.6+back)*0.5
-	# The starter room already has warm light; purchases add visible layers.
-	rug(Vector3(6.45,0.016,13.60),Vector2(5.35,5.0),Color("a86f59"))
+	var front:=Layout.FRONT_Z
+	var right:=Layout.right_x(tier)
+	var left:=Layout.LEFT_X
+	var width:=right-left
+	var depth:=back-front
+	var middle_z: float=(front+back)*0.5
+	var middle_x: float=(left+right)*0.5
+	# Decorative layers follow the staged room footprint; purchased furniture keeps its own layout anchors.
+	var sofa_at:=Layout.item_position("sofa",tier)
+	rug(Vector3(sofa_at.x,0.016,sofa_at.z-0.55),Vector2(minf(5.35,width-0.45),5.0),Color("a86f59"))
 	if "textiles" in owned:
-		rug(Vector3(14.15,0.016,middle),Vector2(5.30,depth-2.0),Color("667a79"))
-		rug(Vector3(10.4,0.016,middle-0.5),Vector2(1.25,depth-3.5),Color("b39870"))
-		if tier==2: rug(Vector3(6.45,0.016,20.55),Vector2(5.40,5.0),Color("7b8966"))
-	if tier==2:
-		for side in [Vector2(3.15,9.25),Vector2(11.55,17.55)]:
-			box(self,Vector3(side.y-side.x,0.28,0.14),Vector3((side.x+side.y)*0.5,2.05,23.55),WOOD)
-			for i in range(int((side.y-side.x)/0.50)):
-				box(self,Vector3(0.055,1.95,0.07),Vector3(side.x+0.14+i*0.50,1.03,23.55),WOOD)
-	box(self,Vector3(14.55,0.10,depth-0.3),Vector3(10.35,4.60,middle),Color("c1b69a"))
-	for z in [11.0,middle,back-0.30]:
-		box(self,Vector3(14.5,0.16,0.16),Vector3(10.35,4.40,z),WOOD)
-	for x in [3.02,17.68]:
-		box(self,Vector3(0.07,1.00,depth-0.4),Vector3(x,0.50,middle),Color("8c7357"))
-		box(self,Vector3(0.10,0.055,depth-0.4),Vector3(x,1.02,middle),GOLD)
-	for z in [13.0,back-3.0]:
-		for x in [6.6,13.7]:
+		rug(Vector3(middle_x,0.016,middle_z+2.6),Vector2(maxf(1.2,width-0.8),minf(5.2,depth-1.0)),Color("667a79"))
+		rug(Vector3(clampf(Layout.AISLE_X,left+0.7,right-0.7),0.016,middle_z),Vector2(1.25,maxf(2.0,depth-3.5)),Color("b39870"))
+		if tier==2: rug(Vector3(maxf(left+2.7,middle_x-2.2),0.016,back-4.4),Vector2(minf(5.4,width-0.5),5.0),Color("7b8966"))
+	box(self,Vector3(maxf(0.5,width-0.35),0.10,depth-0.3),Vector3(middle_x,4.60,middle_z),Color("c1b69a"))
+	for z in [front+0.40,middle_z,back-0.30]:
+		box(self,Vector3(maxf(0.5,width-0.4),0.16,0.16),Vector3(middle_x,4.40,z),WOOD)
+	for x in [left+0.10,right-0.10]:
+		box(self,Vector3(0.07,1.00,depth-0.4),Vector3(x,0.50,middle_z),Color("8c7357"))
+		box(self,Vector3(0.10,0.055,depth-0.4),Vector3(x,1.02,middle_z),GOLD)
+	for z in [front+3.0,back-3.0]:
+		for x in [left+width*0.33,left+width*0.72]:
 			P.line(self,Vector3(x,4.55,z),Vector3(x,3.65,z),0.015,INK)
 			glow(P.cylinder(self,0.42,0.25,Vector3(x,3.58,z),CREAM,0.27),0.28)
 			add_light(self,Vector3(x,3.35,z),Color("ffdeb0"),0.75,6.0)
-	add_light(self,Vector3(10.4,3.25,back-1.4),Color("f6d0a0"),0.65,7.0)
+	add_light(self,Vector3(middle_x,3.25,back-1.4),Color("f6d0a0"),0.65,7.0)
 	if "ambient" in owned:
 		for i in range(25):
-			var z:=11.3+i*(depth-2.3)/24.0
+			var z:=front+0.7+i*(depth-1.4)/24.0
 			var y:=3.95-sin(i*PI/24)*0.28
-			if i>0: P.line(self,Vector3(10.4,3.95-sin((i-1)*PI/24)*0.28,z-(depth-2.3)/24.0),Vector3(10.4,y,z),0.012,DARK_WOOD)
-			if i%2==0: glow(P.ball(self,0.048,Vector3(10.4,y-0.055,z),GOLD),0.6)
-		add_light(self,Vector3(6.5,2.8,middle),Color("ffbf84"),0.5,7.0)
-	for z in [13.0,18.2,21.2]:
-		if z>back-2.0: continue
-		box(self,Vector3(0.12,1.30,1.66),Vector3(17.64,2.65,z),WOOD)
-		glow(box(self,Vector3(0.025,1.12,1.47),Vector3(17.56,2.65,z),Color("496e80")),0.15)
+			if i>0: P.line(self,Vector3(middle_x,3.95-sin((i-1)*PI/24)*0.28,z-(depth-1.4)/24.0),Vector3(middle_x,y,z),0.012,DARK_WOOD)
+			if i%2==0: glow(P.ball(self,0.048,Vector3(middle_x,y-0.055,z),GOLD),0.6)
+		add_light(self,Vector3(middle_x,2.8,middle_z),Color("ffbf84"),0.5,7.0)
+	for z in [front+2.2,middle_z,back-2.2]:
+		box(self,Vector3(0.12,1.30,1.66),Vector3(right-0.12,2.65,z),WOOD)
+		glow(box(self,Vector3(0.025,1.12,1.47),Vector3(right-0.20,2.65,z),Color("496e80")),0.15)
 		if "textiles" in owned:
-			for edge in [-1,1]:
-				box(self,Vector3(0.15,1.62,0.30),Vector3(17.45,2.54,z+edge*0.82),Color("c68b71"))
+			for edge in [-1,1]: box(self,Vector3(0.15,1.62,0.30),Vector3(right-0.31,2.54,z+edge*0.82),Color("c68b71"))
 	if "plants" in owned:
-		for point in [Vector3(8.8,0,11.5),Vector3(17.05,0,back-1.3)]:
-			var plant:=Node3D.new()
-			add_child(plant)
-			plant.position=point
-			build_plant(plant,0.72)
-	var sign:=label(self,"ЗДЕСЬ МОЖНО НИЧЕГО НЕ УСПЕВАТЬ",Vector3(10.4,3.10,back-0.23),32)
+		for point in [Vector3(left+0.8,0,front+1.6),Vector3(right-0.85,0,back-1.3)]:
+			var plant:=Node3D.new(); add_child(plant); plant.position=point; build_plant(plant,0.72)
+	var sign:=label(self,"ЗДЕСЬ МОЖНО НИЧЕГО НЕ УСПЕВАТЬ",Vector3(middle_x,3.10,back-0.23),32)
 	sign.rotation.y=PI
 
 func television_target(camera: Camera3D) -> Dictionary:

@@ -4,31 +4,32 @@ const Props = preload("res://scripts/props.gd")
 const LoungeLayout = preload("res://scripts/lounge_layout.gd")
 const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeFurniture = preload("res://scripts/lounge_furniture.gd")
+const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 
-const CAFE_X_MIN := -11.8
-const CAFE_X_MAX := 17.8
-const CAFE_BACK_Z := 10.6
-const DIVIDER_X := 2.9
-const LAB_X_MIN := -5.0
+const CAFE_X_MIN := Expansion.HALL_X_MIN
+const CAFE_X_MAX := Expansion.HALL_X_MAX
+const CAFE_BACK_Z := Expansion.HALL_BACK_Z
+const DIVIDER_X := 0.0
+const LAB_X_MIN := -14.7
 const LAB_X_MAX := DIVIDER_X
-const LAB_BACK_Z := 16.2
+const LAB_BACK_Z := 30.4
 const REST_X_MIN := DIVIDER_X
-const REST_X_MAX := CAFE_X_MAX
+const REST_X_MAX := 14.9
 const REST_BACK_Z := LoungeLayout.MAX_BACK_Z
-const LAB_DOOR_X := -1.1
-const REST_DOOR_X := 10.4
+const LAB_DOOR_X := -4.0
+const REST_DOOR_X := LoungeLayout.ENTRANCE.x
 const DOOR_WIDTH := 1.8
 const DOOR_HEIGHT := 2.55
 const DOOR_TRIGGER_RADIUS := 2.35
 const WALL_HEIGHT := 4.7
 const WALL_Y := 2.3
 const WALL_THICKNESS := 0.18
-const LAB_ORIGIN := Vector3(-1.1, 0.0, 5.0)
+const LAB_ORIGIN := Vector3(-4.0, 0.0, 8.4)
 const LAB_ROTATION_Y := 0.0
-const LAB_DOOR_CAFE := Vector3(LAB_DOOR_X, 0.0, 9.75)
-const LAB_DOOR_ROOM := Vector3(LAB_DOOR_X, 0.0, 11.45)
-const REST_DOOR_CAFE := Vector3(REST_DOOR_X, 0.0, 9.75)
-const REST_DOOR_ROOM := Vector3(REST_DOOR_X, 0.0, 11.45)
+const LAB_DOOR_CAFE := Vector3(LAB_DOOR_X, 0.0, 13.15)
+const LAB_DOOR_ROOM := Vector3(LAB_DOOR_X, 0.0, 14.85)
+const REST_DOOR_CAFE := Vector3(REST_DOOR_X, 0.0, 13.15)
+const REST_DOOR_ROOM := Vector3(REST_DOOR_X, 0.0, 14.85)
 const REST_AREA := (REST_X_MAX - REST_X_MIN) * (REST_BACK_Z - CAFE_BACK_Z)
 const PLAYER_BED_COUNT := 1
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
@@ -61,39 +62,55 @@ static func player_bed_exit(layer: int, tier := 0) -> Vector3:
 static func rest_spot(index: int) -> Dictionary:
 	return LoungeLayout.rest_spot(index)
 
+static func back_wall_left(p) -> float:
+	var lab_tier: int=int(p.lab_tier) if p!=null else 0
+	return floorf(LabLayout.left(lab_tier)/Expansion.TILE)*Expansion.TILE
+
+static func back_wall_right(p) -> float:
+	if p==null or Expansion.stage_for_progress(p)<2: return DIVIDER_X
+	var tier: int=int(p.lounge_tier)
+	return ceilf(LoungeLayout.right_x(tier)/Expansion.TILE)*Expansion.TILE
+
 static func build_shell(owner_game: Node3D) -> void:
 	var parent := Node3D.new()
 	parent.name="CafeAnnexShell"
 	owner_game.add_child(parent)
 	var p = owner_game.service.progress if is_instance_valid(owner_game.service) else null
+	var building_stage: int=Expansion.stage_for_progress(p)
 	var tier: int=int(p.lounge_tier) if p!=null else 0
-	var rest_back:=LoungeLayout.back_z(tier)
 	var wall_color := Color("2e5355")
 	var lab_tier: int=int(p.lab_tier) if p!=null else 0
 	var lab_left:=LabLayout.left(lab_tier)
 	var lab_back:=LabLayout.back(lab_tier)
 	var lab_width:=LAB_X_MAX-lab_left
 	var lab_depth:=lab_back-CAFE_BACK_Z
-	var rest_width := REST_X_MAX-REST_X_MIN
-	var rest_depth := rest_back-CAFE_BACK_Z
 	Props.box(parent,Vector3(lab_width,0.09,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+lab_back)*0.5),Color("60756f"))
-	Props.box(parent,Vector3(rest_width,0.09,rest_depth),Vector3((REST_X_MIN+REST_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+rest_back)*0.5),Color("776f60"))
 	Props.collision_box(parent,Vector3(lab_width,0.2,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+lab_back)*0.5))
-	Props.collision_box(parent,Vector3(rest_width,0.2,rest_depth),Vector3((REST_X_MIN+REST_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+rest_back)*0.5))
-	_build_cafe_back_wall(parent,wall_color)
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5),wall_color)
-	Props.solid_box(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back),wall_color)
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,maxf(lab_back,rest_back)-CAFE_BACK_Z),Vector3(DIVIDER_X,WALL_Y,(CAFE_BACK_Z+maxf(lab_back,rest_back))*0.5),wall_color)
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,rest_depth),Vector3(REST_X_MAX,WALL_Y,(CAFE_BACK_Z+rest_back)*0.5),wall_color)
-	Props.solid_box(parent,Vector3(rest_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((REST_X_MIN+REST_X_MAX)*0.5,WALL_Y,rest_back),wall_color)
+	var rest_right: float=LoungeLayout.right_x(tier)
+	var rest_back: float=LoungeLayout.back_z(tier)
+	var rest_width:=rest_right-REST_X_MIN
+	var rest_depth:=rest_back-CAFE_BACK_Z
+	if building_stage>=2:
+		Props.box(parent,Vector3(rest_width,0.09,rest_depth),Vector3((REST_X_MIN+rest_right)*0.5,-0.05,(CAFE_BACK_Z+rest_back)*0.5),Color("776f60"))
+		Props.collision_box(parent,Vector3(rest_width,0.2,rest_depth),Vector3((REST_X_MIN+rest_right)*0.5,-0.10,(CAFE_BACK_Z+rest_back)*0.5))
+	_build_cafe_back_wall(parent,wall_color,building_stage,p)
+	# Laboratory keeps its existing internal footprint; its current outside edges become expansion partitions.
+	_add_room_edge(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5),wall_color,lab_tier<2,Vector3.RIGHT)
+	_add_room_edge(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back),wall_color,lab_tier<2,Vector3.BACK)
+	var shared_depth:=maxf(lab_back,rest_back if building_stage>=2 else lab_back)-CAFE_BACK_Z
+	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,shared_depth),Vector3(DIVIDER_X,WALL_Y,CAFE_BACK_Z+shared_depth*0.5),wall_color)
+	if building_stage>=2:
+		_add_room_edge(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,rest_depth),Vector3(rest_right,WALL_Y,(CAFE_BACK_Z+rest_back)*0.5),wall_color,tier<2,Vector3.LEFT)
+		Props.solid_box(parent,Vector3(rest_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((REST_X_MIN+rest_right)*0.5,WALL_Y,rest_back),wall_color)
 	var lab_sign := Props.text(parent,"ЛАБОРАТОРИЯ",Vector3(LAB_DOOR_X,3.12,CAFE_BACK_Z-0.24),24,Color("edd09d"))
 	lab_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lab_sign.pixel_size = 0.005
-	var rest_sign := Props.text(parent,"КОМНАТА ОТДЫХА",Vector3(REST_DOOR_X,3.12,CAFE_BACK_Z-0.24),22,Color("e7c891"))
-	rest_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	rest_sign.pixel_size = 0.005
-	_build_rest_furniture(parent,owner_game,tier,p)
-	for spec in [[Vector3((lab_left+LAB_X_MAX)*0.5,3.25,13.35),Color("b7e0cb")]]:
+	if building_stage>=2:
+		var rest_sign := Props.text(parent,"КОМНАТА ОТДЫХА",Vector3(REST_DOOR_X,3.12,CAFE_BACK_Z-0.24),22,Color("e7c891"))
+		rest_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		rest_sign.pixel_size = 0.005
+		_build_rest_furniture(parent,owner_game,tier,p)
+	for spec in [[Vector3((lab_left+LAB_X_MAX)*0.5,3.25,CAFE_BACK_Z+2.75),Color("b7e0cb")]]:
 		var light := OmniLight3D.new()
 		parent.add_child(light)
 		light.position = Vector3(spec[0])
@@ -101,16 +118,38 @@ static func build_shell(owner_game: Node3D) -> void:
 		light.light_energy = 0.85
 		light.omni_range = 6.5
 
-static func _build_cafe_back_wall(parent: Node3D, color: Color) -> void:
-	var openings := [Vector2(LAB_DOOR_X-DOOR_WIDTH*0.5,LAB_DOOR_X+DOOR_WIDTH*0.5),Vector2(REST_DOOR_X-DOOR_WIDTH*0.5,REST_DOOR_X+DOOR_WIDTH*0.5)]
-	var cursor: float = CAFE_X_MIN
+static func _add_room_edge(parent: Node3D,size: Vector3,center: Vector3,color: Color,temporary: bool,inward: Vector3) -> void:
+	if not temporary:
+		Props.solid_box(parent,size,center,color)
+		return
+	Props.solid_box(parent,size,center,Color("9b815d"))
+	var along_x:=size.x>size.z
+	var length:=size.x if along_x else size.z
+	var frame_offset:=inward*0.16
+	var rail:=Vector3(length,0.12,0.08) if along_x else Vector3(0.08,0.12,length)
+	Props.box(parent,rail,center+frame_offset+Vector3(0,2.10,0),Color("3f4747"))
+	Props.box(parent,rail,center+frame_offset-Vector3(0,2.10,0),Color("3f4747"))
+	var band:=Vector3(maxf(0.4,length-0.2),0.24,0.06) if along_x else Vector3(0.06,0.24,maxf(0.4,length-0.2))
+	Props.box(parent,band,center+inward*0.19+Vector3(0,-1.7,0),Color("e3bd36"))
+	var label:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.23+Vector3(0,-0.35,0),20,Color("fff2b0"))
+	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+
+static func _build_cafe_back_wall(parent: Node3D, color: Color, building_stage: int, p) -> void:
+	var openings := [Vector2(LAB_DOOR_X-DOOR_WIDTH*0.5,LAB_DOOR_X+DOOR_WIDTH*0.5)]
+	if building_stage>=2: openings.append(Vector2(REST_DOOR_X-DOOR_WIDTH*0.5,REST_DOOR_X+DOOR_WIDTH*0.5))
+	openings.sort_custom(func(a,b): return a.x<b.x)
+	var left_edge: float=back_wall_left(p)
+	var right_edge: float=back_wall_right(p)
+	var cursor: float=left_edge
 	for opening in openings:
 		if opening.x > cursor:
 			Props.solid_box(parent,Vector3(opening.x-cursor,WALL_HEIGHT,WALL_THICKNESS),Vector3((cursor+opening.x)*0.5,WALL_Y,CAFE_BACK_Z),color)
 		cursor = opening.y
-	if cursor < CAFE_X_MAX:
-		Props.solid_box(parent,Vector3(CAFE_X_MAX-cursor,WALL_HEIGHT,WALL_THICKNESS),Vector3((cursor+CAFE_X_MAX)*0.5,WALL_Y,CAFE_BACK_Z),color)
-	for door_x in [LAB_DOOR_X,REST_DOOR_X]:
+	if cursor < right_edge:
+		Props.solid_box(parent,Vector3(right_edge-cursor,WALL_HEIGHT,WALL_THICKNESS),Vector3((cursor+right_edge)*0.5,WALL_Y,CAFE_BACK_Z),color)
+	var door_xs: Array=[LAB_DOOR_X]
+	if building_stage>=2: door_xs.append(REST_DOOR_X)
+	for door_x in door_xs:
 		var lintel_height := WALL_HEIGHT-DOOR_HEIGHT
 		Props.solid_box(parent,Vector3(DOOR_WIDTH,lintel_height,WALL_THICKNESS),Vector3(door_x,DOOR_HEIGHT+lintel_height*0.5-0.05,CAFE_BACK_Z),color)
 		for side in [-1.0,1.0]:
@@ -130,9 +169,20 @@ static func _build_rest_furniture(parent: Node3D, owner_game: Node3D, tier: int,
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
-	layout_stamp=LoungeProgress.stamp(game.service.progress)+":"+LabLayout.stamp(game.service.progress)
+	layout_stamp=_layout_stamp()
+	_sync_doors()
+
+func _layout_stamp() -> String:
+	return "%d:%s:%s"%[Expansion.stage_for_progress(game.service.progress),LoungeProgress.stamp(game.service.progress),LabLayout.stamp(game.service.progress)]
+
+func _sync_doors() -> void:
+	for data in doors.values():
+		var root: Node3D=data.get("root")
+		if is_instance_valid(root): root.queue_free()
+	doors.clear()
 	_build_door("lab",LAB_DOOR_X,Color("87a99f"))
-	_build_door("rest",REST_DOOR_X,Color("8bb0a4"))
+	if Expansion.stage_for_progress(game.service.progress)>=2:
+		_build_door("rest",REST_DOOR_X,Color("8bb0a4"))
 
 func _build_door(id: String, door_x: float, color: Color) -> void:
 	var root := Node3D.new()
@@ -155,7 +205,7 @@ func _build_door(id: String, door_x: float, color: Color) -> void:
 
 func _physics_process(delta: float) -> void:
 	if game==null: return
-	if LoungeProgress.stamp(game.service.progress)+":"+LabLayout.stamp(game.service.progress)!=layout_stamp and not refresh_pending:
+	if _layout_stamp()!=layout_stamp and not refresh_pending:
 		refresh_pending=true
 		refresh_shell.call_deferred()
 	advance_doors(delta)
@@ -164,16 +214,22 @@ func refresh_shell() -> void:
 	refresh_pending=false
 	if game==null: return
 	var p=game.service.progress
-	layout_stamp=LoungeProgress.stamp(p)+":"+LabLayout.stamp(p)
+	layout_stamp=_layout_stamp()
+	_sync_doors()
 	var shell:=game.get_node_or_null("CafeAnnexShell")
 	if shell!=null: shell.free()
 	build_shell(game)
 	# Furniture appears around an awake player without moving them; they can simply walk out of the new footprint.
 	var point: Vector3=game.player.global_position
-	if point.x<REST_X_MIN and point.z>CAFE_BACK_Z and not game.session.local_sleeping():
-		if not LabLayout.walkable(point,p):
+	if point.z>CAFE_BACK_Z and not game.session.local_sleeping():
+		if point.x<REST_X_MIN and not LabLayout.walkable(point,p):
 			game.player.global_position=LAB_DOOR_ROOM
 			game.player.velocity=Vector3.ZERO
+		elif point.x>=REST_X_MIN and Expansion.stage_for_progress(p)>=2:
+			var blockers:=LoungeLayout.obstacles(p.lounge_tier,p.lounge_items)
+			if not LoungeLayout.walkable(point,blockers,p.lounge_tier):
+				game.player.global_position=REST_DOOR_ROOM
+				game.player.velocity=Vector3.ZERO
 
 func advance_doors(delta: float) -> void:
 	if game == null: return

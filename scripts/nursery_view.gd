@@ -49,11 +49,11 @@ func rebuild() -> void:
 	for x in [left+0.18,Layout.RIGHT-0.18]:
 		P.box(shell,Vector3(0.06,0.85,depth-0.3),Vector3(x,0.44,(Layout.FRONT+back)*0.5),Color("66887d"))
 		P.box(shell,Vector3(0.09,0.05,depth-0.3),Vector3(x,0.9,(Layout.FRONT+back)*0.5),Color("ddba78"))
-	for z in range(12,int(back),4):
+	for z in range(int(Layout.FRONT)+2,int(back),4):
 		var middle: float=(left+Layout.RIGHT)*0.5
 		P.box(shell,Vector3(width-0.6,0.1,0.12),Vector3(middle,4.35,z),Color("718f82"))
 		light_at(shell,Vector3(middle,3.5,z),Color("d5e5cb"),0.85)
-	text_at(shell,"БИОЛАБОРАТОРИЯ · РАССАДА СОТРУДНИКОВ",Vector3(-1.1,3.65,back-0.25),27)
+	text_at(shell,"БИОЛАБОРАТОРИЯ · РАССАДА СОТРУДНИКОВ",Vector3((left+Layout.RIGHT)*0.5,3.65,back-0.25),27)
 	# Microscope is separate from the mixing bench.
 	var scope:=Node3D.new(); shell.add_child(scope); scope.position=Layout.MICROSCOPE
 	P.solid_box(scope,Vector3(1.05,0.12,0.80),Vector3(0,0.88,0),WOOD)
@@ -66,7 +66,7 @@ func rebuild() -> void:
 	P.ball(scope,0.045,Vector3(0,1.28,0.1),Color("8becbd"))
 	microscope_label=text_at(scope,"МИКРОСКОП\nКапля → формула",Vector3(0,2.0,0),20)
 	# The tools share a shallow wall shelf, leaving the centre walk clear.
-	P.solid_box(shell,Vector3(0.42,0.12,2.65),Vector3(Layout.SUPPLY_X,0.88,14.85),WOOD)
+	P.solid_box(shell,Vector3(0.42,0.12,2.65),Vector3(Layout.SUPPLY_X,0.88,Layout.FRONT+0.85),WOOD)
 	for type in nursery.TOOLS:
 		var root:=Node3D.new(); shell.add_child(root); root.position=Layout.tool_point(type)
 		build_tool(root,type)

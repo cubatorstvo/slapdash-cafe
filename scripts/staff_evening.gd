@@ -5,6 +5,7 @@ const Props=preload("res://scripts/props.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const Rest=preload("res://scripts/lounge_progression.gd")
 const Lounge=preload("res://scripts/lounge_layout.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 var game: Node3D
 var performers := {}
 var plan_stamp := ""
@@ -73,14 +74,16 @@ func settle(actor: Node3D, spot: Dictionary, identity: int) -> void:
 
 func route_for(info: Dictionary, target: Vector3) -> Array:
 	var home: Vector3=info.home
-	var route: Array
-	if bool(info.get("from_training",false)) and home.x>Annex.REST_X_MIN and home.x<Annex.REST_X_MAX and home.z>Annex.CAFE_BACK_Z:
-		route=Lounge.path_between(home,target,game.service.progress.lounge_tier,game.service.progress.lounge_items)
-		return route
+	var route: Array=[]
+	if bool(info.get("from_training",false)) and home.x>Annex.REST_X_MIN and home.x<Lounge.right_x(game.service.progress.lounge_tier) and home.z>Annex.CAFE_BACK_Z:
+		return Lounge.path_between(home,target,game.service.progress.lounge_tier,game.service.progress.lounge_items)
 	if bool(info.get("from_lab",false)):
-		route=[home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE,Vector3(Annex.LAB_DOOR_X,0,8.1),Vector3(Annex.REST_DOOR_X,0,8.1),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+		route=[home,Annex.LAB_DOOR_ROOM,Annex.LAB_DOOR_CAFE]
+		for point in Expansion.cafe_route(Annex.LAB_DOOR_CAFE,Annex.REST_DOOR_CAFE,Expansion.stage_for_progress(game.service.progress),true):
+			if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
 	else:
-		route=[home,Vector3(home.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+		route=Expansion.route_to_rear(home,Annex.REST_DOOR_CAFE)
+	route.append(Annex.REST_DOOR_ROOM)
 	var inside_route:=Lounge.approach_path(target,game.service.progress.lounge_tier,game.service.progress.lounge_items)
 	for point in inside_route:
 		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
@@ -88,9 +91,10 @@ func route_for(info: Dictionary, target: Vector3) -> Array:
 
 func reroute_from(current: Vector3, target: Vector3) -> Array:
 	var p=game.service.progress
-	if current.x>Annex.REST_X_MIN and current.x<Annex.REST_X_MAX and current.z>Annex.CAFE_BACK_Z:
+	if current.x>Annex.REST_X_MIN and current.x<Lounge.right_x(p.lounge_tier) and current.z>Annex.CAFE_BACK_Z:
 		return Lounge.path_between(current,target,p.lounge_tier,p.lounge_items)
-	var route: Array=[current,Vector3(current.x,0,7.8),Vector3(Annex.REST_DOOR_X,0,7.8),Annex.REST_DOOR_CAFE,Annex.REST_DOOR_ROOM]
+	var route: Array=Expansion.route_to_rear(current,Annex.REST_DOOR_CAFE)
+	route.append(Annex.REST_DOOR_ROOM)
 	var inside_route:=Lounge.approach_path(target,p.lounge_tier,p.lounge_items)
 	for point in inside_route:
 		if Vector3(route.back()).distance_to(point)>0.01: route.append(point)
