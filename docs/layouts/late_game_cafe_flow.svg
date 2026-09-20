@@ -12,8 +12,8 @@
 <rect width="1200" height="820" fill="#f7f2e7"/>
 <text x="600" y="42" text-anchor="middle" class="t h">ЛЕЙТГЕЙМ — ВИДИМЫЕ ПОТОКИ ЧЕРЕЗ ШЕФА</text>
 
-<rect x="70" y="75" width="450" height="190" class="room back"/><text x="295" y="110" text-anchor="middle" class="t m">ЛАБОРАТОРИЯ</text>
-<rect x="680" y="75" width="450" height="190" class="room back"/><text x="905" y="110" text-anchor="middle" class="t m">КОМНАТА ОТДЫХА</text>
+<rect x="150" y="75" width="450" height="190" class="room back"/><text x="375" y="110" text-anchor="middle" class="t m">ЛАБОРАТОРИЯ</text>
+<rect x="600" y="75" width="450" height="190" class="room back"/><text x="825" y="110" text-anchor="middle" class="t m">КОМНАТА ОТДЫХА</text>
 
 <rect x="40" y="285" width="1120" height="66" fill="#d6eceb" stroke="#1f5e66" stroke-width="4" rx="12"/>
 <text x="600" y="326" text-anchor="middle" class="t m">ЗАДНЯЯ МАГИСТРАЛЬ — ОБЩИЙ ВИДИМЫЙ ПОТОК</text>
