@@ -551,7 +551,7 @@ func _build_room_shell(stage: int) -> void:
 	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.5),Color("777d7c"))
 	var entrance:=Props.text(room_shell,"ВХОД",Vector3(0,2.75,entrance_z+0.22),28,Color("f3cc85"))
 	entrance.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-	var chef_sign:=Props.text(room_shell,"ШЕФ",Vector3(0,3.15,8.5),30,Color("f4cc86"))
+	var chef_sign:=Props.text(room_shell,"ШЕФ",Vector3(0,3.15,7.5),30,Color("f4cc86"))
 	chef_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	var flow:=Props.text(room_shell,"ГЛАВНЫЙ ПРОХОД",Vector3(0,0.025,Expansion.CHEF_FLOW_POINT.z),19,Color("c09b63"))
 	flow.rotation.x=-PI/2
@@ -563,14 +563,14 @@ func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> v
 func _build_room_floor(parent: Node3D,stage: int) -> void:
 	# Non-overlapping rectangles give one continuous floor surface without tile seams or stacks of
 	# coplanar meshes/colliders. Each expansion only adds strips outside the previous footprint.
-	_floor_rect(parent,Vector2(16.0,18.0),Vector2(0.0,5.0),Color("6c7c73"))
+	_floor_rect(parent,Vector2(16.0,20.0),Vector2(0.0,4.0),Color("6c7c73"))
 	if stage>=2:
-		_floor_rect(parent,Vector2(16.0,18.0),Vector2(-16.0,5.0),Color("70827a"))
-		_floor_rect(parent,Vector2(16.0,18.0),Vector2(16.0,5.0),Color("70827a"))
+		_floor_rect(parent,Vector2(16.0,20.0),Vector2(-16.0,4.0),Color("70827a"))
+		_floor_rect(parent,Vector2(16.0,20.0),Vector2(16.0,4.0),Color("70827a"))
 	if stage>=3:
-		_floor_rect(parent,Vector2(48.0,8.0),Vector2(0.0,-8.0),Color("667970"))
+		_floor_rect(parent,Vector2(48.0,8.0),Vector2(0.0,-10.0),Color("667970"))
 	if stage>=4:
-		_floor_rect(parent,Vector2(48.0,10.0),Vector2(0.0,-17.0),Color("748178"))
+		_floor_rect(parent,Vector2(48.0,10.0),Vector2(0.0,-19.0),Color("748178"))
 
 func _build_room_perimeter(parent: Node3D,cells: Dictionary,stage: int) -> void:
 	var final_cells:=Expansion.final_hall_cells()
