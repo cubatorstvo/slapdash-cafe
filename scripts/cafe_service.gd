@@ -460,27 +460,47 @@ func _same_group_intent(a: Dictionary,b: Dictionary) -> bool:
 	for item in b.get("curriculum",[]): plan_b[str(item.get("dish_id",""))]=int(item.get("record_id",0))
 	return plan_a==plan_b
 
+func _station_group_template(station: Node3D) -> Dictionary:
+	if station==null: return {}
+	var active: Array=station.active_dishes.duplicate() if station.active_menu_initialized else []
+	if not station.active_menu_initialized:
+		for dish in station.dishes():
+			if station.recipes.has(dish) or station.method_plan.has(dish): active.append(str(dish))
+	var curriculum: Array=[]
+	var revision:=1
+	for raw_dish in station.method_plan:
+		var dish:=str(raw_dish)
+		var source: Dictionary=station.method_plan[raw_dish] if station.method_plan[raw_dish] is Dictionary else {}
+		var record_id:=int(source.get("id",source.get("record_id",0)))
+		if record_id<=0: continue
+		var item_revision:=maxi(1,int(source.get("revision",1)))
+		revision=maxi(revision,item_revision)
+		curriculum.append({"dish_id":dish,"record_id":record_id,"revision":item_revision})
+	return {"active_dishes":active,"curriculum":curriculum,"plan_revision":revision}
+
 func create_table_group(ids: Array,name := "") -> String:
-	_ensure_groups()
 	var checked:=_compatible_group_selection(ids)
 	if not str(checked.error).is_empty(): return str(checked.error)
-	if checked.stations.is_empty(): return "Выбери хотя бы один стол."
-	var source_groups: Array=[]
-	for raw_id in checked.stations:
-		var source_id:=group_registry.group_id_for_station(int(raw_id))
-		if not source_id.is_empty() and source_id not in source_groups: source_groups.append(source_id)
-	if source_groups.size()>1:
-		var base: Dictionary=group_registry.by_id(str(source_groups[0]))
-		for source_id in source_groups.slice(1):
-			if not _same_group_intent(base,group_registry.by_id(str(source_id))):
-				return "У выбранных столов разные планы или активное меню. Сначала раздели нужные части и используй «Объединить группы»."
-	var first_group: Dictionary=group_registry.for_station(int(checked.stations[0]))
+	if checked.stations.size()<2: return "Для группы выбери минимум два стола."
+	var first_station: Node3D=by_id(int(checked.stations[0]))
 	var title:=name.strip_edges().left(48)
 	if title.is_empty(): title="%s · группа"%Definition.TYPES[str(checked.type_id)].title
-	var created:=group_registry.create_group(checked.stations,str(checked.type_id),title,first_group)
+	var created:=group_registry.create_group(checked.stations,str(checked.type_id),title,_station_group_template(first_station))
 	if created.is_empty(): return "Не удалось создать группу."
-	_ensure_groups()
-	_sync_all_group_intent()
+	_sync_group_intent(str(created.id))
+	progress.revision+=1
+	return ""
+
+func dissolve_table_groups(group_ids: Array) -> String:
+	var changed:=false
+	var seen: Array=[]
+	for raw_id in group_ids:
+		var group_id:=str(raw_id)
+		if group_id.is_empty() or group_id in seen: continue
+		seen.append(group_id)
+		if group_registry.dissolve(group_id).is_empty(): continue
+		changed=true
+	if not changed: return "Выбери хотя бы одну группу."
 	progress.revision+=1
 	return ""
 
@@ -543,11 +563,22 @@ func set_group_dish_active(group_id: String,dish: String,enabled: bool) -> Strin
 	return error
 
 func _apply_group_plan(record_id: int,ids: Array) -> Array:
-	_ensure_groups()
 	var record:=masterclass_by_id(record_id)
 	if record.is_empty(): return []
-	var affected:=group_registry.apply_plan_to_selection(ids,str(record.dish),record_id)
-	for group_id in affected: _sync_group_intent(str(group_id))
+	var affected: Array=[]
+	var dish:=str(record.dish)
+	for raw_id in ids:
+		var station_id:=int(raw_id)
+		var station: Node3D=by_id(station_id)
+		if station==null or station.manual_station or station.masterclass_station or station.type_id!=str(record.source_type) or dish not in station.dishes(): continue
+		var previous: Dictionary=station.method_plan.get(dish,{}) if station.method_plan.get(dish,{}) is Dictionary else {}
+		var previous_id:=int(previous.get("id",previous.get("record_id",0)))
+		var revision:=maxi(1,int(previous.get("revision",1)))
+		if previous_id!=record_id: revision+=1
+		station.method_plan[dish]={"id":record_id,"name":str(record.get("name","Запись #%d"%record_id)),"revision":revision}
+		if station_id not in affected: affected.append(station_id)
+	affected.sort()
+	if not affected.is_empty(): progress.revision+=1
 	return affected
 
 func preview_table_groups(record_id: int,ids: Array) -> Array:
@@ -607,14 +638,18 @@ func source_label(station_id: int,dish: String) -> String:
 	return str(source.get("name","Запись"))+" · Запись удалена"
 
 func desired_source(group_id: String,dish: String) -> Dictionary:
-	_ensure_groups()
 	var group: Dictionary=group_registry.by_id(group_id)
 	if group.is_empty(): return {}
-	var item: Dictionary=group_registry.plan_record(group,dish)
-	if item.is_empty(): return {}
-	var record_id:=int(item.record_id)
-	var record:=masterclass_by_id(record_id)
-	return {"id":record_id,"name":str(record.get("name","Запись #%d"%record_id)),"revision":int(item.revision)}
+	var result: Dictionary={}
+	for raw_id in group.station_ids:
+		var station: Node3D=by_id(int(raw_id))
+		if station==null: continue
+		var source: Dictionary=station.method_plan.get(dish,{}) if station.method_plan.get(dish,{}) is Dictionary else {}
+		var record_id:=int(source.get("id",source.get("record_id",0)))
+		if record_id<=0: return {}
+		if result.is_empty(): result={"id":record_id,"name":str(source.get("name","Запись #%d"%record_id)),"revision":int(source.get("revision",1))}
+		elif int(result.id)!=record_id: return {}
+	return result
 
 func desired_source_label(group_id: String,dish: String) -> String:
 	var source:=desired_source(group_id,dish)
@@ -624,23 +659,22 @@ func desired_source_label(group_id: String,dish: String) -> String:
 func station_group_status(station_id: int,dish: String) -> String:
 	var station:=by_id(station_id)
 	if station==null: return "нет стола"
-	var group: Dictionary=group_registry.for_station(station_id)
-	var desired: Dictionary=group_registry.plan_record(group,dish) if not group.is_empty() else {}
+	var desired: Dictionary=station.method_plan.get(dish,{}) if station.method_plan.get(dish,{}) is Dictionary else {}
+	var desired_id:=int(desired.get("id",desired.get("record_id",0)))
 	var active: bool=station.dish_active(dish)
 	if is_instance_valid(staff_training) and staff_training.targets_station(station_id,dish): return staff_training.phase_label()
 	if is_instance_valid(training_queue):
 		var queue_state: String=training_queue.station_status(station_id,dish)
 		if not queue_state.is_empty(): return queue_state
 	var actual: Dictionary=station.method_sources.get(dish,{})
-	var desired_mastered: bool=not desired.is_empty() and station.recipes.has(dish) and int(actual.get("id",0))==int(desired.record_id)
-	if desired_mastered:
+	if desired_id>0 and station.recipes.has(dish) and int(actual.get("id",0))==desired_id:
 		var missing: Array=station.missing_recipe_equipment(dish)
 		if not missing.is_empty(): return "освоено · нет оснащения"
 		if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
 		return "освоено" if active else "освоено · выключено в меню"
-	if not desired.is_empty() and masterclass_by_id(int(desired.record_id)).is_empty(): return "нужна действующая запись для нового обучения"
+	if desired_id>0 and masterclass_by_id(desired_id).is_empty(): return "нужна действующая запись для нового обучения"
 	if station.staffed>=0 and station.staffed<station.role_count(): return "нужны сотрудники"
-	if not desired.is_empty():
+	if desired_id>0:
 		if station.recipes.has(dish): return "работает по старому · ожидает переобучения" if active else "старый способ · выключено в меню"
 		return "ожидает обучения" if active else "обучение запланировано · блюдо выключено"
 	if station.recipes.has(dish):
@@ -675,36 +709,7 @@ func add_station_to_group(group_id: String,station_id: int) -> String:
 	return ""
 
 func attach_purchased_station_to_group(station: Node3D,planned_group: String,purchase_snapshot: Dictionary={},legacy_plan: Dictionary={}) -> String:
-	if station==null or station.manual_station or station.masterclass_station: return "Стол недоступен."
-	if planned_group.is_empty(): return ""
-	var current: Dictionary=group_registry.by_id(planned_group)
-	if not current.is_empty() and str(current.type_id)==station.type_id:
-		return add_station_to_group(planned_group,station.station_id)
-	var template: Dictionary={}
-	if not purchase_snapshot.is_empty() and str(purchase_snapshot.get("type_id",purchase_snapshot.get("type","")))==station.type_id:
-		template={
-			"active_dishes":purchase_snapshot.get("active_dishes",[]).duplicate(),
-			"curriculum":purchase_snapshot.get("curriculum",[]).duplicate(true),
-			"plan_revision":int(purchase_snapshot.get("plan_revision",1))
-		}
-	elif not legacy_plan.is_empty():
-		var curriculum: Array=[]
-		var active: Array=[]
-		for dish in Definition.TYPES[station.type_id].dishes:
-			var raw: Dictionary=legacy_plan.get(str(dish),{}) if legacy_plan.get(str(dish),{}) is Dictionary else {}
-			var record_id:=int(raw.get("id",raw.get("record_id",0)))
-			if record_id<=0: continue
-			curriculum.append({"dish_id":str(dish),"record_id":record_id,"revision":maxi(1,int(raw.get("revision",1)))})
-			active.append(str(dish))
-		template={"active_dishes":active,"curriculum":curriculum,"plan_revision":1}
-	if template.is_empty(): return ""
-	var source_name:=str(purchase_snapshot.get("name","Группа заказа")).strip_edges()
-	if source_name.is_empty(): source_name="Группа заказа"
-	var created:=group_registry.create_group([station.station_id],station.type_id,source_name+" · отдельная",template)
-	if created.is_empty(): return "Не удалось восстановить план группы из заказа."
-	_sync_group_intent(str(created.id))
-	progress.revision+=1
-	announce("Группа «%s» была удалена. Стол %d получил отдельную группу с планом из заказа."%[source_name,station.station_id])
+	# Покупка никогда не меняет группы: объединение столов всегда ручное через компьютер.
 	return ""
 
 func compatible_training_station_ids(record_id: int) -> Array:
