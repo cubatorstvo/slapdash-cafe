@@ -322,13 +322,13 @@ func _course_intent(course: Dictionary)->Array:
 
 func _course_feed_name(course_id: int)->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс #%d"%course_id
+	if course.is_empty(): return "Обучение #%d"%course_id
 	var parts: Array=[]
 	for assignment in _course_intent(course):
 		var dish: String=str(assignment.get("dish",""))
 		var title: String=str(Definition.DISHES.get(dish,dish))
 		if title not in parts: parts.append(title)
-	return " + ".join(parts) if not parts.is_empty() else "Курс #%d"%course_id
+	return " + ".join(parts) if not parts.is_empty() else "Обучение #%d"%course_id
 
 func _remaining_course_lessons(course_id: int)->int:
 	var count:=0
@@ -386,8 +386,8 @@ func course_views()->Array:
 
 func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[])->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс не найден."
-	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающий курс."
+	if course.is_empty(): return "Обучение не найдено."
+	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающее обучение."
 	if active_batch_id in course.get("batch_ids",[]): return "Активную учебную партию сначала нужно завершить или отменить."
 	if mode not in ["together","by_groups","balanced"]: return "Неизвестный режим обучения."
 	var normalized:=_normalize_assignments(assignments)
@@ -880,7 +880,7 @@ func cancel_batch(batch_id: int)->String:
 
 func cancel_course(course_id: int)->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс не найден."
+	if course.is_empty(): return "Обучение не найдено."
 	if str(course.get("state","")) in ["completed","cancelled"]: return ""
 	for batch_id in course.get("batch_ids",[]):
 		var batch:=_batch(int(batch_id))
