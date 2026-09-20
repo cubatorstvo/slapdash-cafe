@@ -174,9 +174,13 @@ func _validated_masterclass_equipment(dish: String,value: Variant) -> Dictionary
 	if selected.is_empty(): return {"error":"Выбери хотя бы один доступный предмет для мастер-класса.","equipment":[]}
 	return {"error":"","equipment":selected}
 
+func masterclass_time_available() -> bool:
+	return progress.shift in ["morning","open"]
+
 func masterclass_access(dish: String) -> Dictionary:
 	if dish not in Definition.DISH_ORDER: return {"available":false,"reason":"Неизвестное блюдо."}
 	if progress.stars<1: return {"available":false,"reason":"Мастер-классы откроются после первой звезды."}
+	if not masterclass_time_available(): return {"available":false,"reason":"Мастер-класс проводится в рабочее время."}
 	var type_id: String=Definition.type_for_dish(dish)
 	if type_id.is_empty(): return {"available":false,"reason":"Для блюда не задан тип кухни."}
 	if not _masterclass_type_available(type_id):
@@ -195,7 +199,7 @@ func masterclass_options() -> Array:
 
 func request_masterclass(dish: String,peer: int,equipment: Variant=null) -> String:
 	if progress.busy(): return "Сначала заверши текущую проверку."
-	if progress.shift in ["night","closing"]: return "Мастер-класс проводится в рабочее время."
+	if not masterclass_time_available(): return "Мастер-класс проводится в рабочее время."
 	if masterclass_locked(): return "Мастер-класс уже готовится или идёт."
 	if training_for(peer)!=null: return "Сначала заверши текущий показ."
 	var access:=masterclass_access(dish)
