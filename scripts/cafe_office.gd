@@ -1388,7 +1388,7 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 		label(mode_row,"Запуск:",13)
 		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="together" else "")+"Вместе",func():course_editor_set_mode("together"),host)
 		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="by_groups" else "")+"По группам",func():course_editor_set_mode("by_groups"),host)
-		var preview:=service.training_course_preview(_draft_assignments(),str(course_editor.get("mode","together")),course_group_order)
+		var preview: Dictionary=service.training_course_preview(_draft_assignments(),str(course_editor.get("mode","together")),course_group_order)
 		var error:=str(preview.get("error",""))
 		if not error.is_empty():
 			label(box,error,13)
