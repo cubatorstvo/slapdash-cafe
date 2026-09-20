@@ -30,6 +30,21 @@ static func collision_box(parent: Node3D, size: Vector3, point: Vector3) -> Stat
 	body.add_child(collider)
 	return body
 
+static func moving_solid_box(parent: Node3D, size: Vector3, point: Vector3, color: Color) -> AnimatableBody3D:
+	var body := AnimatableBody3D.new()
+	body.collision_layer = 1
+	body.collision_mask = 2
+	body.sync_to_physics = true
+	parent.add_child(body)
+	body.position = point
+	box(body,size,Vector3.ZERO,color)
+	var collider := CollisionShape3D.new()
+	var shape_box := BoxShape3D.new()
+	shape_box.size = size
+	collider.shape = shape_box
+	body.add_child(collider)
+	return body
+
 static func cylinder(parent: Node3D, radius: float, height: float, point: Vector3, color: Color, top := -1.0) -> MeshInstance3D:
 	var mesh := CylinderMesh.new()
 	mesh.top_radius = radius if top < 0.0 else top
