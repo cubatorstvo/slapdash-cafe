@@ -106,8 +106,8 @@ static func masterclass_training_step(p, station, dish: String, quality: bool, s
 		return step("training_"+dish,"Дождись окончания обучения","Сотрудники закончат текущий заказ, соберутся у телевизора с блокнотами, посмотрят хайлайты и вернутся к столу.","television",station.station_id)
 	var compatible: Array=service.compatible_training_station_ids(int(record.id))
 	var mass: bool=compatible.size()>1
-	var detail: String="Компьютер → Группы столов → выбери стол %d → запись «%s» → Назначить выбранным."%[station.station_id,str(record.get("name","Запись"))]
-	if mass: detail+=" Уже доступно массовое назначение: «Все совместимые» применит этот мастер-класс сразу к нескольким подходящим столам."
+	var detail: String="Компьютер → Столы и обучение → выбери стол %d → «Обучение» → добавь «%s» в очередь."%[station.station_id,str(record.get("name","Запись"))]
+	if mass: detail+=" Можно выбрать сразу несколько столов одного типа: все они уйдут на один общий просмотр."
 	return step("assign_masterclass_"+dish,"Назначь запись столу: "+str(DISH_NAMES[dish]),detail,"computer",station.station_id)
 
 
@@ -169,14 +169,14 @@ static func _post_star_training_intro(p, stations: Array, service) -> Dictionary
 	if target.is_empty():
 		var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0)))
 		var station_id: int=int(compatible[0]) if not compatible.is_empty() else int(production[0].station_id)
-		return step("training_intro_course","3/5 · Добавь первое обучение","Открой компьютер → «Группы столов» → выбери столы → «Обучение». Добавь «%s» в расписание."%str(record.get("name","Запись")),"station",station_id)
+		return step("training_intro_course","3/5 · Добавь первое обучение","Открой компьютер → «Столы и обучение» → выбери столы → «Обучение». Добавь «%s» в очередь."%str(record.get("name","Запись")),"station",station_id)
 	if not _course_target_learned(service,target):
 		var station_id: int=int(target.get("station_id",0))
 		var status: String=service.training_queue.station_status(station_id,str(target.get("dish","")))
 		var suffix: String=" Сейчас: "+status+"." if not status.is_empty() else ""
-		return step("training_intro_wait","4/5 · Дождись окончания обучения","Блюдо уже в расписании. Учебная партия закончит принятый заказ, дойдёт до телевизора, посмотрит фильм и вернётся к столу."+suffix,"television",station_id)
+		return step("training_intro_wait","4/5 · Дождись окончания обучения","Блюдо уже в очереди. Выбранные сотрудники закончат принятые заказы, вместе дойдут до телевизора, посмотрят фильм и вернутся к столам."+suffix,"television",station_id)
 	if p.journey_auto_served<1:
-		return step("training_intro_first_work","4/5 · Увидь обученную бригаду в работе","Открой кафе и дождись реального заказа этого стола. Добавление блюда в расписание само по себе не считается обучением: нужен завершённый фильм и фактическая работа бригады.","station",int(target.get("station_id",0)))
+		return step("training_intro_first_work","4/5 · Увидь обученную бригаду в работе","Открой кафе и дождись реального заказа этого стола. Добавление блюда в очередь само по себе не считается обучением: нужен завершённый просмотр и фактическая работа бригады.","station",int(target.get("station_id",0)))
 	if not bool(p.training_intro_mass_seen):
 		var type_id: String=str(record.get("source_type",""))
 		var compatible_count:=0
@@ -186,7 +186,7 @@ static func _post_star_training_intro(p, stations: Array, service) -> Dictionary
 			compatible_count+=1
 			if first_id==0: first_id=int(station.station_id)
 		if compatible_count>=2:
-			return step("training_intro_mass","5/5 · Назначь обучение нескольким столам","В компьютере выбери несколько совместимых столов или целую группу и добавь блюдо в расписание. Система сама отправит их партиями примерно по 20% столов.","station",first_id)
+			return step("training_intro_mass","5/5 · Назначь обучение нескольким столам","В компьютере выбери несколько столов одного типа или целую группу и добавь блюдо в очередь. Все выбранные столы уйдут на один общий просмотр.","station",first_id)
 	return {}
 
 static func grow(p, stations: Array) -> Dictionary:
