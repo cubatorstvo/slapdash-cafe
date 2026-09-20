@@ -192,7 +192,7 @@ func run()->void:
 	game.office.select_group_stations(compatible)
 	game.office.course_editor_open()
 	var scale_rendered: String=tree_text(game.office.content)
-	check("19/19 производственных мест" in scale_rendered and "работников 19" in scale_rendered,"Course editor reports honest production-place and worker counts at full scale")
+	check("19 столов" in scale_rendered and "работников 19/19" in scale_rendered,"Training workspace reports honest selected-table and worker counts at full scale")
 	game.office.close()
 
 	print("7/10: statistics and group UI render the same drill-down data")
