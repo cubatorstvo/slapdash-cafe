@@ -332,7 +332,7 @@ func capture_player() -> Dictionary:
 
 func clean_pose(pose: Dictionary) -> Dictionary:
 	var appearance: Dictionary = pose.get("presentation", {}) if pose.get("presentation", {}) is Dictionary else {}
-	return {"lab_pull":pose.get("lab_pull",false)==true, "lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], Expansion.HALL_X_MIN-1.0, Expansion.HALL_X_MAX+1.0), clampf(pose.position[1], 0, 4), clampf(pose.position[2], Expansion.FINAL_ENTRANCE_Z-3.0, 31.5)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
+	return {"lab_pull":pose.get("lab_pull",false)==true, "lab_hold":pose.get("lab_hold",false)==true, "position": [clampf(pose.position[0], Expansion.HALL_X_MIN-1.0, Expansion.HALL_X_MAX+1.0), clampf(pose.position[1], 0, 4), clampf(pose.position[2], Expansion.entrance_z(4)-3.0, 31.5)], "yaw": wrapf(pose.yaw, -PI, PI), "pitch": clampf(pose.pitch, -1.4, 1.3), "presentation": {"book": appearance.get("book",false) == true, "page": preload("res://scripts/cookbook_data.gd").page(str(appearance.get("page","index")))}}
 
 @rpc("any_peer", "call_remote", "unreliable_ordered", 3)
 func _presence(pose: Dictionary) -> void:
