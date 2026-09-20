@@ -7,6 +7,7 @@ const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Installer = preload("res://scripts/delivery_installer.gd")
+const Definition = preload("res://scripts/station_definition.gd")
 var ITEMS: Dictionary = preload("res://scripts/cafe_catalogue.gd").ITEMS.duplicate(true)
 var game: Node3D
 var boxes := {}
@@ -343,12 +344,8 @@ func _sync_legacy_installer(parcel: Dictionary,job: Dictionary)->void:
 	parcel.installer_age=float(job.get("phase_age",0.0))
 	parcel.installer_variant=int(job.get("variant",0))
 
-func equipment_allowed(type_id: String, item: String) -> bool:
-	if type_id=="counter": return item in ["sauce","plates","cup","pan","jug","rag","sauce_ramp"]
-	if type_id=="kitchen": return item in ["meat_kit","pasta_kit"]
-	if type_id=="grill_kitchen": return item in ["grill_kit","assembly_kit"]
-	if type_id=="solyanka_kitchen": return item in ["fire_kit","stir_kit","salt_kit"]
-	return false
+func equipment_allowed(type_id: String,item: String) -> bool:
+	return Definition.equipment_allowed(type_id,item)
 
 func order(item: String, station_id: int, with_installer := false) -> String:
 	var p = game.service.progress
