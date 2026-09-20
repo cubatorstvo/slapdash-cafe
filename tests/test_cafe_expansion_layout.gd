@@ -52,8 +52,9 @@ func run()->void:
 		check(hall_contains(Expansion.player_spawn(stage),stage),"Player spawn is inside stage %d"%stage)
 		check(hall_contains(Expansion.customer_spawn(stage),stage),"Customer spawn is inside stage %d"%stage)
 		previous=cells
-	check(is_equal_approx(Expansion.entrance_z(1),Expansion.entrance_z(3)),"Stages 1-3 share the compact entrance")
-	check(Expansion.entrance_z(4)<Expansion.entrance_z(3)-10.0,"Final expansion moves the entrance to the new front wall")
+	check(is_equal_approx(Expansion.entrance_z(1),Expansion.entrance_z(2)),"Stages 1-2 share the compact entrance")
+	check(Expansion.entrance_z(3)<Expansion.entrance_z(2)-6.0,"Stage 3 moves the entrance to the expanded front wall")
+	check(Expansion.entrance_z(4)<Expansion.entrance_z(3)-8.0,"Final expansion adds the full front hall")
 
 	print("2/5: every production slot and customer approach sits on its unlocked floor")
 	for slot in range(Expansion.SLOT_COUNT):
