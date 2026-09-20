@@ -51,29 +51,25 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_reset_player()
 
 func _build_unlock_map() -> void:
-	_mark_rect(Rect2i(-3, -6, 6, 15), 1)
-	_mark_rect(Rect2i(-3, -7, 6, 1), 1)
-	_mark_rect(Rect2i(-3, -12, 3, 5), 1)
-
-	_mark_rect(Rect2i(3, -5, 1, 6), 2)
-	_mark_rect(Rect2i(4, -5, 7, 6), 2)
-	_mark_rect(Rect2i(0, -12, 3, 5), 2)
-
-	_mark_rect(Rect2i(-11, -5, 7, 6), 3)
-	_mark_rect(Rect2i(-4, -5, 1, 6), 3)
-	_mark_rect(Rect2i(-6, -12, 3, 5), 3)
-	_mark_rect(Rect2i(3, -12, 3, 5), 3)
-	_mark_rect(Rect2i(-6, -7, 3, 1), 3)
-	_mark_rect(Rect2i(3, -7, 3, 1), 3)
-
-	_mark_rect(Rect2i(-11, 1, 7, 6), 4)
-	_mark_rect(Rect2i(-4, 1, 1, 6), 4)
-	_mark_rect(Rect2i(3, 1, 1, 6), 4)
-	_mark_rect(Rect2i(4, 1, 7, 6), 4)
-	_mark_rect(Rect2i(-9, -12, 3, 5), 4)
-	_mark_rect(Rect2i(6, -12, 3, 5), 4)
-	_mark_rect(Rect2i(-9, -7, 3, 1), 4)
-	_mark_rect(Rect2i(6, -7, 3, 1), 4)
+	# Fixed Chef plaza, narrower public approach, compact six-metre-deep back rooms.
+	_mark_rect(Rect2i(-3, -7, 6, 6), 1)
+	_mark_rect(Rect2i(-2, -1, 4, 9), 1)
+	_mark_rect(Rect2i(-3, -10, 3, 3), 1)
+	_mark_rect(Rect2i(3, -5, 7, 6), 2)
+	_mark_rect(Rect2i(2, -1, 1, 2), 2)
+	_mark_rect(Rect2i(0, -10, 3, 3), 2)
+	_mark_rect(Rect2i(-10, -5, 7, 6), 3)
+	_mark_rect(Rect2i(-3, -1, 1, 2), 3)
+	_mark_rect(Rect2i(-6, -10, 3, 3), 3)
+	_mark_rect(Rect2i(3, -10, 3, 3), 3)
+	_mark_rect(Rect2i(-6, -7, 3, 2), 3)
+	_mark_rect(Rect2i(3, -7, 3, 2), 3)
+	_mark_rect(Rect2i(-10, 1, 8, 6), 4)
+	_mark_rect(Rect2i(2, 1, 8, 6), 4)
+	_mark_rect(Rect2i(-9, -10, 3, 3), 4)
+	_mark_rect(Rect2i(6, -10, 3, 3), 4)
+	_mark_rect(Rect2i(-9, -7, 3, 2), 4)
+	_mark_rect(Rect2i(6, -7, 3, 2), 4)
 
 func _mark_rect(rect: Rect2i, unlock_stage: int) -> void:
 	for x in range(rect.position.x, rect.end.x):
@@ -106,9 +102,9 @@ func _build_environment() -> void:
 	exterior.name = "Exterior"
 	add_child(exterior)
 	_add_box(exterior, "GroundVisual", Vector3(0.0, -0.14, -3.0), Vector3(70.0, 0.24, 70.0), OUTSIDE_COLOR, false)
-	_add_box(exterior, "EntrancePath", Vector3(0.0, -0.055, 22.0), Vector3(5.5, 0.10, 8.0), Color("777d7c"), false)
+	_add_box(exterior, "EntrancePath", Vector3(0.0, -0.055, 20.0), Vector3(5.5, 0.10, 8.0), Color("777d7c"), false)
 	_add_invisible_floor_collider(exterior)
-	_add_zone_sign(exterior, "ВХОД", Vector3(0.0, 2.2, 19.7), Color("e6ecec"), 34)
+	_add_zone_sign(exterior, "ВХОД", Vector3(0.0, 2.2, 17.7), Color("e6ecec"), 34)
 
 func _add_invisible_floor_collider(parent: Node3D) -> void:
 	var body := StaticBody3D.new()
@@ -284,14 +280,14 @@ func _build_back_block_divider(root: Node3D, stage: int) -> void:
 	var divider := Node3D.new()
 	divider.name = "LabRestSharedWall"
 	root.add_child(divider)
-	_add_final_wall(divider, "SharedWall", Vector3(0.0, WALL_HEIGHT * 0.5, -19.0), Vector3(WALL_THICKNESS, WALL_HEIGHT, 10.0))
+	_add_final_wall(divider, "SharedWall", Vector3(0.0, WALL_HEIGHT * 0.5, -17.0), Vector3(WALL_THICKNESS, WALL_HEIGHT, 6.0))
 
 func _is_entrance_opening(cell: Vector2i) -> bool:
-	return cell.y == 8 and (cell.x == -1 or cell.x == 0)
+	return cell.y == 7 and (cell.x == -1 or cell.x == 0)
 
 func _build_wayfinding(root: Node3D, stage: int) -> void:
 	_add_zone_sign(root, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 2.65, 8.0), Color("dce6e8"), 24)
-	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(0.0, 2.65, -14.0), Color("dce6e8"), 22)
+	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(0.0, 2.65, -12.0), Color("dce6e8"), 22)
 
 func _build_chef(root: Node3D) -> void:
 	var chef := Node3D.new()
@@ -305,53 +301,72 @@ func _build_chef(root: Node3D) -> void:
 	_add_zone_sign(chef, "за спиной — открытая задняя магистраль", Vector3(0.0, 2.05, -8.0), Color("dbe4e4"), 18)
 
 func _build_stage_content(root: Node3D, stage: int) -> void:
-	_add_zone_sign(root, "ЛАБОРАТОРИЯ · 1/3", Vector3(-3.0, 2.35, -20.0), STAGE_COLORS[1].lightened(0.22), 27)
+	_add_zone_sign(root, "ЛАБОРАТОРИЯ", Vector3(-3.0, 2.35, -19.0), STAGE_COLORS[1], 25)
 	_add_lab_props(root, 1)
 	if stage >= 2:
-		_add_zone_sign(root, "КУХНЯ 1 · 5 МЕСТ", Vector3(15.0, 2.35, -3.8), STAGE_COLORS[2].lightened(0.2), 27)
-		_add_kitchen_stations(root, Vector3(15.0, 0.0, -3.8), 5, false)
-		_add_zone_sign(root, "КОМНАТА ОТДЫХА · 1/3", Vector3(3.0, 2.35, -20.0), STAGE_COLORS[2].lightened(0.2), 24)
 		_add_rest_props(root, 1)
+		_add_zone_sign(root, "ОТДЫХ", Vector3(3.0, 2.35, -19.0), STAGE_COLORS[2], 25)
+		# A: crooked five-table horseshoe, entrance towards the Chef on the left.
+		_build_court(root, "Zone A · 5", Vector3(13, 0, -4), [
+			Vector3(-1.6, 0, -3.6), Vector3(2.0, 0, -3.4), Vector3(4.1, 0, 0.1),
+			Vector3(2.1, 0, 3.6), Vector3(-1.6, 0, 3.5)], Vector3.ZERO, 2)
 	if stage >= 3:
-		_add_zone_sign(root, "КУХНЯ 2 · МИДГЕЙМ", Vector3(-15.0, 2.35, -3.8), STAGE_COLORS[3].lightened(0.2), 27)
-		_add_kitchen_stations(root, Vector3(-15.0, 0.0, -3.8), 7, true)
-		_add_zone_sign(root, "ЛАБА · 2/3", Vector3(-9.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
-		_add_zone_sign(root, "ОТДЫХ · 2/3", Vector3(9.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
 		_add_lab_props(root, 2)
 		_add_rest_props(root, 2)
+		# B: elongated, asymmetric oval with an open right-hand mouth.
+		_build_court(root, "Zone B · 7", Vector3(-13, 0, -4), [
+			Vector3(2.4, 0, -3.6), Vector3(-0.8, 0, -3.8), Vector3(-3.7, 0, -2.6),
+			Vector3(-4.4, 0, 0.5), Vector3(-3.0, 0, 3.4), Vector3(0.2, 0, 3.9),
+			Vector3(3.4, 0, 3.0)], Vector3.ZERO, 3)
 	if stage >= 4:
-		_add_zone_sign(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(-15.0, 2.35, 8.0), STAGE_COLORS[4].lightened(0.12), 26)
-		_add_zone_sign(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(15.0, 2.35, 8.0), STAGE_COLORS[4].lightened(0.12), 26)
-		_add_kitchen_stations(root, Vector3(-15.0, 0.0, 8.0), 8, true)
-		_add_kitchen_stations(root, Vector3(15.0, 0.0, 8.0), 8, false)
-		_add_zone_sign(root, "ЛАБА · 3/3", Vector3(-15.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
-		_add_zone_sign(root, "ОТДЫХ · 3/3", Vector3(15.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
 		_add_lab_props(root, 3)
 		_add_rest_props(root, 3)
+		# C: irregular public square; the upper-right corner is the entrance.
+		_build_court(root, "Zone C · 8", Vector3(-13, 0, 8), [
+			Vector3(-3.5, 0, -3.7), Vector3(-0.2, 0, -4.0), Vector3(-4.4, 0, -0.6),
+			Vector3(-4.0, 0, 2.8), Vector3(-1.4, 0, 4.0), Vector3(1.9, 0, 3.8),
+			Vector3(4.3, 0, 1.4), Vector3(4.1, 0, -1.8)], Vector3.ZERO, 4)
+		# D: two connected public pockets, with two back-to-back central counters.
+		_build_court(root, "Zone D · 10", Vector3(13, 0, 8), [
+			Vector3(-2.5, 0, -3.8), Vector3(0.6, 0, -4.0), Vector3(3.7, 0, -3.2),
+			Vector3(4.5, 0, -0.1), Vector3(4.0, 0, 3.2), Vector3(0.8, 0, 4.0),
+			Vector3(-2.5, 0, 3.7), Vector3(-4.3, 0, 1.0)], Vector3(0, 0, -1), 4)
+		_add_debug_table(root, "D_CenterNorth", Vector3(12.0, 0, 7.0), Vector3(12.0, 0, 3.0), 0.06)
+		_add_debug_table(root, "D_CenterSouth", Vector3(14.0, 0, 9.2), Vector3(14.0, 0, 13.0), -0.08)
 
-func _add_kitchen_stations(parent: Node3D, center: Vector3, count: int, face_center: bool) -> void:
-	var props := Node3D.new()
-	props.name = "KitchenProps_%s" % str(center)
-	parent.add_child(props)
-	var columns := 4
-	for i in range(count):
-		var col := i % columns
-		var row := i / columns
-		var local_x := (float(col) - 1.5) * 2.6
-		var local_z := (float(row) - 0.5) * 3.4
-		_add_box(props, "Station_%d" % i, center + Vector3(local_x, 0.5, local_z), Vector3(2.0, 1.0, 1.15), Color("8f989a"))
-		var edge := center + Vector3(local_x, 1.12, local_z + (-0.72 if face_center else 0.72))
-		_add_box(props, "StationEdge_%d" % i, edge, Vector3(2.0, 0.09, 0.12), Color("d8b15b"), false)
+func _build_court(parent: Node3D, title: String, center: Vector3, offsets: Array, focus_offset: Vector3, stage: int) -> void:
+	var court := Node3D.new()
+	court.name = title.split(" · ")[0].replace(" ", "")
+	parent.add_child(court)
+	_add_zone_sign(court, title, center + Vector3(0, 2.8, 0), STAGE_COLORS[stage].lightened(0.2), 30)
+	_add_zone_sign(court, "ПОСЕТИТЕЛИ", center + Vector3(0, 0.3, 0.6), Color("dce6e8"), 19)
+	for i in range(offsets.size()):
+		var offset: Vector3 = offsets[i]
+		var skew := [-0.09, 0.07, -0.04, 0.11, -0.06][i % 5]
+		_add_debug_table(court, "Slot_%02d" % (i + 1), center + offset, center + focus_offset, skew)
+
+func _add_debug_table(parent: Node3D, title: String, position: Vector3, customer_focus: Vector3, skew: float) -> void:
+	var station := Node3D.new()
+	station.name = title
+	station.position = position
+	# Local +Z is the customer edge, local -Z the cook's standing position.
+	var inward := customer_focus - position
+	station.rotation.y = atan2(inward.x, inward.z) + skew
+	parent.add_child(station)
+	_add_box(station, "Table", Vector3(0, 0.5, 0), Vector3(2.0, 1.0, 1.1), Color("8f989a"))
+	_add_box(station, "CustomerEdge", Vector3(0, 1.04, 0.5), Vector3(2.0, 0.08, 0.12), Color("d8b15b"), false)
+	_add_box(station, "CookPosition", Vector3(0, 0.025, -1.1), Vector3(0.85, 0.04, 0.85), Color("748ca6"), false)
+	_add_zone_sign(station, "ПОВАР", Vector3(0, 0.3, -1.1), Color("b7cbe0"), 16)
 
 func _add_lab_props(parent: Node3D, tier: int) -> void:
 	var x := -3.0 - float(tier - 1) * 6.0
-	_add_box(parent, "LabBench_%d" % tier, Vector3(x, 0.48, -22.0), Vector3(4.5, 0.96, 1.2), Color("768b88"))
-	_add_box(parent, "LabMachine_%d" % tier, Vector3(x, 0.8, -18.0), Vector3(1.5, 1.6, 1.5), Color("87989d"))
+	_add_box(parent, "LabBench_%d" % tier, Vector3(x, 0.48, -19.0), Vector3(4.5, 0.96, 1.2), Color("768b88"))
+	_add_box(parent, "LabMachine_%d" % tier, Vector3(x, 0.8, -16.0), Vector3(1.5, 1.6, 1.5), Color("87989d"))
 
 func _add_rest_props(parent: Node3D, tier: int) -> void:
 	var x := 3.0 + float(tier - 1) * 6.0
-	_add_box(parent, "Sofa_%d" % tier, Vector3(x, 0.45, -21.0), Vector3(3.8, 0.9, 1.4), Color("7c6d63"))
-	_add_box(parent, "RestTable_%d" % tier, Vector3(x, 0.35, -17.8), Vector3(1.6, 0.7, 1.6), Color("8d7657"))
+	_add_box(parent, "Sofa_%d" % tier, Vector3(x, 0.45, -18.6), Vector3(3.8, 0.9, 1.4), Color("7c6d63"))
+	_add_box(parent, "RestTable_%d" % tier, Vector3(x, 0.35, -15.5), Vector3(1.6, 0.7, 1.6), Color("8d7657"))
 
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
@@ -365,7 +380,7 @@ func _build_ui() -> void:
 	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
 	var title := Label.new()
-	title.text = "DEBUG: планировка кафе · цельный blockout"
+	title.text = "DEBUG: Zone A–D · посетители внутри, повара снаружи"
 	title.add_theme_font_size_override("font_size", 20)
 	column.add_child(title)
 	var buttons := HBoxContainer.new()
@@ -383,7 +398,7 @@ func _build_ui() -> void:
 	stage_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(stage_label)
 	var legend := Label.new()
-	legend.text = "Бежевые стены — постоянный периметр · деревянные/жёлтые перегородки — будущие расширения"
+	legend.text = "Золотой край — подача внутрь · голубое место — повар снаружи. Перегородки — будущие расширения."
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	legend.modulate = Color(0.95, 0.88, 0.67)
 	column.add_child(legend)
@@ -406,9 +421,9 @@ func set_stage(stage: int) -> void:
 	if stage_label:
 		var descriptions := {
 			1: "КРАСНЫЙ · Шеф + 1/3 лаборатории. Закрытые будущие проходы обозначены глухими строительными перегородками.",
-			2: "СИНИЙ · + кухня на 5 мест + 1/3 комнаты отдыха. Временные перегородки переезжают на новый край доступного помещения.",
-			3: "ЗЕЛЁНЫЙ · + второй кухонный сектор + средние части лаборатории и отдыха.",
-			4: "ЖЁЛТЫЙ · полный поздний контур. Временных перегородок больше нет; остаётся только постоянный наружный периметр.",
+			2: "СИНИЙ · + Zone A на 5 мест + 1/3 комнаты отдыха. Временные перегородки переезжают на новый край доступного помещения.",
+			3: "ЗЕЛЁНЫЙ · + Zone B на 7 мест + средние части лаборатории и отдыха.",
+			4: "ЖЁЛТЫЙ · + Zone C (8) и Zone D (10). Полный поздний контур. Временных перегородок больше нет; остаётся только постоянный наружный периметр.",
 		}
 		stage_label.text = descriptions[stage]
 
@@ -481,3 +496,4 @@ func _add_box(parent: Node3D, node_name: String, center: Vector3, size: Vector3,
 		collision_shape.shape = shape
 		holder.add_child(collision_shape)
 	return holder
+
