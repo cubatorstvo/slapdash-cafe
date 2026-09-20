@@ -185,14 +185,10 @@ func open(page := "overview") -> void:
 	course_group_order=[]
 	group_selected_stations=[]
 	group_selected_groups=[]
-	group_merge_choices={}
-	group_merge_active=[]
-	group_merge_active_initialized=false
 	stats_focus={}
 	course_focus_id=0
 	groups_mode="overview"
 	group_expanded={}
-	group_management_open=false
 	training_type_filter=""
 	training_scope_stations=[]
 	training_library_selection=[]
@@ -254,7 +250,7 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 		if view.is_empty():
 			course_editor_message="Обучение не найдено."
 		else:
-			course_editor.mode="balanced"
+			course_editor.mode="together"
 			course_editor.editing=edit_course_id
 			training_scope_stations=[]
 			for assignment in view.get("assignments",[]):
@@ -274,12 +270,6 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 		var record: Dictionary=game.service.masterclass_by_id(record_id)
 		if not record.is_empty():
 			training_type_filter=str(record.get("source_type",""))
-			if training_scope_stations.is_empty():
-				for station in game.service.stations:
-					if station.manual_station or station.masterclass_station or str(station.type_id)!=training_type_filter: continue
-					training_scope_stations.append(station.station_id)
-				training_scope_stations.sort()
-				group_selected_stations=training_scope_stations.duplicate()
 	if training_type_filter.is_empty() and not training_scope_stations.is_empty():
 		var first_station=game.service.by_id(int(training_scope_stations[0]))
 		if first_station!=null: training_type_filter=str(first_station.type_id)
@@ -342,7 +332,7 @@ func _course_editor_add_record_internal(record_id: int) -> bool:
 	var record_type: String=str(record.get("source_type",""))
 	var current_type: String=str(course_editor.get("type_id",""))
 	if not current_type.is_empty() and current_type!=record_type:
-		course_editor_message="Эта запись относится к другой кухне. Переключи тип кухни в расписании."
+		course_editor_message="Эта запись относится к другой кухне. Переключи тип кухни в очереди."
 		return false
 	course_editor.type_id=record_type
 	var records: Array=course_editor.get("records",[])
@@ -478,7 +468,7 @@ func course_editor_submit() -> void:
 		course_editor_message=""
 		course_group_order=[]
 	else:
-		course_editor_message=notice if not notice.is_empty() else "Изменение расписания не подтверждено. Проверь актуальное состояние."
+		course_editor_message=notice if not notice.is_empty() else "Изменение очереди не подтверждено. Проверь актуальное состояние."
 	stamp=""
 	rebuild()
 
@@ -1274,45 +1264,6 @@ func _training_drop_tail(parent: Node,zone: String,course_id: int,index: int,tex
 	target.setup({"zone":zone,"course_id":course_id,"index":index},text_value,"Перетащи сюда")
 	target.drag_payload={}
 	target.row_dropped.connect(func(data,meta,after):_training_drop(data,meta,after))
-
-func _training_draft_card(parent: Node,host: bool) -> void:
-	var service=game.service
-	var box:=_section_card(parent,Color("30494a"))
-	var records:=_draft_record_ids()
-	var editing:=int(course_editor.get("editing",0)) if not course_editor.is_empty() else 0
-	label(box,"ИЗМЕНИТЬ РАСПИСАНИЕ" if editing>0 else "ДОБАВИТЬ В РАСПИСАНИЕ",17)
-	var targets:=_training_target_stations()
-	var batch_size: int=game.service.training_queue.balanced_batch_size(targets.size()) if not targets.is_empty() else 0
-	label(box,"%d столов · автоматически по %d за раз (~20%%)"%[targets.size(),batch_size],13)
-	if records.is_empty():
-		_training_drop_tail(box,"draft",0,0,"Перетащи сюда одно или несколько блюд")
-	else:
-		for index in range(records.size()):
-			var record_id:=int(records[index])
-			var record: Dictionary=service.masterclass_by_id(record_id)
-			var key:=_queue_key(0,index)
-			var subtitle: String=str(record.get("name","Запись"))+" · фильм %.1f с"%float(record.get("highlight_duration",0.0))
-			_training_make_drag_row(box,{"zone":"draft","course_id":0,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish","")))),subtitle,{"kind":"queue_lessons","course_id":0,"indices":[index],"count":1},key in training_queue_selection,key)
-		_training_drop_tail(box,"draft",0,records.size(),"В конец списка")
-		var preview: Dictionary=service.training_course_preview(_draft_assignments(),"together",[])
-		var error:=str(preview.get("error",""))
-		if not error.is_empty():
-			label(box,error,13)
-		else:
-			var warning_count:=0
-			for lesson in preview.lessons: warning_count+=lesson.get("equipment_issues",[]).size()
-			var summary: String="За раз уйдёт до %d столов · суммарно фильмов %.1f с"%[int(preview.simultaneous_out),float(preview.film_total)]
-			if warning_count>0: summary+=" · ⚠ без нужного оснащения: %d"%warning_count
-			label(box,summary,13)
-			button(box,"▾ Подробности" if training_preview_expanded else "▸ Подробности",toggle_training_preview)
-			if training_preview_expanded:
-				for lesson in preview.lessons:
-					var lesson_batch_size: int=game.service.training_queue.balanced_batch_size(int(lesson.selected))
-					label(box,"%s · %d столов · по %d за раз · освоили %d/%d"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.selected),lesson_batch_size,int(lesson.mastered),int(lesson.selected)],13)
-					for issue in lesson.get("equipment_issues",[]):
-						label(box,"⚠ Стол %d после обучения: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],12)
-			button(box,"Сохранить" if editing>0 else "Добавить в очередь",training_submit_draft,host)
-	if not course_editor_message.is_empty(): label(box,course_editor_message,13)
 
 func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) -> void:
 	var service=game.service
