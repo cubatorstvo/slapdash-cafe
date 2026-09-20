@@ -447,7 +447,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if not error.is_empty(): message_to(sender,error)
 		else:
 			game.save_cafe()
-			var success: String="Курс поставлен в очередь." if action in ["group_train","training_course_confirm","training_course_edit","training_resume"] else "Очередь обучения обновлена." if action.begins_with("training_") else "Группы столов обновлены."
+			var success: String="Обучение добавлено в расписание." if action in ["group_train","training_course_confirm"] else "Расписание обучения обновлено." if action=="training_course_edit" else "Обучение возвращено в расписание." if action=="training_resume" else "Расписание обучения обновлено." if action.begins_with("training_") else "Группы столов обновлены."
 			message_to(sender,success)
 		return
 	if action in ["masterclass_rename","masterclass_delete"]:

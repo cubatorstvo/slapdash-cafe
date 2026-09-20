@@ -216,8 +216,28 @@ func _intent_from_captured(captured: Array)->Array:
 		result.append({"record_id":int(spec.record_id),"dish":str(spec.dish),"station_ids":spec.station_ids.duplicate(),"versions":spec.versions.duplicate(true)})
 	return result
 
+func balanced_batch_size(total_tables: int)->int:
+	return maxi(1,roundi(float(maxi(1,total_tables))*0.20))
+
 func _build_course_batches(course: Dictionary,captured: Array,mode: String,preferred_group_order: Array=[])->void:
 	course.batch_ids=[]
+	if mode=="balanced":
+		course.group_order=[]
+		var dependency:=0
+		for spec in captured:
+			var ids: Array=spec.station_ids.duplicate()
+			ids.sort()
+			var batch_size:=balanced_batch_size(ids.size())
+			var offset:=0
+			while offset<ids.size():
+				var target_ids: Array=ids.slice(offset,mini(offset+batch_size,ids.size()))
+				var copy: Dictionary=spec.duplicate(true)
+				copy.station_ids=target_ids.duplicate()
+				var batch:=_new_batch(int(course.id),target_ids,[copy],dependency)
+				course.batch_ids.append(int(batch.id))
+				dependency=int(batch.id)
+				offset+=batch_size
+		return
 	if mode=="together":
 		var all_ids: Array=[]
 		for spec in captured:
@@ -302,13 +322,13 @@ func _course_intent(course: Dictionary)->Array:
 
 func _course_feed_name(course_id: int)->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс #%d"%course_id
+	if course.is_empty(): return "Обучение #%d"%course_id
 	var parts: Array=[]
 	for assignment in _course_intent(course):
 		var dish: String=str(assignment.get("dish",""))
 		var title: String=str(Definition.DISHES.get(dish,dish))
 		if title not in parts: parts.append(title)
-	return " + ".join(parts) if not parts.is_empty() else "Курс #%d"%course_id
+	return " + ".join(parts) if not parts.is_empty() else "Обучение #%d"%course_id
 
 func _remaining_course_lessons(course_id: int)->int:
 	var count:=0
@@ -366,10 +386,10 @@ func course_views()->Array:
 
 func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[])->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс не найден."
-	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающий курс."
+	if course.is_empty(): return "Обучение не найдено."
+	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающее обучение."
 	if active_batch_id in course.get("batch_ids",[]): return "Активную учебную партию сначала нужно завершить или отменить."
-	if mode not in ["together","by_groups"]: return "Неизвестный режим курса."
+	if mode not in ["together","by_groups","balanced"]: return "Неизвестный режим обучения."
 	var normalized:=_normalize_assignments(assignments)
 	if not str(normalized.error).is_empty(): return str(normalized.error)
 	var preferred_order: Array=_preferred_group_station_sets(group_order,normalized.assignments)
@@ -541,7 +561,7 @@ func enqueue_course(assignments: Array,mode := "together",command_id := "",peer 
 	var command:=str(command_id)
 	if not command.is_empty() and command_courses.has(command):
 		return {"error":"","course_id":int(command_courses[command]),"duplicate":true}
-	if mode not in ["together","by_groups"]: return {"error":"Неизвестный режим курса.","course_id":0}
+	if mode not in ["together","by_groups","balanced"]: return {"error":"Неизвестный режим обучения.","course_id":0}
 	var normalized:=_normalize_assignments(assignments)
 	if not str(normalized.error).is_empty(): return {"error":str(normalized.error),"course_id":0}
 	var preferred_order: Array=_preferred_group_station_sets(group_order,normalized.assignments)
@@ -860,7 +880,7 @@ func cancel_batch(batch_id: int)->String:
 
 func cancel_course(course_id: int)->String:
 	var course:=_course(course_id)
-	if course.is_empty(): return "Курс не найден."
+	if course.is_empty(): return "Обучение не найдено."
 	if str(course.get("state","")) in ["completed","cancelled"]: return ""
 	for batch_id in course.get("batch_ids",[]):
 		var batch:=_batch(int(batch_id))

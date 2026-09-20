@@ -193,22 +193,21 @@ static func event_text(entry: Dictionary,dish_names: Dictionary)->String:
 		"masterclass":
 			return "Начат мастер-класс · "+dish_name
 		"group_training":
-			var course_name: String=str(entry.get("name","Курс"))
+			var training_name: String=str(entry.get("name","Обучение"))
 			if bool(entry.get("automatic",false)) and not str(entry.get("group_name","")).is_empty():
-				return "Новые столы группы «%s» записаны на курс «%s» · %d %s"%[str(entry.group_name),course_name,count,table_word(count)]
+				return "Новые столы группы «%s» добавлены в обучение «%s» · %d %s"%[str(entry.group_name),training_name,count,table_word(count)]
 			var batch_count: int=maxi(1,int(entry.get("batches",1)))
-			var mode: String="Вместе" if str(entry.get("mode","together"))=="together" else "По группам"
-			return "Курс «%s»: %d %s, %d %s · %s"%[course_name,count,table_word(count),batch_count,batch_word(batch_count),mode]
+			return "В расписание добавлено «%s» · %d %s · %d %s"%[training_name,count,table_word(count),batch_count,batch_word(batch_count)]
 		"training_wait":
-			return "Обучение «%s» ждёт: %s"%[str(entry.get("name","Курс")),str(entry.get("reason","условия запуска"))]
+			return "Обучение «%s» ждёт: %s"%[str(entry.get("name","Обучение")),str(entry.get("reason","условия запуска"))]
 		"training_deferred":
 			var remaining: int=maxi(0,int(entry.get("remaining",0)))
-			return "Курс «%s» перенесён на утро · ещё %d %s"%[str(entry.get("name","Курс")),remaining,lesson_word(remaining)]
+			return "Обучение «%s» перенесено на утро · ещё %d %s"%[str(entry.get("name","Обучение")),remaining,lesson_word(remaining)]
 		"training_course_complete":
-			return "Курс «%s» завершён · %d %s"%[str(entry.get("name","Курс")),count,table_word(count)]
+			return "Обучение «%s» завершено · %d %s"%[str(entry.get("name","Обучение")),count,table_word(count)]
 		"training_cancel":
 			var scope: String=str(entry.get("scope","course"))
-			return ("Урок отменён" if scope=="lesson" else "Партия курса отменена" if scope=="batch" else "Курс отменён")+" · «%s»"%str(entry.get("name","Курс"))
+			return ("Урок отменён" if scope=="lesson" else "Учебная партия отменена" if scope=="batch" else "Обучение отменено")+" · «%s»"%str(entry.get("name","Обучение"))
 		"batch":
 			return "Заказано %d %s комплектами"%[count,table_word(count)]
 		_:

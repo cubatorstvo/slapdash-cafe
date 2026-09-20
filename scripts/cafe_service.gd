@@ -750,8 +750,8 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 
 func training_course_preview(assignments: Array,mode := "together",group_order: Array=[]) -> Dictionary:
 	_ensure_groups()
-	if mode not in ["together","by_groups"]: return {"error":"Неизвестный режим курса."}
-	if assignments.is_empty(): return {"error":"Добавь хотя бы один урок."}
+	if mode not in ["together","by_groups","balanced"]: return {"error":"Неизвестный режим обучения."}
+	if assignments.is_empty(): return {"error":"Добавь хотя бы одно блюдо в расписание."}
 	var type_id: String=""
 	var selected: Array=[]
 	var lessons: Array=[]
@@ -769,11 +769,11 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 		unique.sort()
 		if unique.is_empty(): return {"error":"Выбери хотя бы один стол."}
 		var dish: String=str(record.get("dish",""))
-		if dish in seen_dishes: return {"error":"В курсе может быть только одна запись на блюдо."}
+		if dish in seen_dishes: return {"error":"В расписании может быть только одна версия одного блюда."}
 		seen_dishes.append(dish)
 		var record_type: String=str(record.get("source_type",""))
 		if type_id.is_empty(): type_id=record_type
-		elif type_id!=record_type: return {"error":"Один курс содержит записи только одной кухни."}
+		elif type_id!=record_type: return {"error":"Одно расписание редактируется для одного типа кухни."}
 		var mastered:=0
 		var waiting: Array=[]
 		var equipment_issues: Array=[]
@@ -811,7 +811,31 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 			if station_id not in all_needed: all_needed.append(station_id)
 	all_needed.sort()
 	var batch_rows: Array=[]
-	if mode=="together":
+	if mode=="balanced":
+		for lesson in lessons:
+			var waiting_ids: Array=lesson.waiting.duplicate()
+			waiting_ids.sort()
+			var batch_size:=maxi(1,roundi(float(maxi(1,int(lesson.selected)))*0.20))
+			var offset:=0
+			while offset<waiting_ids.size():
+				var chunk: Array=waiting_ids.slice(offset,mini(offset+batch_size,waiting_ids.size()))
+				var reason: String=""
+				if progress.shift!="open": reason="До следующего рабочего дня"
+				elif progress.busy(): reason="Сначала завершится проверка кафе"
+				elif "television" not in progress.lounge_items: reason="Нет телевизора"
+				elif bool(movie_state.get("playing",false)): reason="Телевизор занят"
+				if reason.is_empty():
+					for station_id in chunk:
+						var station=by_id(int(station_id))
+						if station.staffed>=0 and station.staffed<station.role_count():
+							reason="Стол %d: нужны сотрудники"%station_id
+							break
+						if not station.ready_crew():
+							reason="Стол %d: сотрудник занят другой активностью"%station_id
+							break
+				batch_rows.append({"dish":str(lesson.dish),"stations":chunk,"blocked_reason":reason,"ready":reason.is_empty()})
+				offset+=batch_size
+	elif mode=="together":
 		var reasons: Array=[]
 		if progress.shift!="open": reasons.append("До следующего рабочего дня")
 		if progress.busy(): reasons.append("Сначала завершится проверка кафе")
@@ -858,7 +882,13 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 	var max_out:=0
 	for batch in batch_rows: max_out=maxi(max_out,batch.stations.size())
 	var total_film:=0.0
-	for lesson in lessons: total_film+=float(lesson.film)
+	if mode=="balanced":
+		for lesson in lessons:
+			var batch_size:=maxi(1,roundi(float(maxi(1,int(lesson.selected)))*0.20))
+			var batch_count:=ceili(float(lesson.waiting.size())/float(batch_size)) if not lesson.waiting.is_empty() else 0
+			total_film+=float(lesson.film)*batch_count
+	else:
+		for lesson in lessons: total_film+=float(lesson.film)
 	return {"error":"","type_id":type_id,"stations":selected,"employees":employees,"places":selected.size(),"lessons":lessons,"groups":projected,"batches":batch_rows,"simultaneous_out":max_out,"film_total":total_film,"mode":mode}
 
 func edit_training_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[]) -> String:
