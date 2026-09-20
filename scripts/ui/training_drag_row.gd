@@ -28,12 +28,16 @@ func setup(value_meta: Dictionary,title: String,subtitle := "",payload: Dictiona
 	add_child(column)
 	title_label=Label.new()
 	title_label.text=title_text
+	title_label.autowrap_mode=TextServer.AUTOWRAP_WORD
+	title_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	title_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	title_label.add_theme_font_size_override("font_size",16)
 	column.add_child(title_label)
 	if not subtitle_text.is_empty():
 		subtitle_label=Label.new()
 		subtitle_label.text=subtitle_text
+		subtitle_label.autowrap_mode=TextServer.AUTOWRAP_WORD
+		subtitle_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 		subtitle_label.mouse_filter=Control.MOUSE_FILTER_IGNORE
 		subtitle_label.add_theme_font_size_override("font_size",13)
 		subtitle_label.modulate=Color(0.78,0.84,0.82)
@@ -70,3 +74,4 @@ func _can_drop_data(_at_position: Vector2,data: Variant) -> bool:
 
 func _drop_data(at_position: Vector2,data: Variant) -> void:
 	row_dropped.emit(data,meta,at_position.y>size.y*0.5)
+
