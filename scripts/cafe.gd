@@ -551,8 +551,6 @@ func _build_room_shell(stage: int) -> void:
 	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.5),Color("777d7c"))
 	var entrance:=Props.text(room_shell,"ВХОД",Vector3(0,2.75,entrance_z+0.22),28,Color("f3cc85"))
 	entrance.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-	var flow:=Props.text(room_shell,"ГЛАВНЫЙ ПРОХОД",Vector3(0,0.025,Expansion.CHEF_FLOW_POINT.z),19,Color("c09b63"))
-	flow.rotation.x=-PI/2
 
 func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> void:
 	Props.box(parent,Vector3(size.x,0.10,size.y),Vector3(center.x,-0.05,center.y),color)
