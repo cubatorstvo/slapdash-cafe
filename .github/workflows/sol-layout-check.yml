@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - sol/cafe-product-layout
+    paths:
+      - ".github/workflows/sol-layout-check.yml"
   workflow_dispatch:
 
 permissions:
