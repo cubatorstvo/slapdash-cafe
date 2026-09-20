@@ -61,12 +61,13 @@ func _unique_ids(raw_ids: Array)->Array:
 	return result
 
 func _current_assignment(station_id: int,dish: String)->Dictionary:
-	var group: Dictionary=service.group_for_station(station_id)
-	if group.is_empty(): return {}
-	for item in group.get("curriculum",[]):
-		if str(item.get("dish_id",""))==dish:
-			return {"record_id":int(item.get("record_id",0)),"revision":int(item.get("revision",1)),"group":str(group.id)}
-	return {}
+	var station=service.by_id(station_id)
+	if station==null: return {}
+	var source: Variant=station.method_plan.get(dish,{})
+	if not source is Dictionary: return {}
+	var record_id:=int(source.get("id",source.get("record_id",0)))
+	if record_id<=0: return {}
+	return {"record_id":record_id,"revision":maxi(1,int(source.get("revision",1)))}
 
 func _assignment_key(station_id: int,dish: String,record_id: int,version: int)->String:
 	return "%d|%s|%d|%d"%[station_id,dish,record_id,version]
@@ -217,77 +218,18 @@ func _intent_from_captured(captured: Array)->Array:
 	return result
 
 func balanced_batch_size(total_tables: int)->int:
-	return maxi(1,roundi(float(maxi(1,total_tables))*0.20))
+	return maxi(1,total_tables)
 
 func _build_course_batches(course: Dictionary,captured: Array,mode: String,preferred_group_order: Array=[])->void:
 	course.batch_ids=[]
-	if mode=="balanced":
-		course.group_order=[]
-		var dependency:=0
-		for spec in captured:
-			var ids: Array=spec.station_ids.duplicate()
-			ids.sort()
-			var batch_size:=balanced_batch_size(ids.size())
-			var offset:=0
-			while offset<ids.size():
-				var target_ids: Array=ids.slice(offset,mini(offset+batch_size,ids.size()))
-				var copy: Dictionary=spec.duplicate(true)
-				copy.station_ids=target_ids.duplicate()
-				var batch:=_new_batch(int(course.id),target_ids,[copy],dependency)
-				course.batch_ids.append(int(batch.id))
-				dependency=int(batch.id)
-				offset+=batch_size
-		return
-	if mode=="together":
-		var all_ids: Array=[]
-		for spec in captured:
-			for station_id in spec.station_ids:
-				if station_id not in all_ids: all_ids.append(station_id)
-		all_ids.sort()
-		var batch:=_new_batch(int(course.id),all_ids,captured,0)
-		course.batch_ids.append(int(batch.id))
-		return
-	var group_order: Array=[]
-	var group_specs: Dictionary={}
+	course.group_order=[]
+	var all_ids: Array=[]
 	for spec in captured:
 		for station_id in spec.station_ids:
-			var group_id: String=service.group_id_for_station(int(station_id))
-			if group_id.is_empty(): continue
-			if group_id not in group_order:
-				group_order.append(group_id)
-				group_specs[group_id]=[]
-	if not preferred_group_order.is_empty():
-		var ordered: Array=[]
-		for raw_preference in preferred_group_order:
-			if raw_preference is Array:
-				for station_id in raw_preference:
-					var actual_group: String=service.group_id_for_station(int(station_id))
-					if actual_group in group_order and actual_group not in ordered:
-						ordered.append(actual_group)
-						break
-			else:
-				var wanted: String=str(raw_preference)
-				if wanted in group_order and wanted not in ordered: ordered.append(wanted)
-		for group_id in group_order:
-			if group_id not in ordered: ordered.append(group_id)
-		group_order=ordered
-	course.group_order=group_order.duplicate()
-	for group_id in group_order:
-		var group: Dictionary=service.table_group_by_id(str(group_id))
-		for spec in captured:
-			var targets: Array=[]
-			for station_id in spec.station_ids:
-				if int(station_id) in group.stations: targets.append(int(station_id))
-			if not targets.is_empty():
-				var copy: Dictionary=spec.duplicate(true)
-				copy.station_ids=targets
-				group_specs[group_id].append(copy)
-	var dependency:=0
-	for group_id in group_order:
-		var group: Dictionary=service.table_group_by_id(str(group_id))
-		var batch:=_new_batch(int(course.id),group.stations,group_specs[group_id],dependency)
-		course.batch_ids.append(int(batch.id))
-		dependency=int(batch.id)
+			if station_id not in all_ids: all_ids.append(station_id)
+	all_ids.sort()
+	var batch:=_new_batch(int(course.id),all_ids,captured,0)
+	course.batch_ids.append(int(batch.id))
 
 func _retire_pending_course(course: Dictionary)->void:
 	for batch_id in course.get("batch_ids",[]):
@@ -385,6 +327,8 @@ func course_views()->Array:
 	return result
 
 func edit_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[])->String:
+	mode="together"
+	group_order=[]
 	var course:=_course(course_id)
 	if course.is_empty(): return "Обучение не найдено."
 	if str(course.get("state","")) not in ["queued","blocked","deferred"]: return "Можно редактировать только ожидающее обучение."
@@ -421,7 +365,7 @@ func resume_assignment(station_id: int,dish: String,peer := 1)->String:
 	return str(result.get("error",""))
 
 func request_auto_reconcile()->void:
-	auto_reconcile_due=true
+	pass
 
 func _pending_current_course_id(station_id: int,dish: String,record_id: int,version: int)->int:
 	for lesson in lessons:
@@ -542,22 +486,11 @@ func reconcile_automatic_needs()->void:
 		else: _replace_waiting_auto_course(waiting,captured,str(auto_key))
 
 func migrate_from_plans()->void:
-	for group in service.table_groups():
-		var assignments: Array=[]
-		for item in group.get("curriculum",[]):
-			var record_id:=int(item.get("record_id",0))
-			var record: Dictionary=service.masterclass_by_id(record_id)
-			if record.is_empty(): continue
-			var targets: Array=[]
-			for station_id in group.stations:
-				var station=service.by_id(int(station_id))
-				if not _actual_matches(station,record_id,str(item.get("dish_id",""))): targets.append(int(station_id))
-			if not targets.is_empty(): assignments.append({"record_id":record_id,"station_ids":targets})
-		if assignments.is_empty(): continue
-		var command: String="migration:%s:%d"%[str(group.id),int(group.get("plan_revision",1))]
-		enqueue_course(assignments,"together",command,1)
+	pass
 
 func enqueue_course(assignments: Array,mode := "together",command_id := "",peer := 1,group_order: Array=[])->Dictionary:
+	mode="together"
+	group_order=[]
 	var command:=str(command_id)
 	if not command.is_empty() and command_courses.has(command):
 		return {"error":"","course_id":int(command_courses[command]),"duplicate":true}
@@ -735,11 +668,6 @@ func _advance_active()->void:
 
 func advance(delta: float)->void:
 	if service==null: return
-	auto_reconcile_clock+=maxf(0.0,delta)
-	if auto_reconcile_due or auto_reconcile_clock>=3.0:
-		auto_reconcile_due=false
-		auto_reconcile_clock=0.0
-		reconcile_automatic_needs()
 	if service.progress.shift=="open":
 		for batch in batches:
 			if str(batch.get("state",""))=="deferred" and int(batch.get("defer_day",0))<=service.progress.day: batch.state="queued"
