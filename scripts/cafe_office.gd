@@ -1309,16 +1309,21 @@ func training_submit_draft() -> void:
 		rebuild()
 		return
 	var editing:=int(course_editor.get("editing",0))
+	game.hud.notice.text=""
 	if editing>0:
 		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate()})
 	else:
 		var command: String="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
 		course_command_serial+=1
 		send({"action":"training_course_confirm","assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate(),"command":command})
-	course_editor={}
-	course_editor_message=""
-	course_group_order=[]
-	training_queue_selection=[]
+	var notice:=str(game.hud.notice.text)
+	if notice=="Курс поставлен в очередь.":
+		course_editor={}
+		course_editor_message=""
+		course_group_order=[]
+		training_queue_selection=[]
+	else:
+		course_editor_message=notice if not notice.is_empty() else "Курс не подтверждён. Проверь актуальное расписание."
 	stamp=""
 	rebuild()
 
