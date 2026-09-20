@@ -81,12 +81,12 @@ func run()->void:
 	check(service.table_groups().is_empty(),"Dissolve creates no singleton replacement groups")
 	check(service.group_id_for_station(2).is_empty() and service.group_id_for_station(5).is_empty(),"Former members are standalone")
 	check(service.by_id(2).dish_active("wine") and int(service.by_id(2).method_plan.wine.id)==800,"Menu and training intent survive dissolve")
-	var saved:=bytes_to_var(var_to_bytes(service.save_data()))
+	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	check(service.load_data(saved),"Current save reloads")
 	check(service.table_groups().is_empty(),"Reload does not synthesize groups")
 
 	print("G05: old saves no longer auto-migrate inferred groups")
-	var legacy:=bytes_to_var(var_to_bytes(service.save_data()))
+	var legacy: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	legacy.version=19
 	legacy.erase("table_group_registry")
 	legacy.table_group_names={"2-3":"Старая авто-группа"}
