@@ -55,7 +55,7 @@ static func customer_exit(stage: int)->Vector3:
 static func delivery_position(stage: int,id: int)->Vector3:
 	var row:=int(posmod(id,9)/3)
 	var col:=posmod(id,3)
-	return Vector3(-3.15+col*0.72,0.30,entrance_z(stage)+1.05+row*0.72)
+	return Vector3(-3.15+col*0.72,0.25,entrance_z(stage)+1.05+row*0.72)
 
 static func installer_spawn(stage: int,id: int)->Vector3:
 	return Vector3(-3.7,0.0,entrance_z(stage)+0.65+float(posmod(id,4))*0.30)
