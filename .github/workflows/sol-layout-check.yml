@@ -6,57 +6,58 @@ on:
       - sol/cafe-product-layout
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   layout:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Godot 4.7.2
-        shell: bash
+      - name: Install dependencies
         run: |
-          set -euxo pipefail
-          python3 - <<'PY'
-          import urllib.request
-          url = "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
-          urllib.request.urlretrieve(url, "/tmp/godot.zip")
-          PY
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip libgl1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64
+
+      - name: Download Godot 4.7.2
+        run: |
+          mkdir -p /tmp/godot /tmp/sol_layout_capture
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          echo "cadd3204e728a35d3f13adb7fd0d7902636b79f6b95c40c265eb73b6c35329e4  /tmp/godot.zip" | sha256sum -c -
           unzip -q /tmp/godot.zip -d /tmp/godot
-          chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
-          GODOT=/tmp/godot/Godot_v4.7.2-stable_linux.x86_64
-          echo "GODOT_BIN=$GODOT" >> "$GITHUB_ENV"
-          "$GODOT" --version
+          chmod +x "$GODOT_BIN"
+          "$GODOT_BIN" --version
+
+      - name: Import project
+        run: |
+          "$GODOT_BIN" --headless --path . --import
 
       - name: Targeted layout regressions
-        shell: bash
         run: |
-          set -euxo pipefail
           "$GODOT_BIN" --headless --path . --script res://tests/test_product_layout_geometry.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_expansion_layout.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_annex.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_delivery_installers.gd
 
       - name: Capture cafe layout
-        shell: bash
+        timeout-minutes: 4
         run: |
-          set -euxo pipefail
-          if ! command -v xvfb-run >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y xvfb
-          fi
-          xvfb-run -a "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_product_layout.gd
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_product_layout.gd
 
       - name: Collect captures
         if: always()
-        shell: bash
         run: |
-          mkdir -p layout-captures
-          cp /tmp/sol-layout-*.png layout-captures/ 2>/dev/null || true
+          cp /tmp/sol-layout-*.png /tmp/sol_layout_capture/ 2>/dev/null || true
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload screenshots
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: sol-cafe-layout-captures
-          path: layout-captures
+          path: /tmp/sol_layout_capture
           if-no-files-found: warn
+          retention-days: 3
