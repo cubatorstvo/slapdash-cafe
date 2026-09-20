@@ -10,13 +10,16 @@ func _initialize()->void: run.call_deferred()
 
 func set_stage(stage: int)->void:
 	var p=game.service.progress
-	p.stars=0 if stage==1 else stage
+	p.stars=[0,0,1,2,4][stage]
 	p.expanded=stage>=3
 	p.specialized_expanded=stage>=4
 	p.orchestration_expanded=stage>=4
 	p.lab_tier=clampi(stage-1,0,2)
 	p.lab_stage=3
-	p.lab_upgrades=LabPolicy.ITEMS.keys()
+	p.lab_upgrades=[]
+	for id in LabPolicy.ITEMS:
+		if int(LabPolicy.ITEMS[id].tier)<=p.lab_tier and int(LabPolicy.ITEMS[id].star)<=p.stars:
+			p.lab_upgrades.append(id)
 	p.lounge_tier=clampi(stage-2,0,2)
 	p.lounge_items=LoungeProgress.GOODS.keys()
 	game._refresh_cafe_layout(true)
@@ -62,6 +65,8 @@ func run()->void:
 		var front:=Expansion.entrance_z(stage)
 		await shot("stage_%d_overview"%stage,Vector3(31,35,front-16),Vector3(0,0.7,7.5),55.0)
 		await shot("stage_%d_player_flow"%stage,Vector3(0,2.0,front+1.2),Vector3(0,1.0,7.0),74.0)
-		await shot("stage_%d_rear_top"%stage,Vector3(0,34,17),Vector3(0,0.0,23),46.0)
+		await shot("stage_%d_lab_room"%stage,Vector3(-6.8,2.65,29.2),Vector3(-6.2,1.0,17.3),69.0)
+		if stage>=2:
+			await shot("stage_%d_lounge_room"%stage,Vector3(minf(7.4,LoungeProgress.GOODS.size()+2.0),2.65,29.2),Vector3(5.0,1.0,17.3),69.0)
 	game._shutdown_tree(game); game.free()
 	quit()
