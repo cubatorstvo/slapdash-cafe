@@ -270,7 +270,7 @@ func show_station(station: Node3D) -> void:
 func begin_masterclass_setup(dish: String) -> void:
 	masterclass_setup_dish=dish
 	masterclass_setup_equipment=game.service.masterclass_default_equipment(dish)
-	var station:=game.service.by_id(selected_station)
+	var station: Node3D=game.service.by_id(selected_station)
 	if station!=null: show_station(station)
 
 func toggle_masterclass_equipment(item: String,on: bool) -> void:
