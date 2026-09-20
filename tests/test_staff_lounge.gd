@@ -14,9 +14,11 @@ func run() -> void:
 	game.set_physics_process(false)
 	await physics_frame
 	var p=game.service.progress
+	p.stars=2
+	p.expanded=true
 	p.lounge_tier=2
 	p.lounge_items=preload("res://scripts/lounge_progression.gd").GOODS.keys()
-	game.annex.refresh_shell()
+	game._refresh_cafe_layout(true)
 	await physics_frame
 	var lounge: Node3D=get_first_node_in_group("staff_lounge")
 	check(lounge!=null and lounge.fixtures.size()==15,"Fifteen full-size lounge furnishings constructed")
