@@ -22,6 +22,17 @@ func run() -> void:
 	game.player.global_position=Annex.REST_DOOR_CAFE
 	game.annex.advance_doors(0.30)
 	check(game.annex.door_openness("rest")>0.9,"Rest door opens for approaching player")
+	var rest_door: Dictionary=game.annex.doors.get("rest",{})
+	if not rest_door.is_empty():
+		for leaf_data in rest_door.leaves:
+			var leaf: Node3D=leaf_data.node
+			var moving_body: AnimatableBody3D=null
+			var static_body: StaticBody3D=null
+			for child in leaf.get_children():
+				if child is AnimatableBody3D: moving_body=child
+				if child is StaticBody3D and child is not AnimatableBody3D: static_body=child
+			check(moving_body!=null,"Sliding rest door uses an AnimatableBody3D collision")
+			check(static_body==null,"Sliding rest door has no stale StaticBody collision")
 	game.player.global_position=Vector3(0,0,0)
 	for i in range(8): game.annex.advance_doors(0.25)
 	check(game.annex.door_openness("rest")<0.1,"Rest door closes after player leaves")

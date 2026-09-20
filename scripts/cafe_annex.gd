@@ -132,7 +132,7 @@ static func _add_room_edge(parent: Node3D,size: Vector3,center: Vector3,color: C
 	var band:=Vector3(maxf(0.4,length-0.2),0.24,0.06) if along_x else Vector3(0.06,0.24,maxf(0.4,length-0.2))
 	Props.box(parent,band,center+inward*0.19+Vector3(0,-1.7,0),Color("e3bd36"))
 	var label:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.23+Vector3(0,-0.35,0),20,Color("fff2b0"))
-	label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	label.rotation.y=atan2(inward.x,inward.z)
 
 static func _build_cafe_back_wall(parent: Node3D, color: Color, building_stage: int, p) -> void:
 	var openings := [Vector2(LAB_DOOR_X-DOOR_WIDTH*0.5,LAB_DOOR_X+DOOR_WIDTH*0.5)]
@@ -196,7 +196,7 @@ func _build_door(id: String, door_x: float, color: Color) -> void:
 		var closed_x: float = float(side) * DOOR_WIDTH * 0.25
 		var open_x: float = float(side) * DOOR_WIDTH * 0.69
 		leaf.position = Vector3(closed_x,DOOR_HEIGHT*0.5,0)
-		Props.solid_box(leaf,Vector3(DOOR_WIDTH*0.46,DOOR_HEIGHT,0.11),Vector3.ZERO,color)
+		Props.moving_solid_box(leaf,Vector3(DOOR_WIDTH*0.46,DOOR_HEIGHT,0.11),Vector3.ZERO,color)
 		var inset := Props.box(leaf,Vector3(DOOR_WIDTH*0.32,0.72,0.025),Vector3(0,0.18,-0.065),Color("b8d0c7"))
 		inset.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		inset.material_override.albedo_color.a = 0.45

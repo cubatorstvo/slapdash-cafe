@@ -49,14 +49,16 @@ func setup(owner_game: Node3D) -> void:
 	# A visible computer replaces the abstract cafe board.
 	computer = Node3D.new()
 	add_child(computer)
-	computer.position = Vector3(-5.0,0,10.9)
+	computer.position = Expansion.MARKET_POSITION
 	computer.rotation.y=0.0
 	Props.solid_box(computer,Vector3(1.65,0.12,0.9),Vector3(0,0.86,0),Color("99765b"))
 	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
 	Props.box(computer,Vector3(0.95,0.65,0.2),Vector3(0,1.3,-0.15),Color("d8c9a3"))
 	Props.box(computer,Vector3(0.82,0.51,0.025),Vector3(0,1.3,-0.035),Color("213b40"))
+	Props.box(computer,Vector3(0.10,0.20,0.10),Vector3(0,0.99,-0.15),Color("526d65"))
+	Props.box(computer,Vector3(0.44,0.045,0.28),Vector3(0,0.90,-0.15),Color("526d65"))
 	Props.text(computer,"ТЯП-ЛЯП МАРКЕТ\n[E] Компьютер",Vector3(0,1.33,-0.01),18,Color("d9c18c"))
-	Props.box(computer,Vector3(0.75,0.035,0.22),Vector3(0,0.945,0.22),Color("d7cfae"))
+	Props.box(computer,Vector3(0.75,0.035,0.22),Vector3(0,0.94,0.22),Color("d7cfae"))
 	game.development.board.hide()
 	for i in range(3):
 		var at := lab_position(i)
@@ -75,7 +77,7 @@ func setup(owner_game: Node3D) -> void:
 func refresh_layout() -> void:
 	if game==null: return
 	var stage:=Expansion.stage_for_progress(game.service.progress)
-	computer.position=Vector3(-5.0,0,10.9)
+	computer.position=Expansion.MARKET_POSITION
 	for parcel in game.service.progress.deliveries:
 		if int(parcel.get("owner",0))!=0 or float(parcel.get("remaining",0.0))<=0.0: continue
 		var at:=Expansion.delivery_position(stage,int(parcel.get("id",0)))

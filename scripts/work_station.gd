@@ -54,6 +54,7 @@ var age := 0.0
 var observing := false
 var student_paths: Array = []
 var walls: Array = []
+var zone_edges: Array = []
 var was_resting := true
 var upgrade_view: Node3D
 
@@ -159,6 +160,8 @@ func _ready() -> void:
 	left_edge.name = "ZoneEdgeLeft"
 	var right_edge := Props.box(self, Vector3(outline_thickness, 0.01, zone_depth + outline_thickness), Vector3(extent, 0.01, TRAINING_ZONE_CENTER_Z), outline_color)
 	right_edge.name = "ZoneEdgeRight"
+	zone_edges = [front, back, left_edge, right_edge]
+	for edge in zone_edges: edge.hide()
 	for spec in [[Vector3(0.02, 2.5, zone_depth), Vector3(-extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(0.02, 2.5, zone_depth), Vector3(extent, 1.25, TRAINING_ZONE_CENTER_Z)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_min.y)], [Vector3(extent * 2, 2.5, 0.02), Vector3(0, 1.25, zone_max.y)]]:
 		var wall := Props.box(self, spec[0], spec[1], Color("86d7c2"))
 		wall.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -250,9 +253,13 @@ func refresh(local_peer: int, delta: float) -> void:
 	var active: bool = training.active()
 	var resting: bool = not active and state != "cooking"
 	var just_finished_training: bool = observing and not active
-	view.station_label.visible = not active
 	var local_role: int = training.role_for(local_peer)
-	for wall in walls: wall.visible = active and local_role >= 0 and training.phase in ["recording", "confirm_finish"]
+	var training_bounds_visible: bool = active and local_role >= 0 and training.phase in ["recording", "confirm_finish"]
+	for wall in walls: wall.visible = training_bounds_visible
+	for edge in zone_edges: edge.visible = training_bounds_visible
+	var game = get_parent().game if is_inside_tree() else null
+	var player_near: bool = game != null and is_instance_valid(game.player) and global_position.distance_to(game.player.global_position) <= 5.5
+	view.station_label.visible = not active and player_near
 	if active and not observing:
 		for role in range(role_count()):
 			var side := -1 if role == 0 else 1
