@@ -1059,6 +1059,7 @@ func _training_make_drag_row(parent: Node,meta: Dictionary,title: String,subtitl
 	parent.add_child(row)
 	row.setup(meta,title,subtitle,payload)
 	row.set_selected(selected)
+	if str(meta.get("zone",""))=="library": row.drop_enabled=false
 	row.row_clicked.connect(func(value,ctrl,shift):
 		if str(value.get("zone",""))=="library": _training_library_click(value,ctrl,shift)
 		else: _training_queue_click(value,ctrl,shift))
