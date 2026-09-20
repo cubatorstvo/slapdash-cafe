@@ -1130,6 +1130,12 @@ func _course_station_ids(course: Dictionary) -> Array:
 	result.sort()
 	return result
 
+func _course_type_id(course: Dictionary) -> String:
+	for assignment in course.get("assignments",[]):
+		var record: Dictionary=game.service.masterclass_by_id(int(assignment.get("record_id",0)))
+		if not record.is_empty(): return str(record.get("source_type",""))
+	return ""
+
 func _assignments_with_records(course: Dictionary,record_ids: Array,new_station_ids: Array=[]) -> Array:
 	var existing_by_id: Dictionary={}
 	for assignment in course.get("assignments",[]): existing_by_id[int(assignment.get("record_id",0))]=assignment.duplicate(true)
@@ -1432,9 +1438,11 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 	header.add_child(expand)
 	var mode_label: String="вместе" if str(course.mode)=="together" else "по группам"
 	var station_ids:=_course_station_ids(course)
+	var course_type:=_course_type_id(course)
+	var course_type_name:=str(Definition.TYPES.get(course_type,{}).get("title",course_type))
 	var title:=label(header,"Курс #%d · %d уроков · %d столов"%[course_id,course.assignments.size(),station_ids.size()],16)
 	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	label(header,"%s · %s"%[mode_label,str(course.state)],13)
+	label(header,"%s · %s · %s"%[course_type_name,mode_label,str(course.state)],13)
 	if not expanded: return
 	for index in range(course.assignments.size()):
 		var assignment: Dictionary=course.assignments[index]
@@ -1442,13 +1450,16 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 		var record: Dictionary=service.masterclass_by_id(record_id)
 		var key:=_queue_key(course_id,index)
 		var subtitle: String=str(record.get("name",assignment.get("name","Запись")))+" · столы "+", ".join(assignment.get("station_ids",[]).map(func(id):return str(id)))
-		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if bool(course.editable) else {}
-		var row: Variant=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":bool(course.editable)},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
-		row.drop_enabled=bool(course.editable)
+		var can_drag: bool=bool(course.editable) and course_type==training_type_filter
+		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if can_drag else {}
+		var row: Variant=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":can_drag},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
+		row.drop_enabled=can_drag
+	if bool(course.editable) and course_type==training_type_filter:
+		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
 	var action_row:=HBoxContainer.new()
 	box.add_child(action_row)
 	if bool(course.editable):
-		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
+
 		button(action_row,"Настройки курса",func():course_editor_open(0,course_id),host)
 	if str(course.state) not in ["completed","cancelled"]:
 		button(action_row,"Отменить курс",func():send({"action":"training_cancel_course","course":course_id}),host)
