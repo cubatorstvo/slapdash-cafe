@@ -151,7 +151,7 @@ func run()->void:
 	check(str(goal.key)=="training_intro_first_work" and int(goal.station)==2,"Learned course still requires seeing the trained station work")
 	p.journey_auto_served=1
 	goal=Journey.current(p,service.stations,service.served,true,service)
-	check(str(goal.key)=="training_intro_mass" and str(goal.detail).contains("Вместе") and str(goal.detail).contains("По группам"),"Second compatible table exposes mass selection and both dispatch modes")
+	check(str(goal.key)=="training_intro_mass" and str(goal.detail).contains("20%") and not str(goal.detail).contains("По группам"),"Second compatible table explains automatic twenty-percent table batches")
 	game.office.open("groups")
 	game.office.select_group_stations([2])
 	game.office.course_editor_open()
@@ -210,13 +210,15 @@ func run()->void:
 	check(str(linked.get("error","")).is_empty(),"Problem navigation fixture queues a concrete course")
 	game.office.set_stats_focus({"reason":"training","dish":"sausage","stations":[2],"group":str(large_group.id)})
 	rendered=tree_text(game.office.content)
-	check("Открыть связанный курс #" in rendered,"Problem card offers a direct link to the concrete pending course")
+	check("Открыть связанное обучение #" in rendered,"Problem card offers a direct link to the concrete pending training entry")
 	game.office.open_problem_group([2],int(linked.get("course_id",0)))
 	rendered=tree_text(game.office.content)
-	check("→ СВЯЗАННЫЙ Курс #" in rendered,"Problem link opens groups and highlights the linked course")
+	check("→ " in rendered and "Сетевая сосиска" in rendered,"Problem link opens the flat schedule and highlights the linked training row")
+	game.office.groups_mode="overview"
+	game.office.group_expanded[str(large_group.id)]=true
 	game.office.tab="groups"; game.office.stamp=""; game.office.rebuild()
 	rendered=tree_text(game.office.content)
-	check("АКТИВНОЕ МЕНЮ И УЧЕБНЫЙ ПЛАН" in rendered and "Сетевая сосиска" in rendered,"Group cards render desired masterclass and active-menu state beside service results")
+	check("МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ" in rendered and "Сетевая сосиска" in rendered,"Expanded group cards render desired masterclass and active-menu state beside service results")
 	game.office.close()
 
 	print("8/10: feed aggregation window separates later identical events")
