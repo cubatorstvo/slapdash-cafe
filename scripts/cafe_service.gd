@@ -215,7 +215,7 @@ func request_masterclass(dish: String,peer: int,equipment: Variant=null) -> Stri
 	return ""
 
 func _try_begin_masterclass() -> void:
-	if masterclass_pending.is_empty() or masterclass_active(): return
+	if masterclass_pending.is_empty() or masterclass_active() or not masterclass_time_available(): return
 	var chef:=by_id(1)
 	if chef==null or not chef.manual_station or chef.training.active() or chef.state!="idle" or chef.customer_id>=0 or not chef_queue().is_empty(): return
 	var dish: String=str(masterclass_pending.dish)
