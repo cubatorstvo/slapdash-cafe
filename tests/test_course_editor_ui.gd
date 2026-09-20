@@ -8,6 +8,12 @@ func check(ok: bool,message: String)->void:
 		failures+=1
 		printerr("FAIL: ",message)
 
+func tree_text(node: Node)->String:
+	var result: String=""
+	if node is Label or node is Button: result+=str(node.text)+"\n"
+	for child in node.get_children(): result+=tree_text(child)
+	return result
+
 func repeated(value: Dictionary,count: int)->Array:
 	var out: Array=[]
 	for i in range(count): out.append(value.duplicate(true))
@@ -84,19 +90,31 @@ func run()->void:
 	service.masterclasses=[wine,potato,sausage]
 	check(service.create_table_group([2,3],"UI линия").is_empty(),"UI T04 explicit group exists")
 	game.office.open("groups")
+	var overview_text: String=tree_text(game.office.content)
+	check("UI линия" in overview_text and "Стол 2 ·" not in overview_text and "Стол 3 ·" not in overview_text,"UI T04 groups start collapsed and show only aggregate rows")
+	var group_id_overview: String=service.group_id_for_station(2)
+	game.office.toggle_group_expanded(group_id_overview)
+	overview_text=tree_text(game.office.content)
+	check("Стол 2 ·" in overview_text and "Стол 3 ·" in overview_text,"UI T04 expanding a group reveals per-table details")
+	game.office.toggle_group_expanded(group_id_overview)
 	game.office.select_group_stations([2,3])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T04 opens course editor")
-	game.office.course_editor_add_record(2101)
-	game.office.course_editor_add_record(2102)
-	game.office.course_editor_add_record(2103)
-	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 draft keeps three ordered lessons")
-	game.office.course_editor_move_record(2,-1)
-	check(game.office.course_editor.records==[2101,2103,2102],"UI T04 arrows change lesson order")
-	game.office.course_editor_move_record(1,1)
-	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 lesson order can be restored")
+	check(press(game.office,"Обучение"),"UI T04 opens the separate training workspace")
+	check(game.office.groups_mode=="training" and "МАСТЕР-КЛАССЫ" in tree_text(game.office.content) and "РАСПИСАНИЕ" in tree_text(game.office.content),"UI T04 workspace separates library from schedule")
+	game.office._training_library_click({"record_id":2101},false,false)
+	game.office._training_library_click({"record_id":2103},true,false)
+	check(game.office.training_library_selection==[2101,2103],"UI T04 Ctrl adds a non-adjacent masterclass to selection")
+	game.office._training_library_click({"record_id":2101},false,false)
+	game.office._training_library_click({"record_id":2103},false,true)
+	check(game.office.training_library_selection==[2101,2102,2103],"UI T04 Shift selects the contiguous masterclass range")
+	game.office.training_add_selected_to_draft()
+	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 multi-selection becomes one ordered draft")
+	game.office._training_drop({"kind":"queue_lessons","course_id":0,"indices":[2]},{"zone":"draft","course_id":0,"index":0},false)
+	check(game.office.course_editor.records==[2103,2101,2102],"UI T04 drag can reorder lessons inside the draft queue")
+	game.office._training_drop({"kind":"queue_lessons","course_id":0,"indices":[0]},{"zone":"draft","course_id":0,"index":2},true)
+	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 drag can restore lesson order")
 	var preview: Dictionary=service.training_course_preview(game.office.course_editor_assignments(),"together",game.office.course_group_order)
 	check(str(preview.error).is_empty() and int(preview.places)==2 and preview.lessons.size()==3,"UI T04 preview reports selected tables and lessons")
-	check(press(game.office,"Поставить курс в очередь"),"UI T04 queue button exists")
+	check(press(game.office,"Поставить в очередь"),"UI T04 queue button exists")
 	await process_frame
 	var views: Array=service.training_course_views()
 	check(views.size()==1 and views[0].assignments.size()==3 and str(views[0].mode)=="together","UI T04 button creates one three-lesson course")
@@ -122,16 +140,15 @@ func run()->void:
 	var group_b: String=service.group_id_for_station(4)
 	game.office.open("groups")
 	game.office.select_group_stations([2,3,4,5])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T05 opens editor")
+	check(press(game.office,"Обучение"),"UI T05 opens training workspace")
 	game.office.course_editor_add_record(2201)
 	game.office.course_editor_set_mode("by_groups")
-	game.office._sync_course_group_order()
-	check(game.office.course_group_order==[group_a,group_b],"UI T05 default group order follows editor order")
+	check(game.office.course_group_order==[group_a,group_b],"UI T05 choosing by-groups mode automatically builds the group order")
 	game.office.course_editor_move_group(group_b,-1)
 	check(game.office.course_group_order==[group_b,group_a],"UI T05 arrows change group order")
 	preview=service.training_course_preview(game.office.course_editor_assignments(),"by_groups",game.office.course_group_order)
 	check(str(preview.error).is_empty() and preview.batches.size()==2 and str(preview.batches[0].name)=="Группа B","UI T05 preview reflects chosen first group")
-	check(press(game.office,"Поставить курс в очередь"),"UI T05 queues course")
+	check(press(game.office,"Поставить в очередь"),"UI T05 queues course")
 	await process_frame
 	views=service.training_course_views()
 	check(views.size()==1 and str(views[0].mode)=="by_groups","UI T05 creates by-groups course")
@@ -160,13 +177,13 @@ func run()->void:
 	group_b=service.group_id_for_station(5)
 	game.office.open("groups")
 	game.office.select_group_stations([2,5,6])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T05 partial opens editor")
+	check(press(game.office,"Обучение"),"UI T05 partial opens training workspace")
 	game.office.course_editor_add_record(2251)
 	game.office.course_editor_set_mode("by_groups")
 	game.office.course_group_order=[group_a,group_b]
 	preview=service.training_course_preview(game.office.course_editor_assignments(),"by_groups",game.office.course_group_order)
 	check(str(preview.error).is_empty() and preview.batches.size()==2 and preview.batches[0].stations==[2] and preview.batches[1].stations==[5,6],"UI T05 partial preview preserves source-group order after split")
-	check(press(game.office,"Поставить курс в очередь"),"UI T05 partial queues split course")
+	check(press(game.office,"Поставить в очередь"),"UI T05 partial queues split course")
 	await process_frame
 	views=service.training_course_views()
 	check(views.size()==1 and views[0].batches.size()==2 and views[0].batches[0].stations==[2] and views[0].batches[1].stations==[5,6],"UI T05 partial actual queue matches preview order after new group id appears")
@@ -183,25 +200,34 @@ func run()->void:
 	service.progress.lounge_items.erase("television")
 	game.office.open("groups")
 	game.office.select_group_stations([2])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T13 opens editor")
+	check(press(game.office,"Обучение"),"UI T13 opens training workspace")
 	game.office.course_editor_add_record(2301)
-	check(press(game.office,"Поставить курс в очередь"),"UI T13 queues old version")
+	check(press(game.office,"Поставить в очередь"),"UI T13 queues old version")
 	await process_frame
 	service.training_queue.advance(0.0)
 	views=service.training_course_views()
 	course_id=int(views[0].id)
 	check(str(views[0].state)=="blocked","UI T13 waiting course is visible as blocked")
 	game.office.rebuild()
-	check(press(game.office,"Редактировать ожидающий курс"),"UI T13 edit button opens the queued course")
+	game.office.toggle_training_course_expanded(course_id)
+	check(press(game.office,"Настройки курса"),"UI T13 settings button opens the queued course")
 	game.office.course_editor_add_record(2302)
 	check(game.office.course_editor.records==[2302],"UI T13 second version replaces the same-dish draft row")
 	game.office.course_editor_add_record(2303)
 	game.office.course_editor_move_record(1,-1)
 	check(game.office.course_editor.records==[2303,2302],"UI T13 queued-course editor can change composition and lesson order")
-	check(press(game.office,"Сохранить изменения курса"),"UI T13 saves queued-course replacement")
+	check(press(game.office,"Сохранить изменения"),"UI T13 saves queued-course replacement")
 	await process_frame
 	var edited_view: Dictionary=service.training_queue.course_view(course_id)
 	check(edited_view.assignments.size()==2 and int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 edited course persists the new lesson order")
+	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[1]},{"zone":"course","course_id":course_id,"index":0},false)
+	await process_frame
+	edited_view=service.training_queue.course_view(course_id)
+	check(int(edited_view.assignments[0].record_id)==2302 and int(edited_view.assignments[1].record_id)==2303,"UI T13 drag reorders lessons inside an existing waiting course")
+	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[0]},{"zone":"course","course_id":course_id,"index":1},true)
+	await process_frame
+	edited_view=service.training_queue.course_view(course_id)
+	check(int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 existing queue can be reordered back by drag")
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2302,"UI T13 queue now points to the new record version")
 	dispose(game)
 
@@ -214,14 +240,14 @@ func run()->void:
 	service.masterclasses=[old_potato,new_potato]
 	game.office.open("groups")
 	game.office.select_group_stations([2])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T13 active opens first editor")
+	check(press(game.office,"Обучение"),"UI T13 active opens first training workspace")
 	game.office.course_editor_add_record(2311)
-	check(press(game.office,"Поставить курс в очередь"),"UI T13 active queues old film")
+	check(press(game.office,"Поставить в очередь"),"UI T13 active queues old film")
 	await process_frame
 	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==2311),"UI T13 active old film starts")
 	game.office.course_editor_open(2312)
 	game.office.course_editor_select_group(service.group_id_for_station(2),true)
-	check(press(game.office,"Поставить курс в очередь"),"UI T13 active queues the newer version while old film is running")
+	check(press(game.office,"Поставить в очередь"),"UI T13 active queues the newer version while old film is running")
 	await process_frame
 	check(int(service.desired_source(service.group_id_for_station(2),"potato").get("id",0))==2312,"UI T13 active updates the desired version while the old frozen film remains current")
 	var live_views: Array=service.training_course_views()
@@ -243,18 +269,19 @@ func run()->void:
 	service.masterclasses=[old_method,first,second]
 	game.office.open("groups")
 	game.office.select_group_stations([2])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI T12 opens editor")
+	check(press(game.office,"Обучение"),"UI T12 opens training workspace")
 	game.office.course_editor_add_record(2401)
 	game.office.course_editor_add_record(2402)
-	check(press(game.office,"Поставить курс в очередь"),"UI T12 queues course")
+	check(press(game.office,"Поставить в очередь"),"UI T12 queues course")
 	await process_frame
 	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==2402),"UI T12 reaches second film")
 	game.office.open("groups")
-	check(press(game.office,"Отменить оставшийся курс #"),"UI T12 cancellation button is available")
+	check(press(game.office,"Очередь обучения"),"UI T12 opens queue workspace without preselecting tables")
+	check(press(game.office,"Отменить курс"),"UI T12 cancellation button is available")
 	check(await run_until(service,func():return not service.staff_training.is_active(),60.0),"UI T12 workers return after UI cancellation")
 	check(int(station.method_sources.get("sausage",{}).get("id",0))==2401 and int(station.method_sources.get("potato",{}).get("id",0))==2400,"UI T12 completed first lesson stays learned and interrupted second stays old")
 	game.office.rebuild()
-	check(press(game.office,"Продолжить обучение · стол 2"),"UI T12 exposes resume button for the suspended desired assignment")
+	check(press(game.office,"Продолжить"),"UI T12 exposes resume button for the suspended desired assignment")
 	await process_frame
 	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2402,"UI T12 resume creates the required pending lesson")
 	dispose(game)
@@ -267,14 +294,14 @@ func run()->void:
 	service.masterclasses=[wine]
 	game.office.open("groups")
 	game.office.select_group_stations([2])
-	check(press(game.office,"Составить курс из выбранных столов"),"UI draft opens editor")
+	check(press(game.office,"Обучение"),"UI draft opens training workspace")
 	game.office.course_editor_add_record(2491)
 	game.player.global_position=game.shop.computer.global_position+Vector3(20,0,0)
-	check(press(game.office,"Поставить курс в очередь"),"UI draft submit button exists while away from computer")
+	check(press(game.office,"Поставить в очередь"),"UI draft submit button exists while away from computer")
 	check(not game.office.course_editor.is_empty() and game.office.course_editor.records==[2491],"UI draft survives a rejected host confirmation")
 	check(game.office.course_editor_message.contains("Подойди к компьютеру"),"UI draft shows the concrete host rejection reason")
 	game.player.global_position=game.shop.computer.global_position
-	check(press(game.office,"Поставить курс в очередь"),"UI draft can be confirmed after returning to the computer")
+	check(press(game.office,"Поставить в очередь"),"UI draft can be confirmed after returning to the computer")
 	await process_frame
 	check(service.training_course_views().size()==1,"UI draft successful retry creates exactly one course")
 	dispose(game)
@@ -287,7 +314,7 @@ func run()->void:
 	service.masterclasses=[wine]
 	game.office.open("videos")
 	check(press(game.office,"Добавить в курс"),"Videotheque has Add to course")
-	check(game.office.tab=="groups" and game.office.course_editor.records==[2501] and str(game.office.course_editor.type_id)=="counter","Videotheque opens the same course editor with the record prefilled")
+	check(game.office.tab=="groups" and game.office.groups_mode=="training" and game.office.course_editor.records==[2501] and str(game.office.course_editor.type_id)=="counter","Videotheque opens the training workspace with the record prefilled")
 	dispose(game)
 
 	print("PASS: stage 3 course editor and queue management UI" if failures==0 else "FAILURES: %d"%failures)

@@ -113,8 +113,8 @@ func run()->void:
 	game.office.select_group_stations(ids)
 	game.office.course_editor_open()
 	var rendered:=tree_text(game.office.content)
-	check("19/19 производственных мест" in rendered,"Course UI reports nineteen of nineteen production places")
-	check("работников 19" in rendered,"Course UI reports nineteen actual workers")
+	check("19 столов" in rendered,"Training workspace reports nineteen selected production tables")
+	check("работников 19/19" in rendered,"Training workspace reports nineteen actual workers")
 	game.office.close()
 
 	game._shutdown_tree(game)
