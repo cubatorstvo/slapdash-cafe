@@ -14,11 +14,24 @@ static func default_name(dish: String, number: int, archived := false, station_i
 	if archived: return "Архив · %s · стол %d"%[Definition.DISHES.get(dish,dish),station_id]
 	return "%s · мастер-класс %d"%[Definition.DISHES.get(dish,dish),number]
 
+static func _compatible_required(type_id: String,items: Array) -> Array:
+	var result: Array=[]
+	for raw_item in items:
+		var item:=str(raw_item)
+		if Definition.equipment_allowed(type_id,item) and item not in result: result.append(item)
+	return result
+
 static func make_record(id: int,dish: String,type_id: String,tracks: Array,duration: float,quality: Dictionary,name: String,archived := false,source_station := 0,scene_config: Dictionary={}) -> Dictionary:
 	var stored_tracks: Array=tracks.duplicate(true)
 	var events: Array=Highlights.extract_events(stored_tracks)
 	var stored_scene: Dictionary=scene_config.duplicate(true)
-	var required: Array=stored_scene.get("required_equipment",stored_scene.get("equipment",Definition.DISH_EQUIPMENT.get(dish,[]))).duplicate()
+	var required: Array=[]
+	if stored_scene.get("required_equipment",null) is Array:
+		required=_compatible_required(type_id,stored_scene.required_equipment)
+	elif stored_scene.get("equipment",null) is Array:
+		required=_compatible_required(type_id,stored_scene.equipment)
+	else:
+		required=Definition.DISH_EQUIPMENT.get(dish,[]).duplicate()
 	stored_scene.required_equipment=required.duplicate()
 	return {"id":id,"name":name,"dish":dish,"source_type":type_id,"tracks":stored_tracks,"duration":duration,"quality":quality.duplicate(true),"effectiveness":effectiveness(quality),"archived":archived,"source_station":source_station,"scene_config":stored_scene,"required_equipment":required,"highlight_plan_version":Highlights.PLAN_VERSION,"highlight_events":events,"highlight_segments":Highlights.build(stored_tracks,events),"highlight_duration":Highlights.duration(stored_tracks)}
 
@@ -35,11 +48,12 @@ static func ensure_highlights(record: Dictionary) -> void:
 	if not record.has("effectiveness"): record.effectiveness=effectiveness(record.get("quality",{}))
 
 static func required_equipment(record: Dictionary) -> Array:
-	if record.get("required_equipment",null) is Array: return record.required_equipment.duplicate()
+	var type_id: String=str(record.get("source_type",""))
+	if record.get("required_equipment",null) is Array: return _compatible_required(type_id,record.required_equipment)
 	var scene: Variant=record.get("scene_config",{})
 	if scene is Dictionary:
-		if scene.get("required_equipment",null) is Array: return scene.required_equipment.duplicate()
-		if scene.get("equipment",null) is Array: return scene.equipment.duplicate()
+		if scene.get("required_equipment",null) is Array: return _compatible_required(type_id,scene.required_equipment)
+		if scene.get("equipment",null) is Array: return _compatible_required(type_id,scene.equipment)
 	return Definition.DISH_EQUIPMENT.get(str(record.get("dish","")),[]).duplicate()
 
 static func summary(record: Dictionary) -> Dictionary:
