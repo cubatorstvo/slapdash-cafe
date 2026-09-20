@@ -671,7 +671,7 @@ func _batch_idle(batch: Dictionary)->bool:
 	for station_id in batch.get("station_ids",[]):
 		var station=service.by_id(int(station_id))
 		if station==null: return false
-		if station.state!="idle" or station.customer_id>=0 or station.training.active() or station.pending_teacher>0: return false
+		if station.state!="idle" or station.customer_id>=0 or station.training.active(): return false
 	return true
 
 func _next_lesson(batch: Dictionary)->Dictionary:
