@@ -88,9 +88,11 @@ func run()->void:
 	first.state="idle"; first.customer_id=-1
 	second.state="idle"; second.customer_id=-1
 	first.recipes.erase("sausage"); second.recipes.erase("sausage")
-	check(str(service.problem_context("sausage").reason)=="unlearned","Unlearned dish is distinguished")
+	check(str(service.problem_context("sausage").reason)=="unlearned","Unlearned dish is distinguished even when equipment is incomplete")
+	prepare_counter(first,recipe); prepare_counter(second,recipe)
 	first.equipment=["rag","plates"]; second.equipment=["rag","plates"]
-	check(str(service.problem_context("sausage").reason)=="equipment","Missing equipment is distinguished")
+	first.apply_equipment(); second.apply_equipment()
+	check(str(service.problem_context("sausage").reason)=="equipment","Missing equipment is distinguished only after the method is learned")
 	first.equipment=["rag","plates","sauce"]; second.equipment=["rag","plates","sauce"]
 	first.staffed=0; second.staffed=0
 	check(str(service.problem_context("sausage").reason)=="workers","Missing workers are distinguished")
