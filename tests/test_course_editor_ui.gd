@@ -79,6 +79,7 @@ func run()->void:
 	var kitchen=add_station(service,"kitchen",3)
 	var wine=record_for(a,2101,"wine","UI · напиток")
 	var potato=record_for(a,2102,"potato","UI · картошка")
+	var long_wine=record_for(a,2103,"wine","UI · длинная запись",2400)
 	service.masterclasses=[wine,potato]
 
 	print("UI T01: tables never auto-group and actions explain disabled state")
@@ -137,9 +138,14 @@ func run()->void:
 	var edited: Dictionary=service.training_queue.course_view(course_id)
 	check(int(edited.assignments[0].record_id)==2102 and int(edited.assignments[1].record_id)==2101,"Queue order changes directly by drag")
 
-	print("UI T04: short recordings stay uncut and training session time is fixed")
+	print("UI T04: highlight duration is fixed and short recordings stay uncut")
 	check(absf(float(wine.highlight_duration)-float(wine.duration))<0.01,"Short recording keeps its full duration")
 	check(wine.highlight_segments.size()>=2,"Short recording still changes camera angles")
+	check(absf(float(long_wine.highlight_duration)-Library.TRAINING_WATCH_SECONDS)<0.01,"Long recording produces exactly the global fixed highlight duration")
+	var long_highlight_ticks:=0
+	for segment in long_wine.highlight_segments:
+		long_highlight_ticks+=int(segment.film_end)-int(segment.film_start)
+	check(long_highlight_ticks==roundi(Library.TRAINING_WATCH_SECONDS*60.0),"Long highlight timeline contains exactly N seconds instead of 30 percent")
 	var cursor:=0
 	for segment in wine.highlight_segments:
 		check(int(segment.source_start)==cursor,"Uncut short film has no source gap")
