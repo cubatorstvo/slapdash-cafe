@@ -52,29 +52,28 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _build_unlock_map() -> void:
 	_mark_rect(Rect2i(-3, -6, 6, 15), 1)
-	_mark_rect(Rect2i(-5, -7, 8, 2), 1)
-	_mark_rect(Rect2i(-5, -12, 3, 5), 1)
+	_mark_rect(Rect2i(-3, -7, 6, 1), 1)
+	_mark_rect(Rect2i(-3, -12, 3, 5), 1)
 
 	_mark_rect(Rect2i(3, -5, 1, 6), 2)
 	_mark_rect(Rect2i(4, -5, 7, 6), 2)
-	_mark_rect(Rect2i(2, -12, 3, 5), 2)
-	_mark_rect(Rect2i(3, -7, 2, 2), 2)
+	_mark_rect(Rect2i(0, -12, 3, 5), 2)
 
 	_mark_rect(Rect2i(-11, -5, 7, 6), 3)
 	_mark_rect(Rect2i(-4, -5, 1, 6), 3)
-	_mark_rect(Rect2i(-8, -12, 3, 5), 3)
-	_mark_rect(Rect2i(5, -12, 3, 5), 3)
-	_mark_rect(Rect2i(-8, -7, 3, 2), 3)
-	_mark_rect(Rect2i(5, -7, 3, 2), 3)
+	_mark_rect(Rect2i(-6, -12, 3, 5), 3)
+	_mark_rect(Rect2i(3, -12, 3, 5), 3)
+	_mark_rect(Rect2i(-6, -7, 3, 1), 3)
+	_mark_rect(Rect2i(3, -7, 3, 1), 3)
 
 	_mark_rect(Rect2i(-11, 1, 7, 6), 4)
 	_mark_rect(Rect2i(-4, 1, 1, 6), 4)
 	_mark_rect(Rect2i(3, 1, 1, 6), 4)
 	_mark_rect(Rect2i(4, 1, 7, 6), 4)
-	_mark_rect(Rect2i(-11, -12, 3, 5), 4)
-	_mark_rect(Rect2i(8, -12, 3, 5), 4)
-	_mark_rect(Rect2i(-11, -7, 3, 2), 4)
-	_mark_rect(Rect2i(8, -7, 3, 2), 4)
+	_mark_rect(Rect2i(-9, -12, 3, 5), 4)
+	_mark_rect(Rect2i(6, -12, 3, 5), 4)
+	_mark_rect(Rect2i(-9, -7, 3, 1), 4)
+	_mark_rect(Rect2i(6, -7, 3, 1), 4)
 
 func _mark_rect(rect: Rect2i, unlock_stage: int) -> void:
 	for x in range(rect.position.x, rect.end.x):
@@ -144,6 +143,7 @@ func _cells_for_stage(stage: int) -> Dictionary:
 func _build_snapshot(root: Node3D, cells: Dictionary, stage: int) -> void:
 	_build_floor(root, cells)
 	_build_perimeter(root, cells)
+	_build_back_block_divider(root, stage)
 	_build_wayfinding(root, stage)
 	_build_chef(root)
 	_build_stage_content(root, stage)
@@ -278,13 +278,20 @@ func _add_temporary_wall(parent: Node3D, node_name: String, center: Vector3, siz
 	sign_position.y = 1.85
 	_add_zone_sign(partition, "РАСШИРЕНИЕ", sign_position, Color("fff2b0"), 26)
 
+func _build_back_block_divider(root: Node3D, stage: int) -> void:
+	if stage < 2:
+		return
+	var divider := Node3D.new()
+	divider.name = "LabRestSharedWall"
+	root.add_child(divider)
+	_add_final_wall(divider, "SharedWall", Vector3(0.0, WALL_HEIGHT * 0.5, -19.0), Vector3(WALL_THICKNESS, WALL_HEIGHT, 10.0))
+
 func _is_entrance_opening(cell: Vector2i) -> bool:
 	return cell.y == 8 and (cell.x == -1 or cell.x == 0)
 
 func _build_wayfinding(root: Node3D, stage: int) -> void:
 	_add_zone_sign(root, "ГЛАВНЫЙ ПРОХОД", Vector3(0.0, 2.65, 8.0), Color("dce6e8"), 24)
-	var rear_x := -2.0 if stage == 1 else 0.0
-	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(rear_x, 2.65, -14.0), Color("dce6e8"), 22)
+	_add_zone_sign(root, "ЗАДНЯЯ МАГИСТРАЛЬ", Vector3(0.0, 2.65, -14.0), Color("dce6e8"), 22)
 
 func _build_chef(root: Node3D) -> void:
 	var chef := Node3D.new()
@@ -298,18 +305,18 @@ func _build_chef(root: Node3D) -> void:
 	_add_zone_sign(chef, "за спиной — открытая задняя магистраль", Vector3(0.0, 2.05, -8.0), Color("dbe4e4"), 18)
 
 func _build_stage_content(root: Node3D, stage: int) -> void:
-	_add_zone_sign(root, "ЛАБОРАТОРИЯ · 1/3", Vector3(-8.0, 2.35, -20.0), STAGE_COLORS[1].lightened(0.22), 27)
+	_add_zone_sign(root, "ЛАБОРАТОРИЯ · 1/3", Vector3(-3.0, 2.35, -20.0), STAGE_COLORS[1].lightened(0.22), 27)
 	_add_lab_props(root, 1)
 	if stage >= 2:
 		_add_zone_sign(root, "КУХНЯ 1 · 5 МЕСТ", Vector3(15.0, 2.35, -3.8), STAGE_COLORS[2].lightened(0.2), 27)
 		_add_kitchen_stations(root, Vector3(15.0, 0.0, -3.8), 5, false)
-		_add_zone_sign(root, "КОМНАТА ОТДЫХА · 1/3", Vector3(7.0, 2.35, -20.0), STAGE_COLORS[2].lightened(0.2), 24)
+		_add_zone_sign(root, "КОМНАТА ОТДЫХА · 1/3", Vector3(3.0, 2.35, -20.0), STAGE_COLORS[2].lightened(0.2), 24)
 		_add_rest_props(root, 1)
 	if stage >= 3:
 		_add_zone_sign(root, "КУХНЯ 2 · МИДГЕЙМ", Vector3(-15.0, 2.35, -3.8), STAGE_COLORS[3].lightened(0.2), 27)
 		_add_kitchen_stations(root, Vector3(-15.0, 0.0, -3.8), 7, true)
-		_add_zone_sign(root, "ЛАБА · 2/3", Vector3(-13.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
-		_add_zone_sign(root, "ОТДЫХ · 2/3", Vector3(13.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
+		_add_zone_sign(root, "ЛАБА · 2/3", Vector3(-9.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
+		_add_zone_sign(root, "ОТДЫХ · 2/3", Vector3(9.0, 2.35, -20.0), STAGE_COLORS[3].lightened(0.2), 22)
 		_add_lab_props(root, 2)
 		_add_rest_props(root, 2)
 	if stage >= 4:
@@ -317,8 +324,8 @@ func _build_stage_content(root: Node3D, stage: int) -> void:
 		_add_zone_sign(root, "ЛЕЙТГЕЙМ-СЕКТОР", Vector3(15.0, 2.35, 8.0), STAGE_COLORS[4].lightened(0.12), 26)
 		_add_kitchen_stations(root, Vector3(-15.0, 0.0, 8.0), 8, true)
 		_add_kitchen_stations(root, Vector3(15.0, 0.0, 8.0), 8, false)
-		_add_zone_sign(root, "ЛАБА · 3/3", Vector3(-19.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
-		_add_zone_sign(root, "ОТДЫХ · 3/3", Vector3(19.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
+		_add_zone_sign(root, "ЛАБА · 3/3", Vector3(-15.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
+		_add_zone_sign(root, "ОТДЫХ · 3/3", Vector3(15.0, 2.35, -20.0), STAGE_COLORS[4].lightened(0.12), 22)
 		_add_lab_props(root, 3)
 		_add_rest_props(root, 3)
 
@@ -337,12 +344,12 @@ func _add_kitchen_stations(parent: Node3D, center: Vector3, count: int, face_cen
 		_add_box(props, "StationEdge_%d" % i, edge, Vector3(2.0, 0.09, 0.12), Color("d8b15b"), false)
 
 func _add_lab_props(parent: Node3D, tier: int) -> void:
-	var x := -8.0 - float(tier - 1) * 6.0
+	var x := -3.0 - float(tier - 1) * 6.0
 	_add_box(parent, "LabBench_%d" % tier, Vector3(x, 0.48, -22.0), Vector3(4.5, 0.96, 1.2), Color("768b88"))
 	_add_box(parent, "LabMachine_%d" % tier, Vector3(x, 0.8, -18.0), Vector3(1.5, 1.6, 1.5), Color("87989d"))
 
 func _add_rest_props(parent: Node3D, tier: int) -> void:
-	var x := 7.0 + float(tier - 1) * 6.0
+	var x := 3.0 + float(tier - 1) * 6.0
 	_add_box(parent, "Sofa_%d" % tier, Vector3(x, 0.45, -21.0), Vector3(3.8, 0.9, 1.4), Color("7c6d63"))
 	_add_box(parent, "RestTable_%d" % tier, Vector3(x, 0.35, -17.8), Vector3(1.6, 0.7, 1.6), Color("8d7657"))
 
