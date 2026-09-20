@@ -121,8 +121,8 @@ static func slot_label(station_id: int)->String:
 	return "%s · место %d"%[section_for(slot),station_id]
 
 static func zone_gate(point: Vector3)->Vector3:
-	if point.x>6.0: return Vector3(5.2,0.0,-3.0 if point.z<0.0 else 2.4)
-	if point.x<-6.0: return Vector3(-5.2,0.0,-3.0 if point.z<0.0 else 2.4)
+	if point.x>6.0: return Vector3(5.2,0.0,-3.0 if point.z<-2.0 else 2.4)
+	if point.x<-6.0: return Vector3(-5.2,0.0,-3.0 if point.z<-2.0 else 2.4)
 	return Vector3(0.0,0.0,clampf(point.z,-3.0,3.0))
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
