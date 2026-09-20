@@ -45,3 +45,10 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= 18.0 * delta
 
 	move_and_slide()
+
+func reset_pose(target: Vector3) -> void:
+	global_position = target
+	velocity = Vector3.ZERO
+	rotation = Vector3.ZERO
+	pitch = 0.0
+	head.rotation = Vector3.ZERO
