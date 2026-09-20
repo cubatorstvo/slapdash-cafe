@@ -277,13 +277,13 @@ func toggle_masterclass_equipment(item: String,on: bool) -> void:
 	if on and item not in masterclass_setup_equipment: masterclass_setup_equipment.append(item)
 	elif not on: masterclass_setup_equipment.erase(item)
 	masterclass_setup_equipment.sort()
-	var station:=game.service.by_id(selected_station)
+	var station: Node3D=game.service.by_id(selected_station)
 	if station!=null: show_station(station)
 
 func cancel_masterclass_setup() -> void:
 	masterclass_setup_dish=""
 	masterclass_setup_equipment.clear()
-	var station:=game.service.by_id(selected_station)
+	var station: Node3D=game.service.by_id(selected_station)
 	if station!=null: show_station(station)
 
 func submit_masterclass_setup() -> void:
