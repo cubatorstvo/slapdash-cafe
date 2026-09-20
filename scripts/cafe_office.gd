@@ -1024,7 +1024,7 @@ func _training_queue_click(meta: Dictionary,ctrl: bool,shift: bool) -> void:
 func _training_refresh_selection_styles() -> void:
 	for raw_id in training_library_rows:
 		var record_id:=int(raw_id)
-		var row: Control=training_library_rows[raw_id]
+		var row: Variant=training_library_rows[raw_id]
 		if not is_instance_valid(row): continue
 		var selected:=record_id in training_library_selection
 		row.set_selected(selected)
@@ -1032,7 +1032,7 @@ func _training_refresh_selection_styles() -> void:
 		row.drag_payload={"kind":"masterclass_records","record_ids":drag_ids,"count":drag_ids.size()}
 	for raw_key in training_queue_rows:
 		var key:=str(raw_key)
-		var row: Control=training_queue_rows[raw_key]
+		var row: Variant=training_queue_rows[raw_key]
 		if not is_instance_valid(row): continue
 		var selected:=key in training_queue_selection
 		row.set_selected(selected)
@@ -1043,9 +1043,12 @@ func _training_refresh_selection_styles() -> void:
 				if _queue_key_course(str(selected_key))==course_id: indices.append(_queue_key_index(str(selected_key)))
 		if indices.is_empty(): indices=[_queue_key_index(key)]
 		indices.sort()
-		row.drag_payload={"kind":"queue_lessons","course_id":course_id,"indices":indices,"count":indices.size()}
+		if bool(row.meta.get("draggable",true)):
+			row.drag_payload={"kind":"queue_lessons","course_id":course_id,"indices":indices,"count":indices.size()}
+		else:
+			row.drag_payload={}
 
-func _training_make_drag_row(parent: Node,meta: Dictionary,title: String,subtitle: String,payload: Dictionary,selected: bool,queue_key := "") -> Control:
+func _training_make_drag_row(parent: Node,meta: Dictionary,title: String,subtitle: String,payload: Dictionary,selected: bool,queue_key := "") -> Variant:
 	var row=TrainingDragRow.new()
 	parent.add_child(row)
 	row.setup(meta,title,subtitle,payload)
@@ -1418,7 +1421,7 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 		var key:=_queue_key(course_id,index)
 		var subtitle: String=str(record.get("name",assignment.get("name","Запись")))+" · столы "+", ".join(assignment.get("station_ids",[]).map(func(id):return str(id)))
 		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if bool(course.editable) else {}
-		var row:=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
+		var row: Variant=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":bool(course.editable)},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
 		row.drop_enabled=bool(course.editable)
 	if bool(course.editable):
 		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
