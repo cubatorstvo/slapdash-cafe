@@ -127,10 +127,10 @@ func run()->void:
 	check(views[0].batches.size()==1 and views[0].batches[0].stations==[2,3],"All selected tables leave in one pass")
 	game.office.rebuild()
 	workspace=tree_text(game.office.content)
-	check("Бокал вина, столы 2, 3" in workspace and "Жареный картофель, столы 2, 3" in workspace,"Queue rows contain only dish and tables")
-	check("UI · напиток" not in workspace and "по 1 за раз" not in workspace,"Queue rows do not expose recording names or batch sizes")
+	check("Бокал вина, столы 2, 3" in workspace and "Жареный картофель, столы 2, 3" in workspace,"Queue rows show dish and tables")
 	var course_id:=int(views[0].id)
 	var row=game.office.training_queue_rows.get("%d:0"%course_id)
+	check(row!=null and row.title_text=="Бокал вина, столы 2, 3" and row.subtitle_text.is_empty(),"Queue row itself contains only dish and tables")
 	check(row!=null and bool(row.context_highlight),"Rows for the current table selection are outlined")
 	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[1]},{"zone":"course","course_id":course_id,"index":0},false)
 	await process_frame
