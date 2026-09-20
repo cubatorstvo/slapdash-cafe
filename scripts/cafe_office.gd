@@ -1453,7 +1453,7 @@ func _training_schedule_panel(parent: Node,host: bool) -> void:
 	if not training_queue_selection.is_empty(): button(top,"Убрать выбранные",training_remove_queue_selection,host)
 	training_queue_rows={}
 	_training_draft_card(box,host)
-	var views:=game.service.training_course_views()
+	var views: Array=game.service.training_course_views()
 	if views.is_empty(): label(box,"Очередь пуста.",14)
 	else:
 		label(box,"ТЕКУЩАЯ ОЧЕРЕДЬ",14)
