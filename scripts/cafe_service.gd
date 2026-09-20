@@ -736,8 +736,9 @@ func training_selection_error(record_id: int,ids: Array) -> String:
 	return ""
 
 func training_course_preview(assignments: Array,mode := "together",group_order: Array=[]) -> Dictionary:
+	mode="together"
+	group_order=[]
 	_ensure_groups()
-	if mode not in ["together","by_groups","balanced"]: return {"error":"Неизвестный режим обучения."}
 	if assignments.is_empty(): return {"error":"Добавь хотя бы одно блюдо в расписание."}
 	var type_id: String=""
 	var selected: Array=[]
@@ -868,14 +869,7 @@ func training_course_preview(assignments: Array,mode := "together",group_order: 
 			batch_rows.append({"group":str(group_id),"name":str(group.name),"stations":needed,"blocked_reason":reason,"ready":reason.is_empty()})
 	var max_out:=0
 	for batch in batch_rows: max_out=maxi(max_out,batch.stations.size())
-	var total_film:=0.0
-	if mode=="balanced":
-		for lesson in lessons:
-			var batch_size:=maxi(1,roundi(float(maxi(1,int(lesson.selected)))*0.20))
-			var batch_count:=ceili(float(lesson.waiting.size())/float(batch_size)) if not lesson.waiting.is_empty() else 0
-			total_film+=float(lesson.film)*batch_count
-	else:
-		for lesson in lessons: total_film+=float(lesson.film)
+	var total_film:=Masterclasses.TRAINING_WATCH_SECONDS*lessons.size()
 	return {"error":"","type_id":type_id,"stations":selected,"employees":employees,"places":selected.size(),"lessons":lessons,"groups":projected,"batches":batch_rows,"simultaneous_out":max_out,"film_total":total_film,"mode":mode}
 
 func edit_training_course(course_id: int,assignments: Array,mode := "together",peer := 1,group_order: Array=[]) -> String:
@@ -889,7 +883,7 @@ func training_course_views() -> Array:
 
 func queue_training_course(assignments: Array,mode := "together",command_id := "",peer := 1,group_order: Array=[]) -> Dictionary:
 	if not is_instance_valid(training_queue): return {"error":"Система очереди обучения недоступна.","course_id":0}
-	return training_queue.enqueue_course(assignments,str(mode),str(command_id),int(peer),group_order)
+	return training_queue.enqueue_course(assignments,"together",str(command_id),int(peer),[])
 
 func start_group_training(record_id: int,ids: Array,peer := 1,command_id := "") -> String:
 	var error:=training_selection_error(record_id,ids)
