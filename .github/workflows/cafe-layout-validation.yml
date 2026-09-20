@@ -43,11 +43,16 @@ jobs:
 
       - name: Run affected integration regressions
         run: |
+          status=0
           for test in test_cafe_annex.gd test_delivery_installers.gd test_staff_lounge.gd test_first_star.gd test_third_star.gd; do
             echo "::group::$test"
-            "$GODOT_BIN" --headless --path . --script "res://tests/$test"
+            if ! timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/$test"; then
+              echo "::error::$test failed or timed out"
+              status=1
+            fi
             echo "::endgroup::"
           done
+          exit "$status"
 
       - name: Capture all four layout stages
         if: always()
