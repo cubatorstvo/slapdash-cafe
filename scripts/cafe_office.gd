@@ -221,7 +221,14 @@ func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 	if record_id>0:
 		_course_editor_add_record_internal(record_id)
 		var record: Dictionary=game.service.masterclass_by_id(record_id)
-		if not record.is_empty(): training_type_filter=str(record.get("source_type",""))
+		if not record.is_empty():
+			training_type_filter=str(record.get("source_type",""))
+			if training_scope_stations.is_empty():
+				for station in game.service.stations:
+					if station.manual_station or station.masterclass_station or str(station.type_id)!=training_type_filter: continue
+					training_scope_stations.append(station.station_id)
+				training_scope_stations.sort()
+				group_selected_stations=training_scope_stations.duplicate()
 	if training_type_filter.is_empty() and not training_scope_stations.is_empty():
 		var first_station=game.service.by_id(int(training_scope_stations[0]))
 		if first_station!=null: training_type_filter=str(first_station.type_id)
