@@ -1497,7 +1497,14 @@ func training_workspace_page(host: bool) -> void:
 			var type_id:=str(raw_type)
 			button(type_row,("✓ " if type_id==training_type_filter else "")+str(Definition.TYPES.get(type_id,{}).get("title",type_id)),func():set_training_type_filter(type_id),host)
 	var targets:=_training_target_stations()
-	label(content,"%s · столы %s"%[str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter)),", ".join(targets.map(func(id):return str(id)))],14)
+	var assigned_workers:=0
+	var worker_capacity:=0
+	for raw_id in targets:
+		var station: Node3D=service.by_id(int(raw_id))
+		if station==null: continue
+		worker_capacity+=station.role_count()
+		assigned_workers+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	label(content,"%s · %d столов · работников %d/%d · столы %s"%[str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter)),targets.size(),assigned_workers,worker_capacity,", ".join(targets.map(func(id):return str(id)))],14)
 
 	var columns:=HBoxContainer.new()
 	columns.add_theme_constant_override("separation",12)
