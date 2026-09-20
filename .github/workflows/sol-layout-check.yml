@@ -1,9 +1,6 @@
 name: Sol cafe layout check
 
 on:
-  push:
-    branches:
-      - sol/cafe-product-layout
   workflow_dispatch:
 
 permissions:
