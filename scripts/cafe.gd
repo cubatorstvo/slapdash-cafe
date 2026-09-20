@@ -387,6 +387,7 @@ func _physics_process(delta: float) -> void:
 
 func refresh_hud() -> void:
 	hud.clone_status.text = "День %d · %d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.day, service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
+	hud.equipment_warning.text=service.equipment_warning_text(2)
 	var feed_lines: Array=[]
 	for entry in service.analytics.feed.slice(0,mini(3,service.analytics.feed.size())):
 		var source: String="ИГРОК · %s: "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "СИСТЕМА: "
