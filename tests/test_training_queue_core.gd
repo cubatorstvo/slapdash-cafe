@@ -136,7 +136,10 @@ func run()->void:
 	check(learned_station.recipes.has("potato"),"T06 station learns the potato method")
 	check("pan" in learned_station.recipe_requirements("potato"),"T06 learned method keeps its recorded equipment requirements")
 	check(not learned_station.can_execute("potato"),"T06 learned station cannot execute the method without pan")
-	check(str(service.problem_context("potato").reason)=="equipment","T06 service reports execution equipment as the blocker")
+	for candidate in stations:
+		var candidate_group: String=service.group_id_for_station(candidate.station_id)
+		if not candidate_group.is_empty(): service.set_group_dish_active(candidate_group,"potato",candidate.station_id==8)
+	check(str(service.problem_context("potato").reason)=="equipment","T06 service reports execution equipment as the blocker when this is the active learned kitchen")
 	check("Кухня 8" in service.equipment_warning_text(4) and "Дырявая сковорода" in service.equipment_warning_text(4),"T06 persistent warning names the affected kitchen and missing item")
 	learned_station.equipment.append("pan")
 	learned_station.apply_equipment()
