@@ -15,6 +15,9 @@ const REAR_SPINE_POINT:=Vector3(0.0,0.0,12.2)
 const AISLE_XS: Array[float]=[-13.5,-4.5,4.5,13.5]
 const LEFT_AISLE_X:=-4.5
 const RIGHT_AISLE_X:=4.5
+const MARKET_POSITION:=Vector3(-7.0,0.0,13.1)
+const DECOR_SIGN_POSITION:=Vector3(1.5,2.8,13.84)
+const DECOR_PLANT_POINTS: Array[Vector2]=[Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(22.2,-4.2)]
 const STAGE_NAMES:=['Красный','Синий','Зелёный','Жёлтый']
 const SECTION_ROWS: Array=[
 	{"name":"Основной зал · ★3","slots":[6,7,8,9,10,11,12]},
