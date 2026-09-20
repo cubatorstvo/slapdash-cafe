@@ -335,7 +335,9 @@ func course_editor_move_record(index: int,delta: int) -> void:
 	rebuild()
 
 func course_editor_set_mode(mode: String) -> void:
-	if mode in ["together","by_groups"]: course_editor.mode=mode
+	if mode in ["together","by_groups"]:
+		course_editor.mode=mode
+		if mode=="by_groups": _sync_course_group_order()
 	stamp=""
 	rebuild()
 
@@ -344,7 +346,8 @@ func _course_group_id_for_station(station_id: int) -> String:
 
 func _sync_course_group_order() -> void:
 	var valid: Array=[]
-	for raw_id in group_selected_stations:
+	var source_ids: Array=training_scope_stations if groups_mode=="training" and not training_scope_stations.is_empty() else group_selected_stations
+	for raw_id in source_ids:
 		var group_id: String=_course_group_id_for_station(int(raw_id))
 		if not group_id.is_empty() and group_id not in valid: valid.append(group_id)
 	var next: Array=[]
