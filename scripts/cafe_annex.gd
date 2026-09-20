@@ -196,7 +196,7 @@ func _build_door(id: String, door_x: float, color: Color) -> void:
 		var closed_x: float = float(side) * DOOR_WIDTH * 0.25
 		var open_x: float = float(side) * DOOR_WIDTH * 0.69
 		leaf.position = Vector3(closed_x,DOOR_HEIGHT*0.5,0)
-		Props.solid_box(leaf,Vector3(DOOR_WIDTH*0.46,DOOR_HEIGHT,0.11),Vector3.ZERO,color)
+		Props.moving_solid_box(leaf,Vector3(DOOR_WIDTH*0.46,DOOR_HEIGHT,0.11),Vector3.ZERO,color)
 		var inset := Props.box(leaf,Vector3(DOOR_WIDTH*0.32,0.72,0.025),Vector3(0,0.18,-0.065),Color("b8d0c7"))
 		inset.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		inset.material_override.albedo_color.a = 0.45
