@@ -21,16 +21,16 @@ jobs:
       - name: Import project
         run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --quit
       - name: Independent masterclass regression
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_masterclass_independence.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_masterclass_independence.gd
       - name: Training queue regression
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_training_queue_core.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_training_queue_core.gd
       - name: Stage 8 onboarding
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_onboarding.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_onboarding.gd
       - name: Stage 8 integration
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_integration.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_integration.gd
       - name: Stage 8 scale
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_scale.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_scale.gd
       - name: Cafe insights
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_insights.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_insights.gd
       - name: Cafe journey
-        run: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_journey.gd
+        run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_journey.gd
