@@ -7,6 +7,7 @@ const Style = preload("res://scripts/cafe_theme.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
+const TrainingDragRow = preload("res://scripts/ui/training_drag_row.gd")
 var game: Node3D
 var panel: PanelContainer
 var content: VBoxContainer
@@ -42,6 +43,18 @@ var scale_group := ""
 var send_installers := false
 var stats_focus: Dictionary={}
 var course_focus_id:=0
+var groups_mode:="overview"
+var group_expanded: Dictionary={}
+var group_management_open:=false
+var training_type_filter:=""
+var training_library_selection: Array=[]
+var training_library_anchor:=-1
+var training_library_rows: Dictionary={}
+var training_queue_selection: Array=[]
+var training_queue_anchor:=-1
+var training_queue_rows: Dictionary={}
+var training_course_expanded: Dictionary={}
+var training_preview_expanded:=false
 
 func _ready() -> void:
 	layer = 17
@@ -127,6 +140,18 @@ func open(page := "overview") -> void:
 	group_merge_active_initialized=false
 	stats_focus={}
 	course_focus_id=0
+	groups_mode="overview"
+	group_expanded={}
+	group_management_open=false
+	training_type_filter=""
+	training_library_selection=[]
+	training_library_anchor=-1
+	training_library_rows={}
+	training_queue_selection=[]
+	training_queue_anchor=-1
+	training_queue_rows={}
+	training_course_expanded={}
+	training_preview_expanded=false
 	panel.show()
 	stamp = ""
 	rebuild()
