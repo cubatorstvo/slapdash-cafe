@@ -28,9 +28,6 @@ var course_editor_message: String=""
 var course_group_order: Array=[]
 var course_command_serial:=1
 var group_selected_groups: Array=[]
-var group_merge_choices: Dictionary={}
-var group_merge_active: Array=[]
-var group_merge_active_initialized:=false
 var lab_branch := "formula"
 var lab_target := 2
 var lab_reserve := 150
@@ -39,13 +36,11 @@ var lab_live_status: Label
 var scale_type := "counter"
 var scale_slots: Array=[]
 var scale_equipment: Array=[]
-var scale_group := ""
 var send_installers := false
 var stats_focus: Dictionary={}
 var course_focus_id:=0
 var groups_mode:="overview"
 var group_expanded: Dictionary={}
-var group_management_open:=false
 var training_type_filter:=""
 var training_scope_stations: Array=[]
 var training_library_selection: Array=[]
@@ -152,13 +147,13 @@ func label(parent: Node, text: String, size := 17) -> Label:
 	parent.add_child(node)
 	return node
 
-func button(parent: Node, text: String, callback: Callable, enabled := true) -> Button:
+func button(parent: Node, text: String, callback: Callable, enabled := true, disabled_reason := "") -> Button:
 	var node := Button.new()
 	node.text = text
 	node.custom_minimum_size = Vector2(100, 40)
 	node.clip_text = true
 	node.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	node.tooltip_text = text
+	node.tooltip_text = disabled_reason if not enabled and not disabled_reason.is_empty() else text
 	if parent is HFlowContainer: node.custom_minimum_size.x = maxf(100.0, float(text.length()) * 8.5 + 26.0)
 	node.disabled = not enabled
 	node.pressed.connect(func():
@@ -250,7 +245,7 @@ func stage_group_assignment(record_id: int) -> void:
 
 func course_editor_open(record_id := 0,edit_course_id := 0) -> void:
 	var previous_selection: Array=group_selected_stations.duplicate()
-	course_editor={"open":true,"records":[],"mode":"balanced","editing":edit_course_id,"type_id":""}
+	course_editor={"open":true,"records":[],"mode":"together","editing":edit_course_id,"type_id":""}
 	course_editor_message=""
 	course_group_order=[]
 	training_scope_stations=previous_selection
@@ -478,7 +473,7 @@ func course_editor_submit() -> void:
 	game.hud.notice.text=""
 	send(payload)
 	var notice: String=str(game.hud.notice.text)
-	if notice=="Обучение добавлено в расписание.":
+	if notice=="Обучение добавлено в очередь.":
 		course_editor={}
 		course_editor_message=""
 		course_group_order=[]
@@ -488,31 +483,12 @@ func course_editor_submit() -> void:
 	rebuild()
 
 func set_group_selected(id: String,on: bool) -> void:
-	if on and id not in group_selected_groups: group_selected_groups.append(id)
-	elif not on: group_selected_groups.erase(id)
-	group_merge_choices={}
-	group_merge_active=[]
-	group_merge_active_initialized=false
-	stamp=""
-	rebuild()
-
-func set_merge_choice(dish: String,record_id: int) -> void:
-	group_merge_choices[dish]=record_id
-	stamp=""
-	rebuild()
-
-func set_merge_active(dish: String,on: bool) -> void:
-	group_merge_active_initialized=true
-	if on and dish not in group_merge_active: group_merge_active.append(dish)
-	elif not on: group_merge_active.erase(dish)
-	stamp=""
-	rebuild()
+	set_group_all_selected(id,on)
 
 func set_scale_type(value: String) -> void:
 	scale_type=value
 	scale_slots=[]
 	scale_equipment=[]
-	scale_group=""
 	stamp=""
 	rebuild()
 
@@ -648,6 +624,8 @@ func toggle_group_expanded(group_id: String) -> void:
 func set_group_all_selected(group_id: String,on: bool) -> void:
 	var group: Dictionary=game.service.table_group_by_id(group_id)
 	if group.is_empty(): return
+	if on and group_id not in group_selected_groups: group_selected_groups.append(group_id)
+	elif not on: group_selected_groups.erase(group_id)
 	for raw_id in group.stations:
 		var id:=int(raw_id)
 		if on and id not in group_selected_stations: group_selected_stations.append(id)
@@ -658,8 +636,19 @@ func set_group_all_selected(group_id: String,on: bool) -> void:
 
 func clear_group_selection() -> void:
 	group_selected_stations.clear()
+	group_selected_groups.clear()
 	stamp=""
 	rebuild()
+
+func group_selected_now() -> void:
+	if group_selected_stations.size()<2 or _selected_group_types().size()!=1: return
+	send({"action":"group_create","stations":group_selected_stations.duplicate()})
+	clear_group_selection()
+
+func ungroup_selected_now() -> void:
+	if group_selected_groups.is_empty(): return
+	send({"action":"group_dissolve","groups":group_selected_groups.duplicate()})
+	clear_group_selection()
 
 func _selected_group_types() -> Array:
 	var result: Array=[]
@@ -671,13 +660,10 @@ func _selected_group_types() -> Array:
 
 func open_training_workspace() -> void:
 	training_scope_stations=group_selected_stations.duplicate()
-	if training_scope_stations.is_empty():
-		for station in game.service.stations:
-			if station.manual_station or station.masterclass_station: continue
-			training_scope_stations.append(station.station_id)
 	training_scope_stations.sort()
 	var types:=_training_scope_types()
-	training_type_filter=str(types[0]) if not types.is_empty() else ""
+	if training_scope_stations.is_empty() or types.size()!=1: return
+	training_type_filter=str(types[0])
 	course_editor={}
 	course_editor_message=""
 	training_library_selection=[]
@@ -697,25 +683,25 @@ func back_to_groups_overview() -> void:
 
 func groups_overview_page(host: bool) -> void:
 	var service=game.service
-	label(content,"ГРУППЫ СТОЛОВ",23)
-	label(content,"Выбери группу целиком или отдельные столы. Здесь только состояние производства; обучение открывается отдельным экраном.",15)
+	label(content,"СТОЛЫ И ГРУППЫ",23)
+	label(content,"Столы остаются отдельными, пока ты сам их не сгруппируешь. Группа выбирается целиком.",15)
 
 	var selection:=_section_card(content,Color("244143"))
 	var selection_row:=HFlowContainer.new()
 	selection.add_child(selection_row)
 	var selected_count:=group_selected_stations.size()
-	var selection_text: String="Ничего не выбрано" if selected_count==0 else "Выбрано столов: %d"%selected_count
-	var selection_label:=label(selection_row,selection_text,17)
+	var selection_label:=label(selection_row,"Ничего не выбрано" if selected_count==0 else "Выбрано столов: %d"%selected_count,17)
 	selection_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	if selected_count>0:
-		var selected_types:=_selected_group_types()
-		var type_names: Array=[]
-		for type_id in selected_types: type_names.append(str(Definition.TYPES.get(str(type_id),{}).get("title",str(type_id))))
-		label(selection,"Типы: "+", ".join(type_names),13)
-		button(selection_row,"Обучение · %d столов →"%selected_count,open_training_workspace,host)
-		button(selection_row,"Снять выбор",clear_group_selection,host)
-	else:
-		button(selection_row,"Очередь обучения →",open_training_workspace,host)
+	var selected_types:=_selected_group_types()
+	var group_enabled:=host and selected_count>=2 and selected_types.size()==1
+	var group_reason: String="Управлять группами может хозяин кафе." if not host else "Выбери минимум два стола." if selected_count<2 else "Можно группировать только столы одного типа." if selected_types.size()!=1 else ""
+	button(selection_row,"Сгруппировать",group_selected_now,group_enabled,group_reason)
+	var ungroup_enabled:=host and not group_selected_groups.is_empty()
+	var ungroup_reason: String="Управлять группами может хозяин кафе." if not host else "В выборе нет группы. Выбери группу целиком." if group_selected_groups.is_empty() else ""
+	button(selection_row,"Разгруппировать",ungroup_selected_now,ungroup_enabled,ungroup_reason)
+	var training_enabled:=host and selected_count>0 and selected_types.size()==1
+	var training_reason: String="Обучение запускает хозяин кафе." if not host else "Выбери хотя бы один стол." if selected_count==0 else "Для одного обучения выбери столы только одного типа." if selected_types.size()!=1 else ""
+	button(selection_row,"Обучение",open_training_workspace,training_enabled,training_reason)
 
 	if is_instance_valid(service.staff_training) and service.staff_training.is_active():
 		var training_record: Dictionary=service.masterclass_by_id(service.staff_training.record_id)
@@ -723,17 +709,36 @@ func groups_overview_page(host: bool) -> void:
 		label(live,"СЕЙЧАС ИДЁТ ОБУЧЕНИЕ",14)
 		label(live,"%s · %s · %d столов"%[str(training_record.get("name",service.staff_training.record.get("name","Запись"))),service.staff_training.phase_label(),service.staff_training.station_ids.size()],17)
 
+	var ungrouped: Array=[]
+	for station in service.stations:
+		if station.manual_station or station.masterclass_station: continue
+		if service.group_id_for_station(station.station_id).is_empty(): ungrouped.append(station)
+	if not ungrouped.is_empty():
+		label(content,"ОТДЕЛЬНЫЕ СТОЛЫ",15)
+		for station in ungrouped:
+			var card:=_section_card(content,Color("294647"))
+			var row:=HBoxContainer.new()
+			card.add_child(row)
+			var pick:=CheckBox.new()
+			pick.button_pressed=station.station_id in group_selected_stations
+			pick.disabled=not host
+			pick.toggled.connect(func(on):set_group_station_selected(station.station_id,on))
+			row.add_child(pick)
+			var staff_now: int=station.role_count() if station.staffed<0 else station.staffed
+			var state_text: String="обучение" if not station.group_training_state.is_empty() else "готов"
+			var title:=label(row,"Стол %d · %s · работники %d/%d · %s"%[station.station_id,str(Definition.TYPES.get(station.type_id,{}).get("title",station.type_id)),staff_now,station.role_count(),state_text],15)
+			title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+
+	if not service.table_groups().is_empty(): label(content,"ГРУППЫ",15)
 	for group in service.table_groups():
 		var group_id:=str(group.id)
 		var card:=_section_card(content,Color("294647"))
 		var header:=HBoxContainer.new()
 		card.add_child(header)
-		var all_selected: bool=not group.stations.is_empty() and group.stations.all(func(id):return int(id) in group_selected_stations)
-		var selected_here: int=group.stations.filter(func(id):return int(id) in group_selected_stations).size()
 		var pick:=CheckBox.new()
-		pick.button_pressed=all_selected
+		pick.button_pressed=group_id in group_selected_groups
 		pick.disabled=not host
-		pick.tooltip_text="Выбрать все столы этой группы"
+		pick.tooltip_text="Выбрать группу целиком"
 		pick.toggled.connect(func(on):set_group_all_selected(group_id,on))
 		header.add_child(pick)
 		var expanded:=bool(group_expanded.get(group_id,false))
@@ -749,43 +754,26 @@ func groups_overview_page(host: bool) -> void:
 		var performance: Dictionary=service.group_performance(group)
 		var total_orders: int=int(performance.orders_completed)+int(performance.losses)
 		var pct:=Insights.completion_percent(int(performance.orders_completed),total_orders)
-		label(title_box,"%s"%str(group.name),18)
+		label(title_box,str(group.name),18)
 		var issue_count:=_group_equipment_issue_count(group)
 		var subtitle: String="%s · %d столов · работники %d/%d · выполнено %.0f%%"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct]
 		if issue_count>0: subtitle+=" · ⚠ оснащение %d"%issue_count
-		if selected_here>0 and not all_selected: subtitle+=" · выбрано %d/%d"%[selected_here,group.stations.size()]
-		var summary_label:=label(title_box,subtitle,13)
-		summary_label.autowrap_mode=TextServer.AUTOWRAP_WORD
+		label(title_box,subtitle,13)
 
 		if not expanded: continue
-		label(card, "Порций: %d · доход: %d" % [int(performance.portions_served), int(performance.revenue)], 15)
-
+		label(card,"Порций: %d · доход: %d"%[int(performance.portions_served),int(performance.revenue)],15)
 		var active_names: Array=[]
 		for dish in group.active_dishes: active_names.append(str(Definition.DISHES.get(str(dish),str(dish))))
 		label(card,"Активное меню: "+(", ".join(active_names) if not active_names.is_empty() else "пусто"),14)
-
 		label(card,"СТОЛЫ",14)
 		for raw_id in group.stations:
 			var station_id:=int(raw_id)
 			var station: Node3D=service.by_id(station_id)
 			if station==null: continue
-			var station_row:=HBoxContainer.new()
-			card.add_child(station_row)
-			var station_pick:=CheckBox.new()
-			station_pick.button_pressed=station_id in group_selected_stations
-			station_pick.disabled=not host
-			station_pick.toggled.connect(func(on):set_group_station_selected(station_id,on))
-			station_row.add_child(station_pick)
 			var station_stats: Dictionary=service.analytics.stations.get(str(station_id),{})
 			var staff_now: int=station.role_count() if station.staffed<0 else station.staffed
 			var state_text: String="обучение: "+station.group_training_state if not station.group_training_state.is_empty() else "готов"
-			var missing_count:=0
-			for raw_dish in station.recipes.keys():
-				if not station.missing_recipe_equipment(str(raw_dish)).is_empty(): missing_count+=1
-			if missing_count>0: state_text="⚠ нет оснащения для %d блюд"%missing_count
-			var station_text: String="Стол %d · %d/%d работников · %s · %d заказов · %d порций · доход %d"%[station_id,staff_now,station.role_count(),state_text,int(station_stats.get("orders_completed",0)),int(station_stats.get("portions_served",0)),int(station_stats.get("revenue",0))]
-			var station_label:=label(station_row,station_text,14)
-			station_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+			label(card,"Стол %d · %d/%d работников · %s · %d заказов · %d порций · доход %d"%[station_id,staff_now,station.role_count(),state_text,int(station_stats.get("orders_completed",0)),int(station_stats.get("portions_served",0)),int(station_stats.get("revenue",0))],14)
 
 		label(card,"МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ",14)
 		for raw_dish in group.dishes:
@@ -799,7 +787,7 @@ func groups_overview_page(host: bool) -> void:
 			active_toggle.toggled.connect(func(on):send({"action":"group_active","group":group_id,"dish":dish_id,"enabled":on}))
 			dish_row.add_child(active_toggle)
 			var summary: Dictionary=service.group_dish_summary(group_id,dish_id)
-			var dish_status:=label(dish_row,"%d/%d освоили · %s"%[int(summary.get("mastered",0)),int(summary.get("total",group.stations.size())),str(summary.get("desired","не назначено"))],13)
+			var dish_status:=label(dish_row,"%d/%d освоили"%[int(summary.get("mastered",0)),int(summary.get("total",group.stations.size()))],13)
 			dish_status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 
 		var rename_row:=HBoxContainer.new()
@@ -810,65 +798,6 @@ func groups_overview_page(host: bool) -> void:
 		group_edit.editable=host
 		rename_row.add_child(group_edit)
 		button(rename_row,"Переименовать",func():send({"action":"group_rename","group":group_id,"name":group_edit.text}),host)
-		var selected_ids: Array=group.stations.filter(func(id):return int(id) in group_selected_stations)
-		if not selected_ids.is_empty() and selected_ids.size()<group.stations.size():
-			button(card,"Отделить выбранные столы в новую группу",func():send({"action":"group_split","group":group_id,"stations":selected_ids.duplicate()}),host)
-
-	var manage_text: String="▾ Управление группами" if group_management_open else "▸ Управление группами"
-	button(content,manage_text,func():group_management_open=not group_management_open;stamp="";rebuild(),host)
-	if group_management_open: _group_management_page(host)
-
-func _group_management_page(host: bool) -> void:
-	var service=game.service
-	var box:=_section_card(content,Color("263f40"))
-	label(box,"СТРУКТУРА ГРУПП",18)
-	label(box,"Редкие операции спрятаны здесь, чтобы не мешать ежедневной работе.",13)
-	if not group_selected_stations.is_empty():
-		button(box,"Создать отдельную группу из выбранных столов",func():send({"action":"group_create","stations":group_selected_stations.duplicate()}),host)
-	label(box,"Объединить существующие группы",15)
-	for group in service.table_groups():
-		var group_id:=str(group.id)
-		var check:=CheckBox.new()
-		check.text="%s · %s · %d столов"%[str(group.name),str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size()]
-		check.button_pressed=group_id in group_selected_groups
-		check.disabled=not host
-		check.toggled.connect(func(on):set_group_selected(group_id,on))
-		box.add_child(check)
-	if group_selected_groups.size()<2:
-		label(box,"Выбери минимум две группы одного типа кухни.",13)
-		return
-	var merge_preview: Dictionary=service.preview_group_merge(group_selected_groups)
-	if merge_preview.is_empty():
-		label(box,"Эти группы относятся к разным типам кухни.",14)
-		return
-	var type_id:=str(merge_preview.type_id)
-	if not group_merge_active_initialized:
-		group_merge_active_initialized=true
-		for selected_group_id in group_selected_groups:
-			var selected_group: Dictionary=service.table_group_by_id(str(selected_group_id))
-			for dish in selected_group.active_dishes:
-				if dish not in group_merge_active: group_merge_active.append(dish)
-	label(box,"Активное меню объединённой группы",14)
-	for raw_dish in Definition.TYPES[type_id].dishes:
-		var dish_id:=str(raw_dish)
-		var toggle:=CheckBox.new()
-		toggle.text=str(Definition.DISHES.get(dish_id,dish_id))
-		toggle.button_pressed=dish_id in group_merge_active
-		toggle.disabled=not host
-		toggle.toggled.connect(func(on):set_merge_active(dish_id,on))
-		box.add_child(toggle)
-	for raw_dish in merge_preview.differences:
-		var dish_id:=str(raw_dish)
-		label(box,"Для «%s» планы различаются:"%str(Definition.DISHES.get(dish_id,dish_id)),14)
-		for raw_record_id in merge_preview.differences[raw_dish]:
-			var record_id:=int(raw_record_id)
-			if record_id<=0: continue
-			var record: Dictionary=service.masterclass_by_id(record_id)
-			button(box,("✓ " if int(group_merge_choices.get(dish_id,0))==record_id else "")+str(record.get("name","Запись #%d"%record_id)),func():set_merge_choice(dish_id,record_id),host)
-	var ready:=true
-	for raw_dish in merge_preview.differences:
-		if int(group_merge_choices.get(str(raw_dish),0))<=0: ready=false
-	button(box,"Объединить группы",func():send({"action":"group_merge","groups":group_selected_groups.duplicate(),"choices":group_merge_choices.duplicate(true),"active":group_merge_active.duplicate()}),host and ready)
 
 func _training_scope_types() -> Array:
 	var result: Array=[]
@@ -1008,7 +937,7 @@ func _draft_record_ids() -> Array:
 
 func _ensure_draft() -> void:
 	if not course_editor.is_empty(): return
-	course_editor={"open":true,"records":[],"mode":"balanced","editing":0,"type_id":training_type_filter}
+	course_editor={"open":true,"records":[],"mode":"together","editing":0,"type_id":training_type_filter}
 	course_editor_message=""
 	course_group_order=[]
 
@@ -1034,12 +963,20 @@ func _insert_record_ids(existing: Array,new_ids: Array,index: int) -> Array:
 
 func training_add_selected_to_draft() -> void:
 	if training_library_selection.is_empty(): return
+	var selected_records:=training_library_selection.duplicate()
+	var existing: Dictionary=_editable_schedule_course(training_type_filter)
+	if not existing.is_empty():
+		var ids:=_insert_record_ids(_course_record_ids(existing),selected_records,_course_record_ids(existing).size())
+		_send_course_edit(existing,_assignments_with_records(existing,ids,_training_target_stations()))
+		training_library_selection=[]
+		stamp=""
+		rebuild()
+		return
 	_ensure_draft()
-	course_editor.records=_insert_record_ids(_draft_record_ids(),training_library_selection,_draft_record_ids().size())
+	course_editor.records=selected_records
 	course_editor.type_id=training_type_filter
-	training_queue_selection=[]
-	stamp=""
-	rebuild()
+	training_library_selection=[]
+	training_submit_draft()
 
 func _course_record_ids(course: Dictionary) -> Array:
 	var result: Array=[]
@@ -1081,7 +1018,7 @@ func _assignments_with_records(course: Dictionary,record_ids: Array,new_station_
 	return result
 
 func _send_course_edit(course: Dictionary,assignments: Array) -> void:
-	send({"action":"training_course_edit","course":int(course.id),"assignments":assignments,"mode":"balanced","group_order":[]})
+	send({"action":"training_course_edit","course":int(course.id),"assignments":assignments,"mode":"together","group_order":[]})
 
 func _training_reorder_course(course_id: int,indices: Array,target_index: int) -> void:
 	var course: Dictionary=game.service.training_queue.course_view(course_id)
@@ -1183,8 +1120,7 @@ func _training_drop(data: Variant,target: Dictionary,after: bool) -> void:
 			course_editor.records=_insert_record_ids(_draft_record_ids(),data.get("record_ids",[]),target_index)
 			course_editor.type_id=training_type_filter
 			training_library_selection=[]
-			stamp=""
-			rebuild()
+			training_submit_draft()
 		elif kind=="queue_lessons":
 			var source_id:=int(data.get("course_id",0))
 			var indices: Array=data.get("indices",[]).duplicate()
@@ -1251,7 +1187,7 @@ func _draft_assignments() -> Array:
 func training_submit_draft() -> void:
 	if course_editor.is_empty() or _draft_record_ids().is_empty(): return
 	var assignments:=_draft_assignments()
-	var preview: Dictionary=game.service.training_course_preview(assignments,"balanced",[])
+	var preview: Dictionary=game.service.training_course_preview(assignments,"together",[])
 	if not str(preview.get("error","")).is_empty():
 		course_editor_message=str(preview.error)
 		stamp=""
@@ -1260,7 +1196,7 @@ func training_submit_draft() -> void:
 	var editing:=int(course_editor.get("editing",0))
 	game.hud.notice.text=""
 	if editing>0:
-		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":"balanced","group_order":[]})
+		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":"together","group_order":[]})
 	else:
 		var existing: Dictionary=_editable_schedule_course(training_type_filter)
 		if not existing.is_empty():
@@ -1269,16 +1205,16 @@ func training_submit_draft() -> void:
 		else:
 			var command: String="office-schedule:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
 			course_command_serial+=1
-			send({"action":"training_course_confirm","assignments":assignments,"mode":"balanced","group_order":[],"command":command})
+			send({"action":"training_course_confirm","assignments":assignments,"mode":"together","group_order":[],"command":command})
 	var notice:=str(game.hud.notice.text)
-	if notice in ["Обучение добавлено в расписание.","Расписание обучения обновлено."]:
+	if notice in ["Обучение добавлено в очередь.","Очередь обучения обновлена."]:
 		course_editor={}
 		course_editor_message=""
 		course_group_order=[]
 		training_queue_selection=[]
 		training_library_selection=[]
 	else:
-		course_editor_message=notice if not notice.is_empty() else "Изменение не принято. Проверь актуальное расписание."
+		course_editor_message=notice if not notice.is_empty() else "Изменение не принято. Проверь актуальное очередь."
 	stamp=""
 	rebuild()
 
@@ -1330,7 +1266,7 @@ func _training_library_panel(parent: Node,host: bool) -> void:
 			var subtitle: String="%s · качество %s · %s · фильм %.1f с"%[str(record.get("name","Запись")),str(quality.get("grade","D")),str(effect.get("label","Обычная")),float(record.get("highlight_duration",0.0))]
 			_training_make_drag_row(box,{"zone":"library","record_id":record_id},str(Definition.DISHES.get(dish,dish)),subtitle,{"kind":"masterclass_records","record_ids":[record_id],"count":1},record_id in training_library_selection)
 	if not training_library_selection.is_empty():
-		button(box,"Добавить выбранные →",training_add_selected_to_draft,host)
+		button(box,"Добавить в очередь →",training_add_selected_to_draft,host)
 
 func _training_drop_tail(parent: Node,zone: String,course_id: int,index: int,text_value: String) -> void:
 	var target=TrainingDragRow.new()
@@ -1358,7 +1294,7 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 			var subtitle: String=str(record.get("name","Запись"))+" · фильм %.1f с"%float(record.get("highlight_duration",0.0))
 			_training_make_drag_row(box,{"zone":"draft","course_id":0,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish","")))),subtitle,{"kind":"queue_lessons","course_id":0,"indices":[index],"count":1},key in training_queue_selection,key)
 		_training_drop_tail(box,"draft",0,records.size(),"В конец списка")
-		var preview: Dictionary=service.training_course_preview(_draft_assignments(),"balanced",[])
+		var preview: Dictionary=service.training_course_preview(_draft_assignments(),"together",[])
 		var error:=str(preview.get("error",""))
 		if not error.is_empty():
 			label(box,error,13)
@@ -1375,27 +1311,28 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 					label(box,"%s · %d столов · по %d за раз · освоили %d/%d"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.selected),lesson_batch_size,int(lesson.mastered),int(lesson.selected)],13)
 					for issue in lesson.get("equipment_issues",[]):
 						label(box,"⚠ Стол %d после обучения: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],12)
-			button(box,"Сохранить" if editing>0 else "Добавить в расписание",training_submit_draft,host)
+			button(box,"Сохранить" if editing>0 else "Добавить в очередь",training_submit_draft,host)
 	if not course_editor_message.is_empty(): label(box,course_editor_message,13)
 
 func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) -> void:
 	var service=game.service
 	var course_id:=int(course.id)
 	var course_type:=_course_type_id(course)
-	var course_type_name:=str(Definition.TYPES.get(course_type,{}).get("title",course_type))
 	var can_edit_course: bool=bool(course.get("editable",false)) and course_type==training_type_filter
+	var current_targets:=_training_target_stations()
 	for index in range(course.assignments.size()):
 		var assignment: Dictionary=course.assignments[index]
 		var record_id:=int(assignment.get("record_id",0))
 		var record: Dictionary=service.masterclass_by_id(record_id)
 		var key:=_queue_key(course_id,index)
-		var table_count: int=assignment.get("station_ids",[]).size()
-		var batch_size: int=service.training_queue.balanced_batch_size(table_count)
-		var status_text:=_schedule_entry_status(course,record_id)
-		var subtitle: String="%s · %s · %d столов · по %d за раз · %s"%[str(record.get("name",assignment.get("name","Запись"))),course_type_name,table_count,batch_size,status_text]
-		if course_id==course_focus_id: subtitle="→ "+subtitle
+		var station_ids: Array=assignment.get("station_ids",[]).duplicate()
+		station_ids.sort()
+		var table_text:=", ".join(station_ids.map(func(id):return str(int(id))))
+		var title_text: String="%s, столы %s"%[str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),table_text]
 		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if can_edit_course else {}
-		var row: Variant=_training_make_drag_row(parent,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":can_edit_course,"selectable":can_edit_course},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
+		var row: Variant=_training_make_drag_row(parent,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id,"draggable":can_edit_course,"selectable":can_edit_course},title_text,"",payload,key in training_queue_selection,key)
+		var relevant:=station_ids.any(func(id):return int(id) in current_targets)
+		row.set_context_highlight(relevant)
 		row.drop_enabled=can_edit_course
 	if str(course.get("state",""))=="active":
 		button(parent,"Отменить текущее обучение",func():send({"action":"training_cancel_course","course":course_id}),host)
@@ -1404,66 +1341,33 @@ func _training_schedule_panel(parent: Node,host: bool) -> void:
 	var box:=_section_card(parent,Color("203b3c"))
 	var top:=HBoxContainer.new()
 	box.add_child(top)
-	var heading_label:=label(top,"РАСПИСАНИЕ ОБУЧЕНИЯ",18)
+	var heading_label:=label(top,"ОЧЕРЕДЬ ОБУЧЕНИЯ",18)
 	heading_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	if not training_queue_selection.is_empty(): button(top,"Убрать выбранные",training_remove_queue_selection,host)
-	label(box,"Блюда идут сверху вниз. Каждое блюдо автоматически обучается партиями примерно по 20% выбранных столов.",13)
+	label(box,"Перетащи мастер-класс в очередь. Порядок меняется перетаскиванием прямо здесь.",13)
 	training_queue_rows={}
-	_training_draft_card(box,host)
 	var views: Array=game.service.training_course_views()
-	if views.is_empty():
-		label(box,"Очередь пуста.",14)
+	if views.is_empty(): label(box,"Очередь пуста.",14)
 	else:
-		label(box,"ОЧЕРЕДЬ",14)
 		for course in views: _training_existing_course_card(box,course,host)
-	var suspended_found:=false
-	for group in game.service.table_groups():
-		for item in group.curriculum:
-			var dish:=str(item.get("dish_id",""))
-			for raw_id in group.stations:
-				var station_id:=int(raw_id)
-				if not game.service.training_queue.assignment_suspended(station_id,dish): continue
-				if not suspended_found:
-					label(box,"ПРИОСТАНОВЛЕНО",14)
-					suspended_found=true
-				var desired: Dictionary=game.service.desired_source(str(group.id),dish)
-				var row:=HBoxContainer.new()
-				box.add_child(row)
-				var paused:=label(row,"Стол %d · %s · %s"%[station_id,Definition.DISHES.get(dish,dish),str(desired.get("name","Запись"))],13)
-				paused.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-				button(row,"Продолжить",func():send({"action":"training_resume","station":station_id,"dish":dish}),host)
+	var editable: Dictionary=_editable_schedule_course(training_type_filter)
+	if editable.is_empty():
+		_training_drop_tail(box,"draft",0,0,"Перетащи мастер-класс в очередь")
+	else:
+		_training_drop_tail(box,"course",int(editable.id),editable.get("assignments",[]).size(),"В конец очереди")
 
 func training_workspace_page(host: bool) -> void:
 	var service=game.service
 	var top:=HBoxContainer.new()
 	content.add_child(top)
-	button(top,"← Группы столов",back_to_groups_overview)
+	button(top,"← Столы и группы",back_to_groups_overview)
 	var title:=label(top,"ОБУЧЕНИЕ",23)
 	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
-	var scope_count:=training_scope_stations.size()
-	label(content,("Выбрано производственных столов: %d."%scope_count if not group_selected_stations.is_empty() else "Показаны все производственные столы: %d."%scope_count)+" Расписание меняет только обучение; состав групп остаётся прежним.",14)
-	if training_scope_stations.is_empty():
-		label(content,"Сначала вернись к группам и выбери хотя бы один стол.",17)
+	if training_scope_stations.is_empty() or _training_scope_types().size()!=1:
+		label(content,"Сначала выбери столы одного типа.",17)
 		return
-	var types:=_training_scope_types()
-	if training_type_filter.is_empty() and not types.is_empty(): training_type_filter=str(types[0])
-	if types.size()>1:
-		var type_row:=HFlowContainer.new()
-		content.add_child(type_row)
-		label(type_row,"Тип кухни:",14)
-		for raw_type in types:
-			var type_id:=str(raw_type)
-			button(type_row,("✓ " if type_id==training_type_filter else "")+str(Definition.TYPES.get(type_id,{}).get("title",type_id)),func():set_training_type_filter(type_id),host)
 	var targets:=_training_target_stations()
-	var assigned_workers:=0
-	var worker_capacity:=0
-	for raw_id in targets:
-		var station: Node3D=service.by_id(int(raw_id))
-		if station==null: continue
-		worker_capacity+=station.role_count()
-		assigned_workers+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
-	label(content,"%s · %d столов · работников %d/%d · столы %s"%[str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter)),targets.size(),assigned_workers,worker_capacity,", ".join(targets.map(func(id):return str(id)))],14)
-
+	label(content,"Столы: "+", ".join(targets.map(func(id):return str(id)))+" · один общий заход на каждый мастер-класс.",14)
 	var columns:=BoxContainer.new()
 	columns.vertical = get_viewport().get_visible_rect().size.x < 1100
 	columns.add_theme_constant_override("separation",12)
@@ -1725,20 +1629,11 @@ func _shop_batch(host: bool) -> void:
 		check.disabled=not host or not available
 		var equip_id: String=item
 		check.toggled.connect(func(on):toggle_scale_equipment(equip_id,on))
-	label(content,"3. Добавить в группу",18)
-	button(content,("✓ " if scale_group.is_empty() else "")+"Без группы",func():scale_group="";stamp="";rebuild(),host)
-	for group in service.table_groups():
-		if str(group.get("type_id", ""))!=scale_type: continue
-		var group_id: String=str(group.id)
-		button(content,("✓ " if scale_group==group_id else "")+str(group.name),func():scale_group=group_id;stamp="";rebuild(),host)
 	var unit_price: int=int(game.shop.ITEMS[scale_type].price)
 	for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
 	var total_price: int=unit_price*scale_slots.size()
 	label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d%s"%[scale_slots.size(),unit_price,total_price," · сборщики +0" if send_installers else ""],18)
-	if not scale_group.is_empty():
-		var plan: Dictionary=game.shop.group_training_plan(scale_group,scale_type)
-		label(content,"Учебный план: "+(", ".join(plan.keys().map(func(dish):return Definition.DISHES.get(str(dish),str(dish)))) if not plan.is_empty() else "у группы нет доступных фильмов"),15)
-	button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":scale_group,"installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
+	button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":"","installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
 
 func overview_page(host: bool) -> void:
 	var service = game.service
