@@ -539,26 +539,38 @@ func _build_room_shell(stage: int) -> void:
 	room_shell.name="CafeLayoutShell"
 	add_child(room_shell)
 	layout_stage=stage
-	# Exterior sits safely below the walkable floor so no coplanar surfaces flicker.
+	# Exterior and its collider share one footprint. The exterior top stays below the cafe floor,
+	# so it cannot z-fight with the walkable interior and there is no invisible ground beyond the slab.
 	Props.box(room_shell,Vector3(72.0,0.22,76.0),Vector3(0,-0.22,2.0),Color("56615d"))
-	Props.collision_box(room_shell,Vector3(90.0,0.20,90.0),Vector3(0,-0.18,0))
+	Props.collision_box(room_shell,Vector3(72.0,0.20,76.0),Vector3(0,-0.18,2.0))
 	var cells:=Expansion.hall_cells_for_stage(stage)
-	var floor_colors: Dictionary={1:Color("6c7c73"),2:Color("70827a"),3:Color("667970"),4:Color("748178")}
-	for raw_cell in cells:
-		var cell: Vector2i=raw_cell
-		var center:=Expansion.cell_center(cell)
-		var unlock:=int(cells[cell])
-		Props.box(room_shell,Vector3(1.98,0.09,1.98),Vector3(center.x,-0.05,center.z),floor_colors[unlock])
-		Props.collision_box(room_shell,Vector3(2.0,0.20,2.0),Vector3(center.x,-0.10,center.z))
+	_build_room_floor(room_shell,stage)
 	_build_room_perimeter(room_shell,cells,stage)
 	var entrance_z:=Expansion.entrance_z(stage)
-	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.45),Color("777d7c"))
+	# The apron ends exactly at the facade instead of overlapping the interior floor.
+	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.5),Color("777d7c"))
 	var entrance:=Props.text(room_shell,"ВХОД",Vector3(0,2.75,entrance_z+0.22),28,Color("f3cc85"))
 	entrance.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	var chef_sign:=Props.text(room_shell,"ШЕФ",Vector3(0,3.15,8.5),30,Color("f4cc86"))
 	chef_sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-	var flow:=Props.text(room_shell,"ГЛАВНЫЙ ПРОХОД",Vector3(0,0.025,-4.0 if stage>=4 else 0.0),19,Color("c09b63"))
+	var flow:=Props.text(room_shell,"ГЛАВНЫЙ ПРОХОД",Vector3(0,0.025,Expansion.CHEF_FLOW_POINT.z),19,Color("c09b63"))
 	flow.rotation.x=-PI/2
+
+func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> void:
+	Props.box(parent,Vector3(size.x,0.10,size.y),Vector3(center.x,-0.05,center.y),color)
+	Props.collision_box(parent,Vector3(size.x,0.20,size.y),Vector3(center.x,-0.10,center.y))
+
+func _build_room_floor(parent: Node3D,stage: int) -> void:
+	# Non-overlapping rectangles give one continuous floor surface without tile seams or stacks of
+	# coplanar meshes/colliders. Each expansion only adds strips outside the previous footprint.
+	_floor_rect(parent,Vector2(16.0,18.0),Vector2(0.0,5.0),Color("6c7c73"))
+	if stage>=2:
+		_floor_rect(parent,Vector2(16.0,18.0),Vector2(-16.0,5.0),Color("70827a"))
+		_floor_rect(parent,Vector2(16.0,18.0),Vector2(16.0,5.0),Color("70827a"))
+	if stage>=3:
+		_floor_rect(parent,Vector2(48.0,8.0),Vector2(0.0,-8.0),Color("667970"))
+	if stage>=4:
+		_floor_rect(parent,Vector2(48.0,10.0),Vector2(0.0,-17.0),Color("748178"))
 
 func _build_room_perimeter(parent: Node3D,cells: Dictionary,stage: int) -> void:
 	var final_cells:=Expansion.final_hall_cells()
