@@ -101,7 +101,7 @@ func _route(home_world: Vector3,target_world: Vector3)->Array:
 func _ready_to_leave()->bool:
 	for id in station_ids:
 		var station=service.by_id(int(id))
-		if station==null or station.state!="idle" or station.customer_id>=0 or station.training.active() or station.pending_teacher>0: return false
+		if station==null or station.state!="idle" or station.customer_id>=0 or station.training.active(): return false
 	return true
 
 func _spawn_actors()->void:
