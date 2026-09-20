@@ -674,6 +674,817 @@ func rebuild() -> void:
 	scroll.scroll_vertical = offset
 
 
+
+func _section_card(parent: Node,color := Color("294647")) -> VBoxContainer:
+	var panel_card:=PanelContainer.new()
+	panel_card.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	panel_card.add_theme_stylebox_override("panel",Style.box(color,12,14))
+	parent.add_child(panel_card)
+	var box:=VBoxContainer.new()
+	box.add_theme_constant_override("separation",7)
+	panel_card.add_child(box)
+	return box
+
+func _group_workers(group: Dictionary) -> Dictionary:
+	var assigned:=0
+	var capacity:=0
+	for raw_id in group.get("stations",[]):
+		var station: Node3D=game.service.by_id(int(raw_id))
+		if station==null: continue
+		capacity+=station.role_count()
+		assigned+=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	return {"assigned":assigned,"capacity":capacity}
+
+func _group_equipment_issue_count(group: Dictionary) -> int:
+	var count:=0
+	for raw_id in group.get("stations",[]):
+		var station: Node3D=game.service.by_id(int(raw_id))
+		if station==null: continue
+		for raw_dish in station.recipes.keys():
+			var dish:=str(raw_dish)
+			if station.dish_active(dish) and not station.missing_recipe_equipment(dish).is_empty():
+				count+=1
+	return count
+
+func toggle_group_expanded(group_id: String) -> void:
+	group_expanded[group_id]=not bool(group_expanded.get(group_id,false))
+	stamp=""
+	rebuild()
+
+func set_group_all_selected(group_id: String,on: bool) -> void:
+	var group: Dictionary=game.service.table_group_by_id(group_id)
+	if group.is_empty(): return
+	for raw_id in group.stations:
+		var id:=int(raw_id)
+		if on and id not in group_selected_stations: group_selected_stations.append(id)
+		elif not on: group_selected_stations.erase(id)
+	group_selected_stations.sort()
+	stamp=""
+	rebuild()
+
+func clear_group_selection() -> void:
+	group_selected_stations.clear()
+	stamp=""
+	rebuild()
+
+func _selected_group_types() -> Array:
+	var result: Array=[]
+	for raw_id in group_selected_stations:
+		var station: Node3D=game.service.by_id(int(raw_id))
+		if station!=null and station.type_id not in result: result.append(station.type_id)
+	result.sort()
+	return result
+
+func open_training_workspace() -> void:
+	if group_selected_stations.is_empty(): return
+	training_scope_stations=group_selected_stations.duplicate()
+	var types:=_selected_group_types()
+	training_type_filter=str(types[0]) if not types.is_empty() else ""
+	course_editor={}
+	course_editor_message=""
+	training_library_selection=[]
+	training_queue_selection=[]
+	training_library_anchor=-1
+	training_queue_anchor=-1
+	groups_mode="training"
+	stamp=""
+	rebuild()
+
+func back_to_groups_overview() -> void:
+	groups_mode="overview"
+	training_library_selection=[]
+	training_queue_selection=[]
+	stamp=""
+	rebuild()
+
+func groups_overview_page(host: bool) -> void:
+	var service=game.service
+	label(content,"ГРУППЫ СТОЛОВ",23)
+	label(content,"Выбери группу целиком или отдельные столы. Здесь только состояние производства; обучение открывается отдельным экраном.",15)
+
+	var selection:=_section_card(content,Color("244143"))
+	var selection_row:=HBoxContainer.new()
+	selection.add_child(selection_row)
+	var selected_count:=group_selected_stations.size()
+	var selection_text: String="Ничего не выбрано" if selected_count==0 else "Выбрано столов: %d"%selected_count
+	var selection_label:=label(selection_row,selection_text,17)
+	selection_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	if selected_count>0:
+		var selected_types:=_selected_group_types()
+		var type_names: Array=[]
+		for type_id in selected_types: type_names.append(str(Definition.TYPES.get(str(type_id),{}).get("title",str(type_id))))
+		label(selection,"Типы: "+", ".join(type_names),13)
+		button(selection_row,"Обучение →",open_training_workspace,host)
+		button(selection_row,"Снять выбор",clear_group_selection,host)
+
+	if is_instance_valid(service.staff_training) and service.staff_training.is_active():
+		var training_record: Dictionary=service.masterclass_by_id(service.staff_training.record_id)
+		var live:=_section_card(content,Color("334b43"))
+		label(live,"СЕЙЧАС ИДЁТ ОБУЧЕНИЕ",14)
+		label(live,"%s · %s · %d столов"%[str(training_record.get("name",service.staff_training.record.get("name","Запись"))),service.staff_training.phase_label(),service.staff_training.station_ids.size()],17)
+
+	for group in service.table_groups():
+		var group_id:=str(group.id)
+		var card:=_section_card(content,Color("294647"))
+		var header:=HBoxContainer.new()
+		card.add_child(header)
+		var all_selected: bool=not group.stations.is_empty() and group.stations.all(func(id):return int(id) in group_selected_stations)
+		var selected_here: int=group.stations.filter(func(id):return int(id) in group_selected_stations).size()
+		var pick:=CheckBox.new()
+		pick.button_pressed=all_selected
+		pick.disabled=not host
+		pick.tooltip_text="Выбрать все столы этой группы"
+		pick.toggled.connect(func(on):set_group_all_selected(group_id,on))
+		header.add_child(pick)
+		var expanded:=bool(group_expanded.get(group_id,false))
+		var expand:=Button.new()
+		expand.text="▾" if expanded else "▸"
+		expand.custom_minimum_size=Vector2(38,36)
+		expand.pressed.connect(func():toggle_group_expanded(group_id))
+		header.add_child(expand)
+		var title_box:=VBoxContainer.new()
+		title_box.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		header.add_child(title_box)
+		var workers:=_group_workers(group)
+		var performance: Dictionary=service.group_performance(group)
+		var total_orders: int=int(performance.orders_completed)+int(performance.losses)
+		var pct:=Insights.completion_percent(int(performance.orders_completed),total_orders)
+		label(title_box,"%s"%str(group.name),18)
+		var subtitle: String="%s · %d столов · работники %d/%d · заказы %.0f%%"%[str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size(),int(workers.assigned),int(workers.capacity),pct]
+		label(title_box,subtitle,13)
+		var issue_count:=_group_equipment_issue_count(group)
+		var right_text: String="%d порций · доход %d"%[int(performance.portions_served),int(performance.revenue)]
+		if issue_count>0: right_text+=" · ⚠ %d"%issue_count
+		if selected_here>0 and not all_selected: right_text+=" · выбрано %d/%d"%[selected_here,group.stations.size()]
+		label(header,right_text,13)
+
+		if not expanded: continue
+
+		var active_names: Array=[]
+		for dish in group.active_dishes: active_names.append(str(Definition.DISHES.get(str(dish),str(dish))))
+		label(card,"Активное меню: "+(", ".join(active_names) if not active_names.is_empty() else "пусто"),14)
+
+		label(card,"СТОЛЫ",14)
+		for raw_id in group.stations:
+			var station_id:=int(raw_id)
+			var station: Node3D=service.by_id(station_id)
+			if station==null: continue
+			var station_row:=HBoxContainer.new()
+			card.add_child(station_row)
+			var station_pick:=CheckBox.new()
+			station_pick.button_pressed=station_id in group_selected_stations
+			station_pick.disabled=not host
+			station_pick.toggled.connect(func(on):set_group_station_selected(station_id,on))
+			station_row.add_child(station_pick)
+			var station_stats: Dictionary=service.analytics.stations.get(str(station_id),{})
+			var staff_now: int=station.role_count() if station.staffed<0 else station.staffed
+			var state_text: String="обучение: "+station.group_training_state if not station.group_training_state.is_empty() else "готов"
+			var missing_count:=0
+			for raw_dish in station.recipes.keys():
+				if not station.missing_recipe_equipment(str(raw_dish)).is_empty(): missing_count+=1
+			if missing_count>0: state_text="⚠ нет оснащения для %d блюд"%missing_count
+			var station_label:=label(station_row,"Стол %d · %d/%d работников · %s"%[station_id,staff_now,station.role_count(),state_text],14)
+			station_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+			label(station_row,"%d заказов · %d порций · %d"%[int(station_stats.get("orders_completed",0)),int(station_stats.get("portions_served",0)),int(station_stats.get("revenue",0))],13)
+
+		label(card,"МЕНЮ И СОСТОЯНИЕ ОБУЧЕНИЯ",14)
+		for raw_dish in group.dishes:
+			var dish_id:=str(raw_dish)
+			var dish_row:=HBoxContainer.new()
+			card.add_child(dish_row)
+			var active_toggle:=CheckBox.new()
+			active_toggle.text=str(Definition.DISHES.get(dish_id,dish_id))
+			active_toggle.button_pressed=dish_id in group.active_dishes
+			active_toggle.disabled=not host
+			active_toggle.toggled.connect(func(on):send({"action":"group_active","group":group_id,"dish":dish_id,"enabled":on}))
+			dish_row.add_child(active_toggle)
+			var summary: Dictionary=service.group_dish_summary(group_id,dish_id)
+			var dish_status:=label(dish_row,"%d/%d освоили · %s"%[int(summary.get("mastered",0)),int(summary.get("total",group.stations.size())),str(summary.get("desired","не назначено"))],13)
+			dish_status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+
+		var rename_row:=HBoxContainer.new()
+		card.add_child(rename_row)
+		var group_edit:=LineEdit.new()
+		group_edit.text=str(group.name)
+		group_edit.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+		group_edit.editable=host
+		rename_row.add_child(group_edit)
+		button(rename_row,"Переименовать",func():send({"action":"group_rename","group":group_id,"name":group_edit.text}),host)
+		var selected_ids: Array=group.stations.filter(func(id):return int(id) in group_selected_stations)
+		if not selected_ids.is_empty() and selected_ids.size()<group.stations.size():
+			button(card,"Отделить выбранные столы в новую группу",func():send({"action":"group_split","group":group_id,"stations":selected_ids.duplicate()}),host)
+
+	var manage_text: String="▾ Управление группами" if group_management_open else "▸ Управление группами"
+	button(content,manage_text,func():group_management_open=not group_management_open;stamp="";rebuild(),host)
+	if group_management_open: _group_management_page(host)
+
+func _group_management_page(host: bool) -> void:
+	var service=game.service
+	var box:=_section_card(content,Color("263f40"))
+	label(box,"СТРУКТУРА ГРУПП",18)
+	label(box,"Редкие операции спрятаны здесь, чтобы не мешать ежедневной работе.",13)
+	if not group_selected_stations.is_empty():
+		button(box,"Создать отдельную группу из выбранных столов",func():send({"action":"group_create","stations":group_selected_stations.duplicate()}),host)
+	label(box,"Объединить существующие группы",15)
+	for group in service.table_groups():
+		var group_id:=str(group.id)
+		var check:=CheckBox.new()
+		check.text="%s · %s · %d столов"%[str(group.name),str(Definition.TYPES.get(str(group.type_id),{}).get("title",group.type_id)),group.stations.size()]
+		check.button_pressed=group_id in group_selected_groups
+		check.disabled=not host
+		check.toggled.connect(func(on):set_group_selected(group_id,on))
+		box.add_child(check)
+	if group_selected_groups.size()<2:
+		label(box,"Выбери минимум две группы одного типа кухни.",13)
+		return
+	var merge_preview: Dictionary=service.preview_group_merge(group_selected_groups)
+	if merge_preview.is_empty():
+		label(box,"Эти группы относятся к разным типам кухни.",14)
+		return
+	var type_id:=str(merge_preview.type_id)
+	if not group_merge_active_initialized:
+		group_merge_active_initialized=true
+		for selected_group_id in group_selected_groups:
+			var selected_group: Dictionary=service.table_group_by_id(str(selected_group_id))
+			for dish in selected_group.active_dishes:
+				if dish not in group_merge_active: group_merge_active.append(dish)
+	label(box,"Активное меню объединённой группы",14)
+	for raw_dish in Definition.TYPES[type_id].dishes:
+		var dish_id:=str(raw_dish)
+		var toggle:=CheckBox.new()
+		toggle.text=str(Definition.DISHES.get(dish_id,dish_id))
+		toggle.button_pressed=dish_id in group_merge_active
+		toggle.disabled=not host
+		toggle.toggled.connect(func(on):set_merge_active(dish_id,on))
+		box.add_child(toggle)
+	for raw_dish in merge_preview.differences:
+		var dish_id:=str(raw_dish)
+		label(box,"Для «%s» планы различаются:"%str(Definition.DISHES.get(dish_id,dish_id)),14)
+		for raw_record_id in merge_preview.differences[raw_dish]:
+			var record_id:=int(raw_record_id)
+			if record_id<=0: continue
+			var record: Dictionary=service.masterclass_by_id(record_id)
+			button(box,("✓ " if int(group_merge_choices.get(dish_id,0))==record_id else "")+str(record.get("name","Запись #%d"%record_id)),func():set_merge_choice(dish_id,record_id),host)
+	var ready:=true
+	for raw_dish in merge_preview.differences:
+		if int(group_merge_choices.get(str(raw_dish),0))<=0: ready=false
+	button(box,"Объединить группы",func():send({"action":"group_merge","groups":group_selected_groups.duplicate(),"choices":group_merge_choices.duplicate(true),"active":group_merge_active.duplicate()}),host and ready)
+
+func _training_scope_types() -> Array:
+	var result: Array=[]
+	for raw_id in training_scope_stations:
+		var station: Node3D=game.service.by_id(int(raw_id))
+		if station!=null and station.type_id not in result: result.append(station.type_id)
+	result.sort()
+	return result
+
+func _training_target_stations() -> Array:
+	var result: Array=[]
+	for raw_id in training_scope_stations:
+		var station: Node3D=game.service.by_id(int(raw_id))
+		if station!=null and str(station.type_id)==training_type_filter: result.append(station.station_id)
+	result.sort()
+	return result
+
+func set_training_type_filter(type_id: String) -> void:
+	if training_type_filter==type_id: return
+	training_type_filter=type_id
+	training_library_selection=[]
+	training_queue_selection=[]
+	training_library_anchor=-1
+	training_queue_anchor=-1
+	course_editor={}
+	course_editor_message=""
+	stamp=""
+	rebuild()
+
+func _training_library_ids() -> Array:
+	var result: Array=[]
+	for record in game.service.masterclasses:
+		if bool(record.get("archived",false)): continue
+		if str(record.get("source_type",""))==training_type_filter: result.append(int(record.get("id",0)))
+	return result
+
+func _training_library_click(meta: Dictionary,ctrl: bool,shift: bool) -> void:
+	var record_id:=int(meta.get("record_id",0))
+	var ids:=_training_library_ids()
+	var index:=ids.find(record_id)
+	if index<0: return
+	if shift and training_library_anchor>=0 and training_library_anchor<ids.size():
+		if not ctrl: training_library_selection=[]
+		var a:=mini(training_library_anchor,index)
+		var b:=maxi(training_library_anchor,index)
+		for i in range(a,b+1):
+			if ids[i] not in training_library_selection: training_library_selection.append(ids[i])
+	elif ctrl:
+		if record_id in training_library_selection: training_library_selection.erase(record_id)
+		else: training_library_selection.append(record_id)
+		training_library_anchor=index
+	else:
+		training_library_selection=[record_id]
+		training_library_anchor=index
+	_training_refresh_selection_styles()
+
+func _queue_key(course_id: int,index: int) -> String:
+	return "%d:%d"%[course_id,index]
+
+func _queue_key_course(key: String) -> int:
+	var parts:=key.split(":")
+	return int(parts[0]) if parts.size()>=2 else -999
+
+func _queue_key_index(key: String) -> int:
+	var parts:=key.split(":")
+	return int(parts[1]) if parts.size()>=2 else -1
+
+func _training_queue_click(meta: Dictionary,ctrl: bool,shift: bool) -> void:
+	var course_id:=int(meta.get("course_id",0))
+	var index:=int(meta.get("index",-1))
+	if index<0: return
+	var key:=_queue_key(course_id,index)
+	var current_course: int=_queue_key_course(str(training_queue_selection[0])) if not training_queue_selection.is_empty() else course_id
+	if current_course!=course_id:
+		training_queue_selection=[]
+		training_queue_anchor=-1
+	if shift and training_queue_anchor>=0:
+		if not ctrl: training_queue_selection=[]
+		var a:=mini(training_queue_anchor,index)
+		var b:=maxi(training_queue_anchor,index)
+		for i in range(a,b+1):
+			var range_key:=_queue_key(course_id,i)
+			if range_key not in training_queue_selection: training_queue_selection.append(range_key)
+	elif ctrl:
+		if key in training_queue_selection: training_queue_selection.erase(key)
+		else: training_queue_selection.append(key)
+		training_queue_anchor=index
+	else:
+		training_queue_selection=[key]
+		training_queue_anchor=index
+	_training_refresh_selection_styles()
+
+func _training_refresh_selection_styles() -> void:
+	for raw_id in training_library_rows:
+		var record_id:=int(raw_id)
+		var row: Control=training_library_rows[raw_id]
+		if not is_instance_valid(row): continue
+		var selected:=record_id in training_library_selection
+		row.set_selected(selected)
+		var drag_ids: Array=training_library_selection.duplicate() if selected and not training_library_selection.is_empty() else [record_id]
+		row.drag_payload={"kind":"masterclass_records","record_ids":drag_ids,"count":drag_ids.size()}
+	for raw_key in training_queue_rows:
+		var key:=str(raw_key)
+		var row: Control=training_queue_rows[raw_key]
+		if not is_instance_valid(row): continue
+		var selected:=key in training_queue_selection
+		row.set_selected(selected)
+		var course_id:=_queue_key_course(key)
+		var indices: Array=[]
+		if selected:
+			for selected_key in training_queue_selection:
+				if _queue_key_course(str(selected_key))==course_id: indices.append(_queue_key_index(str(selected_key)))
+		if indices.is_empty(): indices=[_queue_key_index(key)]
+		indices.sort()
+		row.drag_payload={"kind":"queue_lessons","course_id":course_id,"indices":indices,"count":indices.size()}
+
+func _training_make_drag_row(parent: Node,meta: Dictionary,title: String,subtitle: String,payload: Dictionary,selected: bool,queue_key := "") -> Control:
+	var row=TrainingDragRow.new()
+	parent.add_child(row)
+	row.setup(meta,title,subtitle,payload)
+	row.set_selected(selected)
+	row.row_clicked.connect(func(value,ctrl,shift):
+		if str(value.get("zone",""))=="library": _training_library_click(value,ctrl,shift)
+		else: _training_queue_click(value,ctrl,shift))
+	row.row_dropped.connect(func(data,target,after):_training_drop(data,target,after))
+	if str(meta.get("zone",""))=="library": training_library_rows[int(meta.record_id)]=row
+	elif not queue_key.is_empty(): training_queue_rows[queue_key]=row
+	return row
+
+func _draft_record_ids() -> Array:
+	return course_editor.get("records",[]).duplicate() if not course_editor.is_empty() else []
+
+func _ensure_draft() -> void:
+	if not course_editor.is_empty(): return
+	course_editor={"open":true,"records":[],"mode":"together","editing":0,"type_id":training_type_filter}
+	course_editor_message=""
+	course_group_order=[]
+
+func _record_dish(record_id: int) -> String:
+	var record: Dictionary=game.service.masterclass_by_id(record_id)
+	return str(record.get("dish",""))
+
+func _insert_record_ids(existing: Array,new_ids: Array,index: int) -> Array:
+	var result:=existing.duplicate()
+	var clean_new: Array=[]
+	for raw_id in new_ids:
+		var record_id:=int(raw_id)
+		var dish:=_record_dish(record_id)
+		if dish.is_empty(): continue
+		for pos in range(result.size()-1,-1,-1):
+			if _record_dish(int(result[pos]))==dish:
+				if pos<index: index-=1
+				result.remove_at(pos)
+		if record_id not in clean_new: clean_new.append(record_id)
+	index=clampi(index,0,result.size())
+	for offset in range(clean_new.size()): result.insert(index+offset,clean_new[offset])
+	return result
+
+func training_add_selected_to_draft() -> void:
+	if training_library_selection.is_empty(): return
+	_ensure_draft()
+	course_editor.records=_insert_record_ids(_draft_record_ids(),training_library_selection,_draft_record_ids().size())
+	course_editor.type_id=training_type_filter
+	training_queue_selection=[]
+	stamp=""
+	rebuild()
+
+func _course_record_ids(course: Dictionary) -> Array:
+	var result: Array=[]
+	for assignment in course.get("assignments",[]): result.append(int(assignment.get("record_id",0)))
+	return result
+
+func _course_station_ids(course: Dictionary) -> Array:
+	var result: Array=[]
+	for assignment in course.get("assignments",[]):
+		for raw_id in assignment.get("station_ids",[]):
+			var id:=int(raw_id)
+			if id not in result: result.append(id)
+	result.sort()
+	return result
+
+func _assignments_with_records(course: Dictionary,record_ids: Array,new_station_ids: Array=[]) -> Array:
+	var existing_by_id: Dictionary={}
+	for assignment in course.get("assignments",[]): existing_by_id[int(assignment.get("record_id",0))]=assignment.duplicate(true)
+	var default_ids:=new_station_ids.duplicate()
+	if default_ids.is_empty(): default_ids=_course_station_ids(course)
+	var result: Array=[]
+	for raw_id in record_ids:
+		var record_id:=int(raw_id)
+		if existing_by_id.has(record_id): result.append(existing_by_id[record_id].duplicate(true))
+		else: result.append({"record_id":record_id,"station_ids":default_ids.duplicate()})
+	return result
+
+func _send_course_edit(course: Dictionary,assignments: Array) -> void:
+	send({"action":"training_course_edit","course":int(course.id),"assignments":assignments,"mode":str(course.mode),"group_order":course.get("group_order",[]).duplicate()})
+
+func _training_reorder_course(course_id: int,indices: Array,target_index: int) -> void:
+	var course: Dictionary=game.service.training_queue.course_view(course_id)
+	if course.is_empty() or not bool(course.get("editable",false)): return
+	var ids:=_course_record_ids(course)
+	var selected: Array=[]
+	var sorted:=indices.duplicate()
+	sorted.sort()
+	for raw_index in sorted:
+		var index:=int(raw_index)
+		if index>=0 and index<ids.size(): selected.append(ids[index])
+	for i in range(sorted.size()-1,-1,-1):
+		var index:=int(sorted[i])
+		if index>=0 and index<ids.size():
+			if index<target_index: target_index-=1
+			ids.remove_at(index)
+	target_index=clampi(target_index,0,ids.size())
+	for offset in range(selected.size()): ids.insert(target_index+offset,selected[offset])
+	_send_course_edit(course,_assignments_with_records(course,ids))
+	training_queue_selection=[]
+	stamp=""
+
+func _training_insert_library_into_course(course_id: int,record_ids: Array,target_index: int) -> void:
+	var course: Dictionary=game.service.training_queue.course_view(course_id)
+	if course.is_empty() or not bool(course.get("editable",false)): return
+	var ids:=_insert_record_ids(_course_record_ids(course),record_ids,target_index)
+	_send_course_edit(course,_assignments_with_records(course,ids))
+	training_library_selection=[]
+	stamp=""
+
+func _training_move_between_courses(source_id: int,indices: Array,target_id: int,target_index: int) -> void:
+	var source: Dictionary=game.service.training_queue.course_view(source_id)
+	var target: Dictionary=game.service.training_queue.course_view(target_id)
+	if source.is_empty() or target.is_empty() or not bool(source.get("editable",false)) or not bool(target.get("editable",false)): return
+	var source_assignments: Array=source.get("assignments",[]).duplicate(true)
+	var sorted:=indices.duplicate()
+	sorted.sort()
+	var moving_ids: Array=[]
+	for raw_index in sorted:
+		var index:=int(raw_index)
+		if index>=0 and index<source_assignments.size(): moving_ids.append(int(source_assignments[index].get("record_id",0)))
+	for i in range(sorted.size()-1,-1,-1):
+		var index:=int(sorted[i])
+		if index>=0 and index<source_assignments.size(): source_assignments.remove_at(index)
+	var target_ids:=_insert_record_ids(_course_record_ids(target),moving_ids,target_index)
+	if source_assignments.is_empty(): send({"action":"training_cancel_course","course":source_id})
+	else: _send_course_edit(source,source_assignments)
+	_send_course_edit(target,_assignments_with_records(target,target_ids))
+	training_queue_selection=[]
+	stamp=""
+
+func _training_move_course_to_draft(source_id: int,indices: Array,target_index: int) -> void:
+	var source: Dictionary=game.service.training_queue.course_view(source_id)
+	if source.is_empty() or not bool(source.get("editable",false)): return
+	var source_assignments: Array=source.get("assignments",[]).duplicate(true)
+	var sorted:=indices.duplicate()
+	sorted.sort()
+	var moving_ids: Array=[]
+	for raw_index in sorted:
+		var index:=int(raw_index)
+		if index>=0 and index<source_assignments.size(): moving_ids.append(int(source_assignments[index].get("record_id",0)))
+	for i in range(sorted.size()-1,-1,-1):
+		var index:=int(sorted[i])
+		if index>=0 and index<source_assignments.size(): source_assignments.remove_at(index)
+	_ensure_draft()
+	course_editor.records=_insert_record_ids(_draft_record_ids(),moving_ids,target_index)
+	course_editor.type_id=training_type_filter
+	if source_assignments.is_empty(): send({"action":"training_cancel_course","course":source_id})
+	else: _send_course_edit(source,source_assignments)
+	training_queue_selection=[]
+	stamp=""
+	rebuild()
+
+func _training_move_draft_to_course(indices: Array,target_id: int,target_index: int) -> void:
+	var ids:=_draft_record_ids()
+	var sorted:=indices.duplicate()
+	sorted.sort()
+	var moving: Array=[]
+	for raw_index in sorted:
+		var index:=int(raw_index)
+		if index>=0 and index<ids.size(): moving.append(ids[index])
+	for i in range(sorted.size()-1,-1,-1):
+		var index:=int(sorted[i])
+		if index>=0 and index<ids.size(): ids.remove_at(index)
+	course_editor.records=ids
+	_training_insert_library_into_course(target_id,moving,target_index)
+	stamp=""
+	rebuild()
+
+func _training_drop(data: Variant,target: Dictionary,after: bool) -> void:
+	if not data is Dictionary: return
+	var zone:=str(target.get("zone",""))
+	var target_course:=int(target.get("course_id",0))
+	var target_index:=int(target.get("index",0))+(1 if after else 0)
+	var kind:=str(data.get("kind",""))
+	if zone=="draft":
+		if kind=="masterclass_records":
+			_ensure_draft()
+			course_editor.records=_insert_record_ids(_draft_record_ids(),data.get("record_ids",[]),target_index)
+			course_editor.type_id=training_type_filter
+			training_library_selection=[]
+			stamp=""
+			rebuild()
+		elif kind=="queue_lessons":
+			var source_id:=int(data.get("course_id",0))
+			var indices: Array=data.get("indices",[]).duplicate()
+			if source_id==0:
+				var ids:=_draft_record_ids()
+				var selected: Array=[]
+				var sorted:=indices.duplicate(); sorted.sort()
+				for raw_index in sorted:
+					var index:=int(raw_index)
+					if index>=0 and index<ids.size(): selected.append(ids[index])
+				for i in range(sorted.size()-1,-1,-1):
+					var index:=int(sorted[i])
+					if index>=0 and index<ids.size():
+						if index<target_index: target_index-=1
+						ids.remove_at(index)
+				target_index=clampi(target_index,0,ids.size())
+				for offset in range(selected.size()): ids.insert(target_index+offset,selected[offset])
+				course_editor.records=ids
+				training_queue_selection=[]
+				stamp=""
+				rebuild()
+			else: _training_move_course_to_draft(source_id,indices,target_index)
+	elif zone=="course":
+		if kind=="masterclass_records": _training_insert_library_into_course(target_course,data.get("record_ids",[]),target_index)
+		elif kind=="queue_lessons":
+			var source_id:=int(data.get("course_id",0))
+			var indices: Array=data.get("indices",[]).duplicate()
+			if source_id==target_course: _training_reorder_course(target_course,indices,target_index)
+			elif source_id==0: _training_move_draft_to_course(indices,target_course,target_index)
+			else: _training_move_between_courses(source_id,indices,target_course,target_index)
+
+func training_remove_queue_selection() -> void:
+	if training_queue_selection.is_empty(): return
+	var course_id:=_queue_key_course(str(training_queue_selection[0]))
+	var indices: Array=[]
+	for key in training_queue_selection:
+		if _queue_key_course(str(key))==course_id: indices.append(_queue_key_index(str(key)))
+	indices.sort()
+	if course_id==0:
+		var ids:=_draft_record_ids()
+		for i in range(indices.size()-1,-1,-1):
+			var index:=int(indices[i])
+			if index>=0 and index<ids.size(): ids.remove_at(index)
+		course_editor.records=ids
+	else:
+		var course: Dictionary=game.service.training_queue.course_view(course_id)
+		if not course.is_empty() and bool(course.get("editable",false)):
+			var assignments: Array=course.get("assignments",[]).duplicate(true)
+			for i in range(indices.size()-1,-1,-1):
+				var index:=int(indices[i])
+				if index>=0 and index<assignments.size(): assignments.remove_at(index)
+			if assignments.is_empty(): send({"action":"training_cancel_course","course":course_id})
+			else: _send_course_edit(course,assignments)
+	training_queue_selection=[]
+	stamp=""
+	rebuild()
+
+func _draft_assignments() -> Array:
+	var targets:=_training_target_stations()
+	var result: Array=[]
+	for raw_record_id in _draft_record_ids(): result.append({"record_id":int(raw_record_id),"station_ids":targets.duplicate()})
+	return result
+
+func training_submit_draft() -> void:
+	if course_editor.is_empty() or _draft_record_ids().is_empty(): return
+	var assignments:=_draft_assignments()
+	var preview: Dictionary=game.service.training_course_preview(assignments,str(course_editor.get("mode","together")),course_group_order)
+	if not str(preview.get("error","")).is_empty():
+		course_editor_message=str(preview.error)
+		stamp=""
+		rebuild()
+		return
+	var editing:=int(course_editor.get("editing",0))
+	if editing>0:
+		send({"action":"training_course_edit","course":editing,"assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate()})
+	else:
+		var command: String="office-course:%d:%d:%d"%[game.service.progress.day,int(game.service.training_queue.next_course_id),course_command_serial]
+		course_command_serial+=1
+		send({"action":"training_course_confirm","assignments":assignments,"mode":str(course_editor.get("mode","together")),"group_order":course_group_order.duplicate(),"command":command})
+	course_editor={}
+	course_editor_message=""
+	course_group_order=[]
+	training_queue_selection=[]
+	stamp=""
+	rebuild()
+
+func toggle_training_course_expanded(course_id: int) -> void:
+	training_course_expanded[course_id]=not bool(training_course_expanded.get(course_id,false))
+	stamp=""
+	rebuild()
+
+func toggle_training_preview() -> void:
+	training_preview_expanded=not training_preview_expanded
+	stamp=""
+	rebuild()
+
+func _training_library_panel(parent: Node,host: bool) -> void:
+	var service=game.service
+	var box:=_section_card(parent,Color("253f41"))
+	label(box,"МАСТЕР-КЛАССЫ",18)
+	label(box,"Ctrl — добавить к выбору · Shift — диапазон · перетащи выбранные записи вправо.",13)
+	training_library_rows={}
+	var ids:=_training_library_ids()
+	if ids.is_empty():
+		label(box,"Для этого типа кухни пока нет сохранённых мастер-классов.",14)
+	else:
+		for raw_id in ids:
+			var record_id:=int(raw_id)
+			var record: Dictionary=service.masterclass_by_id(record_id)
+			var dish:=str(record.get("dish",""))
+			var quality: Dictionary=record.get("quality",{})
+			var effect: Dictionary=record.get("effectiveness",{})
+			var subtitle: String="%s · качество %s · %s · фильм %.1f с"%[str(record.get("name","Запись")),str(quality.get("grade","D")),str(effect.get("label","Обычная")),float(record.get("highlight_duration",0.0))]
+			_training_make_drag_row(box,{"zone":"library","record_id":record_id},str(Definition.DISHES.get(dish,dish)),subtitle,{"kind":"masterclass_records","record_ids":[record_id],"count":1},record_id in training_library_selection)
+	if not training_library_selection.is_empty():
+		button(box,"Добавить выбранные в новый курс →",training_add_selected_to_draft,host)
+
+func _training_drop_tail(parent: Node,zone: String,course_id: int,index: int,text_value: String) -> void:
+	var target=TrainingDragRow.new()
+	parent.add_child(target)
+	target.setup({"zone":zone,"course_id":course_id,"index":index},text_value,"Перетащи сюда")
+	target.drag_payload={}
+	target.row_dropped.connect(func(data,meta,after):_training_drop(data,meta,after))
+
+func _training_draft_card(parent: Node,host: bool) -> void:
+	var service=game.service
+	var box:=_section_card(parent,Color("30494a"))
+	var records:=_draft_record_ids()
+	var editing:=int(course_editor.get("editing",0)) if not course_editor.is_empty() else 0
+	label(box,"РЕДАКТИРОВАНИЕ КУРСА #%d"%editing if editing>0 else "НОВЫЙ КУРС",17)
+	var targets:=_training_target_stations()
+	label(box,"%d столов · %s"%[targets.size(),str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter))],13)
+	if records.is_empty():
+		_training_drop_tail(box,"draft",0,0,"Перетащи сюда одно или несколько блюд")
+	else:
+		for index in range(records.size()):
+			var record_id:=int(records[index])
+			var record: Dictionary=service.masterclass_by_id(record_id)
+			var key:=_queue_key(0,index)
+			var subtitle: String=str(record.get("name","Запись"))+" · фильм %.1f с"%float(record.get("highlight_duration",0.0))
+			_training_make_drag_row(box,{"zone":"draft","course_id":0,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(record.get("dish","")),str(record.get("dish","")))),subtitle,{"kind":"queue_lessons","course_id":0,"indices":[index],"count":1},key in training_queue_selection,key)
+		_training_drop_tail(box,"draft",0,records.size(),"В конец курса")
+		var mode_row:=HBoxContainer.new()
+		box.add_child(mode_row)
+		label(mode_row,"Запуск:",13)
+		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="together" else "")+"Вместе",func():course_editor_set_mode("together"),host)
+		button(mode_row,("✓ " if str(course_editor.get("mode","together"))=="by_groups" else "")+"По группам",func():course_editor_set_mode("by_groups"),host)
+		var preview:=service.training_course_preview(_draft_assignments(),str(course_editor.get("mode","together")),course_group_order)
+		var error:=str(preview.get("error",""))
+		if not error.is_empty():
+			label(box,error,13)
+		else:
+			var warning_count:=0
+			for lesson in preview.lessons: warning_count+=lesson.get("equipment_issues",[]).size()
+			var summary: String="%d сотрудников · фильмы %.1f с · одновременно уйдёт до %d"%[int(preview.employees),float(preview.film_total),int(preview.simultaneous_out)]
+			if warning_count>0: summary+=" · ⚠ оснащение: %d"%warning_count
+			label(box,summary,13)
+			button(box,"▾ Подробности" if training_preview_expanded else "▸ Подробности",toggle_training_preview)
+			if training_preview_expanded:
+				for lesson in preview.lessons:
+					label(box,"%s · освоили %d/%d · %.1f с"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.mastered),int(lesson.selected),float(lesson.film)],13)
+					for issue in lesson.get("equipment_issues",[]):
+						label(box,"⚠ Стол %d после обучения: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],12)
+			button(box,"Сохранить изменения" if editing>0 else "Поставить в очередь",training_submit_draft,host)
+	if not course_editor_message.is_empty(): label(box,course_editor_message,13)
+
+func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) -> void:
+	var service=game.service
+	var course_id:=int(course.id)
+	var box:=_section_card(parent,Color("294647"))
+	var header:=HBoxContainer.new()
+	box.add_child(header)
+	var expanded:=bool(training_course_expanded.get(course_id,course_id==course_focus_id or str(course.state) in ["gathering","watching","returning"]))
+	var expand:=Button.new()
+	expand.text="▾" if expanded else "▸"
+	expand.custom_minimum_size=Vector2(38,36)
+	expand.pressed.connect(func():toggle_training_course_expanded(course_id))
+	header.add_child(expand)
+	var mode_label: String="вместе" if str(course.mode)=="together" else "по группам"
+	var station_ids:=_course_station_ids(course)
+	var title:=label(header,"Курс #%d · %d уроков · %d столов"%[course_id,course.assignments.size(),station_ids.size()],16)
+	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	label(header,"%s · %s"%[mode_label,str(course.state)],13)
+	if not expanded: return
+	for index in range(course.assignments.size()):
+		var assignment: Dictionary=course.assignments[index]
+		var record_id:=int(assignment.get("record_id",0))
+		var record: Dictionary=service.masterclass_by_id(record_id)
+		var key:=_queue_key(course_id,index)
+		var subtitle: String=str(record.get("name",assignment.get("name","Запись")))+" · столы "+", ".join(assignment.get("station_ids",[]).map(func(id):return str(id)))
+		var payload: Dictionary={"kind":"queue_lessons","course_id":course_id,"indices":[index],"count":1} if bool(course.editable) else {}
+		var row:=_training_make_drag_row(box,{"zone":"course","course_id":course_id,"index":index,"record_id":record_id},str(Definition.DISHES.get(str(assignment.get("dish","")),str(assignment.get("dish","")))),subtitle,payload,key in training_queue_selection,key)
+		row.drop_enabled=bool(course.editable)
+	if bool(course.editable):
+		_training_drop_tail(box,"course",course_id,course.assignments.size(),"Добавить в конец курса")
+		var action_row:=HBoxContainer.new()
+		box.add_child(action_row)
+		button(action_row,"Настройки курса",func():course_editor_open(0,course_id),host)
+		button(action_row,"Отменить курс",func():send({"action":"training_cancel_course","course":course_id}),host)
+	for batch in course.batches:
+		if str(batch.get("blocked_reason","")).is_empty(): continue
+		label(box,"⚠ Ждёт: "+str(batch.blocked_reason),13)
+
+func _training_schedule_panel(parent: Node,host: bool) -> void:
+	var box:=_section_card(parent,Color("203b3c"))
+	var top:=HBoxContainer.new()
+	box.add_child(top)
+	var heading_label:=label(top,"РАСПИСАНИЕ",18)
+	heading_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	if not training_queue_selection.is_empty(): button(top,"Убрать выбранные",training_remove_queue_selection,host)
+	training_queue_rows={}
+	_training_draft_card(box,host)
+	var views:=game.service.training_course_views()
+	if views.is_empty(): label(box,"Очередь пуста.",14)
+	else:
+		label(box,"ТЕКУЩАЯ ОЧЕРЕДЬ",14)
+		for course in views: _training_existing_course_card(box,course,host)
+
+func training_workspace_page(host: bool) -> void:
+	var service=game.service
+	var top:=HBoxContainer.new()
+	content.add_child(top)
+	button(top,"← Группы столов",back_to_groups_overview)
+	var title:=label(top,"ОБУЧЕНИЕ",23)
+	title.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	var scope_count:=training_scope_stations.size()
+	label(content,"Выбрано производственных столов: %d. Расписание меняет только обучение; состав групп остаётся прежним."%scope_count,14)
+	if training_scope_stations.is_empty():
+		label(content,"Сначала вернись к группам и выбери хотя бы один стол.",17)
+		return
+	var types:=_training_scope_types()
+	if training_type_filter.is_empty() and not types.is_empty(): training_type_filter=str(types[0])
+	if types.size()>1:
+		var type_row:=HBoxContainer.new()
+		content.add_child(type_row)
+		label(type_row,"Тип кухни:",14)
+		for raw_type in types:
+			var type_id:=str(raw_type)
+			button(type_row,("✓ " if type_id==training_type_filter else "")+str(Definition.TYPES.get(type_id,{}).get("title",type_id)),func():set_training_type_filter(type_id),host)
+	var targets:=_training_target_stations()
+	label(content,"%s · столы %s"%[str(Definition.TYPES.get(training_type_filter,{}).get("title",training_type_filter)),", ".join(targets.map(func(id):return str(id)))],14)
+
+	var columns:=HBoxContainer.new()
+	columns.add_theme_constant_override("separation",12)
+	columns.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	var left:=VBoxContainer.new()
+	left.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	left.size_flags_stretch_ratio=0.42
+	columns.add_child(left)
+	var right:=VBoxContainer.new()
+	right.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	right.size_flags_stretch_ratio=0.58
+	columns.add_child(right)
+	_training_library_panel(left,host)
+	_training_schedule_panel(right,host)
+	_training_refresh_selection_styles()
+
 func course_editor_page(host: bool) -> void:
 	var service=game.service
 	label(content,"ЕДИНЫЙ РЕДАКТОР КУРСА",20)
