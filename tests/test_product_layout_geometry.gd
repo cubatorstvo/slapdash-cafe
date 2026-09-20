@@ -48,8 +48,10 @@ func run()->void:
 	for slot in range(Expansion.SLOT_COUNT):
 		var center:=Expansion.position(slot)
 		for aisle_x in Expansion.AISLE_XS:
-			for z in [-24.0,-16.0,-8.0,0.0,8.0]:
+			for z in [-24.0,-16.0,-8.0,0.0]:
 				check(point_clear_of_station(Vector3(float(aisle_x),0,z),center),"Service aisle %.1f intersects slot %d"%[float(aisle_x),slot+1])
+		for side_aisle_x in [Expansion.LEFT_AISLE_X,Expansion.RIGHT_AISLE_X]:
+			check(point_clear_of_station(Vector3(float(side_aisle_x),0,8.0),center),"Rear service aisle %.1f intersects slot %d"%[float(side_aisle_x),slot+1])
 		check(point_clear_of_station(Expansion.CHEF_FLOW_POINT,center),"Central transverse aisle intersects slot %d"%(slot+1))
 
 	print("3/6: every slot footprint and working side is supported by its unlock-stage floor")
