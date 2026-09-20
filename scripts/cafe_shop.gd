@@ -55,8 +55,10 @@ func setup(owner_game: Node3D) -> void:
 	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
 	Props.box(computer,Vector3(0.95,0.65,0.2),Vector3(0,1.3,-0.15),Color("d8c9a3"))
 	Props.box(computer,Vector3(0.82,0.51,0.025),Vector3(0,1.3,-0.035),Color("213b40"))
+	Props.box(computer,Vector3(0.10,0.20,0.10),Vector3(0,0.99,-0.15),Color("526d65"))
+	Props.box(computer,Vector3(0.44,0.045,0.28),Vector3(0,0.90,-0.15),Color("526d65"))
 	Props.text(computer,"ТЯП-ЛЯП МАРКЕТ\n[E] Компьютер",Vector3(0,1.33,-0.01),18,Color("d9c18c"))
-	Props.box(computer,Vector3(0.75,0.035,0.22),Vector3(0,0.945,0.22),Color("d7cfae"))
+	Props.box(computer,Vector3(0.75,0.035,0.22),Vector3(0,0.94,0.22),Color("d7cfae"))
 	game.development.board.hide()
 	for i in range(3):
 		var at := lab_position(i)
