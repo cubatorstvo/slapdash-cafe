@@ -2,6 +2,7 @@ extends RefCounted
 ## Shared metadata and persistence helpers for chef master-classes.
 const Definition=preload("res://scripts/station_definition.gd")
 const Highlights=preload("res://scripts/masterclass_highlights.gd")
+const TRAINING_WATCH_SECONDS:=Highlights.TRAINING_WATCH_SECONDS
 
 static func effectiveness(report: Dictionary) -> Dictionary:
 	var tricks: Array=report.get("style_tricks",[]).duplicate()
