@@ -104,14 +104,19 @@ static func aisle_x(point_x: float)->float:
 static func aisle_gate(point: Vector3)->Vector3:
 	return Vector3(aisle_x(point.x),0.0,point.z)
 
+static func transfer_gate(point: Vector3)->Vector3:
+	return Vector3(aisle_x(point.x),0.0,CHEF_FLOW_POINT.z)
+
 static func zone_gate(point: Vector3)->Vector3:
 	return aisle_gate(point)
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
 	var result: Array=[customer_spawn(stage)]
 	if Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
+	var transfer:=transfer_gate(target)
+	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(transfer)
 	var gate:=aisle_gate(target)
-	if gate.distance_to(CHEF_FLOW_POINT)>0.2: result.append(gate)
+	if gate.distance_to(transfer)>0.2: result.append(gate)
 	result.append(target)
 	return result
 
@@ -119,7 +124,9 @@ static func route_to_exit(start: Vector3,stage: int)->Array:
 	var result: Array=[start]
 	var gate:=aisle_gate(start)
 	if gate.distance_to(start)>0.2: result.append(gate)
-	if gate.distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
+	var transfer:=transfer_gate(start)
+	if transfer.distance_to(gate)>0.2: result.append(transfer)
+	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
 	result.append(customer_exit(stage))
 	return result
 
@@ -137,9 +144,13 @@ static func cafe_route(start: Vector3,target: Vector3,_stage: int,via_chef := tr
 	var result: Array=[]
 	var start_gate:=aisle_gate(start)
 	if start.distance_to(start_gate)>0.2: result.append(start_gate)
+	var start_transfer:=transfer_gate(start)
+	if start_transfer.distance_to(start_gate)>0.2: result.append(start_transfer)
 	if via_chef and (result.is_empty() or Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2): result.append(CHEF_FLOW_POINT)
+	var target_transfer:=transfer_gate(target)
+	if result.is_empty() or Vector3(result.back()).distance_to(target_transfer)>0.2: result.append(target_transfer)
 	var target_gate:=aisle_gate(target)
-	if target_gate.distance_to(CHEF_FLOW_POINT)>0.2: result.append(target_gate)
+	if target_gate.distance_to(target_transfer)>0.2: result.append(target_gate)
 	result.append(target)
 	return result
 
