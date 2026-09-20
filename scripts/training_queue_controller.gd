@@ -621,7 +621,7 @@ func _batch_block_reason(batch: Dictionary)->String:
 			var station=service.by_id(int(station_id))
 			if station==null: return "Стол %d больше не существует"%int(station_id)
 			if station.staffed>=0 and station.staffed<station.role_count(): return "Стол %d: нужны сотрудники"%int(station_id)
-			if station.training.active() or station.pending_teacher>0: return "Стол %d занят другим обучением"%int(station_id)
+			if station.training.active(): return "Стол %d занят другим обучением"%int(station_id)
 			if not station.group_training_state.is_empty(): return "Стол %d занят другой учебной партией"%int(station_id)
 			if not station.ready_crew(): return "Стол %d: сотрудник занят другой активностью"%int(station_id)
 			if not _record_valid_for_station(record,station): return "Стол %d несовместим с уроком"%int(station_id)
