@@ -23,14 +23,20 @@ jobs:
       - name: Independent masterclass regression
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_masterclass_independence.gd
       - name: Training queue regression
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_training_queue_core.gd
       - name: Stage 8 onboarding
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_onboarding.gd
       - name: Stage 8 integration
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_integration.gd
       - name: Stage 8 scale
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_stage8_scale.gd
       - name: Cafe insights
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_insights.gd
       - name: Cafe journey
+        if: always()
         run: timeout 90s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script tests/test_cafe_journey.gd
