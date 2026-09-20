@@ -67,8 +67,13 @@ func run()->void:
 		var front:=Expansion.entrance_z(stage)
 		await shot("stage_%d_overview"%stage,Vector3(31,35,front-16),Vector3(0,0.7,7.5),55.0)
 		await shot("stage_%d_player_flow"%stage,Vector3(0,2.0,front+1.2),Vector3(0,1.0,7.0),74.0)
-		await shot("stage_%d_lab_room"%stage,Vector3(-6.8,2.65,29.2),Vector3(-6.2,1.0,17.3),69.0)
+		var p=game.service.progress
+		var lab_left: float=LabLayout.left(p.lab_tier)
+		var lab_back: float=LabLayout.back(p.lab_tier)
+		await shot("stage_%d_lab_room"%stage,Vector3((lab_left+LabLayout.RIGHT)*0.5,2.65,lab_back-0.9),Vector3(-4.0,1.0,LabLayout.FRONT+2.2),69.0)
 		if stage>=2:
-			await shot("stage_%d_lounge_room"%stage,Vector3(minf(7.4,LoungeProgress.GOODS.size()+2.0),2.65,29.2),Vector3(5.0,1.0,17.3),69.0)
+			var lounge_right: float=LoungeLayout.right_x(p.lounge_tier)
+			var lounge_back: float=LoungeLayout.back_z(p.lounge_tier)
+			await shot("stage_%d_lounge_room"%stage,Vector3(lounge_right-0.9,2.65,lounge_back-1.2),Vector3(maxf(LoungeLayout.LEFT_X+1.2,lounge_right*0.45),1.0,LoungeLayout.FRONT_Z+2.4),69.0)
 	game._shutdown_tree(game); game.free()
 	quit()
