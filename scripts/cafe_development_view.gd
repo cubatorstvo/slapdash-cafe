@@ -17,19 +17,23 @@ func build(root_game: Node3D) -> void:
 	board = Node3D.new()
 	add_child(board)
 	board.position = Vector3(-1.8, 0, 6.8)
-	Props.solid_box(board, Vector3(1.6, 1.6, 0.12), Vector3(0, 1.2, 0), Color("b5875c"))
+	# Legacy board is visual-only. The market computer owns the actual interaction now; keeping a
+	# hidden StaticBody here used to leave an invisible obstacle beside the Chef station.
+	Props.box(board, Vector3(1.6, 1.6, 0.12), Vector3(0, 1.2, 0), Color("b5875c"))
 	Props.box(board, Vector3(1.42, 1.42, 0.03), Vector3(0, 1.2, 0.08), Color("213b3c"))
 	var title := Props.text(board, "МОЁ КАФЕ\n[E] Управление", Vector3(0, 1.55, 0.12), 26, Color("efcf91"))
 	title.pixel_size = 0.007
 	star_label = Props.text(board, "☆ ☆ ☆ ☆ ☆", Vector3(0, 0.95, 0.12), 30, Color("efcf91"))
 	star_label.pixel_size = 0.007
-	Props.solid_box(board, Vector3(0.9, 0.12, 0.7), Vector3(0, 0.08, 0), Color("775e43"))
+	Props.box(board, Vector3(0.9, 0.12, 0.7), Vector3(0, 0.08, 0), Color("775e43"))
 	for i in range(6):
 		var marker := Node3D.new()
 		add_child(marker)
 		marker.position = game.service.slot_position(i)
 		marker.rotation.y=Expansion.rotation_y(i)
-		Props.box(marker, Vector3(5.5, 0.015, 3.6), Vector3(0, 0.015, 0), Color("61716a"))
+		var pad:=Props.box(marker, Vector3(6.4, 0.012, 5.5), Vector3(0, 0.012, 0), Color("61716a"))
+		pad.material_override.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+		pad.material_override.albedo_color.a=0.28
 		var label := Props.text(marker, "", Vector3(0, 1.3, 0), 27, Color("e7c591"))
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		label.pixel_size = 0.005
@@ -46,8 +50,9 @@ func build(root_game: Node3D) -> void:
 	var sign := Node3D.new()
 	add_child(sign)
 	decor.sign = sign
-	Props.box(sign, Vector3(3.2, 1.0, 0.12), Vector3(-9.2, 2.8, -7.35), Color("d4a268"))
-	Props.text(sign, "МЫ ПОЧТИ УМЕЕМ", Vector3(-9.2, 2.85, -7.25), 33, Color("243f40"))
+	# Wall decor belongs on the permanent rear wall, clear of every production footprint.
+	Props.box(sign, Vector3(3.2, 1.0, 0.12), Vector3(1.5, 2.8, 13.84), Color("d4a268"))
+	Props.text(sign, "МЫ ПОЧТИ УМЕЕМ", Vector3(1.5, 2.85, 13.77), 33, Color("243f40"))
 	var lights := Node3D.new()
 	add_child(lights)
 	decor.lights = lights
@@ -59,10 +64,10 @@ func build(root_game: Node3D) -> void:
 	var plants := Node3D.new()
 	add_child(plants)
 	decor.plants = plants
-	for x in [-7.5, 8.0, 13.0]:
-		Props.cylinder(plants, 0.38, 0.55, Vector3(x, 0.275, 8.8), Color("cd9167"), 0.45)
+	for point in [Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(6.8,-2.7)]:
+		Props.cylinder(plants, 0.38, 0.55, Vector3(point.x, 0.275, point.y), Color("cd9167"), 0.45)
 		for i in range(4):
-			var leaf := Props.ball(plants, 0.3, Vector3(x + sin(i*1.7)*0.3, 0.95+i*0.20, 8.8), Color("84ad78"))
+			var leaf := Props.ball(plants, 0.3, Vector3(point.x + sin(i*1.7)*0.3, 0.95+i*0.20, point.y), Color("84ad78"))
 			leaf.scale = Vector3(0.7, 1.8, 0.65)
 	build_night()
 	refresh()
