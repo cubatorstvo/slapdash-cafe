@@ -19,14 +19,14 @@ func repeated(value: Dictionary,count: int)->Array:
 	for i in range(count): out.append(value.duplicate(true))
 	return out
 
-func record_for(station: Node3D,id: int,dish: String,name: String)->Dictionary:
+func record_for(station: Node3D,id: int,dish: String,name: String,frames_count:=120)->Dictionary:
 	station.model.reset(dish)
-	var frames:=repeated(station.model.snapshot(),120)
-	return Library.make_record(id,dish,station.type_id,[{"group":1,"frames":frames}],2.0,station.model.quality(),name)
+	var frames:=repeated(station.model.snapshot(),frames_count)
+	return Library.make_record(id,dish,station.type_id,[{"group":1,"frames":frames}],float(frames_count)/60.0,station.model.quality(),name)
 
 func prepare(station: Node3D)->void:
-	station.staffed=1
-	station.equipment=["jug","cup","plates","pan","sauce","rag"]
+	station.staffed=station.role_count()
+	station.equipment=["jug","cup","plates","pan","sauce","rag","meat_kit","pasta_kit","grill_kit","assembly_kit","fire_kit","stir_kit","salt_kit"]
 	station.apply_equipment()
 
 func make_game():
@@ -42,8 +42,8 @@ func make_game():
 	game.player.global_position=game.shop.computer.global_position
 	return game
 
-func add_counter(service: Node3D,slot: int)->Node3D:
-	var station=service.add_station("counter",slot,false)
+func add_station(service: Node3D,type_id: String,slot: int)->Node3D:
+	var station=service.add_station(type_id,slot,false)
 	prepare(station)
 	return station
 
@@ -57,18 +57,11 @@ func find_button(node: Node,prefix: String)->Button:
 func press(office: CanvasLayer,prefix: String)->bool:
 	office.rebuild()
 	var target:=find_button(office.content,prefix)
-	if target==null:
-		printerr("Missing UI button: ",prefix)
+	if target==null or target.disabled:
+		printerr("Missing or disabled UI button: ",prefix)
 		return false
 	target.emit_signal("pressed")
 	return true
-
-func run_until(service: Node3D,predicate: Callable,seconds := 90.0)->bool:
-	for i in range(ceili(seconds/0.1)):
-		service.advance(0.1)
-		await process_frame
-		if predicate.call(): return true
-	return false
 
 func dispose(game)->void:
 	game.office.close()
@@ -79,199 +72,91 @@ func _initialize()->void:
 	run.call_deferred()
 
 func run()->void:
-	print("UI T04: compact groups feed one flat training schedule")
 	var game=await make_game()
 	var service=game.service
-	var a=add_counter(service,1)
-	var b=add_counter(service,2)
+	var a=add_station(service,"counter",1)
+	var b=add_station(service,"counter",2)
+	var kitchen=add_station(service,"kitchen",3)
 	var wine=record_for(a,2101,"wine","UI · напиток")
 	var potato=record_for(a,2102,"potato","UI · картошка")
-	var sausage=record_for(a,2103,"sausage","UI · сосиска")
-	service.masterclasses=[wine,potato,sausage]
-	check(service.create_table_group([2,3],"UI линия").is_empty(),"UI T04 explicit group exists")
+	service.masterclasses=[wine,potato]
+
+	print("UI T01: tables never auto-group and actions explain disabled state")
+	check(service.table_groups().is_empty(),"New production tables stay ungrouped")
 	game.office.open("groups")
-	var overview_text: String=tree_text(game.office.content)
-	check("UI линия" in overview_text and "Стол 2 ·" not in overview_text and "Стол 3 ·" not in overview_text,"UI T04 groups start collapsed and show only aggregate rows")
-	var group_id_overview: String=service.group_id_for_station(2)
-	game.office.toggle_group_expanded(group_id_overview)
-	overview_text=tree_text(game.office.content)
-	check("Стол 2 ·" in overview_text and "Стол 3 ·" in overview_text,"UI T04 expanding a group reveals per-table details")
-	game.office.toggle_group_expanded(group_id_overview)
+	var overview:=tree_text(game.office.content)
+	check("ОТДЕЛЬНЫЕ СТОЛЫ" in overview and "Стол 2" in overview and "Стол 3" in overview,"Ungrouped tables are visible in the list")
+	game.office.select_group_stations([2])
+	game.office.rebuild()
+	var ungroup_button:=find_button(game.office.content,"Разгруппировать")
+	check(ungroup_button!=null and ungroup_button.disabled and "нет группы" in ungroup_button.tooltip_text.to_lower(),"Ungroup button explains that only elements are selected")
+	game.office.select_group_stations([2,4])
+	game.office.rebuild()
+	var train_button:=find_button(game.office.content,"Обучение")
+	var group_button:=find_button(game.office.content,"Сгруппировать")
+	check(train_button!=null and train_button.disabled and "одного типа" in train_button.tooltip_text.to_lower(),"Mixed table types disable training with a reason")
+	check(group_button!=null and group_button.disabled and "одного типа" in group_button.tooltip_text.to_lower(),"Mixed table types disable grouping with a reason")
+
+	print("UI T02: group and dissolve are the only structural operations")
 	game.office.select_group_stations([2,3])
-	check(press(game.office,"Обучение"),"UI T04 opens the separate training workspace")
-	var workspace_text:=tree_text(game.office.content)
-	check("МАСТЕР-КЛАССЫ" in workspace_text and "РАСПИСАНИЕ ОБУЧЕНИЯ" in workspace_text,"UI T04 workspace separates library from schedule")
-	check("Вместе" not in workspace_text and "По группам" not in workspace_text and "Курс" not in workspace_text,"UI T04 exposes no schedule or launch-mode settings")
+	check(press(game.office,"Сгруппировать"),"Two same-type tables can be grouped")
+	await process_frame
+	var groups:=service.table_groups()
+	check(groups.size()==1 and groups[0].stations==[2,3],"Manual grouping creates one explicit group")
+	var group_id:=str(groups[0].id)
+	game.office.set_group_all_selected(group_id,true)
+	game.office.rebuild()
+	ungroup_button=find_button(game.office.content,"Разгруппировать")
+	check(ungroup_button!=null and not ungroup_button.disabled,"Selecting a group enables dissolve")
+	check(press(game.office,"Разгруппировать"),"Selected group can be dissolved")
+	await process_frame
+	check(service.table_groups().is_empty() and service.group_id_for_station(2).is_empty() and service.group_id_for_station(3).is_empty(),"Dissolve leaves standalone tables instead of singleton groups")
+
+	print("UI T03: library drops directly into one flat queue")
+	game.office.select_group_stations([2,3])
+	check(press(game.office,"Обучение"),"Same-type selection opens training")
+	var workspace:=tree_text(game.office.content)
+	check("МАСТЕР-КЛАССЫ" in workspace and "ОЧЕРЕДЬ ОБУЧЕНИЯ" in workspace,"Training workspace has library and queue")
+	check("РАСПИСАНИЕ" not in workspace and "По группам" not in workspace and "20%" not in workspace,"Old schedule and batching controls are gone")
 	game.office._training_library_click({"record_id":2101},false,false)
-	game.office._training_library_click({"record_id":2103},true,false)
-	check(game.office.training_library_selection==[2101,2103],"UI T04 Ctrl adds a non-adjacent masterclass to selection")
-	game.office._training_library_click({"record_id":2101},false,false)
-	game.office._training_library_click({"record_id":2103},false,true)
-	check(game.office.training_library_selection==[2101,2102,2103],"UI T04 Shift selects the contiguous masterclass range")
+	game.office._training_library_click({"record_id":2102},true,false)
 	game.office.training_add_selected_to_draft()
-	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 multi-selection becomes one ordered schedule draft")
-	game.office._training_drop({"kind":"queue_lessons","course_id":0,"indices":[2]},{"zone":"draft","course_id":0,"index":0},false)
-	check(game.office.course_editor.records==[2103,2101,2102],"UI T04 drag can reorder dishes before scheduling")
-	game.office._training_drop({"kind":"queue_lessons","course_id":0,"indices":[0]},{"zone":"draft","course_id":0,"index":2},true)
-	check(game.office.course_editor.records==[2101,2102,2103],"UI T04 drag can restore dish order")
-	var preview: Dictionary=service.training_course_preview(game.office._draft_assignments(),"balanced",[])
-	check(str(preview.error).is_empty() and int(preview.places)==2 and preview.lessons.size()==3 and preview.batches.size()==6,"UI T04 preview uses automatic one-table batches for two selected tables")
-	check(press(game.office,"Добавить в расписание"),"UI T04 schedule button exists")
 	await process_frame
 	var views: Array=service.training_course_views()
-	check(views.size()==1 and views[0].assignments.size()==3 and str(views[0].mode)=="balanced","UI T04 creates one internal balanced schedule block")
-	check(views[0].batches.size()==6 and views[0].batches.all(func(batch):return batch.stations.size()<=1),"UI T04 actual queue follows the fixed twenty-percent batching")
-	var schedule_id:=int(views[0].id)
+	check(views.size()==1 and views[0].assignments.size()==2 and str(views[0].mode)=="together","Direct add creates one together queue block")
+	check(views[0].batches.size()==1 and views[0].batches[0].stations==[2,3],"All selected tables leave in one pass")
+	game.office.rebuild()
+	workspace=tree_text(game.office.content)
+	check("Бокал вина, столы 2, 3" in workspace and "Жареный картофель, столы 2, 3" in workspace,"Queue rows contain only dish and tables")
+	check("UI · напиток" not in workspace and "по 1 за раз" not in workspace,"Queue rows do not expose recording names or batch sizes")
+	var course_id:=int(views[0].id)
+	var row=game.office.training_queue_rows.get("%d:0"%course_id)
+	check(row!=null and bool(row.context_highlight),"Rows for the current table selection are outlined")
+	game.office._training_drop({"kind":"queue_lessons","course_id":course_id,"indices":[1]},{"zone":"course","course_id":course_id,"index":0},false)
+	await process_frame
+	var edited: Dictionary=service.training_queue.course_view(course_id)
+	check(int(edited.assignments[0].record_id)==2102 and int(edited.assignments[1].record_id)==2101,"Queue order changes directly by drag")
+
+	print("UI T04: short recordings stay uncut and training session time is fixed")
+	check(absf(float(wine.highlight_duration)-float(wine.duration))<0.01,"Short recording keeps its full duration")
+	check(wine.highlight_segments.size()>=2,"Short recording still changes camera angles")
+	var cursor:=0
+	for segment in wine.highlight_segments:
+		check(int(segment.source_start)==cursor,"Uncut short film has no source gap")
+		cursor=int(segment.source_end)
+	check(cursor==120,"Uncut short film reaches the final source frame")
+	service.training_queue.reset()
+	var queued:=service.queue_training_course([{"record_id":2101,"station_ids":[2,3]}],"by_groups","ui-fixed-time",1)
+	check(str(queued.error).is_empty(),"Legacy mode input is accepted but normalized")
 	service.advance(0.1)
 	await process_frame
-	check(int(service.training_queue.active_batch_id)==int(views[0].batches[0].id),"UI T04 schedule starts from the first visible dish and first table batch")
-	dispose(game)
+	for i in range(300):
+		service.advance(0.1)
+		await process_frame
+		if service.staff_training.phase=="watching": break
+	check(service.staff_training.phase=="watching","Training reaches TV watching phase")
+	check(absf(float(service.movie_state.duration)-Library.TRAINING_WATCH_SECONDS)<0.01 and bool(service.movie_state.loop),"Training watches for the global 30 seconds and loops a short film")
 
-	print("UI T05: automatic batch size is rounded by table count")
-	game=await make_game()
-	service=game.service
-	var ids: Array=[]
-	var first_station: Node3D
-	for slot in range(1,9):
-		var created=add_counter(service,slot)
-		if first_station==null: first_station=created
-		ids.append(created.station_id)
-	potato=record_for(first_station,2201,"potato","UI · двадцать процентов")
-	service.masterclasses=[potato]
-	game.office.open("groups")
-	game.office.select_group_stations(ids)
-	check(press(game.office,"Обучение"),"UI T05 opens training workspace")
-	game.office.course_editor_add_record(2201)
-	preview=service.training_course_preview(game.office._draft_assignments(),"balanced",[])
-	check(str(preview.error).is_empty() and preview.batches.size()==4 and preview.batches.all(func(batch):return batch.stations.size()==2),"UI T05 eight tables become four two-table training batches")
-	check("автоматически по 2 за раз" in tree_text(game.office.content),"UI T05 explains the automatic table batch size")
-	check(press(game.office,"Добавить в расписание"),"UI T05 adds the dish to the schedule")
-	await process_frame
-	views=service.training_course_views()
-	check(views.size()==1 and str(views[0].mode)=="balanced" and views[0].batches.size()==4,"UI T05 backend stores four balanced batches")
-	service.advance(0.1)
-	await process_frame
-	var first_batch: Dictionary=views[0].batches[0]
-	check(first_batch.stations.size()==2 and service.by_id(int(ids[2])).group_training_state.is_empty(),"UI T05 only the first twenty-percent table batch leaves production")
 	dispose(game)
-
-	print("UI T13: replace a waiting record by editing the queued schedule")
-	game=await make_game()
-	service=game.service
-	var station=add_counter(service,1)
-	var old_potato=record_for(station,2301,"potato","UI · версия A")
-	var new_potato=record_for(station,2302,"potato","UI · версия B")
-	var extra_sausage=record_for(station,2303,"sausage","UI · дополнительный урок")
-	service.masterclasses=[old_potato,new_potato,extra_sausage]
-	service.progress.lounge_items.erase("television")
-	game.office.open("groups")
-	game.office.select_group_stations([2])
-	check(press(game.office,"Обучение"),"UI T13 opens training workspace")
-	game.office.course_editor_add_record(2301)
-	check(press(game.office,"Добавить в расписание"),"UI T13 queues old version")
-	await process_frame
-	service.training_queue.advance(0.0)
-	views=service.training_course_views()
-	schedule_id=int(views[0].id)
-	check(str(views[0].state)=="blocked","UI T13 waiting schedule is visible as blocked")
-	game.office.rebuild()
-	check("Курс" not in tree_text(game.office.content),"UI T13 waiting queue stays flat and exposes no schedule wrapper")
-	game.office._training_drop({"kind":"masterclass_records","record_ids":[2302,2303]},{"zone":"course","course_id":schedule_id,"index":0},false)
-	await process_frame
-	var edited_view: Dictionary=service.training_queue.course_view(schedule_id)
-	check(edited_view.assignments.size()==2 and int(edited_view.assignments[0].record_id)==2302 and int(edited_view.assignments[1].record_id)==2303,"UI T13 dropping records replaces the dish version and inserts another dish directly into the schedule")
-	game.office._training_drop({"kind":"queue_lessons","course_id":schedule_id,"indices":[1]},{"zone":"course","course_id":schedule_id,"index":0},false)
-	await process_frame
-	edited_view=service.training_queue.course_view(schedule_id)
-	check(int(edited_view.assignments[0].record_id)==2303 and int(edited_view.assignments[1].record_id)==2302,"UI T13 drag reorders existing schedule rows")
-	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2302,"UI T13 queue now points to the new record version")
-	dispose(game)
-
-	print("UI T13 active: a new UI assignment waits behind the old frozen film")
-	game=await make_game()
-	service=game.service
-	station=add_counter(service,1)
-	old_potato=record_for(station,2311,"potato","UI · активная A")
-	new_potato=record_for(station,2312,"potato","UI · активная B")
-	service.masterclasses=[old_potato,new_potato]
-	game.office.open("groups")
-	game.office.select_group_stations([2])
-	check(press(game.office,"Обучение"),"UI T13 active opens first training workspace")
-	game.office.course_editor_add_record(2311)
-	check(press(game.office,"Добавить в расписание"),"UI T13 active queues old film")
-	await process_frame
-	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==2311),"UI T13 active old film starts")
-	game.office.course_editor_open(2312)
-	game.office.course_editor_select_group(service.group_id_for_station(2),true)
-	check(press(game.office,"Добавить в расписание"),"UI T13 active queues the newer version while old film is running")
-	await process_frame
-	check(int(service.desired_source(service.group_id_for_station(2),"potato").get("id",0))==2312,"UI T13 active updates the desired version while the old frozen film remains current")
-	var live_views: Array=service.training_course_views()
-	check(live_views.any(func(view):return view.assignments.any(func(item):return int(item.record_id)==2312)),"UI T13 active keeps the newer UI-created assignment in the queue")
-	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2311 and not service.staff_training.is_active(),60.0),"UI T13 active old film commits old knowledge first")
-	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2312,"UI T13 active still requires the newer version after old film completion")
-	check(await run_until(service,func():return int(station.method_sources.get("potato",{}).get("id",0))==2312,90.0),"UI T13 active eventually retrains through the UI-created follow-up schedule")
-	dispose(game)
-
-	print("UI T12: cancel an active schedule and resume its suspended plan from the queue page")
-	game=await make_game()
-	service=game.service
-	station=add_counter(service,1)
-	var old_method=record_for(station,2400,"potato","UI · старый способ")
-	var first=record_for(station,2401,"sausage","UI · первый урок")
-	var second=record_for(station,2402,"potato","UI · второй урок")
-	station.recipes.potato={"tracks":old_method.tracks.duplicate(true),"duration":old_method.duration,"quality":old_method.quality.duplicate(true)}
-	station.method_sources.potato={"id":2400,"name":"UI · старый способ"}
-	service.masterclasses=[old_method,first,second]
-	game.office.open("groups")
-	game.office.select_group_stations([2])
-	check(press(game.office,"Обучение"),"UI T12 opens training workspace")
-	game.office.course_editor_add_record(2401)
-	game.office.course_editor_add_record(2402)
-	check(press(game.office,"Добавить в расписание"),"UI T12 queues schedule")
-	await process_frame
-	check(await run_until(service,func():return service.staff_training.phase=="watching" and service.staff_training.record_id==2402),"UI T12 reaches second film")
-	game.office.open("groups")
-	check(press(game.office,"Очередь обучения"),"UI T12 opens queue workspace without preselecting tables")
-	check(press(game.office,"Отменить текущее обучение"),"UI T12 cancellation button is available")
-	check(await run_until(service,func():return not service.staff_training.is_active(),60.0),"UI T12 workers return after UI cancellation")
-	check(int(station.method_sources.get("sausage",{}).get("id",0))==2401 and int(station.method_sources.get("potato",{}).get("id",0))==2400,"UI T12 completed first lesson stays learned and interrupted second stays old")
-	game.office.rebuild()
-	check(press(game.office,"Продолжить"),"UI T12 exposes resume button for the suspended desired assignment")
-	await process_frame
-	check(int(service.training_queue.pending_source(2,"potato").get("id",0))==2402,"UI T12 resume creates the required pending lesson")
-	dispose(game)
-
-	print("UI draft: host rejection keeps the schedule draft and explains why")
-	game=await make_game()
-	service=game.service
-	station=add_counter(service,1)
-	wine=record_for(station,2491,"wine","UI · черновик")
-	service.masterclasses=[wine]
-	game.office.open("groups")
-	game.office.select_group_stations([2])
-	check(press(game.office,"Обучение"),"UI draft opens training workspace")
-	game.office.course_editor_add_record(2491)
-	game.player.global_position=game.shop.computer.global_position+Vector3(20,0,0)
-	check(press(game.office,"Добавить в расписание"),"UI draft submit button exists while away from computer")
-	check(not game.office.course_editor.is_empty() and game.office.course_editor.records==[2491],"UI draft survives a rejected host confirmation")
-	check(game.office.course_editor_message.contains("Подойди к компьютеру"),"UI draft shows the concrete host rejection reason")
-	game.player.global_position=game.shop.computer.global_position
-	check(press(game.office,"Добавить в расписание"),"UI draft can be confirmed after returning to the computer")
-	await process_frame
-	check(service.training_course_views().size()==1,"UI draft successful retry creates exactly one schedule")
-	dispose(game)
-
-	print("UI video entry: Add to schedule opens the same editor")
-	game=await make_game()
-	service=game.service
-	station=add_counter(service,1)
-	wine=record_for(station,2501,"wine","UI · из видеотеки")
-	service.masterclasses=[wine]
-	game.office.open("videos")
-	check(press(game.office,"Добавить в обучение"),"Videotheque has Add to schedule")
-	check(game.office.tab=="groups" and game.office.groups_mode=="training" and game.office.course_editor.records==[2501] and str(game.office.course_editor.type_id)=="counter","Videotheque opens the training workspace with the record prefilled")
-	dispose(game)
-
-	print("PASS: player-facing flat training schedule UI" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: manual groups and direct training queue UI" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)
