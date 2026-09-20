@@ -69,7 +69,7 @@ func run()->void:
 	service.masterclasses=[record]
 	service.next_masterclass_id=701
 	check(service.create_table_group([2,3],"Сервисная линия").is_empty(),"Two counters form an explicit service group")
-	check(service._apply_group_plan(700,[2,3]).size()==1,"Explicit service group receives its desired sausage record")
+	check(service._apply_group_plan(700,[2,3]).size()==2,"Both tables in the explicit service group receive their desired sausage record directly")
 	check(service.set_group_dish_active(service.group_id_for_station(2),"sausage",true).is_empty(),"Service group has sausage explicitly enabled for diagnostics")
 	var service_group: Dictionary=service.table_groups().filter(func(value):return value.stations==[2,3])[0]
 	var service_group_id: String=str(service_group.id)
@@ -170,7 +170,7 @@ func run()->void:
 	var compatible: Array=service.compatible_training_station_ids(700)
 	check(compatible.size()==19 and compatible.front()==2 and compatible.back()==20,"One masterclass can select all nineteen compatible production tables without auto-merging them")
 	check(service._apply_group_plan(700,compatible).size()==19,"All compatible tables receive the same desired record directly")
-	check(service.table_groups().is_empty(),"Mass training intent does not create any groups")
+	check(service.table_groups().size()==1 and service.table_group_by_id(service_group_id).stations==[2,3],"Mass training intent does not create or alter groups")
 	check(service.create_table_group(compatible,"Массовая линия").is_empty(),"Player can explicitly combine nineteen tables when desired")
 	check(int(service.desired_source(service.group_id_for_station(2),"sausage").id)==700,"Large explicit group keeps the shared desired record")
 	var groups: Array=service.table_groups()
