@@ -3,6 +3,7 @@ extends Node3D
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const LoungeLayout=preload("res://scripts/lounge_layout.gd")
+const Masterclasses=preload("res://scripts/masterclass_library.gd")
 var service: Node3D
 var active:=false
 var phase:=""
@@ -174,7 +175,7 @@ func _complete_legacy()->void:
 	for id in station_ids:
 		var station=service.by_id(int(id))
 		if station==null: continue
-		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true)}
+		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true),"required_equipment":Masterclasses.required_equipment(record)}
 		station.method_sources[dish]={"id":record_id,"name":str(record.get("name","Запись"))}
 		station.method_plan.erase(dish)
 		station.drafts.erase(dish)
