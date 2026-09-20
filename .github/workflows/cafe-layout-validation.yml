@@ -50,6 +50,7 @@ jobs:
           done
 
       - name: Capture all four layout stages
+        if: always()
         run: |
           mkdir -p /tmp/cafe_layout_capture
           xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_cafe_expansion_layout.gd -- /tmp/cafe_layout_capture
