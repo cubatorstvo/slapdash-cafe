@@ -1,5 +1,7 @@
 extends Node3D
 
+const TABLE_SKEWS: Array[float] = [-0.09, 0.07, -0.04, 0.11, -0.06]
+
 const TILE := 2.0
 const WALL_HEIGHT := 3.2
 const WALL_THICKNESS := 0.28
@@ -334,7 +336,7 @@ func _build_stage_content(root: Node3D, stage: int) -> void:
 		_add_debug_table(root, "D_CenterNorth", Vector3(12.0, 0, 7.0), Vector3(12.0, 0, 3.0), 0.06)
 		_add_debug_table(root, "D_CenterSouth", Vector3(14.0, 0, 9.2), Vector3(14.0, 0, 13.0), -0.08)
 
-func _build_court(parent: Node3D, title: String, center: Vector3, offsets: Array, focus_offset: Vector3, stage: int) -> void:
+func _build_court(parent: Node3D, title: String, center: Vector3, offsets: Array[Vector3], focus_offset: Vector3, stage: int) -> void:
 	var court := Node3D.new()
 	court.name = title.split(" · ")[0].replace(" ", "")
 	parent.add_child(court)
@@ -342,7 +344,7 @@ func _build_court(parent: Node3D, title: String, center: Vector3, offsets: Array
 	_add_zone_sign(court, "ПОСЕТИТЕЛИ", center + Vector3(0, 0.3, 0.6), Color("dce6e8"), 19)
 	for i in range(offsets.size()):
 		var offset: Vector3 = offsets[i]
-		var skew := [-0.09, 0.07, -0.04, 0.11, -0.06][i % 5]
+		var skew: float = TABLE_SKEWS[i % TABLE_SKEWS.size()]
 		_add_debug_table(court, "Slot_%02d" % (i + 1), center + offset, center + focus_offset, skew)
 
 func _add_debug_table(parent: Node3D, title: String, position: Vector3, customer_focus: Vector3, skew: float) -> void:
