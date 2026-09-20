@@ -1421,7 +1421,7 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 	var editing:=int(course_editor.get("editing",0)) if not course_editor.is_empty() else 0
 	label(box,"ИЗМЕНИТЬ РАСПИСАНИЕ" if editing>0 else "ДОБАВИТЬ В РАСПИСАНИЕ",17)
 	var targets:=_training_target_stations()
-	var batch_size:=game.service.training_queue.balanced_batch_size(targets.size()) if not targets.is_empty() else 0
+	var batch_size: int=game.service.training_queue.balanced_batch_size(targets.size()) if not targets.is_empty() else 0
 	label(box,"%d столов · автоматически по %d за раз (~20%%)"%[targets.size(),batch_size],13)
 	if records.is_empty():
 		_training_drop_tail(box,"draft",0,0,"Перетащи сюда одно или несколько блюд")
@@ -1446,7 +1446,7 @@ func _training_draft_card(parent: Node,host: bool) -> void:
 			button(box,"▾ Подробности" if training_preview_expanded else "▸ Подробности",toggle_training_preview)
 			if training_preview_expanded:
 				for lesson in preview.lessons:
-					var lesson_batch_size:=game.service.training_queue.balanced_batch_size(int(lesson.selected))
+					var lesson_batch_size: int=game.service.training_queue.balanced_batch_size(int(lesson.selected))
 					label(box,"%s · %d столов · по %d за раз · освоили %d/%d"%[Definition.DISHES.get(str(lesson.dish),str(lesson.dish)),int(lesson.selected),lesson_batch_size,int(lesson.mastered),int(lesson.selected)],13)
 					for issue in lesson.get("equipment_issues",[]):
 						label(box,"⚠ Стол %d после обучения: нет %s"%[int(issue.get("station",0)),service.equipment_names(issue.get("missing",[]))],12)
@@ -1464,8 +1464,8 @@ func _training_existing_course_card(parent: Node,course: Dictionary,host: bool) 
 		var record_id:=int(assignment.get("record_id",0))
 		var record: Dictionary=service.masterclass_by_id(record_id)
 		var key:=_queue_key(course_id,index)
-		var table_count:=assignment.get("station_ids",[]).size()
-		var batch_size:=service.training_queue.balanced_batch_size(table_count)
+		var table_count: int=assignment.get("station_ids",[]).size()
+		var batch_size: int=service.training_queue.balanced_batch_size(table_count)
 		var status_text:=_schedule_entry_status(course,record_id)
 		var subtitle: String="%s · %s · %d столов · по %d за раз · %s"%[str(record.get("name",assignment.get("name","Запись"))),course_type_name,table_count,batch_size,status_text]
 		if course_id==course_focus_id: subtitle="→ "+subtitle
