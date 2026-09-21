@@ -40,7 +40,7 @@
 - [x] Pot — `scenes/props/pasta_pot.tscn`
 - [x] Water pitcher — `scenes/props/water_pitcher.tscn`
 - [x] Pasta bag — `scenes/props/pasta_bag.tscn`
-- [ ] Salt shaker
+- [x] Salt shaker — `scenes/props/salt_shaker.tscn`
 - [ ] Meat spatula
 - [ ] Pasta salt tool
 - [ ] Pasta spatula
