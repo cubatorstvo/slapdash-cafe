@@ -43,7 +43,7 @@
 - [x] Salt shaker — `scenes/props/salt_shaker.tscn`
 - [x] Meat spatula — `scenes/props/meat_spatula.tscn`
 - [x] Pasta salt tool — `scenes/props/pasta_salt_tool.tscn`
-- [ ] Pasta spatula
+- [x] Pasta spatula — `scenes/props/pasta_spatula.tscn`
 - [ ] Steak serving plate
 - [ ] Pasta serving plate
 
