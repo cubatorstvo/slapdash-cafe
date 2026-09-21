@@ -12,7 +12,7 @@
 - [x] Delivery installer — `scenes/actors/delivery_installer.tscn`
 - [x] Growing clone / sprout variant — `scenes/actors/clone_sprout.tscn`
 - [x] Remote multiplayer player visual — `scenes/actors/remote_player.tscn`
-- [ ] Cook lounge accessories: cup, paddle, snack
+- [x] Cook lounge accessories: cup, paddle, snack — `scenes/props/cook_lounge_accessories.tscn`
 
 ## Производственные станции
 - [ ] Counter station
