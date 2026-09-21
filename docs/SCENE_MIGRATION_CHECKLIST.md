@@ -85,7 +85,7 @@
 - [x] Wine serving — `scenes/food/wine_serving.tscn`
 - [x] Fried potato serving — `scenes/food/fried_potato_serving.tscn`
 - [x] Sausage serving — `scenes/food/sausage_serving.tscn`
-- [ ] Steak & pasta serving
+- [x] Steak & pasta serving — `scenes/food/steak_pasta_serving.tscn`
 - [ ] Burger serving
 - [ ] Cheeseburger serving
 - [ ] Spicy burger serving
