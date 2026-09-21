@@ -1,0 +1,13 @@
+Scene runtime integration checkpoint
+
+Local commit: 929c955c75b66bb50c8b9fa33ab5221b94b4ebfb
+GitHub branch base before checkpoint artifact: 525a99f331ff5d7ad1a9cabf61dc01f89615d66c
+Patch SHA-256 (decoded gzip payload source .patch): c4a119f303085a07b11aa576695f33fb2176de5333e57819451e417f15e99f51
+
+The sibling file scene-runtime-integration-929c955.patch.gz.b64 contains the exact source diff from the local baseline snapshot to the checkpoint commit.
+
+Recovery:
+  base64 -d scene-runtime-integration-929c955.patch.gz.b64 | gzip -d > /tmp/scene-runtime.patch
+  git apply /tmp/scene-runtime.patch
+
+Generated local Godot .uid/.import files were intentionally excluded from the checkpoint.
