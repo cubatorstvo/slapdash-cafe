@@ -111,7 +111,7 @@
 - [x] “Моё кафе” board — `scenes/decor/my_cafe_board.tscn`
 - [x] Market computer + desk — `scenes/decor/market_computer_desk.tscn`
 - [x] Delivery truck — `scenes/decor/delivery_truck.tscn`
-- [ ] Delivery parcel box
+- [x] Delivery parcel box — `scenes/decor/delivery_parcel_box.tscn`
 - [ ] Garland reel
 
 ## Комната отдыха
