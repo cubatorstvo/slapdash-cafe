@@ -87,7 +87,7 @@
 - [x] Sausage serving — `scenes/food/sausage_serving.tscn`
 - [x] Steak & pasta serving — `scenes/food/steak_pasta_serving.tscn`
 - [x] Burger serving — `scenes/food/burger_serving.tscn`
-- [ ] Cheeseburger serving
+- [x] Cheeseburger serving — `scenes/food/cheeseburger_serving.tscn`
 - [ ] Spicy burger serving
 - [ ] Solyanka serving
 
