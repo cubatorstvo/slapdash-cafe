@@ -68,7 +68,7 @@
 - [x] Tomato — `scenes/props/solyanka_tomato.tscn`
 - [x] Carrot — `scenes/props/solyanka_carrot.tscn`
 - [x] Garlic — `scenes/props/solyanka_garlic.tscn`
-- [ ] Cabbage
+- [x] Cabbage — `scenes/props/solyanka_cabbage.tscn`
 - [ ] Cucumber
 - [ ] Beet
 - [ ] Pepper
