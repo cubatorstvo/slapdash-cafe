@@ -52,7 +52,7 @@
 - [x] Patty spatula — `scenes/props/patty_spatula.tscn`
 - [x] Seasoning — `scenes/props/burger_seasoning.tscn`
 - [x] Bun — `scenes/props/burger_bun.tscn`
-- [ ] Cheese
+- [x] Cheese — `scenes/props/cheese.tscn`
 - [ ] Sauce bottle
 - [ ] Chili sauce bottle
 - [ ] Burger assembly plate

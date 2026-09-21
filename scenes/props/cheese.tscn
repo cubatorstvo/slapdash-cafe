@@ -1,0 +1,30 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_cheese"]
+albedo_color = Color(0.941176,0.8,0.345098,1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[sub_resource type="BoxShape3D" id="Shape_cheese"]
+size = Vector3(0.42,0.035,0.42)
+
+[node name="Cheese" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.025,0)
+rotation = Vector3(0,0.785398,0)
+shape = SubResource("Shape_cheese")
+
+[node name="Slice" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.025,0)
+rotation = Vector3(0,0.785398,0)
+scale = Vector3(0.42,0.035,0.42)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cheese")
+
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.06,0)
