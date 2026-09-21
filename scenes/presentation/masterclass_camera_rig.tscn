@@ -1,0 +1,40 @@
+[gd_scene load_steps=7 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.152941,0.235294,0.270588,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.090196,0.156863,0.184314,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="StandardMaterial3D" id="Mat_lens"]
+albedo_color = Color(0.145098,0.25098,0.286275,1)
+metallic = 0.2
+roughness = 0.35
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[node name="MasterclassCameraRig" type="Node3D"]
+[node name="CameraBody" type="MeshInstance3D" parent="."]
+scale = Vector3(0.34,0.22,0.40)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_body")
+[node name="LensHousing" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,-0.29)
+scale = Vector3(0.16,0.12,0.23)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Lens" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,-0.48)
+rotation = Vector3(1.570796,0,0)
+scale = Vector3(0.11,0.26,0.11)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_lens")
+[node name="ViewAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0,-0.62)
+[node name="OperatorGripAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.18,-0.08,0.14)
+[node name="ShoulderAnchor" type="Marker3D" parent="."]
+position = Vector3(0.20,-0.10,0.16)

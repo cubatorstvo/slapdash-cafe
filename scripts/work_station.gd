@@ -270,7 +270,7 @@ func refresh(local_peer: int, delta: float) -> void:
 	var performing: bool = training.phase in ["recording", "review", "confirm_finish"]
 	if type_id == "counter":
 		view.is_production = not (active and local_role == 0)
-		for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm]: node.visible = not active and not resting
+		if is_instance_valid(view.worker): view.worker.visible = not active and not resting
 		view.name_label.text = crew_name(0) + ("\nГотовит" if state == "cooking" else "\nЖдёт показа" if recipes.is_empty() else "\nЖдёт заказ")
 	else:
 		view.status.visible = state == "cooking"
@@ -321,7 +321,8 @@ func refresh(local_peer: int, delta: float) -> void:
 	if manual_station:
 		for student in students: student.hide()
 		if type_id=="counter":
-			for node in [view.worker, view.left_hand, view.right_hand, view.left_arm, view.right_arm, view.name_label]: node.hide()
+			if is_instance_valid(view.worker): view.worker.hide()
+			if is_instance_valid(view.name_label): view.name_label.hide()
 		view.station_label.text = "ШЕФ-СТАНЦИЯ · МАСТЕР-КЛАСС" if masterclass_station else "ТВОЯ СТОЙКА · [E] ГОТОВИТЬ"
 	if not manual_station:
 		view.station_label.text="СТАНЦИЯ %d · [E] ПОКАЖИ КАК"%station_id
@@ -436,18 +437,11 @@ func world_entry() -> Dictionary:
 	return data
 
 func _build_bell() -> void:
-	bell = Node3D.new()
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	bell = runtime.instantiate("res://scenes/props/service_bell.tscn") as Node3D
 	add_child(bell)
 	bell.position = Vector3(0.70, 1.035, 0.95) if type_id == "counter" else Vector3(0, 1.035, 1.08)
-	Props.cylinder(bell, 0.16, 0.035, Vector3.ZERO, Color("344c4c"))
-	bell_cap = Node3D.new()
-	bell.add_child(bell_cap)
-	var dome := Props.ball(bell_cap, 0.135, Vector3(0,0.055,0), Color("ddb77a"))
-	dome.scale.y = 0.65
-	dome.material_override.metallic = 0.8
-	dome.material_override.roughness = 0.25
-	Props.cylinder(bell_cap, 0.024, 0.05, Vector3(0,0.15,0), Color("f1d29a"))
-	Props.cylinder(bell_cap, 0.06, 0.015, Vector3(0,0.18,0), Color("e5c58c"))
+	bell_cap = bell.get_node("BellCap") as Node3D
 
 func bell_hit(camera: Camera3D) -> bool:
 	var origin := bell.to_local(camera.global_position)
@@ -504,26 +498,6 @@ func apply_upgrades() -> void:
 			upgrade_view = null
 		return
 	if is_instance_valid(upgrade_view): return
-	upgrade_view = Node3D.new()
-	upgrade_view.name = "SauceRamp"
+	upgrade_view = preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/props/sauce_ramp.tscn") as Node3D
 	add_child(upgrade_view)
-	var length := Model.RAMP_END - Model.RAMP_START
-	var slope := atan2(0.65, length)
-	var chute := Node3D.new()
-	upgrade_view.add_child(chute)
-	chute.position = Vector3(Model.RAMP_X, 0.975, (Model.RAMP_START + Model.RAMP_END) / 2)
-	chute.rotation.x = slope
-	var size := sqrt(length * length + 0.65 * 0.65)
-	Props.box(chute, Vector3(0.56, 0.07, size + 0.1), Vector3(0,-0.045,0), Color("b7c7bb"))
-	Props.box(chute, Vector3(0.45, 0.015, size), Vector3.ZERO, Color("c45b47"))
-	for x in [-0.27, 0.27]: Props.box(chute, Vector3(0.035, 0.16, size + 0.1), Vector3(x,0.04,0), Color("d5cbb2"))
-	for z in [Model.RAMP_START, Model.RAMP_END]:
-		var height := Model.ramp_height(z) - 0.10
-		Props.box(upgrade_view, Vector3(0.08,height,0.08), Vector3(Model.RAMP_X,height/2,z), Color("728779"))
-	# An improvised spring spoon visibly explains the launch at the end.
-	var spoon := Props.box(upgrade_view, Vector3(0.48,0.045,0.42), Vector3(Model.RAMP_X,0.70,Model.RAMP_END), Color("e4b668"))
-	spoon.rotation.x = -0.55
-	for i in range(4): Props.box(upgrade_view, Vector3(0.28,0.025,0.24), Vector3(Model.RAMP_X,0.45+i*0.045,Model.RAMP_END), Color("728779"))
-	var label := Props.text(upgrade_view, "СОУСНЫЙ ТРАМПЛИН", Vector3(Model.RAMP_X,1.60,Model.RAMP_START), 18, Color("efcc8e"))
-	label.pixel_size = 0.003
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+

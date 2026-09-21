@@ -1,0 +1,83 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.090196,0.180392,0.188235,0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8,0.72,0.5,0.18)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+
+[node name="TrainingCourseEditor" type="PanelContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Column" type="VBoxContainer" parent="."]
+theme_override_constants/separation = 12
+[node name="Top" type="HBoxContainer" parent="Column"]
+[node name="Back" type="Button" parent="Column/Top"]
+text = "← Столы и группы"
+[node name="Title" type="Label" parent="Column/Top"]
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "КУРС ОБУЧЕНИЯ"
+[node name="Selection" type="PanelContainer" parent="Column"]
+theme_override_styles/panel = SubResource("Panel")
+[node name="Flow" type="HFlowContainer" parent="Column/Selection"]
+[node name="Selected" type="Label" parent="Column/Selection/Flow"]
+text = "Выбрано столов: 0"
+[node name="SelectAll" type="Button" parent="Column/Selection/Flow"]
+text = "Выбрать совместимые"
+[node name="Columns" type="HBoxContainer" parent="Column"]
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+[node name="Library" type="VBoxContainer" parent="Column/Columns"]
+size_flags_horizontal = 3
+[node name="Heading" type="Label" parent="Column/Columns/Library"]
+theme_override_font_sizes/font_size = 18
+text = "МАСТЕР-КЛАССЫ"
+[node name="Record1" type="Button" parent="Column/Columns/Library"]
+text = "Запись блюда · добавить →"
+[node name="Course" type="VBoxContainer" parent="Column/Columns"]
+size_flags_horizontal = 3
+[node name="Heading" type="Label" parent="Column/Columns/Course"]
+theme_override_font_sizes/font_size = 18
+text = "СОСТАВ КУРСА"
+[node name="Lesson1" type="HBoxContainer" parent="Column/Columns/Course"]
+[node name="Label" type="Label" parent="Column/Columns/Course/Lesson1"]
+size_flags_horizontal = 3
+text = "1. Урок"
+[node name="Up" type="Button" parent="Column/Columns/Course/Lesson1"]
+text = "↑"
+[node name="Down" type="Button" parent="Column/Columns/Course/Lesson1"]
+text = "↓"
+[node name="Remove" type="Button" parent="Column/Columns/Course/Lesson1"]
+text = "×"
+[node name="Mode" type="HFlowContainer" parent="Column"]
+[node name="Together" type="Button" parent="Column/Mode"]
+text = "Все вместе"
+[node name="ByGroups" type="Button" parent="Column/Mode"]
+text = "По группам"
+[node name="GroupOrder" type="Label" parent="Column"]
+text = "Порядок групп"
+[node name="Queue" type="PanelContainer" parent="Column"]
+theme_override_styles/panel = SubResource("Panel")
+[node name="Column" type="VBoxContainer" parent="Column/Queue"]
+[node name="Heading" type="Label" parent="Column/Queue/Column"]
+theme_override_font_sizes/font_size = 18
+text = "ОЧЕРЕДЬ ОБУЧЕНИЯ"
+[node name="Hint" type="Label" parent="Column/Queue/Column"]
+text = "Порядок меняется прямо здесь."
+[node name="Actions" type="HBoxContainer" parent="Column"]
+[node name="Cancel" type="Button" parent="Column/Actions"]
+text = "Отмена"
+[node name="Submit" type="Button" parent="Column/Actions"]
+size_flags_horizontal = 3
+text = "Поставить курс в очередь"

@@ -7,16 +7,15 @@ var parcel_box: Node3D
 var clock:=0.0
 
 func setup(index: int)->void:
-	actor=Avatar.new()
+	actor=get_node("Actor") as Node3D
+	if actor.get_script()!=Avatar:
+		actor.set_script(Avatar)
+		if actor.is_inside_tree(): actor._ready()
 	actor.tint=[Color("d58c5c"),Color("7b9fc0"),Color("a889ba"),Color("78a47e")][index%4]
-	add_child(actor)
 	actor.add_to_group("automatic_door_actor")
 	actor.hat.hide()
 	actor.notebook.hide()
-	parcel_box=Node3D.new()
-	actor.add_child(parcel_box)
-	Props.box(parcel_box,Vector3(0.52,0.46,0.44),Vector3.ZERO,Color("b28a59"))
-	Props.box(parcel_box,Vector3(0.09,0.47,0.45),Vector3.ZERO,Color("d4be91"))
+	parcel_box=get_node("Actor/ParcelBox") as Node3D
 
 func apply(job: Dictionary,install_target: Vector3,cook_target: Vector3,exit_target: Vector3,delta: float)->void:
 	if actor==null: return

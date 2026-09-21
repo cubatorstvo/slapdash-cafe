@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/food/burger_serving.tscn" id="1_burger"]
+[ext_resource type="PackedScene" path="res://scenes/props/cheese.tscn" id="2_cheese"]
+
+[node name="CheeseburgerServing" type="Node3D"]
+[node name="Burger" parent="." instance=ExtResource("1_burger")]
+[node name="Cheese" parent="." instance=ExtResource("2_cheese")]
+position = Vector3(0,0.205,0)
+rotation = Vector3(0,0.785398,0)
+scale = Vector3(0.88,0.88,0.88)

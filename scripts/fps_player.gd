@@ -16,20 +16,11 @@ var sleeping := false
 var wake_pitch := -0.2
 
 func _ready() -> void:
+	preload("res://scripts/scene_runtime.gd").ensure_children(self, "res://scenes/actors/player.tscn")
 	collision_layer = 2
 	collision_mask = 1
-	body_collider = CollisionShape3D.new()
-	var capsule := CapsuleShape3D.new()
-	capsule.radius = BODY_RADIUS
-	capsule.height = 1.8
-	body_collider.shape = capsule
-	body_collider.position.y = 0.9
-	add_child(body_collider)
-	camera = Camera3D.new()
-	add_child(camera)
-	camera.position.y = EYE_HEIGHT
-	camera.fov = 78.0
-	camera.near = 0.04
+	body_collider = get_node("BodyCollider") as CollisionShape3D
+	camera = get_node("Camera3D") as Camera3D
 	camera.current = true
 
 func look(movement: Vector2) -> void:

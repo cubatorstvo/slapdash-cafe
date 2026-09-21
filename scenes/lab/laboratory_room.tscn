@@ -1,0 +1,55 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.376471,0.458824,0.435294,1)
+[sub_resource type="StandardMaterial3D" id="Mat_wall"]
+albedo_color = Color(0.180392,0.32549,0.333333,1)
+[sub_resource type="StandardMaterial3D" id="Mat_ceiling"]
+albedo_color = Color(0.72549,0.788235,0.729412,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_floor"]
+size = Vector3(14.7,0.2,16.4)
+
+[node name="LaboratoryRoom" type="Node3D"]
+[node name="FloorBody" type="StaticBody3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorBody"]
+position = Vector3(-7.35,-0.10,22.2)
+shape = SubResource("Shape_floor")
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(-7.35,-0.05,22.2)
+scale = Vector3(14.7,0.10,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_floor")
+[node name="Ceiling" type="MeshInstance3D" parent="."]
+position = Vector3(-7.35,4.55,22.2)
+scale = Vector3(14.4,0.10,16.1)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_ceiling")
+[node name="WestWall" type="MeshInstance3D" parent="."]
+position = Vector3(-14.7,2.3,22.2)
+scale = Vector3(0.18,4.7,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="EastDivider" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.3,22.2)
+scale = Vector3(0.18,4.7,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="BackWall" type="MeshInstance3D" parent="."]
+position = Vector3(-7.35,2.3,30.4)
+scale = Vector3(14.7,4.7,0.18)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="EntranceAnchor" type="Marker3D" parent="."]
+position = Vector3(-4,0,14.85)
+[node name="MicroscopeAnchor" type="Marker3D" parent="."]
+position = Vector3(-1.45,0,14.95)
+[node name="ResearchBenchAnchor" type="Marker3D" parent="."]
+position = Vector3(-4,0,16.4)
+[node name="RecalibrationAnchor" type="Marker3D" parent="."]
+position = Vector3(-6.5,0,19.2)
+[node name="NurseryAisleAnchor" type="Marker3D" parent="."]
+position = Vector3(-7.2,0,23.7)
+[node name="ProductionAnchor" type="Marker3D" parent="."]
+position = Vector3(-7.5,0,26.4)

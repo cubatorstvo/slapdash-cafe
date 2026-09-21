@@ -1,0 +1,57 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_top"]
+albedo_color = Color(0.654902,0.501961,0.352941,1)
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.254902,0.356863,0.329412,1)
+[sub_resource type="StandardMaterial3D" id="Mat_panel"]
+albedo_color = Color(0.294118,0.415686,0.384314,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_bench"]
+size = Vector3(3.55,0.95,1.05)
+
+[node name="AssemblyBench" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.475,0)
+shape = SubResource("Shape_bench")
+[node name="Top" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.92,0)
+scale = Vector3(3.55,0.12,1.05)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_top")
+[node name="LegFL" type="MeshInstance3D" parent="."]
+position = Vector3(-1.55,0.44,-0.37)
+scale = Vector3(0.12,0.88,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="LegFR" type="MeshInstance3D" parent="."]
+position = Vector3(1.55,0.44,-0.37)
+scale = Vector3(0.12,0.88,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="LegBL" type="MeshInstance3D" parent="."]
+position = Vector3(-1.55,0.44,0.37)
+scale = Vector3(0.12,0.88,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="LegBR" type="MeshInstance3D" parent="."]
+position = Vector3(1.55,0.44,0.37)
+scale = Vector3(0.12,0.88,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="BackPanel" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.45,0.44)
+scale = Vector3(3.3,0.95,0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_panel")
+[node name="Module1Anchor" type="Marker3D" parent="."]
+position = Vector3(-1.1,1.02,0)
+[node name="Module2Anchor" type="Marker3D" parent="."]
+position = Vector3(0,1.02,0)
+[node name="Module3Anchor" type="Marker3D" parent="."]
+position = Vector3(1.1,1.02,0)
+[node name="ControlAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.5,-0.49)

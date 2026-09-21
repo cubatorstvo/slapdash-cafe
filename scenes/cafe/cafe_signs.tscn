@@ -1,0 +1,39 @@
+[gd_scene format=3]
+
+[node name="CafeSigns" type="Node3D"]
+[node name="ZoneA" type="Label3D" parent="."]
+position = Vector3(20,3.2,1)
+billboard = 1
+pixel_size = 0.014
+font_size = 44
+text = "ЗОНА A"
+[node name="ZoneB" type="Label3D" parent="."]
+position = Vector3(-20,3.2,1)
+billboard = 1
+pixel_size = 0.014
+font_size = 44
+text = "ЗОНА B"
+[node name="ZoneC" type="Label3D" parent="."]
+position = Vector3(-21,3.2,-27)
+billboard = 1
+pixel_size = 0.014
+font_size = 44
+text = "ЗОНА C"
+[node name="ZoneD" type="Label3D" parent="."]
+position = Vector3(12,3.2,-29)
+billboard = 1
+pixel_size = 0.014
+font_size = 44
+text = "ЗОНА D"
+[node name="Lab" type="Label3D" parent="."]
+position = Vector3(-4,3.12,13.76)
+billboard = 1
+pixel_size = 0.005
+font_size = 24
+text = "ЛАБОРАТОРИЯ"
+[node name="Lounge" type="Label3D" parent="."]
+position = Vector3(4,3.12,13.76)
+billboard = 1
+pixel_size = 0.005
+font_size = 22
+text = "КОМНАТА ОТДЫХА"

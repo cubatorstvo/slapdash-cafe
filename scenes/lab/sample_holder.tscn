@@ -1,0 +1,41 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_base"]
+albedo_color = Color(0.819608,0.764706,0.596078,1)
+[sub_resource type="StandardMaterial3D" id="Mat_vial"]
+albedo_color = Color(0.686275,0.862745,0.831373,0.22)
+transparency = 1
+[sub_resource type="StandardMaterial3D" id="Mat_sample"]
+albedo_color = Color(0.603922,0.839216,0.678431,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="CylinderShape3D" id="Shape_vial"]
+radius = 0.11
+height = 0.32
+
+[node name="SampleHolder" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.18,0)
+shape = SubResource("Shape_vial")
+[node name="Base" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.02,0)
+scale = Vector3(0.44,0.04,0.44)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_base")
+[node name="Vial" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.18,0)
+scale = Vector3(0.18,0.32,0.18)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_vial")
+[node name="Sample" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.14,0)
+scale = Vector3(0.14,0.17,0.14)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_sample")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.24,0)

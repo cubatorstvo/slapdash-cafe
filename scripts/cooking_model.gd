@@ -765,4 +765,5 @@ func take_serving() -> Array:
 		guest_serving.drunk+=tray_wine; tray_wine=0
 	_load_food("potato",potato_index); _load_food("sausage",sausage_index)
 	guest_serving.chew=0.8
+	for entry in result: entry.dish=dish
 	return result

@@ -12,28 +12,35 @@ var status:Label3D
 var station_label:Label3D
 var bounds:Array=[]
 var griddle:MeshInstance3D
-var assembly_plate:MeshInstance3D
+var assembly_plate:Node3D
 
 func build(production:=false) -> void:
-	P.solid_box(self,Vector3(6.1,0.16,2.25),Vector3(0,0.92,0),Color("a97855"))
-	for x in [-2.65,2.65]: P.box(self,Vector3(0.18,0.87,1.8),Vector3(x,0.43,0),Color("344e53"))
-	griddle=P.box(self,Vector3(1.55,0.055,1.05),Vector3(M.GRIDDLE.x,1.03,M.GRIDDLE.y),Color("2f3437"))
-	for i in range(6): P.box(self,Vector3(1.35,0.012,0.045),Vector3(0,1.065,M.GRIDDLE.y-0.34+i*0.14),Color("4b5355"))
-	assembly_plate=P.cylinder(self,0.48,0.03,Vector3(M.ASSEMBLY.x,1.035,M.ASSEMBLY.y),Color("fff0d4"))
-	equipment_nodes.grill_kit=[griddle]; equipment_nodes.assembly_kit=[assembly_plate]
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	runtime.ensure_children(self,"res://scenes/stations/burger_station.tscn")
+	griddle=get_node("Griddle/Plate") as MeshInstance3D
+	assembly_plate=get_node("AssemblyPlate") as Node3D
+	equipment_nodes.grill_kit=[get_node("Griddle")]
+	equipment_nodes.assembly_kit=[assembly_plate]
+	var item_scenes:={
+		"patty":"res://scenes/props/patty.tscn",
+		"patty_spatula":"res://scenes/props/patty_spatula.tscn",
+		"seasoning":"res://scenes/props/burger_seasoning.tscn",
+		"bun":"res://scenes/props/burger_bun.tscn",
+		"cheese":"res://scenes/props/cheese.tscn",
+		"sauce_bottle":"res://scenes/props/sauce_bottle.tscn",
+		"chili_bottle":"res://scenes/props/chili_sauce_bottle.tscn"
+	}
 	for item in M.ITEMS:
-		var node:=Node3D.new(); add_child(node); items[item]=node
+		var node:=runtime.instantiate(str(item_scenes[item])) as Node3D
+		add_child(node); items[item]=node
 		var ring:=P.cylinder(self,0.12,0.005,Vector3.ZERO,Color("92d5d4")); ring.hide(); marks[item]=ring
-	patty=P.ball(items.patty,0.27,Vector3(0,0.08,0),Color("b75f4c")); patty.scale=Vector3(1.15,0.28,1.0)
-	P.box(items.patty_spatula,Vector3(0.14,0.03,0.52),Vector3(0,0.03,0),Color("9c754d")); P.box(items.patty_spatula,Vector3(0.34,0.025,0.28),Vector3(0,0.03,-0.34),Color("a8b6b6"))
-	P.cylinder(items.seasoning,0.075,0.18,Vector3(0,0.09,0),Color("eee4cf"))
-	P.cylinder(items.bun,0.30,0.10,Vector3(0,0.05,0),Color("d9a65b")); bun_top=P.ball(items.bun,0.30,Vector3(0,0.16,0),Color("e0ae62")); bun_top.scale=Vector3(1,0.45,1)
-	P.box(items.cheese,Vector3(0.42,0.025,0.42),Vector3(0,0.03,0),Color("f0cc58")).rotation.y=PI/4
-	for key in ["sauce_bottle","chili_bottle"]:
-		var color:=Color("c56a4f") if key=="sauce_bottle" else Color("bd4f45"); P.cylinder(items[key],0.09,0.27,Vector3(0,0.135,0),color); P.cylinder(items[key],0.04,0.08,Vector3(0,0.31,0),Color("eee1bd"))
+	patty=items.patty.get_node("Body") as MeshInstance3D
+	bun_top=items.bun.get_node("Top") as MeshInstance3D
 	for role in range(2):
 		var actor:=Avatar.new(); actor.tint=Color("7ba2b0") if role==0 else Color("c4926e"); add_child(actor); actors.append(actor); actor.visible=production
-	station_label=P.text(self,"БУРГЕРНАЯ БРИГАДА" if production else "ПОКАЖИ ВДВОЁМ",Vector3(0,1.28,-1.2),25,Color("f2cc8a")); station_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	station_label=get_node("StationLabel") as Label3D
+	station_label.text="БУРГЕРНАЯ БРИГАДА" if production else "ПОКАЖИ ВДВОЁМ"
+	station_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 	status=P.text(self,"",Vector3(0,1.88,-1.15),18); status.pixel_size=0.004; status.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 
 func update_view(model,_time:=0.0,_resting:=false) -> void:

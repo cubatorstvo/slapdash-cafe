@@ -1,0 +1,37 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/cafe/stage1_shell.tscn" id="1_stage1"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/zone_a.tscn" id="2_a"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/zone_b.tscn" id="3_b"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/zone_c.tscn" id="4_c"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/zone_d.tscn" id="5_d"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/main_entrance.tscn" id="6_entry"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/rear_spine.tscn" id="7_rear"]
+[ext_resource type="PackedScene" path="res://scenes/cafe/cafe_signs.tscn" id="8_signs"]
+[ext_resource type="PackedScene" path="res://scenes/decor/almost_ready_sign.tscn" id="9_almost"]
+[ext_resource type="PackedScene" path="res://scenes/decor/cafe_plant.tscn" id="10_plant"]
+[ext_resource type="PackedScene" path="res://scenes/decor/garland.tscn" id="11_garland"]
+[ext_resource type="PackedScene" path="res://scenes/decor/market_computer_desk.tscn" id="12_market"]
+
+[node name="CafeWorld" type="Node3D"]
+[node name="Stage1" parent="." instance=ExtResource("1_stage1")]
+[node name="ZoneA" parent="." instance=ExtResource("2_a")]
+[node name="ZoneB" parent="." instance=ExtResource("3_b")]
+[node name="ZoneC" parent="." instance=ExtResource("4_c")]
+[node name="ZoneD" parent="." instance=ExtResource("5_d")]
+[node name="Entrance" parent="." instance=ExtResource("6_entry")]
+[node name="RearSpine" parent="." instance=ExtResource("7_rear")]
+[node name="Signs" parent="." instance=ExtResource("8_signs")]
+[node name="AlmostReadySign" parent="." instance=ExtResource("9_almost")]
+[node name="PlantLeft" parent="." instance=ExtResource("10_plant")]
+position = Vector3(-4,0,12)
+[node name="PlantRight" parent="." instance=ExtResource("10_plant")]
+position = Vector3(4,0,12)
+[node name="Garland" parent="." instance=ExtResource("11_garland")]
+[node name="Market" parent="." instance=ExtResource("12_market")]
+[node name="ChefAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0,5.1)
+[node name="FrontFlow" type="Marker3D" parent="."]
+position = Vector3(0,0,-23)
+[node name="RearFlow" type="Marker3D" parent="."]
+position = Vector3(0,0,11.2)

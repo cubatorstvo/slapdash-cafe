@@ -18,53 +18,43 @@ var station_label: Label3D
 var bounds: Array = []
 
 func build(production := false) -> void:
-	P.solid_box(self, Vector3(6.1, 0.16, 2.25), Vector3(0, 0.92, 0), Color("b98a58"))
-	for x in [-2.65, 2.65]: P.box(self, Vector3(0.18, 0.87, 1.8), Vector3(x, 0.43, 0), Color("344e53"))
-	var before := get_child_count()
-	for point in [M.GRILL, M.STOVE]:
-		P.box(self, Vector3(1.08, 0.06, 0.9), Vector3(point.x, 1.02, point.y), Color("303d42"))
-		P.cylinder(self, 0.37, 0.035, Vector3(point.x, 1.07, point.y), Color("da7846"))
-	for n in range(7): P.box(self, Vector3(0.85, 0.035, 0.035), Vector3(M.GRILL.x, 1.1, M.GRILL.y - 0.3 + n * 0.1), Color("384046"))
-	for plate in [M.PLATE, M.PASTA_PLATE]: serving_plates.append(P.cylinder(self, 0.44, 0.025, Vector3(plate.x, 1.03, plate.y), Color("fff0d4")))
-	var new_nodes := get_children().slice(before)
-	equipment_nodes.meat_kit = new_nodes.slice(0,2)+new_nodes.slice(4,11)+[new_nodes[11]]
-	equipment_nodes.pasta_kit = new_nodes.slice(2,4)+[new_nodes[12]]
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	runtime.ensure_children(self, "res://scenes/stations/meat_pasta_station.tscn")
+	station_label = get_node("StationLabel") as Label3D
+	station_label.text = "СТОЙКА 4 · БРИГАДА" if production else "ПОКАЖИ ВДВОЁМ\n[E] Стейк с макаронами"
+	station_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	serving_plates = [get_node("SteakPlate"), get_node("PastaPlate")]
+	equipment_nodes.meat_kit = [get_node("MeatGrill"), get_node("SteakPlate")]
+	equipment_nodes.pasta_kit = [get_node("PastaStove"), get_node("PastaPlate")]
+	var item_scenes := {
+		"steak":"res://scenes/props/steak.tscn",
+		"pot":"res://scenes/props/pasta_pot.tscn",
+		"water":"res://scenes/props/water_pitcher.tscn",
+		"pasta_bag":"res://scenes/props/pasta_bag.tscn",
+		"salt":"res://scenes/props/salt_shaker.tscn",
+		"spatula":"res://scenes/props/meat_spatula.tscn",
+		"pasta_salt_tool":"res://scenes/props/pasta_salt_tool.tscn",
+		"pasta_spatula":"res://scenes/props/pasta_spatula.tscn"
+	}
 	for item in M.ITEMS:
-		var node := Node3D.new()
+		var node := runtime.instantiate(str(item_scenes[item])) as Node3D
 		add_child(node)
 		items[item] = node
 		var ring := P.cylinder(self, 0.12, 0.005, Vector3.ZERO, Color("92d5d4"))
 		ring.visible = false
 		marks[item] = ring
-	meat = P.ball(items.steak, 0.28, Vector3(0, 0.1, 0), Color("bc6355"))
-	meat.scale = Vector3(1.2, 0.35, 0.8)
-	for n in range(4): P.box(items.steak, Vector3(0.4, 0.007, 0.015), Vector3(0, 0.19, -0.13 + n * 0.075), Color("713d2f"))
-	P.cylinder(items.pot, 0.36, 0.08, Vector3(0, 0.04, 0), Color("627e87"))
-	for n in range(20):
-		var a := n * TAU / 20
-		P.box(items.pot, Vector3(0.12, 0.3, 0.04), Vector3(sin(a) * 0.34, 0.2, cos(a) * 0.34), Color("78939a")).rotation.y = a
-	for side in [-1, 1]: P.box(items.pot, Vector3(0.18, 0.06, 0.13), Vector3(side * 0.43, 0.23, 0), Color("313b42"))
-	liquid = P.cylinder(items.pot, 0.31, 0.015, Vector3(0, 0.12, 0), Color("74b9cb"))
+	meat = items.steak.get_node("Body") as MeshInstance3D
+	liquid = items.pot.get_node("LiquidPreview") as MeshInstance3D
 	noodles = Node3D.new()
 	items.pot.add_child(noodles)
 	plated = Node3D.new()
 	add_child(plated)
 	plated.position = Vector3(M.PASTA_PLATE.x, 1.06, M.PASTA_PLATE.y)
+	# Noodles change amount/position during cooking and remain runtime food geometry.
 	for group in [noodles, plated]:
 		for n in range(18):
 			var noodle := P.cylinder(group, 0.017, 0.12, Vector3(sin(n * 2.3) * 0.23, 0.04 + (n % 3) * 0.025, cos(n * 3.1) * 0.2), Color("edcf74"))
 			noodle.rotation = Vector3(PI / 2, n * 0.7, 0.3)
-	P.cylinder(items.water, 0.19, 0.43, Vector3(0, 0.22, 0), Color("80b5c1"), 0.23)
-	P.box(items.water, Vector3(0.12, 0.06, 0.16), Vector3(0.22, 0.42, 0), Color("80b5c1"))
-	P.box(items.water, Vector3(0.09, 0.3, 0.13), Vector3(-0.25, 0.23, 0), Color("80b5c1"))
-	P.box(items.pasta_bag, Vector3(0.35, 0.48, 0.22), Vector3(0, 0.24, 0), Color("d7b168"))
-	P.text(items.pasta_bag, "PASTA", Vector3(0, 0.25, 0.12), 12).pixel_size = 0.003
-	for key in ["salt", "pasta_salt_tool"]:
-		P.cylinder(items[key], 0.075, 0.17, Vector3(0, 0.085, 0), Color("efe9d6"))
-		P.cylinder(items[key], 0.078, 0.035, Vector3(0, 0.18, 0), Color("718188"))
-	for key in ["spatula", "pasta_spatula"]:
-		P.box(items[key], Vector3(0.10, 0.035, 0.48), Vector3(0, 0.03, 0), Color("96744e"))
-		P.box(items[key], Vector3(0.24, 0.025, 0.26), Vector3(0, 0.03, -0.32), Color("a2b4b4"))
 	for role in range(2):
 		var actor := Avatar.new()
 		actor.tint = Color("689fb8") if role == 0 else Color("b58b69")
@@ -72,8 +62,6 @@ func build(production := false) -> void:
 		actors.append(actor)
 		actor.visible = production
 		streams.append(P.line(self, Vector3.ZERO, Vector3(0, 0.5, 0), 0.017, Color("a0d5e2")))
-	station_label = P.text(self, "СТОЙКА 4 · БРИГАДА" if production else "ПОКАЖИ ВДВОЁМ\n[E] Стейк с макаронами", Vector3(0, 1.28, -1.2), 25, Color("f2cc8a"))
-	station_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	status = P.text(self, "", Vector3(0, 1.85, -1.15), 19)
 	status.pixel_size = 0.004
 	status.billboard = BaseMaterial3D.BILLBOARD_ENABLED

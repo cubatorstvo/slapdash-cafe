@@ -1,0 +1,114 @@
+[gd_scene load_steps=9 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_cover"]
+albedo_color = Color(0.478431,0.239216,0.219608,1)
+[sub_resource type="StandardMaterial3D" id="Mat_page_l"]
+albedo_color = Color(0.952941,0.901961,0.784314,1)
+[sub_resource type="StandardMaterial3D" id="Mat_page_r"]
+albedo_color = Color(0.972549,0.937255,0.839216,1)
+[sub_resource type="StandardMaterial3D" id="Mat_spine"]
+albedo_color = Color(0.368627,0.196078,0.184314,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="PlaneMesh" id="Mesh_page"]
+size = Vector2(0.54,0.76)
+orientation = 1
+[sub_resource type="BoxShape3D" id="Shape_book"]
+size = Vector3(1.24,0.10,0.84)
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.909804,0.721569,0.576471,1)
+[node name="PhysicalCookbook" type="StaticBody3D"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("Shape_book")
+[node name="CoverLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-0.31,-0.006,0)
+scale = Vector3(0.60,0.044,0.84)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cover")
+[node name="CoverRight" type="MeshInstance3D" parent="."]
+position = Vector3(0.31,-0.006,0)
+scale = Vector3(0.60,0.044,0.84)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cover")
+[node name="PageBlockLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-0.305,0.028,0)
+scale = Vector3(0.56,0.016,0.78)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_page_l")
+[node name="PageBlockRight" type="MeshInstance3D" parent="."]
+position = Vector3(0.305,0.028,0)
+scale = Vector3(0.56,0.016,0.78)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_page_r")
+[node name="Spine" type="MeshInstance3D" parent="."]
+scale = Vector3(0.038,0.07,0.84)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_spine")
+[node name="LeftPageSurface" type="MeshInstance3D" parent="."]
+position = Vector3(-0.305,0.046,0)
+mesh = SubResource("Mesh_page")
+material_override = SubResource("Mat_page_l")
+[node name="RightPageSurface" type="MeshInstance3D" parent="."]
+position = Vector3(0.305,0.046,0)
+mesh = SubResource("Mesh_page")
+material_override = SubResource("Mat_page_r")
+[node name="LeftGripAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.64,0.02,0.40)
+[node name="RightGripAnchor" type="Marker3D" parent="."]
+position = Vector3(0.64,0.02,0.40)
+[node name="PageTurnAnchor" type="Marker3D" parent="."]
+position = Vector3(0.26,0.08,0)
+
+[node name="HandLeft" type="Node3D" parent="."]
+position = Vector3(-0.62,0.04,0.08)
+rotation = Vector3(-0.2,0.55,-0.18)
+[node name="Palm" type="MeshInstance3D" parent="HandLeft"]
+scale = Vector3(0.11,0.045,0.14)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger1" type="MeshInstance3D" parent="HandLeft"]
+position = Vector3(0.035,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger2" type="MeshInstance3D" parent="HandLeft"]
+position = Vector3(0.007,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger3" type="MeshInstance3D" parent="HandLeft"]
+position = Vector3(-0.021,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger4" type="MeshInstance3D" parent="HandLeft"]
+position = Vector3(-0.049,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="HandRight" type="Node3D" parent="."]
+position = Vector3(0.62,0.04,0.08)
+rotation = Vector3(-0.2,-0.55,0.18)
+[node name="Palm" type="MeshInstance3D" parent="HandRight"]
+scale = Vector3(0.11,0.045,0.14)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger1" type="MeshInstance3D" parent="HandRight"]
+position = Vector3(-0.035,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger2" type="MeshInstance3D" parent="HandRight"]
+position = Vector3(-0.007,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger3" type="MeshInstance3D" parent="HandRight"]
+position = Vector3(0.021,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")
+[node name="Finger4" type="MeshInstance3D" parent="HandRight"]
+position = Vector3(0.049,0.018,-0.10)
+scale = Vector3(0.026,0.026,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_skin")

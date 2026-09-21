@@ -1,0 +1,50 @@
+[gd_scene load_steps=10 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157,0.423529,0.309804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.313725,0.243137,0.207843,1)
+[sub_resource type="StandardMaterial3D" id="Mat_cream"]
+albedo_color = Color(0.945098,0.85098,0.682353,1)
+[sub_resource type="StandardMaterial3D" id="Mat_teal"]
+albedo_color = Color(0.321569,0.552941,0.509804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.862745,0.643137,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+albedo_color = Color(0.14902,0.239216,0.270588,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[node name="Stool" type="Node3D"]
+[node name="Leg1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.16,0.185,-0.16)
+scale = Vector3(0.09,0.37,0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Leg2" type="MeshInstance3D" parent="."]
+position = Vector3(0.16,0.185,-0.16)
+scale = Vector3(0.09,0.37,0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Leg3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.16,0.185,0.16)
+scale = Vector3(0.09,0.37,0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Leg4" type="MeshInstance3D" parent="."]
+position = Vector3(0.16,0.185,0.16)
+scale = Vector3(0.09,0.37,0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Seat" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.44,0)
+scale = Vector3(0.58,0.12,0.58)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_gold")
+[node name="SeatAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.5,0)

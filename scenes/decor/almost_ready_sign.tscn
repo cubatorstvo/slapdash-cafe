@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_board"]
+albedo_color = Color(0.831373,0.635294,0.407843,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[node name="AlmostReadySign" type="Node3D"]
+position = Vector3(1.5,2.8,13.84)
+[node name="Board" type="MeshInstance3D" parent="."]
+scale = Vector3(3.2,1.0,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_board")
+[node name="Text" type="Label3D" parent="."]
+position = Vector3(0,0.05,-0.07)
+pixel_size = 0.006
+font_size = 33
+text = "МЫ ПОЧТИ УМЕЕМ"

@@ -1,0 +1,26 @@
+[gd_scene format=3]
+[node name="PresentationAccessoryAnchors" type="Node3D"]
+[node name="ChefFocus" type="Marker3D" parent="."]
+position = Vector3(0,1.55,0.7)
+[node name="FoodFocus" type="Marker3D" parent="."]
+position = Vector3(0,1.0,0.1)
+[node name="OperatorStart" type="Marker3D" parent="."]
+position = Vector3(-2.72,0,-1.10)
+[node name="OperatorRightFront" type="Marker3D" parent="."]
+position = Vector3(2.72,0,-0.20)
+[node name="OperatorRightBack" type="Marker3D" parent="."]
+position = Vector3(2.66,0,1.65)
+[node name="OperatorLeftBack" type="Marker3D" parent="."]
+position = Vector3(-2.68,0,1.45)
+[node name="AudienceLeft" type="Marker3D" parent="."]
+position = Vector3(-2.0,0,-3.25)
+[node name="AudienceMidLeft" type="Marker3D" parent="."]
+position = Vector3(-0.65,0,-3.45)
+[node name="AudienceMidRight" type="Marker3D" parent="."]
+position = Vector3(0.65,0,-3.45)
+[node name="AudienceRight" type="Marker3D" parent="."]
+position = Vector3(2.0,0,-3.25)
+[node name="CookbookAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.30,-0.85)
+[node name="CameraRigAnchor" type="Marker3D" parent="."]
+position = Vector3(-2.72,1.42,-1.30)

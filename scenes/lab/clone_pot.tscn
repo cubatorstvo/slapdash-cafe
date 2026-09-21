@@ -1,0 +1,83 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_primary"]
+albedo_color = Color(0.427451,0.698039,0.603922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_secondary"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.227451,0.360784,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.827451,0.705882,0.490196,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="ClonePot" type="Node3D"]
+[node name="PotBody" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.37,0)
+scale = Vector3(0.86,0.65,0.86)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_secondary")
+[node name="PotRim" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.73,0)
+scale = Vector3(1.18,0.10,1.18)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_accent")
+[node name="Soil" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.77,0)
+scale = Vector3(1.06,0.04,1.06)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_dark")
+[node name="SoilClod1" type="MeshInstance3D" parent="."]
+position = Vector3(0.0000,0.796,0.3500)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod2" type="MeshInstance3D" parent="."]
+position = Vector3(0.2610,0.796,-0.2332)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.3478,0.796,-0.0393)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod4" type="MeshInstance3D" parent="."]
+position = Vector3(0.2025,0.796,0.2855)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod5" type="MeshInstance3D" parent="."]
+position = Vector3(0.0780,0.796,-0.3412)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod6" type="MeshInstance3D" parent="."]
+position = Vector3(-0.3064,0.796,0.1692)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SoilClod7" type="MeshInstance3D" parent="."]
+position = Vector3(0.3303,0.796,0.1158)
+scale = Vector3(0.05,0.025,0.05)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_secondary")
+[node name="SproutAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.80,0)
+[node name="LampAnchor" type="Marker3D" parent="."]
+position = Vector3(0,3.05,0)
+[node name="FeederAnchor" type="Marker3D" parent="."]
+position = Vector3(0.65,0,0.35)
+[node name="IrrigationAnchor" type="Marker3D" parent="."]
+position = Vector3(0.63,0.18,0)
+[node name="PlanterArmAnchor" type="Marker3D" parent="."]
+position = Vector3(0.68,0.1,0.45)
+[node name="ExtractorAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.75,0.3)

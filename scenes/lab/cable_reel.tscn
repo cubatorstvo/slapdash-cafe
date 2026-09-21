@@ -1,0 +1,47 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_spool"]
+albedo_color = Color(0.690196,0.537255,0.384314,1)
+[sub_resource type="StandardMaterial3D" id="Mat_cable"]
+albedo_color = Color(0.164706,0.211765,0.203922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_handle"]
+albedo_color = Color(0.321569,0.552941,0.509804,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="TorusMesh" id="Mesh_torus"]
+inner_radius = 0.20
+outer_radius = 0.29
+
+[node name="CableReel" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="Core" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.31,0)
+rotation = Vector3(1.570796,0,0)
+scale = Vector3(0.55,0.30,0.55)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_spool")
+[node name="Cable1" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.31,0)
+rotation = Vector3(1.570796,0,0)
+mesh = SubResource("Mesh_torus")
+material_override = SubResource("Mat_cable")
+[node name="Cable2" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.31,0.04)
+rotation = Vector3(1.570796,0,0)
+scale = Vector3(0.88,0.88,0.88)
+mesh = SubResource("Mesh_torus")
+material_override = SubResource("Mat_cable")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(0.40,0.45,0)
+rotation = Vector3(0,0,1.570796)
+scale = Vector3(0.09,0.35,0.09)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_handle")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0.40,0.48,0)
+[node name="CableEndAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.38,0.18,0)

@@ -5,6 +5,7 @@ const LoungeLayout = preload("res://scripts/lounge_layout.gd")
 const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeFurniture = preload("res://scripts/lounge_furniture.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 
 const CAFE_X_MIN := Expansion.HALL_X_MIN
 const CAFE_X_MAX := Expansion.HALL_X_MAX
@@ -84,8 +85,13 @@ static func build_shell(owner_game: Node3D) -> void:
 	var lab_back:=LabLayout.back(lab_tier)
 	var lab_width:=LAB_X_MAX-lab_left
 	var lab_depth:=lab_back-CAFE_BACK_Z
-	Props.box(parent,Vector3(lab_width,0.09,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+lab_back)*0.5),Color("60756f"))
-	Props.collision_box(parent,Vector3(lab_width,0.2,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+lab_back)*0.5))
+	var authored_lab: Node3D=null
+	if lab_tier>=2:
+		authored_lab=SceneRuntime.instantiate("res://scenes/lab/laboratory_room.tscn") as Node3D
+		parent.add_child(authored_lab)
+	else:
+		Props.box(parent,Vector3(lab_width,0.09,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.05,(CAFE_BACK_Z+lab_back)*0.5),Color("60756f"))
+		Props.collision_box(parent,Vector3(lab_width,0.2,lab_depth),Vector3((lab_left+LAB_X_MAX)*0.5,-0.10,(CAFE_BACK_Z+lab_back)*0.5))
 	var rest_right: float=LoungeLayout.right_x(tier)
 	var rest_back: float=LoungeLayout.back_z(tier)
 	var rest_width:=rest_right-REST_X_MIN
@@ -95,10 +101,15 @@ static func build_shell(owner_game: Node3D) -> void:
 		Props.collision_box(parent,Vector3(rest_width,0.2,rest_depth),Vector3((REST_X_MIN+rest_right)*0.5,-0.10,(CAFE_BACK_Z+rest_back)*0.5))
 	_build_cafe_back_wall(parent,wall_color,building_stage,p)
 	# Laboratory keeps its existing internal footprint; its current outside edges become expansion partitions.
-	_add_room_edge(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5),wall_color,lab_tier<2,Vector3.RIGHT)
-	_add_room_edge(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back),wall_color,lab_tier<2,Vector3.BACK)
 	var shared_depth:=maxf(lab_back,rest_back if building_stage>=2 else lab_back)-CAFE_BACK_Z
-	Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,shared_depth),Vector3(DIVIDER_X,WALL_Y,CAFE_BACK_Z+shared_depth*0.5),wall_color)
+	if lab_tier>=2:
+		Props.collision_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5))
+		Props.collision_box(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back))
+		Props.collision_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,shared_depth),Vector3(DIVIDER_X,WALL_Y,CAFE_BACK_Z+shared_depth*0.5))
+	else:
+		_add_room_edge(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,lab_depth),Vector3(lab_left,WALL_Y,(CAFE_BACK_Z+lab_back)*0.5),wall_color,true,Vector3.RIGHT)
+		_add_room_edge(parent,Vector3(lab_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((lab_left+LAB_X_MAX)*0.5,WALL_Y,lab_back),wall_color,true,Vector3.BACK)
+		Props.solid_box(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,shared_depth),Vector3(DIVIDER_X,WALL_Y,CAFE_BACK_Z+shared_depth*0.5),wall_color)
 	if building_stage>=2:
 		_add_room_edge(parent,Vector3(WALL_THICKNESS,WALL_HEIGHT,rest_depth),Vector3(rest_right,WALL_Y,(CAFE_BACK_Z+rest_back)*0.5),wall_color,tier<2,Vector3.LEFT)
 		Props.solid_box(parent,Vector3(rest_width,WALL_HEIGHT,WALL_THICKNESS),Vector3((REST_X_MIN+rest_right)*0.5,WALL_Y,rest_back),wall_color)
@@ -111,7 +122,7 @@ static func build_shell(owner_game: Node3D) -> void:
 		rest_sign.pixel_size = 0.005
 		_build_rest_furniture(parent,owner_game,tier,p)
 	for spec in [[Vector3((lab_left+LAB_X_MAX)*0.5,3.25,CAFE_BACK_Z+2.75),Color("b7e0cb")]]:
-		var light := OmniLight3D.new()
+		var light := SceneRuntime.instantiate("res://scenes/runtime/omni_light.tscn") as OmniLight3D
 		parent.add_child(light)
 		light.position = Vector3(spec[0])
 		light.light_color = Color(spec[1])
@@ -122,17 +133,15 @@ static func _add_room_edge(parent: Node3D,size: Vector3,center: Vector3,color: C
 	if not temporary:
 		Props.solid_box(parent,size,center,color)
 		return
-	Props.solid_box(parent,size,center,Color("9b815d"))
+	var partition:=SceneRuntime.instantiate("res://scenes/cafe/expansion_partition.tscn") as Node3D
+	parent.add_child(partition); partition.position=Vector3(center.x,0,center.z)
 	var along_x:=size.x>size.z
 	var length:=size.x if along_x else size.z
-	var frame_offset:=inward*0.16
-	var rail:=Vector3(length,0.12,0.08) if along_x else Vector3(0.08,0.12,length)
-	Props.box(parent,rail,center+frame_offset+Vector3(0,2.10,0),Color("3f4747"))
-	Props.box(parent,rail,center+frame_offset-Vector3(0,2.10,0),Color("3f4747"))
-	var band:=Vector3(maxf(0.4,length-0.2),0.24,0.06) if along_x else Vector3(0.06,0.24,maxf(0.4,length-0.2))
-	Props.box(parent,band,center+inward*0.19+Vector3(0,-1.7,0),Color("e3bd36"))
-	var label:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.23+Vector3(0,-0.35,0),20,Color("fff2b0"))
-	label.rotation.y=atan2(inward.x,inward.z)
+	partition.scale.x=length/8.0
+	if not along_x: partition.rotation.y=PI/2.0
+	var label:=partition.get_node_or_null("Sign") as Label3D
+	if label!=null: label.rotation.y=atan2(inward.x,inward.z)-partition.rotation.y
+	Props.collision_box(parent,size,center)
 
 static func _build_cafe_back_wall(parent: Node3D, color: Color, building_stage: int, p) -> void:
 	var openings := [Vector2(LAB_DOOR_X-DOOR_WIDTH*0.5,LAB_DOOR_X+DOOR_WIDTH*0.5)]
@@ -160,12 +169,9 @@ static func _build_rest_furniture(parent: Node3D, owner_game: Node3D, tier: int,
 	parent.add_child(lounge)
 	lounge.setup(owner_game,tier,p.lounge_items if p!=null else ["sofa"],p.lounge_upgrades if p!=null else [])
 	var center := player_bed_center(0,tier)
-	Props.solid_box(parent,Vector3(2.65,0.28,1.25),Vector3(center.x,0.26,center.z),Color("80634f"))
-	Props.box(parent,Vector3(2.45,0.18,1.07),Vector3(center.x,0.47,center.z),Color("c1ae82"))
-	Props.box(parent,Vector3(0.62,0.13,0.98),Vector3(center.x+0.82,0.61,center.z),Color("e7dcc0"))
-	Props.box(parent,Vector3(1.12,0.035,1.07),Vector3(center.x-0.45,0.59,center.z),Color("528d82"))
-	var sign:=Props.text(parent,"ШЕФ-КРОВАТЬ\nВсем хватит места",center+Vector3(0,1.7,0.65),23,Color("f1d9ae"))
-	sign.rotation.y=PI
+	var bed:=SceneRuntime.instantiate("res://scenes/lounge/chef_bed.tscn") as Node3D
+	parent.add_child(bed); bed.position=center; bed.rotation.y=PI
+	Props.collision_box(parent,Vector3(2.65,0.28,1.25),center+Vector3(0,0.26,0))
 
 func setup(owner_game: Node3D) -> void:
 	game = owner_game
@@ -184,24 +190,18 @@ func _sync_doors() -> void:
 	if Expansion.stage_for_progress(game.service.progress)>=2:
 		_build_door("rest",REST_DOOR_X,Color("8bb0a4"))
 
-func _build_door(id: String, door_x: float, color: Color) -> void:
-	var root := Node3D.new()
-	root.name = "%sDoor" % id.capitalize()
-	add_child(root)
-	root.position = Vector3(door_x,0,CAFE_BACK_Z-0.015)
-	var leaves: Array = []
-	for side in [-1.0,1.0]:
-		var leaf := Node3D.new()
-		root.add_child(leaf)
-		var closed_x: float = float(side) * DOOR_WIDTH * 0.25
-		var open_x: float = float(side) * DOOR_WIDTH * 0.69
-		leaf.position = Vector3(closed_x,DOOR_HEIGHT*0.5,0)
-		Props.moving_solid_box(leaf,Vector3(DOOR_WIDTH*0.46,DOOR_HEIGHT,0.11),Vector3.ZERO,color)
-		var inset := Props.box(leaf,Vector3(DOOR_WIDTH*0.32,0.72,0.025),Vector3(0,0.18,-0.065),Color("b8d0c7"))
-		inset.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		inset.material_override.albedo_color.a = 0.45
-		leaves.append({"node":leaf,"closed":closed_x,"open":open_x})
-	doors[id] = {"root":root,"leaves":leaves,"amount":0.0,"hold":0.0}
+func _build_door(id: String, door_x: float, _color: Color) -> void:
+	var root:=SceneRuntime.instantiate("res://scenes/cafe/automatic_sliding_door.tscn") as Node3D
+	root.name="%sDoor"%id.capitalize(); add_child(root); root.position=Vector3(door_x,0,CAFE_BACK_Z-0.015)
+	var leaves: Array=[]
+	for data in [[-1.0,"LeftLeaf"],[1.0,"RightLeaf"]]:
+		var side: float=float(data[0]); var body:=root.get_node(str(data[1])) as AnimatableBody3D
+		var pivot:=Node3D.new(); pivot.name=str(data[1])+"Pivot"; root.add_child(pivot)
+		body.reparent(pivot,false); body.position=Vector3.ZERO
+		var closed_x: float=side*DOOR_WIDTH*0.25; var open_x: float=side*DOOR_WIDTH*0.69
+		pivot.position=Vector3(closed_x,DOOR_HEIGHT*0.5,0)
+		leaves.append({"node":pivot,"closed":closed_x,"open":open_x})
+	doors[id]={"root":root,"leaves":leaves,"amount":0.0,"hold":0.0}
 
 func _physics_process(delta: float) -> void:
 	if game==null: return

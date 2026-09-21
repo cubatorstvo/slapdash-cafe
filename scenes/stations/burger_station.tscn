@@ -1,0 +1,116 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/burger_assembly_plate.tscn" id="1_assembly"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.662745, 0.470588, 0.333333, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.203922, 0.305882, 0.32549, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_griddle"]
+albedo_color = Color(0.184314, 0.203922, 0.215686, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_bar"]
+albedo_color = Color(0.294118, 0.32549, 0.333333, 1)
+[sub_resource type="StandardMaterial3D" id="Mat_plate"]
+albedo_color = Color(1, 0.941176, 0.831373, 1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="BoxShape3D" id="Shape_counter"]
+size = Vector3(6.1, 0.9, 2.25)
+
+[node name="BurgerStation" type="Node3D"]
+[node name="CounterBody" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="CounterBody"]
+position = Vector3(0,0.49,0)
+shape = SubResource("Shape_counter")
+[node name="CounterTop" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.92,0)
+scale = Vector3(6.1,0.16,2.25)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="LeftLeg" type="MeshInstance3D" parent="."]
+position = Vector3(-2.65,0.435,0)
+scale = Vector3(0.18,0.87,1.8)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="RightLeg" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.435,0)
+scale = Vector3(0.18,0.87,1.8)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="Griddle" type="Node3D" parent="."]
+position = Vector3(0,1.03,-0.28)
+[node name="Plate" type="MeshInstance3D" parent="Griddle"]
+scale = Vector3(1.55,0.055,1.05)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_griddle")
+[node name="Bars" type="Node3D" parent="Griddle"]
+[node name="Bar1" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,-0.34)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="Bar2" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,-0.20)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="Bar3" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,-0.06)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="Bar4" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,0.08)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="Bar5" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,0.22)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="Bar6" type="MeshInstance3D" parent="Griddle/Bars"]
+position = Vector3(0,0.035,0.36)
+scale = Vector3(1.35,0.012,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_bar")
+[node name="AssemblyPlate" parent="." instance=ExtResource("1_assembly")]
+position = Vector3(0,1.035,0.72)
+[node name="StationLabel" type="Label3D" parent="."]
+position = Vector3(0,1.28,-1.2)
+billboard = 1
+pixel_size = 0.005
+text = "ОБЩАЯ ЖАРОЧНАЯ"
+[node name="Anchors" type="Node3D" parent="."]
+[node name="Customer" type="Marker3D" parent="Anchors"]
+position = Vector3(0,0,-1.85)
+[node name="CookGrill" type="Marker3D" parent="Anchors"]
+position = Vector3(-1.35,0,1.85)
+[node name="CookAssembly" type="Marker3D" parent="Anchors"]
+position = Vector3(1.35,0,1.85)
+[node name="Patty" type="Marker3D" parent="Anchors"]
+position = Vector3(-2.2,1.015,0.22)
+[node name="PattySpatula" type="Marker3D" parent="Anchors"]
+position = Vector3(-1.55,1.015,-0.62)
+[node name="Seasoning" type="Marker3D" parent="Anchors"]
+position = Vector3(-2.38,1.015,-0.68)
+[node name="Bun" type="Marker3D" parent="Anchors"]
+position = Vector3(2.15,1.015,0.18)
+[node name="Cheese" type="Marker3D" parent="Anchors"]
+position = Vector3(1.38,1.015,-0.68)
+[node name="SauceBottle" type="Marker3D" parent="Anchors"]
+position = Vector3(2.18,1.015,-0.68)
+[node name="ChiliBottle" type="Marker3D" parent="Anchors"]
+position = Vector3(2.6,1.015,-0.68)
+[node name="GriddleCenter" type="Marker3D" parent="Anchors"]
+position = Vector3(0,1.065,-0.28)
+[node name="AssemblyCenter" type="Marker3D" parent="Anchors"]
+position = Vector3(0,1.055,0.72)
+[node name="Bell" type="Marker3D" parent="Anchors"]
+position = Vector3(0,1.035,1.08)

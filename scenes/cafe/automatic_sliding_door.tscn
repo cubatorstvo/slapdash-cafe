@@ -1,0 +1,45 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_door"]
+albedo_color = Color(0.529412,0.662745,0.623529,1)
+[sub_resource type="StandardMaterial3D" id="Mat_glass"]
+albedo_color = Color(0.721569,0.815686,0.780392,0.45)
+transparency = 1
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_leaf"]
+size = Vector3(0.828,2.55,0.11)
+
+[node name="AutomaticSlidingDoor" type="Node3D"]
+[node name="LeftLeaf" type="AnimatableBody3D" parent="."]
+position = Vector3(-0.45,1.275,0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="LeftLeaf"]
+shape = SubResource("Shape_leaf")
+[node name="Panel" type="MeshInstance3D" parent="LeftLeaf"]
+scale = Vector3(0.828,2.55,0.11)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_door")
+[node name="Inset" type="MeshInstance3D" parent="LeftLeaf"]
+position = Vector3(0,0.18,-0.065)
+scale = Vector3(0.576,0.72,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_glass")
+[node name="RightLeaf" type="AnimatableBody3D" parent="."]
+position = Vector3(0.45,1.275,0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="RightLeaf"]
+shape = SubResource("Shape_leaf")
+[node name="Panel" type="MeshInstance3D" parent="RightLeaf"]
+scale = Vector3(0.828,2.55,0.11)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_door")
+[node name="Inset" type="MeshInstance3D" parent="RightLeaf"]
+position = Vector3(0,0.18,-0.065)
+scale = Vector3(0.576,0.72,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_glass")
+[node name="TriggerCenter" type="Marker3D" parent="."]
+position = Vector3(0,0,0)
+[node name="LeftOpen" type="Marker3D" parent="."]
+position = Vector3(-1.242,1.275,0)
+[node name="RightOpen" type="Marker3D" parent="."]
+position = Vector3(1.242,1.275,0)

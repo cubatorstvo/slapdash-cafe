@@ -1,0 +1,41 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.937255,0.913725,0.839216,1)
+[sub_resource type="StandardMaterial3D" id="Mat_band"]
+albedo_color = Color(0.345098,0.52549,0.529412,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderShape3D" id="Shape_tool"]
+radius = 0.08
+height = 0.22
+[node name="PastaSaltTool" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.11,0)
+shape = SubResource("Shape_tool")
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.11,0)
+scale = Vector3(0.15,0.22,0.15)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_body")
+[node name="Band" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.12,-0.078)
+scale = Vector3(0.11,0.05,0.012)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_band")
+[node name="Cap" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.235,0)
+scale = Vector3(0.155,0.03,0.155)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_band")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.13,0)
+[node name="SprinkleAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.255,0)

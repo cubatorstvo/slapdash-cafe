@@ -1,0 +1,76 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157,0.423529,0.309804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+albedo_color = Color(0.14902,0.239216,0.270588,1)
+[sub_resource type="StandardMaterial3D" id="Mat_water"]
+albedo_color = Color(0.352941,0.647059,0.666667,0.23)
+transparency = 1
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.862745,0.643137,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_fish"]
+albedo_color = Color(0.843137,0.560784,0.498039,1)
+[sub_resource type="StandardMaterial3D" id="Mat_plant"]
+albedo_color = Color(0.321569,0.552941,0.509804,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="Aquarium" type="Node3D"]
+[node name="Cabinet" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.35,0)
+scale = Vector3(1.8,0.70,0.70)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="TankBack" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.14,0.31)
+scale = Vector3(1.72,0.75,0.02)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_water")
+[node name="TankFront" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.15,-0.322)
+scale = Vector3(1.71,0.73,0.018)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_water")
+[node name="Top" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.56,0)
+scale = Vector3(1.81,0.07,0.70)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_ink")
+[node name="Gravel" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.78,0)
+scale = Vector3(1.72,0.03,0.62)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_gold")
+[node name="PlantL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.62,1.02,0.08)
+rotation = Vector3(0,0,0.2)
+scale = Vector3(0.08,0.42,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_plant")
+[node name="PlantR" type="MeshInstance3D" parent="."]
+position = Vector3(0.55,1.08,0.10)
+rotation = Vector3(0,0,-0.3)
+scale = Vector3(0.08,0.48,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_plant")
+[node name="Fish1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.45,1.16,-0.10)
+scale = Vector3(0.31,0.14,0.10)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_gold")
+[node name="Fish2" type="MeshInstance3D" parent="."]
+position = Vector3(0.15,1.32,-0.08)
+scale = Vector3(0.27,0.12,0.09)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_fish")
+[node name="Fish3" type="MeshInstance3D" parent="."]
+position = Vector3(0.52,1.06,-0.12)
+scale = Vector3(0.25,0.11,0.08)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_gold")
+[node name="ViewerAnchor" type="Marker3D" parent="."]
+position = Vector3(1.05,0,0)

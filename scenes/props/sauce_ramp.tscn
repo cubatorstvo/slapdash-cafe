@@ -1,0 +1,83 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_chute"]
+albedo_color = Color(0.717647,0.780392,0.733333,1)
+[sub_resource type="StandardMaterial3D" id="Mat_track"]
+albedo_color = Color(0.768627,0.356863,0.278431,1)
+[sub_resource type="StandardMaterial3D" id="Mat_rail"]
+albedo_color = Color(0.835294,0.796078,0.698039,1)
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.447059,0.529412,0.47451,1)
+[sub_resource type="StandardMaterial3D" id="Mat_spoon"]
+albedo_color = Color(0.894118,0.713725,0.407843,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="SauceRamp" type="Node3D"]
+[node name="Chute" type="Node3D" parent="."]
+position = Vector3(2.65,0.975,0.1)
+rotation = Vector3(0.409251,0,0)
+[node name="Body" type="MeshInstance3D" parent="Chute"]
+position = Vector3(0,-0.045,0)
+scale = Vector3(0.56,0.07,1.734)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_chute")
+[node name="Track" type="MeshInstance3D" parent="Chute"]
+scale = Vector3(0.45,0.015,1.634)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_track")
+[node name="LeftRail" type="MeshInstance3D" parent="Chute"]
+position = Vector3(-0.27,0.04,0)
+scale = Vector3(0.035,0.16,1.734)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_rail")
+[node name="RightRail" type="MeshInstance3D" parent="Chute"]
+position = Vector3(0.27,0.04,0)
+scale = Vector3(0.035,0.16,1.734)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_rail")
+[node name="RearSupport" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.60,-0.65)
+scale = Vector3(0.08,1.20,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="FrontSupport" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.275,0.85)
+scale = Vector3(0.08,0.55,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="SpringSpoon" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.70,0.85)
+rotation = Vector3(-0.55,0,0)
+scale = Vector3(0.48,0.045,0.42)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_spoon")
+[node name="Spring1" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.45,0.85)
+scale = Vector3(0.28,0.025,0.24)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="Spring2" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.495,0.85)
+scale = Vector3(0.28,0.025,0.24)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="Spring3" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.54,0.85)
+scale = Vector3(0.28,0.025,0.24)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="Spring4" type="MeshInstance3D" parent="."]
+position = Vector3(2.65,0.585,0.85)
+scale = Vector3(0.28,0.025,0.24)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="Start" type="Marker3D" parent="."]
+position = Vector3(2.65,1.30,-0.65)
+[node name="End" type="Marker3D" parent="."]
+position = Vector3(2.65,0.65,0.85)
+[node name="Label" type="Label3D" parent="."]
+position = Vector3(2.65,1.60,-0.65)
+billboard = 1
+pixel_size = 0.003
+text = "СОУСНЫЙ ТРАМПЛИН"

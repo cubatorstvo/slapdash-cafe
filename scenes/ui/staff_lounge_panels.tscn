@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.090196,0.180392,0.188235,0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8,0.72,0.5,0.18)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+
+[node name="StaffLoungePanels" type="PanelContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Column" type="VBoxContainer" parent="."]
+theme_override_constants/separation = 12
+[node name="Heading" type="Label" parent="Column"]
+theme_override_font_sizes/font_size = 24
+text = "КОМНАТА ОТДЫХА"
+[node name="Status" type="Label" parent="Column"]
+text = "Размер комнаты · места отдыха · качество отдыха"
+[node name="ExpansionCard" type="PanelContainer" parent="Column"]
+theme_override_styles/panel = SubResource("Panel")
+[node name="Row" type="HBoxContainer" parent="Column/ExpansionCard"]
+[node name="Name" type="Label" parent="Column/ExpansionCard/Row"]
+size_flags_horizontal = 3
+text = "Расширение комнаты"
+[node name="Expand" type="Button" parent="Column/ExpansionCard/Row"]
+text = "Расширить"
+[node name="ItemsHeading" type="Label" parent="Column"]
+theme_override_font_sizes/font_size = 20
+text = "РАЗВЛЕЧЕНИЯ"
+[node name="ItemCard" type="PanelContainer" parent="Column"]
+theme_override_styles/panel = SubResource("Panel")
+[node name="Box" type="VBoxContainer" parent="Column/ItemCard"]
+[node name="Top" type="HBoxContainer" parent="Column/ItemCard/Box"]
+[node name="Name" type="Label" parent="Column/ItemCard/Box/Top"]
+size_flags_horizontal = 3
+text = "Диван / автомат / настольная игра"
+[node name="Buy" type="Button" parent="Column/ItemCard/Box/Top"]
+text = "Купить"
+[node name="Detail" type="Label" parent="Column/ItemCard/Box"]
+text = "1 место отдыха · бонус на следующий день"
+[node name="RestQuality" type="ProgressBar" parent="Column"]
+value = 72.0

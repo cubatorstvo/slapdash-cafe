@@ -21,67 +21,21 @@ var port: SpinBox
 
 func _ready() -> void:
 	layer = 15
-	panel = _panel(760, 620)
-	var scroll := ScrollContainer.new()
-	panel.add_child(scroll)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	training_box = _column(scroll)
-	training_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.hide()
-	var box: VBoxContainer
-	net_panel = _panel(620, 650)
-	box = _column(net_panel)
-	_label(box, "ИГРАТЬ С ДРУЗЬЯМИ", 23)
-	_button(box, "Пригласить друга через Steam", func(): steam_requested.emit("invite"))
-	_button(box, "Создать Steam-кафе", func(): steam_requested.emit("host"))
-	_label(box, "Shift+Tab → друзья → пригласить в игру", 17)
-	_label(box, "Прямое подключение по IP (для локальной проверки)", 15)
-	player_name = LineEdit.new()
-	player_name.text = "Повар"
-	player_name.placeholder_text = "Имя игрока"
-	box.add_child(player_name)
-	address = LineEdit.new()
-	address.text = "127.0.0.1"
-	address.placeholder_text = "IP хоста"
-	box.add_child(address)
-	port = SpinBox.new()
-	port.min_value = 1024
-	port.max_value = 65535
-	port.value = 27666
-	box.add_child(port)
-	_button(box, "Создать сессию", func(): network_requested.emit("host", address.text, int(port.value), player_name.text))
-	_button(box, "Подключиться", func(): network_requested.emit("join", address.text, int(port.value), player_name.text))
-	_button(box, "Отключиться", func(): network_requested.emit("leave", "", 0, ""))
-	net_status = _label(box, "Steam: проверяю подключение…")
-	net_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	net_status.custom_minimum_size = Vector2(540, 62)
-	_button(box, "Вернуться в кафе", close)
-	net_panel.hide()
-
-func _panel(width: float, height: float) -> PanelContainer:
-	var result := PanelContainer.new()
-	add_child(result)
-	result.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	result.offset_left = -width / 2
-	result.offset_right = width / 2
-	result.offset_top = -height / 2
-	result.offset_bottom = height / 2
-	result.theme = CafeStyle.make()
-	var style := CafeStyle.box(Color("213b3c"), 20, 24)
-	style.bg_color = Color("203b43")
-	style.content_margin_left = 22
-	style.content_margin_right = 22
-	style.content_margin_top = 20
-	style.content_margin_bottom = 20
-	result.add_theme_stylebox_override("panel", style)
-	return result
-
-func _column(parent: Control) -> VBoxContainer:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 9)
-	parent.add_child(box)
-	return box
+	var root := get_node("Root") as Control
+	root.theme = CafeStyle.make()
+	panel = get_node("Root/MenuPanel") as PanelContainer
+	training_box = get_node("Root/MenuPanel/Scroll/TrainingBox") as VBoxContainer
+	net_panel = get_node("Root/NetworkPanel") as PanelContainer
+	player_name = get_node("Root/NetworkPanel/Column/PlayerName") as LineEdit
+	address = get_node("Root/NetworkPanel/Column/DirectAddress") as LineEdit
+	port = get_node("Root/NetworkPanel/Column/Port") as SpinBox
+	net_status = get_node("Root/NetworkPanel/Column/NetworkStatus") as Label
+	(get_node("Root/NetworkPanel/Column/Invite") as Button).pressed.connect(func(): steam_requested.emit("invite"))
+	(get_node("Root/NetworkPanel/Column/SteamHost") as Button).pressed.connect(func(): steam_requested.emit("host"))
+	(get_node("Root/NetworkPanel/Column/Create") as Button).pressed.connect(func(): network_requested.emit("host", address.text, int(port.value), player_name.text))
+	(get_node("Root/NetworkPanel/Column/Join") as Button).pressed.connect(func(): network_requested.emit("join", address.text, int(port.value), player_name.text))
+	(get_node("Root/NetworkPanel/Column/Leave") as Button).pressed.connect(func(): network_requested.emit("leave", "", 0, ""))
+	(get_node("Root/NetworkPanel/Column/Back") as Button).pressed.connect(close)
 
 func _label(parent: Control, value: String, size := 17) -> Label:
 	var label := Label.new()

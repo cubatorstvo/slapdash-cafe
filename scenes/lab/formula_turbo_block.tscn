@@ -1,0 +1,47 @@
+[gd_scene load_steps=9 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_power"]
+albedo_color = Color(0.729412,0.564706,0.403922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_teal"]
+albedo_color = Color(0.466667,0.619608,0.607843,1)
+[sub_resource type="StandardMaterial3D" id="Mat_green"]
+albedo_color = Color(0.505882,0.654902,0.596078,1)
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.823529,0.698039,0.482353,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[node name="FormulaTurboBlock" type="Node3D"]
+[node name="Module" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,0)
+scale = Vector3(0.38,0.34,0.28)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_power")
+[node name="Lamp1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.10,0.05,-0.15)
+scale = Vector3(0.07,0.07,0.07)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_green")
+[node name="Lamp2" type="MeshInstance3D" parent="."]
+position = Vector3(0.00,0.05,-0.15)
+scale = Vector3(0.07,0.07,0.07)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_green")
+[node name="Lamp3" type="MeshInstance3D" parent="."]
+position = Vector3(0.10,0.05,-0.15)
+scale = Vector3(0.07,0.07,0.07)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_green")
+[node name="Label" type="Label3D" parent="."]
+position = Vector3(0,0.32,0)
+billboard = 1
+pixel_size = 0.003
+font_size = 16
+text = "ТУРБОБЛОК ФОРМУЛЫ"
+[node name="MountAnchor" type="Marker3D" parent="."]
+position = Vector3(0,-0.17,0)

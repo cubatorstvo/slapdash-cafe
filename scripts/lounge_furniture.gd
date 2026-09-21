@@ -3,6 +3,7 @@ extends Node3D
 const P = preload("res://scripts/props.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
 const MoviePlayer = preload("res://scripts/masterclass_movie_player.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 const WOOD := Color("976c4f")
 const DARK_WOOD := Color("503e35")
 const CREAM := Color("f1d9ae")
@@ -32,38 +33,48 @@ func setup(owner_game: Node3D, room_tier := 0, items: Array = ["sofa"], upgrades
 	improved=upgrades.duplicate()
 	name="StaffLounge"
 	add_to_group("staff_lounge")
+	preload("res://scripts/scene_runtime.gd").ensure_children(self,"res://scenes/lounge/staff_lounge.tscn")
+	# Annex owns the staged room shell and chef bed; this scene supplies all authored furnishings.
+	for shell_name in ["Floor","BackWall","LeftWall","RightWall","ChefBed"]:
+		var shell_node:=get_node_or_null(shell_name) as Node3D
+		if shell_node!=null: shell_node.hide()
+	var scene_names: Dictionary={
+		"sofa":"Sofa","television":"Television","rocking_chair":"RockingChair","foosball":"Foosball",
+		"arcade":"Arcade","table_tennis":"TableTennis","board_games":"BoardGames","bookcase":"Bookcase",
+		"beanbag":"Beanbag","tea_station":"TeaStation","jukebox":"Jukebox","aquarium":"Aquarium",
+		"plants":"Plant","floor_lamp":"FloorLamp","snack_fridge":"SnackFridge"
+	}
+	for scene_name in scene_names.values():
+		var scene_node:=get_node_or_null(str(scene_name)) as Node3D
+		if scene_node!=null: scene_node.hide()
+	var sofa_rug:=get_node_or_null("SofaRug") as Node3D
+	if sofa_rug!=null: sofa_rug.visible="sofa" in owned
 	for spec in Layout.catalogue(tier,owned):
-		var item:=Node3D.new()
-		item.name=str(spec.id).to_pascal_case()
-		add_child(item)
+		var id:=str(spec.id)
+		if not scene_names.has(id): continue
+		var item:=get_node(str(scene_names[id])) as Node3D
+		item.show()
 		item.position=spec.position
 		item.rotation.y=float(spec.yaw)
-		item.set_meta("lounge_item",spec.id)
+		item.set_meta("lounge_item",id)
 		item.set_meta("future_stage",spec.stage)
-		fixtures[spec.id]=item
-		match str(spec.id):
-			"sofa": build_sofa(item)
-			"television": build_tv(item)
-			"rocking_chair": build_rocker(item)
-			"foosball": build_foosball(item)
-			"arcade": build_arcade(item)
-			"table_tennis": build_pingpong(item)
-			"board_games": build_board_games(item)
-			"bookcase": build_bookcase(item)
-			"beanbag": build_beanbag(item)
-			"tea_station": build_tea(item)
-			"jukebox": build_jukebox(item)
-			"aquarium": build_aquarium(item)
-			"plants": build_plant(item,1.0)
-			"floor_lamp": build_lamp(item)
-			"snack_fridge": build_fridge(item)
-		if spec.id in improved:
-			# A visible brass badge and fresh upholstery identify improved furnishings.
+		fixtures[id]=item
+		if id in improved:
 			var badge:=label(item,"★",Vector3(0,1.55,0),30)
-			badge.modulate=GOLD
-			badge.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-			box(item,Vector3(0.42,0.035,0.28),Vector3(0,0.12,-0.48),GOLD)
-	build_interior()
+			badge.modulate=GOLD; badge.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	# Bind ambient-animation targets authored inside their furniture scenes.
+	if fixtures.has("television"):
+		var tv: Node3D=fixtures.television
+		television_screen=tv.get_node("Screen") as MeshInstance3D
+		television_ball=tv.get_node("Moon") as Node3D
+		television_status=tv.get_node("Status") as Label3D
+		movie_player=MoviePlayer.new(); add_child(movie_player); movie_player.setup(television_screen)
+	if fixtures.has("rocking_chair"): rocking_root=fixtures.rocking_chair
+	if fixtures.has("foosball"):
+		for i in range(1,7): rods.append(fixtures.foosball.get_node("Rod%d"%i))
+	if fixtures.has("table_tennis"): pong_ball=fixtures.table_tennis.get_node("Ball") as Node3D
+	if fixtures.has("aquarium"):
+		for i in range(1,4): fishes.append(fixtures.aquarium.get_node("Fish%d"%i))
 	# Shared footprint proxies keep walking and clone routes consistent.
 	var blockers:=Layout.obstacles(tier,owned)
 	var heights:=Layout.obstacle_heights(tier,owned)
@@ -307,7 +318,7 @@ func build_fridge(parent: Node3D) -> void:
 	box(parent,Vector3(0.04,0.56,0.08),Vector3(0.39,1.0,-0.48),WOOD)
 
 func add_light(parent: Node3D, at: Vector3, color: Color, energy: float, radius: float) -> void:
-	var light:=OmniLight3D.new()
+	var light:=SceneRuntime.instantiate("res://scenes/runtime/omni_light.tscn") as OmniLight3D
 	parent.add_child(light)
 	light.position=at
 	light.light_color=color

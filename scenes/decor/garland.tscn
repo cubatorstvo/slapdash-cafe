@@ -1,0 +1,96 @@
+[gd_scene load_steps=4 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_wire"]
+albedo_color = Color(0.2,0.243137,0.223529,1)
+[sub_resource type="StandardMaterial3D" id="Mat_bulb"]
+albedo_color = Color(1,0.843137,0.54902,1)
+emission_enabled = true
+emission = Color(1,0.843137,0.54902,1)
+emission_energy_multiplier = 1.3
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[node name="Garland" type="Node3D"]
+[node name="Bulbs" type="Node3D" parent="."]
+[node name="Bulb01" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-10.000,3.700,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb02" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-8.200,3.622,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb03" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-6.400,3.548,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb04" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-4.600,3.482,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb05" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-2.800,3.426,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb06" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(-1.000,3.385,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb07" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(0.800,3.359,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb08" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(2.600,3.350,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb09" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(4.400,3.359,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb10" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(6.200,3.385,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb11" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(8.000,3.426,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb12" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(9.800,3.482,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb13" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(11.600,3.548,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb14" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(13.400,3.622,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Bulb15" type="MeshInstance3D" parent="Bulbs"]
+position = Vector3(15.200,3.700,-5.7)
+scale = Vector3(0.17,0.17,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_bulb")
+[node name="Anchor1" type="Marker3D" parent="."]
+position = Vector3(-10,3.7,-5.7)
+[node name="Anchor2" type="Marker3D" parent="."]
+position = Vector3(-1,3.35,-5.7)
+[node name="Anchor3" type="Marker3D" parent="."]
+position = Vector3(8,3.7,-5.7)
+[node name="Anchor4" type="Marker3D" parent="."]
+position = Vector3(15.2,3.7,-5.7)

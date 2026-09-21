@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/plate.tscn" id="1_plate"]
+[ext_resource type="PackedScene" path="res://scenes/props/sausage.tscn" id="2_sausage"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_sauce"]
+albedo_color = Color(0.709804,0.196078,0.286275,1)
+
+[node name="SausageServing" type="Node3D"]
+[node name="Plate" parent="." instance=ExtResource("1_plate")]
+[node name="Sausage" parent="." instance=ExtResource("2_sausage")]
+position = Vector3(0,0.09,0)
+rotation = Vector3(0,0.35,0)
+scale = Vector3(0.88,0.88,0.88)
+[node name="SauceStripe" type="Label3D" parent="."]
+position = Vector3(0,0.19,-0.01)
+rotation = Vector3(-1.570796,0,0)
+pixel_size = 0.002
+font_size = 30
+text = "~~~"
+modulate = Color(0.709804,0.196078,0.286275,1)
+[node name="PickupAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.20,0)

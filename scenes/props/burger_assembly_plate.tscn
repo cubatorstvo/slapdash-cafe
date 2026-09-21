@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/plate.tscn" id="1_plate"]
+
+[node name="BurgerAssemblyPlate" type="Node3D"]
+[node name="Plate" parent="." instance=ExtResource("1_plate")]
+[node name="BottomBunAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.07,0)
+[node name="PattyAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.16,0)
+[node name="CheeseAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.24,0)
+[node name="TopBunAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.32,0)
+[node name="SauceAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.36,0)

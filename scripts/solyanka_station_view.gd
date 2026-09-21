@@ -14,27 +14,29 @@ var is_production := false
 
 func build(production := false) -> void:
 	is_production = production
-	P.solid_box(self,Vector3(6.1,0.10,4.9),Vector3(0,0.96,0),Color("6c5542"))
-	P.box(self,Vector3(5.9,0.08,4.7),Vector3(0,1.02,0),Color("a67f5b"))
-	P.cylinder(self,0.88,0.70,Vector3(M.POT.x,1.28,M.POT.y),Color("3b4144"),0.77)
-	broth = P.cylinder(self,0.70,0.045,Vector3(M.POT.x,1.62,M.POT.y),Color("a64f35"))
-	for side in [-1,1]:
-		var handle := P.box(self,Vector3(0.50,0.09,0.12),Vector3(side*1.02,1.45,M.POT.y),Color("2a3032"))
-		handle.rotation.z = side*0.08
-	fire_root = Node3D.new(); add_child(fire_root)
-	for i in range(5):
-		var flame := P.ball(fire_root,0.13,Vector3(sin(i*1.4)*0.32,1.00+0.05*(i%2),M.POT.y+cos(i*1.4)*0.25),Color("e98236"))
-		flame.scale = Vector3(0.75,1.65,0.75)
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	runtime.ensure_children(self,"res://scenes/stations/solyanka_station.tscn")
+	broth=get_node("Cauldron/Broth") as MeshInstance3D
+	fire_root=get_node("Cauldron/Fire") as Node3D
+	var item_scenes:={
+		"lighter":"res://scenes/props/solyanka_lighter.tscn", "potato":"res://scenes/props/solyanka_potato.tscn", "onion":"res://scenes/props/solyanka_onion.tscn",
+		"tomato":"res://scenes/props/solyanka_tomato.tscn", "carrot":"res://scenes/props/solyanka_carrot.tscn", "garlic":"res://scenes/props/solyanka_garlic.tscn",
+		"boot":"res://scenes/props/solyanka_boot.tscn", "paddle":"res://scenes/props/solyanka_paddle.tscn", "cabbage":"res://scenes/props/solyanka_cabbage.tscn",
+		"cucumber":"res://scenes/props/solyanka_cucumber.tscn", "beet":"res://scenes/props/solyanka_beet.tscn", "pepper":"res://scenes/props/solyanka_pepper.tscn",
+		"zucchini":"res://scenes/props/solyanka_zucchini.tscn", "mug":"res://scenes/props/solyanka_mug.tscn", "salt":"res://scenes/props/solyanka_salt.tscn",
+		"pickle":"res://scenes/props/solyanka_pickle.tscn", "lemon":"res://scenes/props/solyanka_lemon.tscn", "sausage":"res://scenes/props/solyanka_sausage.tscn",
+		"mushroom":"res://scenes/props/solyanka_mushroom.tscn", "eggplant":"res://scenes/props/solyanka_eggplant.tscn", "bolt":"res://scenes/props/solyanka_bolt.tscn"
+	}
 	for item in M.ITEMS:
-		var node := Node3D.new(); add_child(node); items[item] = node
-		_build_item(node,item)
-		var mark := P.cylinder(self,0.16,0.008,Vector3.ZERO,Color("f3d690")); marks[item] = mark
+		var node:=runtime.instantiate(str(item_scenes[item])) as Node3D
+		add_child(node); items[item]=node
+		var mark:=P.cylinder(self,0.16,0.008,Vector3.ZERO,Color("f3d690")); marks[item]=mark
 	for role in range(3):
-		var actor := Avatar.new(); actor.tint = [Color("a56b58"),Color("6e9c83"),Color("8b78a8")][role]; add_child(actor); actors.append(actor); actor.visible = production
-	station_label = P.text(self,"СОЛЯНКА · ТРИ РОЛИ" if production else "ПОКАЖИ ВТРОЁМ",Vector3(0,1.30,-2.15),25,Color("f2cc8a")); station_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	# WorkStation expects a status node for team stations. It intentionally carries no recipe progress:
-	# live progress belongs only in the cookbook.
-	status = P.text(self,"",Vector3(0,-20,0),1,Color(0,0,0,0)); status.hide()
+		var actor:=Avatar.new(); actor.tint=[Color("a56b58"),Color("6e9c83"),Color("8b78a8")][role]; add_child(actor); actors.append(actor); actor.visible=production
+	station_label=get_node("StationLabel") as Label3D
+	station_label.text="СОЛЯНКА · ТРИ РОЛИ" if production else "ПОКАЖИ ВТРОЁМ"
+	station_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+	status=P.text(self,"",Vector3(0,-20,0),1,Color(0,0,0,0)); status.hide()
 
 func _build_item(parent: Node3D, item: String) -> void:
 	match item:

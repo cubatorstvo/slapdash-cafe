@@ -1,0 +1,40 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_primary"]
+albedo_color = Color(0.427451,0.698039,0.603922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_secondary"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.227451,0.360784,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.827451,0.705882,0.490196,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="WateringTool" type="Node3D"]
+[node name="Can" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.10,0)
+scale = Vector3(0.26,0.22,0.26)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_primary")
+[node name="Spout" type="MeshInstance3D" parent="."]
+position = Vector3(0.16,0.20,0)
+rotation = Vector3(0,0,-1.05)
+scale = Vector3(0.07,0.38,0.07)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_accent")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(-0.17,0.22,0)
+rotation = Vector3(0,0,0.65)
+scale = Vector3(0.05,0.25,0.05)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_secondary")
+[node name="PourAnchor" type="Marker3D" parent="."]
+position = Vector3(0.34,0.25,0)

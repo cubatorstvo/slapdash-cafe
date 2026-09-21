@@ -1,0 +1,180 @@
+[gd_scene load_steps=14 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_clothes"]
+albedo_color = Color(0.65098, 0.423529, 0.462745, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.160784, 0.239216, 0.294118, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_shoe"]
+albedo_color = Color(0.141176, 0.196078, 0.231373, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.909804, 0.721569, 0.576471, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_eye"]
+albedo_color = Color(0.12549, 0.235294, 0.25098, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_mouth"]
+albedo_color = Color(0.203922, 0.109804, 0.145098, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_stain"]
+albedo_color = Color(0.85098, 0.282353, 0.231373, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_chef"]
+albedo_color = Color(1, 0.941176, 0.796078, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="Customer" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.96, 0)
+scale = Vector3(0.59, 0.61, 0.33)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_clothes")
+
+[node name="LeftLeg" type="Node3D" parent="."]
+position = Vector3(-0.14, 0.65, 0)
+
+[node name="Upper" type="MeshInstance3D" parent="LeftLeg"]
+position = Vector3(0, -0.23, 0)
+scale = Vector3(0.18, 0.58, 0.2)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="Shoe" type="MeshInstance3D" parent="LeftLeg"]
+position = Vector3(0, -0.56, -0.06)
+scale = Vector3(0.21, 0.13, 0.34)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_shoe")
+
+[node name="RightLeg" type="Node3D" parent="."]
+position = Vector3(0.14, 0.65, 0)
+
+[node name="Upper" type="MeshInstance3D" parent="RightLeg"]
+position = Vector3(0, -0.23, 0)
+scale = Vector3(0.18, 0.58, 0.2)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="Shoe" type="MeshInstance3D" parent="RightLeg"]
+position = Vector3(0, -0.56, -0.06)
+scale = Vector3(0.21, 0.13, 0.34)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_shoe")
+
+[node name="LeftShoulder" type="Node3D" parent="."]
+position = Vector3(-0.36, 1.16, 0)
+
+[node name="Arm" type="MeshInstance3D" parent="LeftShoulder"]
+position = Vector3(0, -0.22, 0)
+scale = Vector3(0.14, 0.5, 0.18)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_clothes")
+
+[node name="Hand" type="MeshInstance3D" parent="LeftShoulder"]
+position = Vector3(0, -0.49, 0)
+scale = Vector3(0.17, 0.17, 0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_skin")
+
+[node name="RightShoulder" type="Node3D" parent="."]
+position = Vector3(0.36, 1.16, 0)
+
+[node name="Arm" type="MeshInstance3D" parent="RightShoulder"]
+position = Vector3(0, -0.22, 0)
+scale = Vector3(0.14, 0.5, 0.18)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_clothes")
+
+[node name="Hand" type="MeshInstance3D" parent="RightShoulder"]
+position = Vector3(0, -0.49, 0)
+scale = Vector3(0.17, 0.17, 0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_skin")
+
+[node name="Head" type="Node3D" parent="."]
+position = Vector3(0, 1.51, 0)
+
+[node name="Face" type="MeshInstance3D" parent="Head"]
+scale = Vector3(0.48, 0.48, 0.48)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_skin")
+
+[node name="LeftEye" type="MeshInstance3D" parent="Head"]
+position = Vector3(-0.08, 0.04, -0.22)
+scale = Vector3(0.054, 0.054, 0.054)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+
+[node name="RightEye" type="MeshInstance3D" parent="Head"]
+position = Vector3(0.08, 0.04, -0.22)
+scale = Vector3(0.054, 0.054, 0.054)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+
+[node name="Hair" type="MeshInstance3D" parent="Head"]
+position = Vector3(0, 0.13, 0.025)
+scale = Vector3(0.5, 0.24, 0.5)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+
+[node name="Mouth" type="MeshInstance3D" parent="Head"]
+position = Vector3(0, -0.035, -0.248)
+scale = Vector3(0.082, 0.0246, 0.0492)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_mouth")
+
+[node name="Stain" type="MeshInstance3D" parent="Head"]
+visible = false
+position = Vector3(0, -0.01, -0.235)
+scale = Vector3(0.26, 0.26, 0.039)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_stain")
+
+[node name="ChefVariant" type="Node3D" parent="."]
+visible = false
+
+[node name="Hat" type="MeshInstance3D" parent="ChefVariant"]
+position = Vector3(0, 1.78, 0)
+scale = Vector3(0.52, 0.22, 0.52)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_chef")
+
+[node name="Apron" type="MeshInstance3D" parent="ChefVariant"]
+position = Vector3(0, 0.91, -0.185)
+scale = Vector3(0.38, 0.5, 0.04)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_chef")
+
+[node name="MouthAnchor" type="Marker3D" parent="Head"]
+position = Vector3(0, -0.035, -0.28)
+
+[node name="FoodLookAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 1.45, -0.55)
+
+[node name="MealHandAnchor" type="Marker3D" parent="."]
+position = Vector3(0.36, 1.16, 0)
+
+[node name="Caption" type="Label3D" parent="."]
+position = Vector3(0, 2.05, 0)
+billboard = 1
+pixel_size = 0.005
+text = ""
+
+[node name="DrinkLabel" type="Label3D" parent="."]
+position = Vector3(0, 2.32, 0)
+billboard = 1
+pixel_size = 0.005
+text = ""

@@ -28,133 +28,46 @@ var event_feed_panel: PanelContainer
 var event_feed_text: Label
 
 func _ready() -> void:
-	var root := Control.new()
-	add_child(root)
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var root := get_node("Root") as Control
 	root.theme = CafeStyle.make()
-	var top := _panel(root)
-	top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	top.offset_left = 26
-	top.offset_right = -26
-	top.offset_top = 22
-	top.offset_bottom = 190
-	var row := HBoxContainer.new()
-	top.add_child(row)
-	row.add_theme_constant_override("separation", 24)
-	var brand := VBoxContainer.new()
-	row.add_child(brand)
-	_label(brand,"SLAPDASH",22,CafeStyle.GOLD)
-	_label(brand,"C A F E",12,CafeStyle.MINT)
-	var order := VBoxContainer.new()
-	row.add_child(order)
-	order.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	goal = _label(order,"",20)
-	clone_status = _label(order,"",14,CafeStyle.MINT)
-	equipment_warning = _label(order,"",14,Color("f0b06b"))
-	equipment_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	equipment_warning.max_lines_visible = 2
-	journey = _label(order,"",15,CafeStyle.CREAM)
-	journey.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	journey.max_lines_visible = 2
-	clock = _label(row,"",18,CafeStyle.GOLD)
-	var office_button := Button.new()
-	row.add_child(office_button)
-	office_button.text = "Кафе"
-	office_button.hide()
+	goal = get_node("Root/Top/Row/Order/Goal") as Label
+	clone_status = get_node("Root/Top/Row/Order/CloneStatus") as Label
+	clone_status.add_theme_color_override("font_color", CafeStyle.MINT)
+	equipment_warning = get_node("Root/Top/Row/Order/EquipmentWarning") as Label
+	equipment_warning.add_theme_color_override("font_color", Color("f0b06b"))
+	journey = get_node("Root/Top/Row/Order/Journey") as Label
+	journey.add_theme_color_override("font_color", CafeStyle.CREAM)
+	clock = get_node("Root/Top/Row/Clock") as Label
+	clock.add_theme_color_override("font_color", CafeStyle.GOLD)
+	var office_button := get_node("Root/Top/Row/CafeButton") as Button
 	office_button.pressed.connect(func(): office_requested.emit())
-	progress = ProgressBar.new()
-	order.add_child(progress)
-	progress.hide()
-	event_feed_panel=_panel(root)
-	event_feed_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	event_feed_panel.offset_left=26
-	event_feed_panel.offset_right=560
-	event_feed_panel.offset_top=204
-	event_feed_panel.offset_bottom=310
-	event_feed_text=_label(event_feed_panel,"",14,CafeStyle.CREAM)
-	event_feed_text.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-	event_feed_text.max_lines_visible=4
-	event_feed_panel.hide()
-	recipe_panel = _panel(root)
-	recipe_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	recipe_panel.offset_left = -346
-	recipe_panel.offset_right = -26
-	recipe_panel.offset_top = 204
-	recipe_panel.offset_bottom = 204
-	recipe_panel.custom_minimum_size = Vector2(320, 0)
-	recipe_scroll = ScrollContainer.new()
-	recipe_panel.add_child(recipe_scroll)
-	recipe_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	recipe_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	recipe_scroll.custom_minimum_size = Vector2(300, 0)
-	recipe_content = VBoxContainer.new()
-	recipe_scroll.add_child(recipe_content)
-	recipe_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	recipe_content.add_theme_constant_override("separation", 8)
-	recipe_text = Label.new()
-	root.add_child(recipe_text)
-	recipe_text.hide()
-	recipe_panel.hide()
-	bottom = _panel(root)
-	bottom.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	bottom.offset_left = 120
-	bottom.offset_right = -120
-	bottom.offset_top = -90
-	bottom.offset_bottom = -16
-	var column := VBoxContainer.new()
-	bottom.add_child(column)
-	controls = _label(column,"",16)
-	controls.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	supplies = _label(column,"",14,CafeStyle.MINT)
-	supplies.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	notice = _label(root,"",16,CafeStyle.GOLD)
-	notice.hide()
-	crosshair = _label(root,"·",32)
-	crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	crosshair.offset_left = -8
-	crosshair.offset_top = -22
-	prompt = _label(root,"",17)
-	prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	prompt.offset_left = -410
-	prompt.offset_right = 410
-	prompt.offset_top = 42
-	prompt.offset_bottom = 80
-	prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	prompt.add_theme_constant_override("outline_size",5)
-	prompt.add_theme_color_override("font_outline_color",CafeStyle.INK)
-	visit_status = _label(root,"",15,CafeStyle.MINT)
-	visit_status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	visit_status.offset_left=130; visit_status.offset_right=-130
-	visit_status.offset_top=-122; visit_status.offset_bottom=-96
-	visit_status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
-	toast = _label(root,"",24,CafeStyle.GOLD)
-	toast.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	toast.offset_left = -390
-	toast.offset_right = 390
-	toast.offset_top = -155
-	toast.offset_bottom = -112
-	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	toast.add_theme_constant_override("outline_size",6)
-	toast.add_theme_color_override("font_outline_color",CafeStyle.INK)
-	toast.modulate.a = 0
-	pause_panel = _panel(root)
-	pause_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	pause_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	pause_panel.offset_left = -240
-	pause_panel.offset_right = 240
-	pause_panel.offset_top = -120
-	pause_panel.offset_bottom = 120
-	var pause := VBoxContainer.new()
-	pause_panel.add_child(pause)
-	pause.add_theme_constant_override("separation",20)
-	_label(pause,"Небольшой перерыв",26,CafeStyle.GOLD)
-	_label(pause,"Кофе подождёт.",18)
-	var resume := Button.new()
-	pause.add_child(resume)
-	resume.text = "Вернуться в кафе"
+	progress = get_node("Root/Top/Row/Order/Progress") as ProgressBar
+	event_feed_panel = get_node("Root/EventFeed") as PanelContainer
+	event_feed_text = get_node("Root/EventFeed/Text") as Label
+	event_feed_text.add_theme_color_override("font_color", CafeStyle.CREAM)
+	recipe_panel = get_node("Root/RecipePanel") as PanelContainer
+	recipe_scroll = get_node("Root/RecipePanel/Scroll") as ScrollContainer
+	recipe_content = get_node("Root/RecipePanel/Scroll/Content") as VBoxContainer
+	recipe_text = get_node("Root/RecipeText") as Label
+	bottom = get_node("Root/Bottom") as PanelContainer
+	controls = get_node("Root/Bottom/Column/Controls") as Label
+	supplies = get_node("Root/Bottom/Column/Supplies") as Label
+	supplies.add_theme_color_override("font_color", CafeStyle.MINT)
+	notice = get_node("Root/Notice") as Label
+	notice.add_theme_color_override("font_color", CafeStyle.GOLD)
+	crosshair = get_node("Root/Crosshair") as Label
+	prompt = get_node("Root/Prompt") as Label
+	prompt.add_theme_constant_override("outline_size", 5)
+	prompt.add_theme_color_override("font_outline_color", CafeStyle.INK)
+	visit_status = get_node("Root/VisitStatus") as Label
+	visit_status.add_theme_color_override("font_color", CafeStyle.MINT)
+	toast = get_node("Root/Toast") as Label
+	toast.add_theme_color_override("font_color", CafeStyle.GOLD)
+	toast.add_theme_constant_override("outline_size", 6)
+	toast.add_theme_color_override("font_outline_color", CafeStyle.INK)
+	pause_panel = get_node("Root/PausePanel") as PanelContainer
+	var resume := get_node("Root/PausePanel/Pause/Resume") as Button
 	resume.pressed.connect(func(): resume_requested.emit())
-	pause_panel.hide()
 
 func show_chef_request(order: Dictionary) -> void:
 	var text: String = preload("res://scripts/chef_orders.gd").special_request(order)
@@ -191,16 +104,6 @@ func show_toast(message: String) -> void:
 	toast_tween = create_tween()
 	toast_tween.tween_interval(1.5)
 	toast_tween.tween_property(toast,"modulate:a",0.0,0.5)
-
-func _panel(parent: Control) -> PanelContainer:
-	var panel := PanelContainer.new()
-	parent.add_child(panel)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := CafeStyle.box(Color(0.055,0.115,0.12,0.92),16,16)
-	style.border_color = Color(0.8,0.72,0.5,0.18)
-	style.set_border_width_all(1)
-	panel.add_theme_stylebox_override("panel",style)
-	return panel
 
 func _label(parent: Node, value: String, size: int, color := CafeStyle.CREAM) -> Label:
 	var label := Label.new()

@@ -1,0 +1,77 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_cover"]
+albedo_color = Color(0.47451, 0.341176, 0.27451, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_paper"]
+albedo_color = Color(1, 0.945098, 0.788235, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_line"]
+albedo_color = Color(0.541176, 0.588235, 0.564706, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_pencil"]
+albedo_color = Color(0.898039, 0.705882, 0.333333, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_pencil"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="CookNotebook" type="Node3D"]
+
+[node name="Cover" type="MeshInstance3D" parent="."]
+scale = Vector3(0.32, 0.025, 0.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cover")
+
+[node name="Paper" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.018, 0)
+scale = Vector3(0.28, 0.008, 0.36)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_paper")
+
+[node name="Line1" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.024, -0.13)
+scale = Vector3(0.21, 0.003, 0.008)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_line")
+
+[node name="Line2" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.024, -0.075)
+scale = Vector3(0.21, 0.003, 0.008)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_line")
+
+[node name="Line3" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.024, -0.02)
+scale = Vector3(0.21, 0.003, 0.008)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_line")
+
+[node name="Line4" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.024, 0.035)
+scale = Vector3(0.21, 0.003, 0.008)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_line")
+
+[node name="Line5" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.024, 0.09)
+scale = Vector3(0.21, 0.003, 0.008)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_line")
+
+[node name="Pencil" type="MeshInstance3D" parent="."]
+position = Vector3(0.06, 0.12, 0)
+rotation = Vector3(0, 0, -0.643501)
+scale = Vector3(0.024, 0.233, 0.024)
+mesh = SubResource("Mesh_pencil")
+material_override = SubResource("Mat_pencil")
+
+[node name="LeftHandAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.14, 0, 0)
+
+[node name="WritingHandAnchor" type="Marker3D" parent="."]
+position = Vector3(0.1, 0.13, -0.01)

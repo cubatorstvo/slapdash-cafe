@@ -3,6 +3,7 @@ extends Node
 const Station=preload("res://scripts/work_station.gd")
 const Highlights=preload("res://scripts/masterclass_highlights.gd")
 const Definition=preload("res://scripts/station_definition.gd")
+const SceneRuntime=preload("res://scripts/scene_runtime.gd")
 var viewport: SubViewport
 var world_root: Node3D
 var camera: Camera3D
@@ -31,11 +32,11 @@ func setup(target_screen: MeshInstance3D)->void:
 	camera.current=true
 	camera.fov=57.0
 	camera.near=0.05
-	var light:=DirectionalLight3D.new()
+	var light:=SceneRuntime.instantiate("res://scenes/runtime/directional_light.tscn") as DirectionalLight3D
 	world_root.add_child(light)
 	light.rotation_degrees=Vector3(-55,-25,0)
 	light.light_energy=1.4
-	var fill:=OmniLight3D.new()
+	var fill:=SceneRuntime.instantiate("res://scenes/runtime/omni_light.tscn") as OmniLight3D
 	world_root.add_child(fill)
 	fill.position=Vector3(0,4,-2)
 	fill.omni_range=10

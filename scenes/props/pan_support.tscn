@@ -1,0 +1,69 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.160784, 0.239216, 0.266667, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_burner"]
+albedo_color = Color(0.92549, 0.580392, 0.34902, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="TorusMesh" id="Mesh_ring"]
+inner_radius = 0.42
+outer_radius = 0.47
+
+[node name="PanSupport" type="Node3D"]
+
+[node name="FootFL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.65, 1.0825, -0.52)
+scale = Vector3(0.12, 0.135, 0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="FootFR" type="MeshInstance3D" parent="."]
+position = Vector3(0.65, 1.0825, -0.52)
+scale = Vector3(0.12, 0.135, 0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="FootBL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.65, 1.0825, 0.52)
+scale = Vector3(0.12, 0.135, 0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="FootBR" type="MeshInstance3D" parent="."]
+position = Vector3(0.65, 1.0825, 0.52)
+scale = Vector3(0.12, 0.135, 0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="FrontRail" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.155, 0.52)
+scale = Vector3(1.42, 0.05, 0.10)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="BackRail" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.155, -0.52)
+scale = Vector3(1.42, 0.05, 0.10)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="LeftRail" type="MeshInstance3D" parent="."]
+position = Vector3(-0.65, 1.155, 0)
+scale = Vector3(0.10, 0.05, 1.04)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="RightRail" type="MeshInstance3D" parent="."]
+position = Vector3(0.65, 1.155, 0)
+scale = Vector3(0.10, 0.05, 1.04)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+
+[node name="Burner" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.305, 0)
+mesh = SubResource("Mesh_ring")
+material_override = SubResource("Mat_burner")
