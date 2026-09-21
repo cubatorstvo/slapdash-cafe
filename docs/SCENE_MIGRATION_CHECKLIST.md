@@ -122,7 +122,7 @@
 - [x] Television + cabinet — `scenes/lounge/television_cabinet.tscn`
 - [x] Rocking chair — `scenes/lounge/rocking_chair.tscn`
 - [x] Foosball — `scenes/lounge/foosball.tscn`
-- [ ] Arcade machine
+- [x] Arcade machine — `scenes/lounge/arcade_machine.tscn`
 - [ ] Table tennis
 - [ ] Board games
 - [ ] Bookcase
