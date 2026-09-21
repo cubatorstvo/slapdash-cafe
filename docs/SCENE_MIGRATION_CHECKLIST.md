@@ -79,7 +79,7 @@
 - [x] Mushroom — `scenes/props/solyanka_mushroom.tscn`
 - [x] Eggplant — `scenes/props/solyanka_eggplant.tscn`
 - [x] Boot — `scenes/props/solyanka_boot.tscn`
-- [ ] Bolt
+- [x] Bolt — `scenes/props/solyanka_bolt.tscn`
 
 ## Готовая еда / подача
 - [ ] Wine serving
