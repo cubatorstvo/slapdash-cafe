@@ -32,7 +32,7 @@
 - [x] Holed pan — `scenes/props/holed_pan.tscn`
 - [x] Sauce bowl — `scenes/props/sauce_bowl.tscn`
 - [x] Potato — `scenes/props/potato.tscn`
-- [ ] Sausage
+- [x] Sausage — `scenes/props/sausage.tscn`
 - [ ] Tomato
 
 ## Meat & pasta props
