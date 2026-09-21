@@ -118,7 +118,7 @@
 - [ ] Staff lounge authored room
 - [ ] Chef bed
 - [ ] Sofa
-- [ ] Coffee table
+- [x] Coffee table — `scenes/lounge/coffee_table.tscn`
 - [ ] Television + cabinet
 - [ ] Rocking chair
 - [ ] Foosball
