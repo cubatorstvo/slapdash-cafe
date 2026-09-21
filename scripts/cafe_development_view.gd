@@ -7,6 +7,7 @@ var game: Node3D
 var board: Node3D
 var decor := {}
 var slots: Array = []
+var zone_signs: Array = []
 var ribbon: Node3D
 var specialty_ribbon: Node3D
 var orchestration_ribbon: Node3D
@@ -26,7 +27,7 @@ func build(root_game: Node3D) -> void:
 	star_label = Props.text(board, "☆ ☆ ☆ ☆ ☆", Vector3(0, 0.95, 0.12), 30, Color("efcf91"))
 	star_label.pixel_size = 0.007
 	Props.box(board, Vector3(0.9, 0.12, 0.7), Vector3(0, 0.08, 0), Color("775e43"))
-	for i in range(6):
+	for i in range(Expansion.SLOT_COUNT):
 		var marker := Node3D.new()
 		add_child(marker)
 		marker.position = game.service.slot_position(i)
@@ -38,6 +39,11 @@ func build(root_game: Node3D) -> void:
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		label.pixel_size = 0.005
 		slots.append({"node": marker, "label": label})
+	for spec in [["A",Expansion.ZONE_A_CENTER,2],["B",Expansion.ZONE_B_CENTER,3],["C",Expansion.ZONE_C_CENTER,4],["D",Expansion.ZONE_D_CENTER,4]]:
+		var sign:=Props.text(self,"ЗОНА "+str(spec[0]),Vector3(spec[1])+Vector3(0,3.2,0),44,Color("f1d8a1"))
+		sign.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+		sign.pixel_size=0.014
+		zone_signs.append({"node":sign,"stage":spec[2]})
 	ribbon = Node3D.new()
 	add_child(ribbon)
 	Props.box(ribbon, Vector3(6.0, 0.11, 0.04), Vector3(13.8, 1.0, 0.65), Color("bfa565"))
@@ -80,10 +86,13 @@ func board_hit(camera: Camera3D) -> bool:
 
 func refresh() -> void:
 	var progress = game.service.progress
+	for sign in zone_signs: sign.node.visible = int(sign.stage)<=Expansion.stage_for_progress(progress)
 	for id in decor: decor[id].visible = id in progress.decorations
 	for i in range(slots.size()):
 		slots[i].node.visible = game.service.by_id(i + 1) == null and Expansion.slot_available(i,Expansion.stage_for_progress(progress))
-		if i < 3:
+		if i >= Expansion.BASE_SLOT_COUNT:
+			slots[i].label.text = Expansion.slot_label(i + 1) + "\n[E] Компьютер · выбрать кухню"
+		elif i < 3:
 			slots[i].label.text = "МЕСТО ДЛЯ СТОЙКИ\nПервая звезда" if progress.stars == 0 else "МЕСТО ДЛЯ СТОЙКИ\n[E] Компьютер · 120"
 		elif i == 3:
 			slots[i].label.text = "РАСШИРЕНИЕ ЗАЛА\nВторая звезда" if not progress.expanded else "КУХНЯ НА ДВОИХ\n[E] Компьютер · 250"

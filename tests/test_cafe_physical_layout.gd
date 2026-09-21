@@ -66,8 +66,11 @@ func run()->void:
 	print("2/5: visitor pockets for all four documented zones stay open from the central hall")
 	check_segment(game,"Zone A mouth",Vector3(0,1.35,Expansion.CHEF_FLOW_POINT.z),Vector3(Expansion.ZONE_A_CENTER.x,1.35,Expansion.ZONE_A_CENTER.z))
 	check_segment(game,"Zone B mouth",Vector3(0,1.35,Expansion.CHEF_FLOW_POINT.z),Vector3(Expansion.ZONE_B_CENTER.x,1.35,Expansion.ZONE_B_CENTER.z))
-	check_segment(game,"Zone C mouth",Vector3(0,1.35,Expansion.FRONT_FLOW_POINT.z),Vector3(Expansion.ZONE_C_CENTER.x,1.35,Expansion.ZONE_C_CENTER.z))
-	check_segment(game,"Zone D mouth",Vector3(0,1.35,Expansion.FRONT_FLOW_POINT.z),Vector3(Expansion.ZONE_D_CENTER.x,1.35,Expansion.ZONE_D_CENTER.z))
+	for center in [Expansion.ZONE_C_CENTER,Expansion.ZONE_D_NORTH,Expansion.ZONE_D_SOUTH]:
+		var route: Array=[Expansion.FRONT_FLOW_POINT]
+		route.append_array(Expansion._court_entry(center))
+		for i in range(route.size()-1):
+			check_segment(game,"front court approach",Vector3(route[i])+Vector3.UP*1.35,Vector3(route[i+1])+Vector3.UP*1.35)
 	print("3/5: starter cafe keeps a clear approach to fixed Chef")
 	set_stage(game,1); await physics_frame; await process_frame
 	check_segment(game,"starter central approach",Vector3(0,1.35,Expansion.entrance_z(1)+1.2),Vector3(0,1.35,1.35))

@@ -541,8 +541,8 @@ func _build_room_shell(stage: int) -> void:
 	layout_stage=stage
 	# Exterior and its collider share one footprint. The exterior top stays below the cafe floor,
 	# so it cannot z-fight with the walkable interior and there is no invisible ground beyond the slab.
-	Props.box(room_shell,Vector3(92.0,0.22,84.0),Vector3(0,-0.22,-9.0),Color("56615d"))
-	Props.collision_box(room_shell,Vector3(92.0,0.20,84.0),Vector3(0,-0.18,-9.0))
+	Props.box(room_shell,Vector3(96.0,0.22,100.0),Vector3(0,-0.22,-9.0),Color("56615d"))
+	Props.collision_box(room_shell,Vector3(96.0,0.20,100.0),Vector3(0,-0.18,-9.0))
 	var cells:=Expansion.hall_cells_for_stage(stage)
 	_build_room_floor(room_shell,stage)
 	_build_room_perimeter(room_shell,cells,stage)
@@ -559,13 +559,14 @@ func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> v
 func _build_room_floor(parent: Node3D,stage: int) -> void:
 	# Preserve the irregular A-D outline without overlapping coplanar floor slabs. Adjacent cells
 	# unlocked in the same expansion are merged into row runs.
-	var colors: Dictionary={1:Color("6c7c73"),2:Color("70827a"),3:Color("667970"),4:Color("748178")}
+	var colors: Dictionary={1:Color("6c7c73"),2:Color("70827a"),3:Color("667970"),4:Color("74786a"),5:Color("797164")}
 	var cells:=Expansion.hall_cells_for_stage(stage)
 	var rows: Dictionary={}
 	for raw_cell in cells:
 		var cell: Vector2i=raw_cell
 		var unlock:=int(cells[cell])
-		var key:=Vector2i(cell.y,unlock)
+		var floor_zone:=5 if unlock==4 and cell.x>=3 else unlock
+		var key:=Vector2i(cell.y,floor_zone)
 		if not rows.has(key): rows[key]=[]
 		rows[key].append(cell.x)
 	for raw_key in rows:

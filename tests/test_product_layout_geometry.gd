@@ -69,7 +69,7 @@ func run()->void:
 	for slot in range(1,Expansion.SLOT_COUNT): counts[Expansion.zone_for_slot(slot)]=int(counts.get(Expansion.zone_for_slot(slot),0))+1
 	check(counts["Zone A"]==5,"Zone A keeps five production places")
 	check(counts["Zone B"]==7,"Zone B keeps seven production places")
-	check(counts["Zone C"]==3 and counts["Zone D"]==4,"Current late-game capacity remains split between Zone C and Zone D")
+	check(counts["Zone C"]==8 and counts["Zone D"]==10,"Full prototype courts contain eight and ten places")
 
 	print("2/7: A and B begin on the Chef row instead of behind him")
 	var rear_a:=-INF
@@ -102,7 +102,8 @@ func run()->void:
 		var stage:=Expansion.unlock_stage_for_slot(slot)
 		var center:=Expansion.position(slot)
 		var customer:=center+Vector3(0,0,-1.85).rotated(Vector3.UP,Expansion.rotation_y(slot))
-		var arriving:=Expansion.route_from_entrance(customer,stage)
+		var arriving: Array=[Expansion.customer_spawn(stage)]
+		arriving.append_array(Expansion.cafe_route(arriving[0],customer,stage))
 		var leaving:=Expansion.route_to_exit(customer,stage)
 		check(arriving.has(Expansion.zone_center(slot)),"Entrance route to slot %d passes through its visitor pocket"%(slot+1))
 		check(leaving.has(Expansion.zone_center(slot)),"Exit route from slot %d passes through its visitor pocket"%(slot+1))

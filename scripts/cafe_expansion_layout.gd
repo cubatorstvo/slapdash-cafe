@@ -3,7 +3,7 @@ extends RefCounted
 ## The design scene uses compact placeholder tables; gameplay stations are larger, so the courts
 ## are scaled while preserving their topology: visitors inside, cooks outside, Chef as the rear
 ## centre anchor, and the main flow visible from the central hall.
-const SLOT_COUNT:=20
+const SLOT_COUNT:=31
 const BASE_SLOT_COUNT:=6
 const TILE:=2.0
 const HALL_X_MIN:=-40.0
@@ -11,23 +11,23 @@ const HALL_X_MAX:=40.0
 const HALL_BACK_Z:=14.0
 # Early stages keep a compact front door; the final expansion moves it forward between C/D.
 const EARLY_ENTRANCE_Z:=-8.0
-const FINAL_ENTRANCE_Z:=-32.0
+const FINAL_ENTRANCE_Z:=-48.0
 const CHEF_POSITION:=Vector3(0.0,0.0,5.1)
-const CHEF_FLOW_POINT:=Vector3(0.0,0.0,2.4)
-const FRONT_FLOW_POINT:=Vector3(0.0,0.0,-18.0)
+const CHEF_FLOW_POINT:=Vector3(0.0,0.0,0.0)
+const FRONT_FLOW_POINT:=Vector3(0.0,0.0,-23.0)
 const REAR_SPINE_POINT:=Vector3(0.0,0.0,11.2)
 # Compatibility aliases for systems that need a coarse central routing spine.
 const AISLE_XS: Array[float]=[-6.0,0.0,6.0]
 const LEFT_AISLE_X:=-6.0
 const RIGHT_AISLE_X:=6.0
-const MARKET_POSITION:=Vector3(6.0,0.0,11.0)
+const MARKET_POSITION:=Vector3(-4.5,0.0,8.8)
 const DECOR_SIGN_POSITION:=Vector3(1.5,2.8,13.84)
 const DECOR_PLANT_POINTS: Array[Vector2]=[Vector2(-4.0,12.0),Vector2(4.0,12.0)]
 const STAGE_NAMES:=['Красный','Синий','Зелёный','Жёлтый']
 const SECTION_ROWS: Array=[
 	{"name":"Zone B","slots":[6,7,8,9,10,11,12]},
-	{"name":"Zone C","slots":[13,14,15]},
-	{"name":"Zone D","slots":[16,17,18,19]}
+	{"name":"Zone C","slots":[13,14,15,20,21,22,23,24]},
+	{"name":"Zone D","slots":[16,17,18,19,25,26,27,28,29,30]}
 ]
 
 const TABLE_SKEWS: Array[float]=[-0.09,0.07,-0.04,0.11,-0.06]
@@ -35,8 +35,13 @@ const TABLE_SKEWS: Array[float]=[-0.09,0.07,-0.04,0.11,-0.06]
 # tables now begin roughly on the Chef's row, so both courts are visible from behind his counter.
 const ZONE_A_CENTER:=Vector3(20.0,0.0,1.0)
 const ZONE_B_CENTER:=Vector3(-20.0,0.0,1.0)
-const ZONE_C_CENTER:=Vector3(-17.0,0.0,-18.0)
-const ZONE_D_CENTER:=Vector3(17.0,0.0,-18.0)
+const ZONE_C_CENTER:=Vector3(-21.0,0.0,-27.0)
+const ZONE_D_CENTER:=Vector3(12.0,0.0,-29.0)
+const ZONE_D_NORTH:=Vector3(22.0,0.0,-21.0)
+const ZONE_D_SOUTH:=Vector3(24.0,0.0,-39.0)
+# Keep IDs 1-20 compatible with existing saves; additional places extend the two front courts.
+const C_SLOTS: Array[int]=[13,14,15,20,21,22,23,24]
+const D_SLOTS: Array[int]=[16,17,18,19,25,26,27,28,29,30]
 
 # Zone A: five-table crooked horseshoe, open on the west side toward Chef and the central plaza.
 const ZONE_A_POSITIONS: Array[Vector3]=[
@@ -48,13 +53,17 @@ const ZONE_B_POSITIONS: Array[Vector3]=[
 	Vector3(-10.0,0.0,6.0),Vector3(-19.0,0.0,6.0),Vector3(-28.0,0.0,6.0),
 	Vector3(-36.0,0.0,0.0),Vector3(-28.0,0.0,-5.0),Vector3(-19.0,0.0,-5.0),Vector3(-10.0,0.0,-5.0)
 ]
-# The current 20-slot game occupies only part of the larger documented late-game C/D courts.
-# These positions leave the public pockets open for later capacity growth.
+# C is an angular square with its upper-right corner open to the central promenade.
 const ZONE_C_POSITIONS: Array[Vector3]=[
-	Vector3(-24.0,0.0,-13.0),Vector3(-27.0,0.0,-21.0),Vector3(-18.0,0.0,-27.0)
+	Vector3(-21,0,-16),Vector3(-32,0,-26),Vector3(-20,0,-39),
+	Vector3(-30,0,-17),Vector3(-29,0,-36),Vector3(-10,0,-37),
+	Vector3(-7.5,0,-27),Vector3(-12,0,-16)
 ]
+# D has a perimeter and two back-to-back central kitchens separating connected guest pockets.
 const ZONE_D_POSITIONS: Array[Vector3]=[
-	Vector3(8.0,0.0,-25.0),Vector3(17.0,0.0,-27.0),Vector3(27.0,0.0,-22.0),Vector3(26.0,0.0,-13.0)
+	Vector3(12,0,-42),Vector3(23,0,-43),Vector3(34,0,-42),Vector3(36,0,-26),
+	Vector3(10,0,-16),Vector3(20,0,-16),Vector3(31,0,-17),Vector3(7,0,-29),
+	Vector3(22,0,-26),Vector3(24,0,-34)
 ]
 
 static func stage_for_progress(p)->int:
@@ -90,7 +99,7 @@ static func zone_for_slot(slot_index: int)->String:
 	if slot_index==0: return "Шеф"
 	if slot_index<=5: return "Zone A"
 	if slot_index<=12: return "Zone B"
-	if slot_index<=15: return "Zone C"
+	if slot_index in C_SLOTS: return "Zone C"
 	return "Zone D"
 
 static func unlock_stage_for_slot(slot_index: int)->int:
@@ -100,6 +109,9 @@ static func unlock_stage_for_slot(slot_index: int)->int:
 	return 4
 
 static func zone_center(slot_index: int)->Vector3:
+	if slot_index in D_SLOTS:
+		if slot_index==28: return ZONE_D_CENTER
+		return ZONE_D_NORTH if slot_index in [19,25,26,27,29] else ZONE_D_SOUTH
 	return zone_center_named(zone_for_slot(slot_index))
 
 static func zone_center_named(zone: String)->Vector3:
@@ -123,16 +135,19 @@ static func position(slot_index: int)->Vector3:
 	if slot_index==0: return CHEF_POSITION
 	if slot_index<=5: return ZONE_A_POSITIONS[slot_index-1]
 	if slot_index<=12: return ZONE_B_POSITIONS[slot_index-6]
-	if slot_index<=15: return ZONE_C_POSITIONS[slot_index-13]
-	return ZONE_D_POSITIONS[slot_index-16]
+	if slot_index in C_SLOTS: return ZONE_C_POSITIONS[C_SLOTS.find(slot_index)]
+	return ZONE_D_POSITIONS[D_SLOTS.find(slot_index)]
 
 static func rotation_y(slot_index: int)->float:
 	if slot_index==0: return 0.0
-	var point:=position(slot_index)
-	var inward:=(zone_center(slot_index)-point).normalized()
-	var skew:=TABLE_SKEWS[(slot_index-1)%TABLE_SKEWS.size()]
-	# WorkStation customers stand on local -Z; cooks therefore occupy the outside of each court.
-	return atan2(-inward.x,-inward.z)+skew
+	# Long runs face across the court instead of converging on one point: this keeps each
+	# customer's approach in front of its own kitchen, including the wider three-person model.
+	if slot_index in [6,7,8,13,20,24,25,26,27,30]: return 0.0
+	if slot_index in [10,11,12,15,21,22,16,17,18,29]: return PI
+	if slot_index in [9,14,28]: return -PI*0.5
+	if slot_index in [23,19]: return PI*0.5
+	var inward:=(zone_center(slot_index)-position(slot_index)).normalized()
+	return atan2(-inward.x,-inward.z)+TABLE_SKEWS[(slot_index-1)%TABLE_SKEWS.size()]
 
 static func section_for(slot_index: int)->String:
 	return zone_for_slot(slot_index)
@@ -156,42 +171,77 @@ static func zone_gate(point: Vector3)->Vector3:
 	var zone:=zone_for_point(point)
 	return Vector3(side,0.0,FRONT_FLOW_POINT.z if zone in ["Zone C","Zone D"] else CHEF_FLOW_POINT.z)
 
+static func visitor_focus(point: Vector3)->Vector3:
+	var zone:=zone_for_point(point)
+	if zone=="Zone D":
+		# The westmost counter faces the passage connecting both pockets.
+		if point.x<11.0 and point.z<-23.0 and point.z>-34.0: return ZONE_D_CENTER
+		return ZONE_D_NORTH if point.z>-30.0 else ZONE_D_SOUTH
+	return zone_center_named(zone)
+
 static func _append_unique(route: Array,point: Vector3)->void:
 	if route.is_empty() or Vector3(route.back()).distance_to(point)>0.2: route.append(point)
+
+static func _court_entry(target: Vector3)->Array:
+	var zone:=zone_for_point(target)
+	if zone=="Zone C": return [Vector3(-5,0,-21),Vector3(-16,0,-23),ZONE_C_CENTER]
+	if zone=="Zone D":
+		var focus:=visitor_focus(target)
+		var route: Array=[Vector3(5,0,-22),Vector3(14,0,-22)]
+		if focus==ZONE_D_NORTH: route.append(focus)
+		else:
+			route.append(Vector3(14,0,-29))
+			if focus==ZONE_D_SOUTH: route.append(Vector3(16,0,-39))
+			route.append(focus)
+		return route
+	return [zone_center_named(zone)] if not zone.is_empty() else []
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
 	var result: Array=[customer_spawn(stage)]
 	var zone:=zone_for_point(target)
-	if stage>=4 and zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
-	else: _append_unique(result,CHEF_FLOW_POINT)
-	if not zone.is_empty(): _append_unique(result,zone_center_named(zone))
+	_append_unique(result,FRONT_FLOW_POINT if stage>=4 and zone in ["Zone C","Zone D"] else CHEF_FLOW_POINT)
+	for point in _court_entry(target): _append_unique(result,point)
 	_append_unique(result,target)
 	return result
 
 static func route_to_exit(start: Vector3,stage: int)->Array:
-	var result: Array=[start]
-	var zone:=zone_for_point(start)
-	if not zone.is_empty(): _append_unique(result,zone_center_named(zone))
-	if stage>=4 and zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
-	else: _append_unique(result,CHEF_FLOW_POINT)
-	_append_unique(result,customer_exit(stage))
+	var result:=route_from_entrance(start,stage)
+	result.reverse()
+	result[result.size()-1]=customer_exit(stage)
+	return result
+
+static func _court_approach(point: Vector3)->Array:
+	var result:=_court_entry(point)
+	# Staff and installers approach from the back. Go around a table end before crossing
+	# between its public and working sides; all models fit the same reserved slot.
+	var nearest:=-1
+	var distance:=INF
+	for slot in range(SLOT_COUNT):
+		var d:=point.distance_squared_to(position(slot))
+		if d<distance:
+			distance=d
+			nearest=slot
+	if nearest>=0 and distance<25.0:
+		var center:=position(nearest)
+		var yaw:=rotation_y(nearest)
+		var local:=(point-center).rotated(Vector3.UP,-yaw)
+		if local.z>0.4:
+			var approach:=Vector3(result.back()) if not result.is_empty() else CHEF_FLOW_POINT
+			var side:=1.0 if (approach-center).rotated(Vector3.UP,-yaw).x>=0.0 else -1.0
+			for corner in [Vector3(side*4.2,0,-3.6),Vector3(side*4.2,0,maxf(local.z,3.6))]:
+				_append_unique(result,center+corner.rotated(Vector3.UP,yaw))
+	_append_unique(result,point)
 	return result
 
 static func route_to_rear(start: Vector3,target: Vector3)->Array:
-	var result: Array=[start]
+	var result:=_court_approach(start)
+	result.reverse()
 	var zone:=zone_for_point(start)
-	if zone in ["Zone C","Zone D"]:
-		_append_unique(result,zone_center_named(zone))
-		_append_unique(result,FRONT_FLOW_POINT)
+	if zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	if start.z<9.0:
 		_append_unique(result,CHEF_FLOW_POINT)
-	elif zone in ["Zone A","Zone B"]:
-		if start.z>8.5: _append_unique(result,REAR_SPINE_POINT)
-		else:
-			_append_unique(result,zone_center_named(zone))
-			_append_unique(result,CHEF_FLOW_POINT)
-	else:
-		if start.z<EARLY_ENTRANCE_Z: _append_unique(result,FRONT_FLOW_POINT)
-		_append_unique(result,CHEF_FLOW_POINT)
+		_append_unique(result,Vector3(4.8,0,CHEF_FLOW_POINT.z))
+		_append_unique(result,Vector3(4.8,0,REAR_SPINE_POINT.z))
 	_append_unique(result,REAR_SPINE_POINT)
 	_append_unique(result,target)
 	return result
@@ -200,16 +250,22 @@ static func cafe_route(start: Vector3,target: Vector3,stage: int,via_chef := tru
 	var result: Array=[]
 	var start_zone:=zone_for_point(start)
 	var target_zone:=zone_for_point(target)
-	# Short movements inside the entrance apron should remain local.
 	if start_zone.is_empty() and target_zone.is_empty() and start.distance_to(target)<=8.0:
-		_append_unique(result,target)
-		return result
-	if not start_zone.is_empty(): _append_unique(result,zone_center_named(start_zone))
+		return [target]
+	if not start_zone.is_empty():
+		var departure:=_court_approach(start)
+		departure.reverse()
+		for point in departure.slice(1): _append_unique(result,point)
 	if stage>=4 and start_zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	if start.z>=9.0 and start_zone.is_empty():
+		_append_unique(result,Vector3(4.8,0,REAR_SPINE_POINT.z))
+		_append_unique(result,Vector3(4.8,0,CHEF_FLOW_POINT.z))
 	if via_chef: _append_unique(result,CHEF_FLOW_POINT)
 	if stage>=4 and target_zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
-	if not target_zone.is_empty(): _append_unique(result,zone_center_named(target_zone))
-	_append_unique(result,target)
+	if target.z>=9.0 and target_zone.is_empty():
+		_append_unique(result,Vector3(4.8,0,CHEF_FLOW_POINT.z))
+		_append_unique(result,Vector3(4.8,0,REAR_SPINE_POINT.z))
+	for point in _court_approach(target): _append_unique(result,point)
 	return result
 
 static func hall_cells_for_stage(stage: int)->Dictionary:
@@ -221,9 +277,9 @@ static func hall_cells_for_stage(stage: int)->Dictionary:
 	# Stage 3: Zone B opens on the left without moving Chef or Zone A.
 	_mark_rect(plan,Rect2i(-20,-5,17,12),3)
 	# Stage 4: two separate front courts around the same central promenade.
-	_mark_rect(plan,Rect2i(-3,-16,6,12),4)
-	_mark_rect(plan,Rect2i(-17,-16,14,12),4)
-	_mark_rect(plan,Rect2i(3,-16,14,12),4)
+	_mark_rect(plan,Rect2i(-3,-24,6,20),4)
+	_mark_rect(plan,Rect2i(-19,-23,16,19),4)
+	_mark_rect(plan,Rect2i(3,-24,17,20),4)
 	var cells: Dictionary={}
 	for cell in plan:
 		var unlock:=int(plan[cell])
