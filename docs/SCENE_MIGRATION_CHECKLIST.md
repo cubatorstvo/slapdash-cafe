@@ -123,7 +123,7 @@
 - [x] Rocking chair — `scenes/lounge/rocking_chair.tscn`
 - [x] Foosball — `scenes/lounge/foosball.tscn`
 - [x] Arcade machine — `scenes/lounge/arcade_machine.tscn`
-- [ ] Table tennis
+- [x] Table tennis — `scenes/lounge/table_tennis.tscn`
 - [ ] Board games
 - [ ] Bookcase
 - [ ] Beanbag
