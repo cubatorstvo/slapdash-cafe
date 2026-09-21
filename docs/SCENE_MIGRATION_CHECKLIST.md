@@ -77,7 +77,7 @@
 - [x] Lemon — `scenes/props/solyanka_lemon.tscn`
 - [x] Sausage — `scenes/props/solyanka_sausage.tscn`
 - [x] Mushroom — `scenes/props/solyanka_mushroom.tscn`
-- [ ] Eggplant
+- [x] Eggplant — `scenes/props/solyanka_eggplant.tscn`
 - [ ] Boot
 - [ ] Bolt
 
