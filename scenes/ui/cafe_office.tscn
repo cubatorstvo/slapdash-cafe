@@ -1,0 +1,82 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.090196,0.180392,0.188235,0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8,0.72,0.5,0.18)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+
+[node name="CafeOffice" type="CanvasLayer"]
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 32.0
+offset_right = -28.0
+offset_bottom = -32.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Column" type="VBoxContainer" parent="Panel"]
+theme_override_constants/separation = 14
+[node name="Top" type="HBoxContainer" parent="Panel/Column"]
+[node name="Brand" type="Label" parent="Panel/Column/Top"]
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "ТЯП-ЛЯП / КАФЕ"
+[node name="Close" type="Button" parent="Panel/Column/Top"]
+text = "Вернуться в кафе · Esc"
+[node name="Body" type="HBoxContainer" parent="Panel/Column"]
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+[node name="SideScroll" type="ScrollContainer" parent="Panel/Column/Body"]
+custom_minimum_size = Vector2(208,0)
+horizontal_scroll_mode = 0
+[node name="Side" type="VBoxContainer" parent="Panel/Column/Body/SideScroll"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+[node name="Overview" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Обзор кафе"
+[node name="Groups" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Столы и обучение"
+[node name="Shop" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Интернет-магазин"
+[node name="Videos" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Мастер-классы"
+[node name="Laboratory" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Лаборатория"
+[node name="Lounge" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Комната отдыха"
+[node name="Stars" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Звёзды"
+[node name="Stats" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Статистика"
+[node name="Settings" type="Button" parent="Panel/Column/Body/SideScroll/Side"]
+text = "Сохранение и помощь"
+[node name="Main" type="VBoxContainer" parent="Panel/Column/Body"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+[node name="Heading" type="Label" parent="Panel/Column/Body/Main"]
+theme_override_font_sizes/font_size = 26
+text = "Обзор кафе"
+[node name="Status" type="Label" parent="Panel/Column/Body/Main"]
+theme_override_font_sizes/font_size = 15
+text = "Деньги · популярность · звёзды · гости"
+[node name="Timer" type="Label" parent="Panel/Column/Body/Main"]
+theme_override_font_sizes/font_size = 16
+text = "Смена"
+[node name="Scroll" type="ScrollContainer" parent="Panel/Column/Body/Main"]
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+[node name="Content" type="VBoxContainer" parent="Panel/Column/Body/Main/Scroll"]
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+[node name="Placeholder" type="Label" parent="Panel/Column/Body/Main/Scroll/Content"]
+text = "Содержимое выбранной страницы"
