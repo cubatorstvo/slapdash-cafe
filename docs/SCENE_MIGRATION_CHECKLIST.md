@@ -148,7 +148,7 @@
 - [x] Formula stabilizer / research apparatus — `scenes/lab/formula_stabilizer.tscn`
 - [x] Sample holder — `scenes/lab/sample_holder.tscn`
 - [x] Microscope — `scenes/lab/microscope.tscn`
-- [ ] Tool shelf
+- [x] Tool shelf — `scenes/lab/tool_shelf.tscn`
 - [ ] Pot rack / grow shelf
 
 ## Лаборатория — выращивание
