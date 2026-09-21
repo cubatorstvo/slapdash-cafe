@@ -141,7 +141,7 @@
 - [ ] Laboratory authored room
 - [x] Initial assembly bench — `scenes/lab/assembly_bench.tscn`
 - [x] Initial lab module 1 — `scenes/lab/initial_module_1.tscn`
-- [ ] Initial lab module 2
+- [x] Initial lab module 2 — `scenes/lab/initial_module_2.tscn`
 - [ ] Initial lab module 3
 - [ ] Initial switches / start button
 - [ ] Cable reel

@@ -1,0 +1,35 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_case"]
+albedo_color = Color(0.203922,0.301961,0.282353,1)
+[sub_resource type="StandardMaterial3D" id="Mat_face"]
+albedo_color = Color(0.847059,0.784314,0.615686,1)
+[sub_resource type="StandardMaterial3D" id="Mat_needle"]
+albedo_color = Color(0.913725,0.521569,0.388235,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="InitialLabModule2" type="Node3D"]
+[node name="Case" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.36,0)
+scale = Vector3(0.82,0.72,0.48)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_case")
+[node name="Gauge" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.43,-0.255)
+rotation = Vector3(1.570796,0,0)
+scale = Vector3(0.46,0.05,0.46)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_face")
+[node name="Needle" type="MeshInstance3D" parent="."]
+position = Vector3(0.06,0.43,-0.31)
+rotation = Vector3(0,0,-0.35)
+scale = Vector3(0.035,0.30,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_needle")
+[node name="GaugeAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.43,-0.32)
