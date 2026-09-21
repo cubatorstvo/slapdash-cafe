@@ -1,0 +1,40 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_pepper"]
+albedo_color = Color(0.839216,0.603922,0.262745,1)
+[sub_resource type="StandardMaterial3D" id="Mat_stem"]
+albedo_color = Color(0.337255,0.533333,0.305882,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="SolyankaPepper" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.16,0)
+scale = Vector3(0.30,0.28,0.34)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_pepper")
+[node name="Lobe1" type="MeshInstance3D" parent="."]
+position = Vector3(0.08,0.16,0)
+scale = Vector3(0.20,0.25,0.23)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_pepper")
+[node name="Lobe2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.08,0.16,0)
+scale = Vector3(0.20,0.25,0.23)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_pepper")
+[node name="Stem" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.32,0)
+scale = Vector3(0.06,0.10,0.06)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_stem")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.19,0)
