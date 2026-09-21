@@ -130,7 +130,7 @@
 - [x] Tea station — `scenes/lounge/tea_station.tscn`
 - [x] Jukebox — `scenes/lounge/jukebox.tscn`
 - [x] Aquarium — `scenes/lounge/aquarium.tscn`
-- [ ] Lounge plant
+- [x] Lounge plant — `scenes/lounge/lounge_plant.tscn`
 - [ ] Floor lamp
 - [ ] Snack fridge
 - [x] Stool — `scenes/lounge/stool.tscn`
