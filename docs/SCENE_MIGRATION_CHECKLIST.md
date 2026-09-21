@@ -50,7 +50,7 @@
 ## Burger props
 - [x] Patty — `scenes/props/patty.tscn`
 - [x] Patty spatula — `scenes/props/patty_spatula.tscn`
-- [ ] Seasoning
+- [x] Seasoning — `scenes/props/burger_seasoning.tscn`
 - [ ] Bun
 - [ ] Cheese
 - [ ] Sauce bottle
