@@ -149,7 +149,7 @@
 - [x] Sample holder — `scenes/lab/sample_holder.tscn`
 - [x] Microscope — `scenes/lab/microscope.tscn`
 - [x] Tool shelf — `scenes/lab/tool_shelf.tscn`
-- [ ] Pot rack / grow shelf
+- [x] Pot rack / grow shelf — `scenes/lab/pot_rack.tscn`
 
 ## Лаборатория — выращивание
 - [ ] Clone pot
