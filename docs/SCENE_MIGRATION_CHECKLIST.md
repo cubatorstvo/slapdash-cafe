@@ -74,7 +74,7 @@
 - [x] Pepper — `scenes/props/solyanka_pepper.tscn`
 - [x] Zucchini — `scenes/props/solyanka_zucchini.tscn`
 - [x] Pickle — `scenes/props/solyanka_pickle.tscn`
-- [ ] Lemon
+- [x] Lemon — `scenes/props/solyanka_lemon.tscn`
 - [ ] Sausage
 - [ ] Mushroom
 - [ ] Eggplant
