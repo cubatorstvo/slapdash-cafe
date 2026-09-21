@@ -124,7 +124,7 @@
 - [x] Foosball — `scenes/lounge/foosball.tscn`
 - [x] Arcade machine — `scenes/lounge/arcade_machine.tscn`
 - [x] Table tennis — `scenes/lounge/table_tennis.tscn`
-- [ ] Board games
+- [x] Board games — `scenes/lounge/board_games.tscn`
 - [ ] Bookcase
 - [ ] Beanbag
 - [ ] Tea station
