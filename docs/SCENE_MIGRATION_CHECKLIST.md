@@ -109,7 +109,7 @@
 - [x] Decorative cafe plant — `scenes/decor/cafe_plant.tscn`
 - [x] Garland — `scenes/decor/garland.tscn`
 - [x] “Моё кафе” board — `scenes/decor/my_cafe_board.tscn`
-- [ ] Market computer + desk
+- [x] Market computer + desk — `scenes/decor/market_computer_desk.tscn`
 - [ ] Delivery truck
 - [ ] Delivery parcel box
 - [ ] Garland reel
