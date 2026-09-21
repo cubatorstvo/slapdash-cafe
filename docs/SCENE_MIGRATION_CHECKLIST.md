@@ -108,7 +108,7 @@
 - [x] “Мы почти умеем” sign — `scenes/decor/almost_ready_sign.tscn`
 - [x] Decorative cafe plant — `scenes/decor/cafe_plant.tscn`
 - [x] Garland — `scenes/decor/garland.tscn`
-- [ ] “Моё кафе” board
+- [x] “Моё кафе” board — `scenes/decor/my_cafe_board.tscn`
 - [ ] Market computer + desk
 - [ ] Delivery truck
 - [ ] Delivery parcel box
