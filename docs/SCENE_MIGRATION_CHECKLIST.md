@@ -25,7 +25,7 @@
 
 ## Посуда и предметы первой стойки
 - [x] Plate — `scenes/props/plate.tscn`
-- [ ] Serving tray
+- [x] Serving tray — `scenes/props/serving_tray.tscn`
 - [ ] Wine jug
 - [ ] Wine cup
 - [ ] Rag
