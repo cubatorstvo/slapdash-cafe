@@ -88,7 +88,7 @@
 - [x] Steak & pasta serving — `scenes/food/steak_pasta_serving.tscn`
 - [x] Burger serving — `scenes/food/burger_serving.tscn`
 - [x] Cheeseburger serving — `scenes/food/cheeseburger_serving.tscn`
-- [ ] Spicy burger serving
+- [x] Spicy burger serving — `scenes/food/spicy_burger_serving.tscn`
 - [ ] Solyanka serving
 
 ## Основное кафе
