@@ -144,7 +144,7 @@
 - [x] Initial lab module 2 — `scenes/lab/initial_module_2.tscn`
 - [x] Initial lab module 3 — `scenes/lab/initial_module_3.tscn`
 - [x] Initial switches / start button — `scenes/lab/initial_controls.tscn`
-- [ ] Cable reel
+- [x] Cable reel — `scenes/lab/cable_reel.tscn`
 - [ ] Formula stabilizer / research apparatus
 - [ ] Sample holder
 - [ ] Microscope
