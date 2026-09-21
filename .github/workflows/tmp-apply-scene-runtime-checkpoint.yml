@@ -1,0 +1,35 @@
+name: Apply scene runtime checkpoint
+
+on:
+  push:
+    branches:
+      - work/scene-runtime-integration
+    paths:
+      - ".github/workflows/tmp-apply-scene-runtime-checkpoint.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-checkpoint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/scene-runtime-integration
+          fetch-depth: 0
+      - name: Apply preserved local checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d docs/checkpoints/scene-runtime-integration-929c955.patch.gz.b64 | gzip -d > /tmp/scene-runtime.patch
+          git apply --check /tmp/scene-runtime.patch
+          git apply /tmp/scene-runtime.patch
+          rm docs/checkpoints/scene-runtime-integration-929c955.patch.gz.b64
+          rm docs/checkpoints/scene-runtime-integration-929c955.txt
+          rm .github/workflows/tmp-apply-scene-runtime-checkpoint.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Checkpoint scene-backed runtime integration"
+          git push origin HEAD:work/scene-runtime-integration
