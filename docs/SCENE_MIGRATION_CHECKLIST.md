@@ -121,7 +121,7 @@
 - [x] Coffee table — `scenes/lounge/coffee_table.tscn`
 - [x] Television + cabinet — `scenes/lounge/television_cabinet.tscn`
 - [x] Rocking chair — `scenes/lounge/rocking_chair.tscn`
-- [ ] Foosball
+- [x] Foosball — `scenes/lounge/foosball.tscn`
 - [ ] Arcade machine
 - [ ] Table tennis
 - [ ] Board games
