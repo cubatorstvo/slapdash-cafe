@@ -127,7 +127,7 @@
 - [x] Board games — `scenes/lounge/board_games.tscn`
 - [x] Bookcase — `scenes/lounge/bookcase.tscn`
 - [x] Beanbag — `scenes/lounge/beanbag.tscn`
-- [ ] Tea station
+- [x] Tea station — `scenes/lounge/tea_station.tscn`
 - [ ] Jukebox
 - [ ] Aquarium
 - [ ] Lounge plant
