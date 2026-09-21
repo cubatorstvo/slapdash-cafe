@@ -50,3 +50,4 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 # sync scene migration snapshot after food scenes
+# refresh snapshot after lounge authoring
