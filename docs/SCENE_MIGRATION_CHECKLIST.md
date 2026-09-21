@@ -98,7 +98,7 @@
 - [x] Zone B — `scenes/cafe/zone_b.tscn`
 - [x] Zone C — `scenes/cafe/zone_c.tscn`
 - [x] Zone D — `scenes/cafe/zone_d.tscn`
-- [ ] Main entrance / exterior apron
+- [x] Main entrance / exterior apron — `scenes/cafe/main_entrance.tscn`
 - [ ] Rear spine / annex transition
 - [ ] Expansion partition
 - [ ] Automatic sliding door
