@@ -101,7 +101,7 @@
 - [x] Main entrance / exterior apron — `scenes/cafe/main_entrance.tscn`
 - [x] Rear spine / annex transition — `scenes/cafe/rear_spine.tscn`
 - [x] Expansion partition — `scenes/cafe/expansion_partition.tscn`
-- [ ] Automatic sliding door
+- [x] Automatic sliding door — `scenes/cafe/automatic_sliding_door.tscn`
 - [ ] Cafe signs / room signs / zone signs
 
 ## Постоянный декор кафе
