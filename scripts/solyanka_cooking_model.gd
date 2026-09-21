@@ -195,7 +195,7 @@ func take_serving() -> Array:
 	if served: return []
 	served = true
 	for info in guest_roles: info.chew = 0.8
-	return [{"kind":"solyanka","from":Vector3(POT.x,BASE_Y+0.55,POT.y)},{"kind":"plate","from":Vector3(POT.x,BASE_Y+0.05,POT.y)}]
+	return [{"kind":"solyanka","dish":"solyanka","from":Vector3(POT.x,BASE_Y+0.55,POT.y)},{"kind":"plate","dish":"solyanka","from":Vector3(POT.x,BASE_Y+0.05,POT.y)}]
 
 func held_center(role: int) -> Vector3:
 	if role < 0 or role >= hands.size(): return Vector3(100,100,100)

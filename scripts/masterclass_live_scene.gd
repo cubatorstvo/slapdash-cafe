@@ -2,9 +2,11 @@ extends Node3D
 ## Physical comedy around a live chef master-class. Cinematic angles are intentionally unrelated.
 const Person=preload("res://scripts/customer_view.gd")
 const Props=preload("res://scripts/props.gd")
+const SceneRuntime=preload("res://scripts/scene_runtime.gd")
 var station: Node3D
 var operator: Node3D
 var audience: Array=[]
+var anchors: Node3D
 var waypoints: Array=[]
 var waypoint_index:=0
 var age:=0.0
@@ -16,41 +18,33 @@ func point(local: Vector3)->Vector3:
 func setup(owner_station: Node3D)->void:
 	station=owner_station
 	name="MasterclassLiveScene"
+	anchors=SceneRuntime.instantiate("res://scenes/presentation/presentation_accessory_anchors.tscn") as Node3D
+	add_child(anchors)
 	_build_operator()
 	_build_audience()
 
 func _build_operator()->void:
-	operator=Person.new()
-	operator.color=Color("527988")
-	add_child(operator)
-	operator.caption.text="Оператор · очень важная съёмка"
-	var rig:=Node3D.new()
-	operator.add_child(rig)
-	rig.position=Vector3(0.34,1.42,-0.20)
-	Props.box(rig,Vector3(0.34,0.22,0.40),Vector3.ZERO,Color("273c45"))
-	Props.box(rig,Vector3(0.16,0.12,0.23),Vector3(0,0, -0.29),Color("17282f"))
-	Props.cylinder(rig,0.055,0.26,Vector3(0,0,-0.48),Color("1d3038"))
+	operator=SceneRuntime.instantiate("res://scenes/actors/customer.tscn",Person) as Node3D
+	operator.color=Color("527988"); add_child(operator); operator.caption.text="Оператор · очень важная съёмка"
+	var rig:=SceneRuntime.instantiate("res://scenes/presentation/masterclass_camera_rig.tscn") as Node3D
+	operator.add_child(rig); rig.position=Vector3(0.34,1.42,-0.20)
 	var half: float=float(station.Definition.TYPES[station.type_id].width)*0.5
-	waypoints=[
-		point(Vector3(-half-0.72,0,-1.10)),
-		point(Vector3(half+0.72,0,-0.20)),
-		point(Vector3(half+0.66,0,1.65)),
-		point(Vector3(-half-0.68,0,1.45))
-	]
+	var local_points=[Vector3(-half-0.72,0,-1.10),Vector3(half+0.72,0,-0.20),Vector3(half+0.66,0,1.65),Vector3(-half-0.68,0,1.45)]
+	var marker_names=["OperatorStart","OperatorRightFront","OperatorRightBack","OperatorLeftBack"]
+	waypoints.clear()
+	for i in range(marker_names.size()):
+		var marker:=anchors.get_node(marker_names[i]) as Marker3D; marker.position=local_points[i]; waypoints.append(point(marker.position))
 	operator.position=waypoints[0]
 
 func _build_audience()->void:
 	var half: float=float(station.Definition.TYPES[station.type_id].width)*0.5
-	var points: Array=[
-		Vector3(-mini(half-0.5,2.0),0,-3.25),
-		Vector3(-0.65,0,-3.45),
-		Vector3(0.65,0,-3.45),
-		Vector3(mini(half-0.5,2.0),0,-3.25)
-	]
+	var points: Array=[Vector3(-mini(half-0.5,2.0),0,-3.25),Vector3(-0.65,0,-3.45),Vector3(0.65,0,-3.45),Vector3(mini(half-0.5,2.0),0,-3.25)]
+	var audience_names=["AudienceLeft","AudienceMidLeft","AudienceMidRight","AudienceRight"]
 	for i in range(points.size()):
-		var viewer:=Person.new()
+		var marker:=anchors.get_node(audience_names[i]) as Marker3D; marker.position=points[i]
+		var viewer:=SceneRuntime.instantiate("res://scenes/actors/customer.tscn",Person) as Node3D
 		add_child(viewer)
-		viewer.position=point(points[i])
+		viewer.position=point(marker.position)
 		viewer.rotation.y=PI
 		viewer.caption.text="Зритель" if i>0 else "Зритель · пришёл на мастер-класс"
 		viewer.watching=true

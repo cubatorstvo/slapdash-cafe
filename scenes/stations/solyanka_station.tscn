@@ -1,4 +1,6 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/solyanka_cauldron.tscn" id="1_cauldron"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_base"]
 albedo_color = Color(0.423529,0.333333,0.258824,1)
@@ -44,44 +46,22 @@ position = Vector3(0,1.02,0)
 scale = Vector3(5.9,0.08,4.7)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_top")
-[node name="Cauldron" type="Node3D" parent="."]
-position = Vector3(0,0,-0.1)
-[node name="Body" type="MeshInstance3D" parent="Cauldron"]
-position = Vector3(0,1.28,0)
-scale = Vector3(1.76,0.70,1.76)
-mesh = SubResource("Mesh_cylinder")
-material_override = SubResource("Mat_pot")
-[node name="Broth" type="MeshInstance3D" parent="Cauldron"]
-position = Vector3(0,1.62,0)
-scale = Vector3(1.4,0.045,1.4)
-mesh = SubResource("Mesh_cylinder")
-material_override = SubResource("Mat_broth")
-[node name="LeftHandle" type="MeshInstance3D" parent="Cauldron"]
-position = Vector3(-1.02,1.45,0)
-rotation = Vector3(0,0,-0.08)
-scale = Vector3(0.50,0.09,0.12)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_handle")
-[node name="RightHandle" type="MeshInstance3D" parent="Cauldron"]
-position = Vector3(1.02,1.45,0)
-rotation = Vector3(0,0,0.08)
-scale = Vector3(0.50,0.09,0.12)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_handle")
+[node name="Cauldron" parent="." instance=ExtResource("1_cauldron")]
+position = Vector3(0,0.92,-0.1)
 [node name="Fire" type="Node3D" parent="Cauldron"]
 visible = false
 [node name="Flame1" type="MeshInstance3D" parent="Cauldron/Fire"]
-position = Vector3(-0.28,1.01,0.1)
+position = Vector3(-0.28,0.09,0.1)
 scale = Vector3(0.2,0.42,0.2)
 mesh = SubResource("Mesh_sphere")
 material_override = SubResource("Mat_fire")
 [node name="Flame2" type="MeshInstance3D" parent="Cauldron/Fire"]
-position = Vector3(0,1.05,-0.1)
+position = Vector3(0,0.13,-0.1)
 scale = Vector3(0.22,0.48,0.22)
 mesh = SubResource("Mesh_sphere")
 material_override = SubResource("Mat_fire")
 [node name="Flame3" type="MeshInstance3D" parent="Cauldron/Fire"]
-position = Vector3(0.28,1.01,0.1)
+position = Vector3(0.28,0.09,0.1)
 scale = Vector3(0.2,0.42,0.2)
 mesh = SubResource("Mesh_sphere")
 material_override = SubResource("Mat_fire")

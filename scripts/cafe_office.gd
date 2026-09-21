@@ -8,9 +8,11 @@ const Definition = preload("res://scripts/station_definition.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
 const TrainingDragRow = preload("res://scripts/ui/training_drag_row.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 var game: Node3D
 var panel: PanelContainer
 var content: VBoxContainer
+var content_root: VBoxContainer
 var scroll: ScrollContainer
 var heading: Label
 var status: Label
@@ -63,63 +65,53 @@ const PAGE_NAMES: Dictionary = {"overview":"Обзор кафе", "groups":"Ст
 
 func _ready() -> void:
 	layer = 17
-	panel = PanelContainer.new()
-	add_child(panel)
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 28
-	panel.offset_right = -28
-	panel.offset_top = 32
-	panel.offset_bottom = -32
+	panel = get_node("Panel") as PanelContainer
 	panel.theme = Style.make()
 	panel.theme.default_font_size = 16
 	panel.theme.set_color("font_disabled_color", "Button", Color("9ba9a3"))
 	panel.theme.set_color("font_color", "CheckBox", Style.CREAM)
 	panel.theme.set_color("font_disabled_color", "CheckBox", Color("9ba9a3"))
-	panel.add_theme_stylebox_override("panel", Style.box(Color("172e30"), 18, 18))
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
-	panel.add_child(column)
-	var top := HBoxContainer.new()
-	column.add_child(top)
-	var brand := label(top, "ТЯП-ЛЯП / КАФЕ", 22)
-	brand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button(top, "Вернуться в кафе · Esc", close)
-	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 20)
-	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_child(body)
-	var side_scroll := ScrollContainer.new()
-	side_scroll.custom_minimum_size.x = 208
-	side_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	body.add_child(side_scroll)
-	var side := VBoxContainer.new()
-	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	side.add_theme_constant_override("separation", 5)
-	side_scroll.add_child(side)
-	for entry in [["overview","Обзор кафе"],["groups","Столы и обучение"],["stations","Интернет-магазин"],["videos","Мастер-классы"],["laboratory","Лаборатория"],["lounge","Комната отдыха"],["star","Звёзды"],["stats","Статистика"],["settings","Сохранение и помощь"]]:
-		var key: String = entry[0]
-		var nav := button(side, entry[1], func(): navigate(key))
+	(get_node("Panel/Column/Top/Close") as Button).pressed.connect(close)
+	var nav_map := {
+		"overview":"Overview", "groups":"Groups", "stations":"Shop", "videos":"Videos",
+		"laboratory":"Laboratory", "lounge":"Lounge", "star":"Stars", "stats":"Stats", "settings":"Settings"
+	}
+	for key in nav_map:
+		var nav := get_node("Panel/Column/Body/SideScroll/Side/" + str(nav_map[key])) as Button
 		nav.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		nav.toggle_mode = true
+		nav.pressed.connect(navigate.bind(str(key)))
 		navigation[key] = nav
-	var main := VBoxContainer.new()
-	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main.add_theme_constant_override("separation", 8)
-	body.add_child(main)
-	heading = label(main, "Обзор кафе", 26)
-	status = label(main, "", 15)
+	heading = get_node("Panel/Column/Body/Main/Heading") as Label
+	status = get_node("Panel/Column/Body/Main/Status") as Label
 	status.add_theme_color_override("font_color", Style.MINT)
-	timer = label(main, "", 16)
+	timer = get_node("Panel/Column/Body/Main/Timer") as Label
 	timer.add_theme_color_override("font_color", Style.GOLD)
-	scroll = ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	main.add_child(scroll)
-	content = VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 12)
-	scroll.add_child(content)
+	scroll = get_node("Panel/Column/Body/Main/Scroll") as ScrollContainer
+	content = get_node("Panel/Column/Body/Main/Scroll/Content") as VBoxContainer
+	content_root = content
+	var placeholder := content.get_node_or_null("Placeholder")
+	if placeholder != null: placeholder.queue_free()
 	panel.hide()
+
+func _page_scene_path() -> String:
+	if tab == "overview": return "res://scenes/ui/development_panels.tscn"
+	if tab == "groups": return "res://scenes/ui/training_course_editor.tscn"
+	if tab == "stations": return "res://scenes/ui/shop_panels.tscn"
+	if tab == "stats": return "res://scenes/ui/statistics_panels.tscn"
+	if tab == "laboratory": return "res://scenes/ui/laboratory_panels.tscn"
+	if tab == "lounge": return "res://scenes/ui/staff_lounge_panels.tscn"
+	return ""
+
+func _mount_page_scene(path: String) -> VBoxContainer:
+	var shell := SceneRuntime.instantiate(path) as Control
+	content_root.add_child(shell)
+	shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var column := shell.get_node("Column") as VBoxContainer
+	for child in column.get_children():
+		column.remove_child(child)
+		child.queue_free()
+	return column
 
 func navigate(page: String) -> void:
 	tab = "stations" if page in ["deliveries", "decor", "night"] else page
@@ -523,7 +515,10 @@ func rebuild() -> void:
 	for key in navigation:
 		navigation[key].set_pressed_no_signal(key == tab)
 	delivery_labels.clear()
-	for child in content.get_children(): content.remove_child(child); child.queue_free()
+	for child in content_root.get_children(): content_root.remove_child(child); child.queue_free()
+	content = content_root
+	var page_scene := _page_scene_path()
+	if not page_scene.is_empty(): content = _mount_page_scene(page_scene)
 	var service = game.service
 	var progress = service.progress
 	var host: bool = not game.session.is_guest()

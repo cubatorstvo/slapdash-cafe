@@ -1,5 +1,6 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+const SceneRuntime=preload("res://scripts/scene_runtime.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
 const LabPolicy = preload("res://scripts/laboratory_progression.gd")
 const LabLayout = preload("res://scripts/laboratory_layout.gd")
@@ -47,18 +48,10 @@ func setup(owner_game: Node3D) -> void:
 	placement_label.outline_size = 10
 	placement_label.hide()
 	# A visible computer replaces the abstract cafe board.
-	computer = Node3D.new()
+	computer = preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/decor/market_computer_desk.tscn") as Node3D
 	add_child(computer)
 	computer.position = Expansion.MARKET_POSITION
 	computer.rotation.y=0.0
-	Props.solid_box(computer,Vector3(1.65,0.12,0.9),Vector3(0,0.86,0),Color("99765b"))
-	for x in [-0.65,0.65]: Props.solid_box(computer,Vector3(0.1,0.85,0.6),Vector3(x,0.425,0),Color("405b58"))
-	Props.box(computer,Vector3(0.95,0.65,0.2),Vector3(0,1.3,-0.15),Color("d8c9a3"))
-	Props.box(computer,Vector3(0.82,0.51,0.025),Vector3(0,1.3,-0.035),Color("213b40"))
-	Props.box(computer,Vector3(0.10,0.20,0.10),Vector3(0,0.99,-0.15),Color("526d65"))
-	Props.box(computer,Vector3(0.44,0.045,0.28),Vector3(0,0.90,-0.15),Color("526d65"))
-	Props.text(computer,"ТЯП-ЛЯП МАРКЕТ\n[E] Компьютер",Vector3(0,1.33,-0.01),18,Color("d9c18c"))
-	Props.box(computer,Vector3(0.75,0.035,0.22),Vector3(0,0.94,0.22),Color("d7cfae"))
 	game.development.board.hide()
 	for i in range(3):
 		var at := lab_position(i)
@@ -66,12 +59,8 @@ func setup(owner_game: Node3D) -> void:
 		var label := Props.text(self,ITEMS["lab_%d"%i].name+"\nНужна доставка",at+Vector3.UP*0.8,17,Color("d4c99b"))
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		guide_nodes.append({"mesh":ghost,"label":label})
-	truck = Node3D.new()
+	truck = preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/decor/delivery_truck.tscn") as Node3D
 	add_child(truck)
-	Props.box(truck,Vector3(1.2,1.15,1.65),Vector3(0,0.9,0),Color("dca859"))
-	Props.box(truck,Vector3(1.2,0.8,0.7),Vector3(0,0.72,1.0),Color("69a799"))
-	for x in [-0.65,0.65]:
-		for z in [-0.55,0.9]: Props.ball(truck,0.23,Vector3(x,0.28,z),Color("263536"))
 	truck.hide()
 
 func refresh_layout() -> void:
@@ -715,9 +704,7 @@ func _process(delta: float) -> void:
 	for parcel in p.deliveries:
 		ids.append(parcel.id)
 		if not boxes.has(parcel.id):
-			var box := Node3D.new(); add_child(box)
-			Props.box(box,Vector3(0.52,0.5,0.48),Vector3.ZERO,Color("b28a59"))
-			Props.box(box,Vector3(0.09,0.51,0.49),Vector3.ZERO,Color("d4be91"))
+			var box := preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/decor/delivery_parcel_box.tscn") as Node3D; add_child(box)
 			var label := Props.text(box,parcel_name(parcel),Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 			boxes[parcel.id]=box
 		var node: Node3D = boxes[parcel.id]
@@ -739,7 +726,7 @@ func _process(delta: float) -> void:
 		var id: int=int(job.get("id",0))
 		installer_ids.append(id)
 		if not installers.has(id):
-			var worker_instance: Node3D=Installer.new(); add_child(worker_instance); worker_instance.setup(id); installers[id]=worker_instance
+			var worker_instance: Node3D=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/actors/delivery_installer.tscn",Installer) as Node3D; worker_instance.get_node("Actor").set_script(preload("res://scripts/cook_avatar.gd")); add_child(worker_instance); worker_instance.setup(id); installers[id]=worker_instance
 		var worker: Node3D=installers[id]
 		var raw_target: Array=job.get("install_target",[])
 		var install_target: Vector3=Vector3(float(raw_target[0]),float(raw_target[1]),float(raw_target[2])) if raw_target.size()==3 else installation_position(parcel) if not parcel.is_empty() else _job_position(job)+Vector3.UP
@@ -765,10 +752,8 @@ func _process(delta: float) -> void:
 				placement_label.text="▼  УСТАНОВИТЬ СЮДА\n%s\n%d м"%[parcel_name(held_parcel),roundi(game.player.global_position.distance_to(install_target))]
 	if p.garland_builder>0:
 		if not garland_reels.has(p.garland_builder):
-			var reel := Node3D.new(); add_child(reel)
-			Props.cylinder(reel,0.16,0.22,Vector3.ZERO,Color("dabb84"))
-			for i in range(5): Props.ball(reel,0.045,Vector3(sin(i)*0.18,0.05,cos(i)*0.18),Color("ffe39d"))
-			garland_reels[p.garland_builder]=reel
+			var reel:=SceneRuntime.instantiate("res://scenes/decor/garland_reel.tscn") as Node3D
+			add_child(reel); garland_reels[p.garland_builder]=reel
 		var reel: Node3D = garland_reels[p.garland_builder]
 		if p.garland_builder==game.session.local_id(): reel.global_transform=game.camera.global_transform; reel.position+=game.camera.global_basis.x*0.35-game.camera.global_basis.z*0.65-game.camera.global_basis.y*0.3
 		else:

@@ -12,37 +12,19 @@ var phase := 0.0
 var tint := Color("6cac9b")
 
 func _ready() -> void:
-	for side in [-1, 1]:
-		var leg := Node3D.new()
-		add_child(leg)
-		leg.position = Vector3(side * 0.14, 0.65, 0)
-		P.box(leg, Vector3(0.18, 0.58, 0.2), Vector3(0, -0.25, 0), Color("293d4b"))
-		P.box(leg, Vector3(0.22, 0.13, 0.34), Vector3(0, -0.56, -0.06), Color("24323b"))
-		legs.append(leg)
-		arms.append(P.line(self, Vector3(side * 0.3, 1.2, 0), Vector3(side * 0.36, 0.8, -0.2), 0.075, tint))
-	P.box(self, Vector3(0.59, 0.61, 0.33), Vector3(0, 0.96, 0), tint)
-	P.box(self, Vector3(0.38, 0.5, 0.04), Vector3(0, 0.91, -0.185), Color("f3deb1"))
-	head = Node3D.new()
-	add_child(head)
-	head.position.y = 1.51
-	P.ball(head, 0.24, Vector3.ZERO, Color("e8b893"))
-	for side in [-1, 1]: P.ball(head, 0.027, Vector3(side * 0.08, 0.04, -0.22), Color("203c40"))
-	hat=P.cylinder(head, 0.26, 0.22, Vector3(0, 0.27, 0), Color("fff0cb"))
-	notebook = Node3D.new()
-	add_child(notebook)
-	notebook.position = Vector3(0, 1.02, -0.35)
-	notebook.rotation.x = -0.7
-	P.box(notebook, Vector3(0.32, 0.025, 0.4), Vector3.ZERO, Color("795746"))
-	P.box(notebook, Vector3(0.28, 0.008, 0.36), Vector3(0, 0.018, 0), Color("fff1c9"))
-	for n in range(5): P.box(notebook, Vector3(0.21, 0.003, 0.008), Vector3(0, 0.024, -0.13 + n * 0.055), Color("8a9690"))
-	pencil = Node3D.new()
-	notebook.add_child(pencil)
-	P.line(pencil, Vector3(0, 0.04, 0), Vector3(0.12, 0.20, 0), 0.012, Color("e5b455"))
-	caption = P.text(self, "", Vector3(0, 2.1, 0), 19)
-	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	caption.pixel_size = 0.005
+	preload("res://scripts/scene_runtime.gd").ensure_children(self, "res://scenes/actors/cook_avatar.tscn")
+	legs = [get_node("LeftLeg"), get_node("RightLeg")]
+	arms = [get_node("LeftArmPivot/Arm"), get_node("RightArmPivot/Arm")]
+	head = get_node("Head")
+	hat = get_node("Head/Hat") as MeshInstance3D
+	notebook = get_node("Notebook")
+	pencil = get_node("Notebook/Pencil")
+	caption = get_node("Caption") as Label3D
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	for path in ["Body", "LeftArmPivot/Arm", "RightArmPivot/Arm"]:
+		runtime.colorize(get_node(path) as MeshInstance3D, tint)
 	notebook.hide()
-	book = preload("res://scripts/book_prop.gd").new()
+	book = runtime.instantiate("res://scenes/presentation/physical_cookbook.tscn", preload("res://scripts/book_prop.gd")) as Node3D
 	add_child(book)
 	book.pose_in_hands(false)
 
@@ -197,19 +179,11 @@ func build_lounge_accessories() -> void:
 		P.line(lounge_floor_legs,Vector3(side*0.14,0.65,0),Vector3(side*0.36,0.57,-0.28),0.095,Color("293d4b"))
 		P.line(lounge_floor_legs,Vector3(side*0.36,0.57,-0.28),Vector3(-side*0.12,0.57,-0.43),0.085,Color("293d4b"))
 		P.box(lounge_floor_legs,Vector3(0.22,0.13,0.28),Vector3(-side*0.12,0.565,-0.46),Color("24323b"))
-	lounge_cup=Node3D.new()
-	add_child(lounge_cup)
-	P.cylinder(lounge_cup,0.066,0.13,Vector3.ZERO,Color("f1d9ae"))
-	P.cylinder(lounge_cup,0.052,0.008,Vector3(0,0.069,0),Color("584438"))
-	lounge_paddle=Node3D.new()
-	add_child(lounge_paddle)
-	var face:=P.ball(lounge_paddle,0.13,Vector3.ZERO,Color("bb7565"))
-	face.scale=Vector3(0.85,1.0,0.16)
-	P.line(lounge_paddle,Vector3(0,-0.10,0),Vector3(0,-0.25,0),0.025,Color("976c4f"))
-	lounge_snack=Node3D.new()
-	add_child(lounge_snack)
-	P.box(lounge_snack,Vector3(0.15,0.22,0.09),Vector3.ZERO,Color("dca458"))
-	P.box(lounge_snack,Vector3(0.11,0.07,0.012),Vector3(0,0,-0.05),Color("f1d9ae"))
+	var accessories:=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/props/cook_lounge_accessories.tscn") as Node3D
+	add_child(accessories)
+	lounge_cup=accessories.get_node("Cup") as Node3D
+	lounge_paddle=accessories.get_node("Paddle") as Node3D
+	lounge_snack=accessories.get_node("Snack") as Node3D
 
 func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 	if not is_instance_valid(lounge_legs): build_lounge_accessories()

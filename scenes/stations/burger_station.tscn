@@ -1,4 +1,6 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/burger_assembly_plate.tscn" id="1_assembly"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_wood"]
 albedo_color = Color(0.662745, 0.470588, 0.333333, 1)
@@ -78,11 +80,8 @@ position = Vector3(0,0.035,0.36)
 scale = Vector3(1.35,0.012,0.045)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_bar")
-[node name="AssemblyPlate" type="MeshInstance3D" parent="."]
+[node name="AssemblyPlate" parent="." instance=ExtResource("1_assembly")]
 position = Vector3(0,1.035,0.72)
-scale = Vector3(0.96,0.03,0.96)
-mesh = SubResource("Mesh_cylinder")
-material_override = SubResource("Mat_plate")
 [node name="StationLabel" type="Label3D" parent="."]
 position = Vector3(0,1.28,-1.2)
 billboard = 1

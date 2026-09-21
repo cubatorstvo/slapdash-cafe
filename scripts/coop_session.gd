@@ -86,7 +86,9 @@ func leave(message: String) -> void:
 	connection_deadline = 0
 	for actor in player_avatars.values():
 		if is_instance_valid(actor) and actor.book: actor.book.shutdown()
-		if is_instance_valid(actor): actor.free()
+		if is_instance_valid(actor):
+			var remote_root: Node=actor.get_meta("remote_root",actor)
+			remote_root.free()
 	for actor in remote_customers.values():
 		if is_instance_valid(actor): actor.free()
 	player_avatars.clear()
@@ -125,7 +127,9 @@ func _peer_left(id: int) -> void:
 	player_poses.erase(id)
 	handshakes.erase(id)
 	if player_avatars.has(id):
-		player_avatars[id].queue_free()
+		var avatar: Node=player_avatars[id]
+		var remote_root: Node=avatar.get_meta("remote_root",avatar)
+		remote_root.queue_free()
 		player_avatars.erase(id)
 	if not guest:
 		game.laboratory.nursery.release_peer(id)
@@ -780,9 +784,12 @@ func _draw_players(delta: float) -> void:
 	for id in player_poses:
 		if id == local_id() or not members.has(id): continue
 		if not player_avatars.has(id):
-			var avatar := Avatar.new()
+			var remote_root:=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/actors/remote_player.tscn") as Node3D
+			var avatar:=remote_root.get_node("Avatar") as Node3D
+			avatar.set_script(Avatar)
 			avatar.tint = Color("789fce") if id == 1 else Color("c99a73")
-			game.add_child(avatar)
+			game.add_child(remote_root)
+			avatar.set_meta("remote_root",remote_root)
 			player_avatars[id] = avatar
 		var avatar: Node3D = player_avatars[id]
 		var pose: Dictionary = player_poses[id].duplicate(true)

@@ -4,6 +4,7 @@ const Player = preload("res://scripts/fps_player.gd")
 const Service = preload("res://scripts/cafe_service.gd")
 const Annex = preload("res://scripts/cafe_annex.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 const SAVE_PATH := "user://shop_cafe.save"
 const ITEM_NAMES := {"plate_0": "тарелка", "plate_1": "тарелка", "plate_2": "тарелка","jug": "кувшин", "cup": "стакан", "rag": "тряпка", "pan": "сковорода", "potato": "картошка", "sausage": "сосиска", "tomato": "помидор · ПКМ — бросить"}
 var sleep_cinematic: Node3D
@@ -58,10 +59,10 @@ func _ready() -> void:
 	player.position = Expansion.player_spawn(1)
 	camera = player.camera
 	camera.rotation.x = -0.2
-	hud = preload("res://scripts/cafe_hud.gd").new()
+	hud = SceneRuntime.instantiate("res://scenes/ui/cafe_hud.tscn", preload("res://scripts/cafe_hud.gd")) as CanvasLayer
 	add_child(hud)
 	hud.resume_requested.connect(toggle_pause)
-	menu = preload("res://scripts/cafe_menu.gd").new()
+	menu = SceneRuntime.instantiate("res://scenes/ui/main_pause_menu.tscn", preload("res://scripts/cafe_menu.gd")) as CanvasLayer
 	add_child(menu)
 	menu.game = self
 	service = Service.new()
@@ -85,7 +86,7 @@ func _ready() -> void:
 	feedback = preload("res://scripts/cafe_feedback.gd").new()
 	add_child(feedback)
 	feedback.game = self
-	office = preload("res://scripts/cafe_office.gd").new()
+	office = SceneRuntime.instantiate("res://scenes/ui/cafe_office.tscn", preload("res://scripts/cafe_office.gd")) as CanvasLayer
 	office.game = self
 	add_child(office)
 	development = preload("res://scripts/cafe_development_view.gd").new()
@@ -514,7 +515,7 @@ func _build_room() -> void:
 	environment.environment.ambient_light_energy = 0.35
 	add_child(environment)
 	room_environment = environment
-	var sun := DirectionalLight3D.new()
+	var sun := SceneRuntime.instantiate("res://scenes/runtime/directional_light.tscn") as DirectionalLight3D
 	daylight = sun
 	add_child(sun)
 	sun.rotation_degrees = Vector3(-60, -25, 0)
@@ -535,10 +536,11 @@ func _refresh_cafe_layout(force := false) -> void:
 
 func _build_room_shell(stage: int) -> void:
 	if is_instance_valid(room_shell): room_shell.free()
-	room_shell=Node3D.new()
+	room_shell=SceneRuntime.instantiate("res://scenes/cafe/cafe_world.tscn") as Node3D
 	room_shell.name="CafeLayoutShell"
 	add_child(room_shell)
 	layout_stage=stage
+	_configure_authored_cafe_world(stage)
 	# Exterior and its collider share one footprint. The exterior top stays below the cafe floor,
 	# so it cannot z-fight with the walkable interior and there is no invisible ground beyond the slab.
 	Props.box(room_shell,Vector3(96.0,0.22,100.0),Vector3(0,-0.22,-9.0),Color("56615d"))
@@ -546,11 +548,35 @@ func _build_room_shell(stage: int) -> void:
 	var cells:=Expansion.hall_cells_for_stage(stage)
 	_build_room_floor(room_shell,stage)
 	_build_room_perimeter(room_shell,cells,stage)
-	var entrance_z:=Expansion.entrance_z(stage)
-	# The apron ends exactly at the facade instead of overlapping the interior floor.
-	Props.box(room_shell,Vector3(5.5,0.08,7.0),Vector3(0,-0.08,entrance_z-3.5),Color("777d7c"))
-	var entrance:=Props.text(room_shell,"ВХОД",Vector3(0,2.75,entrance_z+0.22),28,Color("f3cc85"))
-	entrance.billboard=BaseMaterial3D.BILLBOARD_ENABLED
+
+
+func _configure_authored_cafe_world(stage: int) -> void:
+	var stage1:=room_shell.get_node_or_null("Stage1")
+	if stage1!=null: stage1.visible=false
+	for spec in [["ZoneA",2],["ZoneB",3],["ZoneC",4],["ZoneD",4]]:
+		var zone:=room_shell.get_node_or_null(str(spec[0]))
+		if zone==null: continue
+		zone.visible=stage>=int(spec[1])
+		var floor:=zone.get_node_or_null("Floor")
+		if floor!=null: floor.visible=false
+		var pads:=zone.get_node_or_null("Slots")
+		if pads!=null: pads.visible=false
+	var entrance:=room_shell.get_node_or_null("Entrance") as Node3D
+	if entrance!=null: entrance.position.z=Expansion.entrance_z(stage)-Expansion.FINAL_ENTRANCE_Z
+	var signs:=room_shell.get_node_or_null("Signs")
+	if signs!=null:
+		for name in ["ZoneA","ZoneB","ZoneC","ZoneD"]:
+			var label:=signs.get_node_or_null(name)
+			if label!=null: label.visible=false
+		var lounge_label:=signs.get_node_or_null("Lounge")
+		if lounge_label!=null: lounge_label.visible=stage>=2
+	var authored_plants:=Node3D.new(); authored_plants.name="AuthoredPlants"; room_shell.add_child(authored_plants)
+	for plant_name in ["PlantLeft","PlantRight"]:
+		var plant:=room_shell.get_node_or_null(plant_name)
+		if plant!=null: plant.reparent(authored_plants,true)
+	for name in ["AlmostReadySign","Garland","AuthoredPlants","Market"]:
+		var node:=room_shell.get_node_or_null(name)
+		if node!=null: node.visible=false
 
 func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> void:
 	Props.box(parent,Vector3(size.x,0.10,size.y),Vector3(center.x,-0.05,center.y),color)
@@ -647,29 +673,14 @@ func _build_room_wall_run(parent: Node3D,side: String,line: int,start: int,finis
 	else: Props.solid_box(parent,size,center,Color("2e5355"))
 
 func _build_expansion_partition(parent: Node3D,center: Vector3,size: Vector3,inward: Vector3,side: String,length: float) -> void:
-	var panel_color:=Color("9b815d")
-	var frame_color:=Color("3f4747")
-	Props.solid_box(parent,size,center,panel_color)
-	var vertical:=side in ["W","E"]
-	var offset:=inward*0.17
-	var rail_size:=Vector3(0.08,0.12,length) if vertical else Vector3(length,0.12,0.08)
-	Props.box(parent,rail_size,center+offset+Vector3(0,2.12,0),frame_color)
-	Props.box(parent,rail_size,center+offset-Vector3(0,2.12,0),frame_color)
-	var studs:=maxi(2,int(ceil(length/2.0))+1)
-	for i in range(studs):
-		var t:=float(i)/float(studs-1)
-		var along:=lerpf(-length*0.5+0.10,length*0.5-0.10,t)
-		var at:=center+offset
-		var stud_size: Vector3
-		if vertical:
-			at.z+=along; stud_size=Vector3(0.08,4.35,0.10)
-		else:
-			at.x+=along; stud_size=Vector3(0.10,4.35,0.08)
-		Props.box(parent,stud_size,at,frame_color)
-	var band_size:=Vector3(0.06,0.24,maxf(0.4,length-0.25)) if vertical else Vector3(maxf(0.4,length-0.25),0.24,0.06)
-	Props.box(parent,band_size,center+inward*0.19+Vector3(0,-1.72,0),Color("e3bd36"))
-	var sign:=Props.text(parent,"РАСШИРЕНИЕ",center+inward*0.24+Vector3(0,-0.35,0),22,Color("fff2b0"))
-	sign.rotation.y=atan2(inward.x,inward.z)
+	var partition:=SceneRuntime.instantiate("res://scenes/cafe/expansion_partition.tscn") as Node3D
+	parent.add_child(partition)
+	partition.position=Vector3(center.x,0,center.z)
+	partition.scale.x=length/8.0
+	if side in ["W","E"]: partition.rotation.y=PI/2.0
+	var sign:=partition.get_node_or_null("Sign") as Label3D
+	if sign!=null: sign.rotation.y=atan2(inward.x,inward.z)-partition.rotation.y
+	Props.collision_box(parent,size,center)
 
 func new_cafe() -> void:
 	if is_instance_valid(session): session.clear_sleeping()

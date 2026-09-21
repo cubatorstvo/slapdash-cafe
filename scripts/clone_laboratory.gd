@@ -6,6 +6,7 @@ const Layout=preload("res://scripts/laboratory_layout.gd")
 const Lounge=preload("res://scripts/lounge_layout.gd")
 const Annex=preload("res://scripts/cafe_annex.gd")
 const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
+const SceneRuntime=preload("res://scripts/scene_runtime.gd")
 const BALANCE_SECONDS := 6.0
 const BUTTON := Vector3(0,1.12,7.85)
 const SAMPLE := Vector3(0.98,1.10,7.98)
@@ -52,59 +53,35 @@ func setup(owner_game: Node3D) -> void:
 		pcm.encode_s16(n*2,int(clampf((sin(t*TAU*(130-t*240))+noise)*exp(-t*15)*0.55,-1,1)*32767))
 	var sound:=AudioStreamWAV.new(); sound.format=AudioStreamWAV.FORMAT_16_BITS; sound.mix_rate=22050; sound.data=pcm
 	burst_sound.stream=sound
-	apparatus = Node3D.new()
+	apparatus = SceneRuntime.instantiate("res://scenes/lab/formula_stabilizer.tscn") as Node3D
 	add_child(apparatus)
-	# Front faces look toward the laboratory doorway (-Z).
-	Props.box(apparatus,Vector3(1.35,0.7,0.18),Vector3(0,1.55,8.12),Color("344c48"))
-	Props.box(apparatus,Vector3(1.16,0.09,0.025),Vector3(0,1.64,8.015),Color("d9c89d"))
-	for i in range(50):
-		var t := (i+0.5)/50.0
-		Props.box(apparatus,Vector3(1.16/50+0.001,0.11,0.03),Vector3(-0.58+1.16*t,1.64,7.995),zone_color(zone_quality(t)))
-	needle = Props.box(apparatus,Vector3(0.025,0.21,0.035),Vector3(-0.58,1.64,7.97),Color("e98563"))
-	var label := Props.text(apparatus,"СТАБИЛИЗАТОР",Vector3(0,1.85,7.99),18,Color("efdeb4"))
-	label.rotation.y = PI
-	label.pixel_size = 0.0035
-	Props.cylinder(apparatus,0.31,0.08,Vector3(-0.94,0.98,7.96),Color("314f4c"))
-	var glass := Props.cylinder(apparatus,0.26,0.8,Vector3(-0.94,1.4,7.96),Color("afdcd4"))
-	glass.material_override.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glass.material_override.albedo_color.a = 0.18
-	glass.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	liquid = Props.cylinder(apparatus,0.23,0.76,Vector3(-0.94,1.4,7.96),Color("87bd95"))
-	# A physical green band shows the acceptable fill level, even with an empty flask.
-	for i in range(40):
-		var t := (i+0.5)/40.0
-		Props.box(apparatus,Vector3(0.07,0.76/40+0.001,0.035),Vector3(-0.63,1.02+0.76*t,7.94),zone_color(zone_quality(t,true)))
-	Props.box(apparatus,Vector3(0.58,0.12,0.07),Vector3(-0.94,1.88,7.91),Color("304b46"))
-	progress_bar=Props.box(apparatus,Vector3(0.52,0.075,0.015),Vector3(-0.94,1.88,7.865),Color("e4c379"))
-	for i in range(11): Props.box(apparatus,Vector3(0.09 if i%5==0 else 0.05,0.012,0.025),Vector3(-0.63,1.02+i*0.076,7.915),Color("eed5a4"))
-	Props.line(apparatus,Vector3(-0.94,1.9,7.96),Vector3(-0.94,2.02,7.96),0.035,Color("bf976e"))
-	Props.line(apparatus,Vector3(-0.94,2.02,7.96),Vector3(-0.36,2.02,8.18),0.035,Color("bf976e"))
-	button = Props.cylinder(apparatus,0.17,0.12,BUTTON,Color("d18a69"))
-	caption = Props.text(apparatus,"",Vector3(0,2.18,8.04),22,Color("f0d69f"))
-	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	caption.pixel_size = 0.004
-	# A liquid sample replaces the old miniature clone output.
-	sample_mesh=Props.cylinder(apparatus,0.09,0.20,Vector3(0.98,1.10,7.98),Color("9ad6ad"))
-	Props.cylinder(apparatus,0.22,0.04,Vector3(0.98,0.98,7.98),Color("d1c398"))
-	var sample_label:=Props.text(apparatus,"ОБРАЗЕЦ",Vector3(0.98,1.45,7.98),17,Color("dfd5a5"))
+	apparatus.position=Vector3(0,0.8,8.02)
+	needle=apparatus.get_node("Needle") as MeshInstance3D
+	liquid=apparatus.get_node("FlaskLiquid") as MeshInstance3D
+	progress_bar=Props.box(apparatus,Vector3(0.52,0.075,0.015),Vector3(-0.94,1.08,-0.155),Color("e4c379"))
+	button=Props.cylinder(apparatus,0.17,0.12,Vector3(0,0.32,-0.17),Color("d18a69"))
+	caption=Props.text(apparatus,"",Vector3(0,1.38,0.02),22,Color("f0d69f"))
+	caption.billboard=BaseMaterial3D.BILLBOARD_ENABLED; caption.pixel_size=0.004
+	var sample_holder:=SceneRuntime.instantiate("res://scenes/lab/sample_holder.tscn") as Node3D
+	add_child(sample_holder); sample_holder.position=Vector3(0.98,0.96,7.98)
+	sample_mesh=sample_holder.get_node("Sample") as MeshInstance3D
+	var sample_label:=Props.text(apparatus,"ОБРАЗЕЦ",Vector3(0.98,0.65,-0.04),17,Color("dfd5a5"))
 	sample_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; sample_label.pixel_size=0.0035
 	for i in range(10):
-		var drop:=Props.ball(apparatus,0.05,Vector3(-0.94,1.4,7.96),Color("c4bc61"))
+		var drop:=Props.ball(apparatus,0.05,Vector3(-0.94,0.6,-0.06),Color("c4bc61"))
 		drop.hide(); burst_parts.append(drop)
-	Props.box(apparatus,Vector3(0.23,0.1,0.24),Vector3(-1.48,1.09,7.88),Color("bc7869"))
-	result_label=Props.text(apparatus,"",Vector3(0,2.44,8.04),20,Color("b5dbb6"))
+	result_label=Props.text(apparatus,"",Vector3(0,1.64,0.02),20,Color("b5dbb6"))
 	result_label.billboard=BaseMaterial3D.BILLBOARD_ENABLED; result_label.pixel_size=0.004
-	for item in Policy.ITEMS:
-		if Policy.ITEMS[item].branch!="formula": continue
-		var root:=Node3D.new(); add_child(root); root.position=to_local(Layout.fixture(item)); upgrade_nodes[item]=root
-		if item=="lab_power_3":
-			Props.solid_box(root,Vector3(1.0,1.45,0.8),Vector3(0,0.73,0),Color("81a798"))
-			for i in range(3): Props.cylinder(root,0.1,0.65,Vector3(-0.25+i*0.25,1.40,0),Color("b4d5ac"))
-		else:
-			Props.box(root,Vector3(0.38,0.34,0.28),Vector3.ZERO,Color("ba9067") if "power" in item else Color("779e9b"))
-			for i in range(3): Props.ball(root,0.035,Vector3(-0.1+i*0.1,0.05,-0.15),Color("b9df91"))
-		var label2:=Props.text(root,str(Policy.ITEMS[item].name).get_slice(" · ",0),Vector3(0,1.95 if item=="lab_power_3" else 0.32,0),16,Color("ecd49f"))
-		label2.billboard=BaseMaterial3D.BILLBOARD_ENABLED; label2.pixel_size=0.003
+	var formula_scenes={
+		"lab_power":"res://scenes/lab/formula_power_amplifier.tscn",
+		"lab_power_2":"res://scenes/lab/formula_turbo_block.tscn",
+		"lab_power_3":"res://scenes/lab/formula_synthesizer.tscn",
+		"lab_valve":"res://scenes/lab/precision_valve.tscn",
+		"lab_damper":"res://scenes/lab/damper.tscn"
+	}
+	for item in formula_scenes:
+		var upgrade:=SceneRuntime.instantiate(formula_scenes[item]) as Node3D
+		add_child(upgrade); upgrade.position=to_local(Layout.fixture(item)); upgrade_nodes[item]=upgrade
 	nursery=preload("res://scripts/clone_nursery.gd").new()
 	game.add_child(nursery); nursery.setup(game,self)
 	calibrator=preload("res://scripts/clone_recalibrator.gd").new()
@@ -370,9 +347,9 @@ func _process(_delta: float) -> void:
 	for i in range(burst_parts.size()):
 		var t:=float(state.age)
 		burst_parts[i].visible=state.phase=="failed" and t<0.85
-		burst_parts[i].position=Vector3(-0.94,1.4,7.96)+Vector3(sin(i*2.4)*t*0.9,1.6*t-2.5*t*t,cos(i*2.4)*t*0.6)
+		burst_parts[i].position=Vector3(-0.94,0.6,-0.06)+Vector3(sin(i*2.4)*t*0.9,1.6*t-2.5*t*t,cos(i*2.4)*t*0.6)
 	var level:=maxf(0.006,float(state.level))
-	liquid.scale.y=level; liquid.position.y=1.02+0.38*level
+	liquid.scale.y=0.76*level; liquid.position.y=0.22+0.38*level
 	needle.position.x=-0.58+1.16*float(state.needle)
 	progress_bar.scale.x=maxf(0.001,float(state.balanced)/BALANCE_SECONDS)
 	progress_bar.position.x=-1.2+0.26*progress_bar.scale.x

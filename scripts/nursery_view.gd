@@ -32,137 +32,78 @@ func text_at(parent: Node3D, text: String, point: Vector3, size := 20) -> Label3
 	return label
 
 func light_at(parent: Node3D, point: Vector3, color: Color, energy := 0.8) -> void:
-	var light:=OmniLight3D.new(); parent.add_child(light)
+	var light:=preload("res://scenes/runtime/omni_light.tscn").instantiate() as OmniLight3D
+	parent.add_child(light)
 	light.position=point; light.light_color=color; light.light_energy=energy; light.omni_range=5.0
 
 func rebuild() -> void:
 	if is_instance_valid(shell): shell.free()
-	shell=Node3D.new(); add_child(shell)
+	shell=Node3D.new(); shell.name="NurserySceneObjects"; add_child(shell)
 	pot_views.clear(); machine_arms.clear()
 	var p=game.service.progress
 	stamp=Layout.stamp(p)
-	var left:=Layout.left(p.lab_tier)
-	var back:=Layout.back(p.lab_tier)
-	var width:=Layout.RIGHT-left
-	var depth:=back-Layout.FRONT
-	P.box(shell,Vector3(width-0.3,0.10,depth-0.3),Vector3((left+Layout.RIGHT)*0.5,4.55,(Layout.FRONT+back)*0.5),Color("b9c9ba"))
-	for x in [left+0.18,Layout.RIGHT-0.18]:
-		P.box(shell,Vector3(0.06,0.85,depth-0.3),Vector3(x,0.44,(Layout.FRONT+back)*0.5),Color("66887d"))
-		P.box(shell,Vector3(0.09,0.05,depth-0.3),Vector3(x,0.9,(Layout.FRONT+back)*0.5),Color("ddba78"))
-	for z in range(int(Layout.FRONT)+2,int(back),4):
-		var middle: float=(left+Layout.RIGHT)*0.5
-		P.box(shell,Vector3(width-0.6,0.1,0.12),Vector3(middle,4.35,z),Color("718f82"))
-		light_at(shell,Vector3(middle,3.5,z),Color("d5e5cb"),0.85)
-	text_at(shell,"БИОЛАБОРАТОРИЯ · РАССАДА СОТРУДНИКОВ",Vector3((left+Layout.RIGHT)*0.5,3.65,back-0.25),27)
-	# Microscope is separate from the mixing bench.
-	var scope:=Node3D.new(); shell.add_child(scope); scope.position=Layout.MICROSCOPE
-	P.solid_box(scope,Vector3(1.05,0.12,0.80),Vector3(0,0.88,0),WOOD)
-	for x in [-0.4,0.4]: P.box(scope,Vector3(0.08,0.84,0.6),Vector3(x,0.42,0),Color("486c61"))
-	P.box(scope,Vector3(0.5,0.08,0.46),Vector3(0,1.0,0),Color("3a5c58"))
-	P.line(scope,Vector3(0,1.02,-0.16),Vector3(0,1.65,-0.16),0.055,GREEN)
-	P.box(scope,Vector3(0.38,0.035,0.31),Vector3(0,1.24,0.05),Color("38564f"))
-	P.line(scope,Vector3(0,1.63,-0.16),Vector3(0,1.69,0.18),0.10,Color("b4c9b3"))
-	P.cylinder(scope,0.085,0.10,Vector3(0,1.50,0.1),Color("263a39"))
-	P.ball(scope,0.045,Vector3(0,1.28,0.1),Color("8becbd"))
-	microscope_label=text_at(scope,"МИКРОСКОП\nКапля → формула",Vector3(0,2.0,0),20)
-	# The tools share a shallow wall shelf, leaving the centre walk clear.
-	P.solid_box(shell,Vector3(0.42,0.12,2.65),Vector3(Layout.SUPPLY_X,0.88,Layout.FRONT+0.85),WOOD)
+	var runtime=preload("res://scripts/scene_runtime.gd")
+	# The annex owns the room shell. Nursery-specific permanent objects are authored scenes.
+	var scope:=runtime.instantiate("res://scenes/lab/microscope.tscn") as Node3D
+	shell.add_child(scope); scope.position=Layout.MICROSCOPE
+	microscope_label=scope.get_node("Label") as Label3D
+	var shelf:=runtime.instantiate("res://scenes/lab/tool_shelf.tscn") as Node3D
+	shell.add_child(shelf); shelf.position=Vector3(Layout.SUPPLY_X,0,18.225)
+	var tool_scenes: Dictionary={"soil":"res://scenes/lab/soil_scoop.tscn","liquid":"res://scenes/lab/formula_pipette.tscn","sample":"res://scenes/lab/formula_pipette.tscn","water":"res://scenes/lab/watering_tool.tscn","fertilizer":"res://scenes/lab/fertilizer_tool.tscn"}
 	for type in nursery.TOOLS:
-		var root:=Node3D.new(); shell.add_child(root); root.position=Layout.tool_point(type)
-		build_tool(root,type)
-		text_at(root,str(nursery.TOOLS[type]),Vector3(-0.08,0.35,0),15)
+		var tool:=runtime.instantiate(str(tool_scenes[type])) as Node3D
+		shell.add_child(tool); tool.position=Layout.tool_point(type)
 	for i in range(Policy.pot_count(p)):
-		var root:=Node3D.new(); shell.add_child(root); root.position=Layout.pot_point(i)
-		P.cylinder(root,0.43,0.65,Vector3(0,0.37,0),Color("b47c62"),0.57)
-		P.cylinder(root,0.59,0.10,Vector3(0,0.73,0),Color("d7a379"))
-		var soil:=P.cylinder(root,0.53,0.04,Vector3(0,0.77,0),Color("554536"))
-		P.collision_box(root,Vector3(1.12,0.80,1.12),Vector3(0,0.4,0))
-		for j in range(7): P.ball(soil,0.025,Vector3(sin(j*2.3)*0.35,0.026,cos(j*2.3)*0.35),Color("8c7250"))
-		var actor:=Avatar.new(); root.add_child(actor)
-		var mouth:=P.ball(actor.head,0.06,Vector3(0,-0.1,-0.22),Color("4a3030")); mouth.scale=Vector3(1,0.5,0.25)
-		var leaf:=P.ball(actor.head,0.11,Vector3(-0.10,0.24,0),GREEN); leaf.scale=Vector3(1.3,0.22,0.5); leaf.rotation.z=0.4
-		var other:=P.ball(actor.head,0.11,Vector3(0.10,0.24,0),GREEN); other.scale=Vector3(1.3,0.22,0.5); other.rotation.z=-0.4
-		var pellet:=P.ball(root,0.075,Vector3.ZERO,Color("d7bd77")); pellet.hide()
+		var root:=runtime.instantiate("res://scenes/lab/clone_pot.tscn") as Node3D
+		shell.add_child(root); root.position=Layout.pot_point(i)
+		var sprout:=runtime.instantiate("res://scenes/actors/clone_sprout.tscn") as Node3D
+		var actor:=sprout.get_node("Actor") as Node3D
+		actor.set_script(Avatar)
+		root.add_child(sprout)
+		var soil:=root.get_node("Soil") as MeshInstance3D
+		var mouth:=sprout.get_node("SproutDecor/HungryMouth") as Node3D
+		var pellet:=sprout.get_node("FertilizerPellet") as Node3D; pellet.hide()
 		var label:=text_at(root,"",Vector3(0,2.1,0),18)
 		pot_views[i]={"root":root,"soil":soil,"actor":actor,"mouth":mouth,"label":label,"pellet":pellet}
 		if "lab_lamps" in p.lab_upgrades:
-			P.box(root,Vector3(1.2,0.10,0.62),Vector3(0,3.05,0),Color("7d8f82"))
-			var bulb:=P.box(root,Vector3(1.05,0.03,0.50),Vector3(0,2.98,0),Color("d4a6cc"))
-			bulb.material_override.emission_enabled=true; bulb.material_override.emission=Color("be8aa9")
+			var lamp:=runtime.instantiate("res://scenes/lab/grow_lamp.tscn") as Node3D; root.add_child(lamp)
 			light_at(root,Vector3(0,2.7,0),Color("e2b8da"),0.5)
 		if "lab_feeder" in p.lab_upgrades:
-			P.line(root,Vector3(0.65,0,0.35),Vector3(0.65,2.45,0.35),0.045,GREEN)
-			P.line(root,Vector3(0.65,2.45,0.35),Vector3(0,2.45,0),0.06,Color("cab785"))
-			P.cylinder(root,0.12,0.24,Vector3(0,2.43,0),Color("d6b871"),0.22)
+			root.add_child(runtime.instantiate("res://scenes/lab/auto_feeder.tscn"))
+		# Small per-pot pipes/arms remain composed from scene-backed reusable primitives.
 		if "lab_irrigation" in p.lab_upgrades:
-			P.line(root,Vector3(0.63,0.18,0),Vector3(0.63,1.2,0),0.025,Color("82bdb6"))
-			P.line(root,Vector3(0.63,1.2,0),Vector3(0.3,1.15,0),0.025,Color("82bdb6"))
+			P.line(root,Vector3(0.63,0.18,0),Vector3(0.63,1.2,0),0.025,Color("82bdb6")); P.line(root,Vector3(0.63,1.2,0),Vector3(0.3,1.15,0),0.025,Color("82bdb6"))
 		if "lab_planter" in p.lab_upgrades:
-			P.line(root,Vector3(0.68,0.1,0.45),Vector3(0.68,1.68,0.45),0.035,Color("779b82"))
-			P.box(root,Vector3(0.30,0.25,0.25),Vector3(0.45,1.70,0.15),Color("c6b080"))
-			P.line(root,Vector3(0.45,1.7,0.15),Vector3(-0.35,1.6,0.15),0.026,Color("9dd0b7"))
+			P.line(root,Vector3(0.68,0.1,0.45),Vector3(0.68,1.68,0.45),0.035,Color("779b82")); P.box(root,Vector3(0.30,0.25,0.25),Vector3(0.45,1.70,0.15),Color("c6b080")); P.line(root,Vector3(0.45,1.7,0.15),Vector3(-0.35,1.6,0.15),0.026,Color("9dd0b7"))
 		if "lab_extractor" in p.lab_upgrades:
-			var arm:=Node3D.new(); root.add_child(arm); arm.position=Vector3(0,1.75,0.3)
-			for side in [-1,1]:
-				P.line(arm,Vector3(side*0.65,0.9,0),Vector3(side*0.38,0,0),0.045,Color("d5b47d"))
-				P.box(arm,Vector3(0.10,0.20,0.2),Vector3(side*0.33,-0.1,-0.1),Color("5b8e81"))
+			var arm:=Node3D.new(); arm.name="ExtractorArm"; root.add_child(arm); arm.position=Vector3(0,1.75,0.3)
+			for side in [-1,1]: P.line(arm,Vector3(side*0.65,0.9,0),Vector3(side*0.38,0,0),0.045,Color("d5b47d")); P.box(arm,Vector3(0.10,0.20,0.2),Vector3(side*0.33,-0.1,-0.1),Color("5b8e81"))
 			machine_arms[i]=arm
 	for id in p.lab_upgrades:
 		if not Policy.ITEMS.has(id) or Policy.ITEMS[id].branch=="formula" or Policy.ITEMS[id].branch=="calibration" or id in ["lab_feeder","lab_lamps","lab_rack","lab_rack_2"]: continue
 		build_machine(id)
-	if "lab_rack" in p.lab_upgrades:
-		for point in [Vector3(-6.3,0,16.5),Vector3(-6.3,0,19.5)]:
-			P.box(shell,Vector3(1.6,0.10,1.6),point+Vector3(0,0.06,0),Color("647f72"))
-			P.line(shell,point+Vector3(-0.8,0,0.7),point+Vector3(-0.8,2.8,0.7),0.035,GREEN)
+	for rack_id in ["lab_rack","lab_rack_2"]:
+		if rack_id in p.lab_upgrades:
+			var path: String="res://scenes/lab/pot_rack.tscn" if rack_id=="lab_rack" else "res://scenes/lab/extra_rack_section.tscn"
+			var rack:=runtime.instantiate(path) as Node3D
+			shell.add_child(rack); rack.position=Layout.fixture(rack_id)
 	production_label=text_at(shell,"",Layout.fixture("lab_production")+Vector3(0,1.8,0),18)
 	production_label.visible="lab_production" in p.lab_upgrades
 
 func build_machine(id: String) -> void:
-	var root:=Node3D.new(); shell.add_child(root); root.position=Layout.fixture(id)
-	match id:
-		"lab_irrigation","lab_nutrients":
-			P.cylinder(root,0.46,1.3,Vector3(0,0.70,0),Color("6ba6a0") if id=="lab_irrigation" else Color("b5a16b"))
-			for y in [0.16,1.24]: P.cylinder(root,0.49,0.07,Vector3(0,y,0),Color("47695e"))
-			P.line(root,Vector3(0.45,0.3,0),Vector3(0.65,0.3,-0.3),0.06,Color("c4d6bd"))
-		"lab_planter":
-			P.box(root,Vector3(1.05,0.95,0.8),Vector3(0,0.5,0),Color("709d85"))
-			P.cylinder(root,0.38,0.48,Vector3(0,1.2,0),Color("c8b582"),0.5)
-			P.box(root,Vector3(0.65,0.12,0.6),Vector3(0,0.78,-0.5),WOOD)
-			for i in range(5): P.ball(root,0.06,Vector3(-0.23+i*0.1,1.45,0),Color("5b4b39"))
-		"lab_extractor":
-			P.box(root,Vector3(0.95,0.7,0.8),Vector3(0,0.35,0),GREEN)
-			for side in [-1,1]:
-				P.line(root,Vector3(side*0.32,0.6,0),Vector3(side*0.46,1.7,-0.1),0.06,Color("ddbd84"))
-				P.box(root,Vector3(0.12,0.34,0.18),Vector3(side*0.46,1.6,-0.2),Color("4b7065"))
-		"lab_climate":
-			P.box(root,Vector3(1.1,1.7,0.9),Vector3(0,0.88,0),Color("8aaca2"))
-			for y in [0.65,1.30]:
-				P.cylinder(root,0.29,0.08,Vector3(0,y,-0.5),Color("38564f")).rotation.x=PI/2
-				for i in range(4): P.line(root,Vector3.ZERO+Vector3(0,y,-0.55),Vector3(sin(i*PI/2)*0.22,y+cos(i*PI/2)*0.22,-0.55),0.035,Color("c7d0b7"))
-		"lab_production":
-			P.box(root,Vector3(0.95,0.9,0.65),Vector3(0,0.45,0),GREEN)
-			P.box(root,Vector3(0.95,0.65,0.10),Vector3(0,1.2,0),Color("38564f"))
-			P.box(root,Vector3(0.78,0.44,0.03),Vector3(0,1.2,-0.07),Color("9bcaa8"))
-	P.collision_box(root,Vector3(1.16,1.0,1.0),Vector3(0,0.5,0))
+	var paths: Dictionary={
+		"lab_irrigation":"res://scenes/lab/irrigation_tank.tscn","lab_nutrients":"res://scenes/lab/nutrient_dispenser.tscn",
+		"lab_planter":"res://scenes/lab/planter.tscn","lab_extractor":"res://scenes/lab/extractor.tscn",
+		"lab_climate":"res://scenes/lab/climate_unit.tscn","lab_production":"res://scenes/lab/production_controller.tscn"
+	}
+	if not paths.has(id): return
+	var root:=preload("res://scripts/scene_runtime.gd").instantiate(str(paths[id])) as Node3D
+	shell.add_child(root); root.position=Layout.fixture(id)
 	text_at(root,str(Policy.ITEMS[id].name).get_slice(" · ",0),Vector3(0,1.95,0),17)
 
 func build_tool(parent: Node3D, type: String) -> void:
-	match type:
-		"soil":
-			P.line(parent,Vector3(0,0,0),Vector3(0,0.18,-0.16),0.025,WOOD)
-			P.box(parent,Vector3(0.18,0.035,0.24),Vector3(0,0.03,-0.23),Color("a8b8a4"))
-			P.ball(parent,0.085,Vector3(0,0.08,-0.22),Color("66513a")).scale=Vector3(1,0.5,1)
-		"liquid","sample":
-			P.cylinder(parent,0.045,0.22,Vector3(0,0.10,0),Color("94d7b4"))
-			P.cylinder(parent,0.022,0.12,Vector3(0,-0.06,0),Color("bdd7cf"))
-			P.ball(parent,0.065,Vector3(0,0.23,0),Color("d4bb81"))
-		"water":
-			P.cylinder(parent,0.13,0.22,Vector3(0,0.10,0),Color("7ab5b1"))
-			P.line(parent,Vector3(0,0.15,0),Vector3(0.32,0.24,0),0.035,Color("b9d0b5"))
-			P.line(parent,Vector3(-0.12,0.17,0),Vector3(-0.23,0.27,0),0.025,WOOD)
-		"fertilizer":
-			P.box(parent,Vector3(0.18,0.22,0.12),Vector3(0,0.1,0),Color("d8bd76"))
-			P.ball(parent,0.055,Vector3(0,0.26,0),Color("739968"))
+	var paths: Dictionary={"soil":"res://scenes/lab/soil_scoop.tscn","liquid":"res://scenes/lab/formula_pipette.tscn","sample":"res://scenes/lab/formula_pipette.tscn","water":"res://scenes/lab/watering_tool.tscn","fertilizer":"res://scenes/lab/fertilizer_tool.tscn"}
+	if paths.has(type): parent.add_child(preload("res://scripts/scene_runtime.gd").instantiate(str(paths[type])))
 
 func _attention_position(peer: int) -> Vector3:
 	if peer==game.session.local_id(): return game.player.global_position+Vector3(0,1.2,0)

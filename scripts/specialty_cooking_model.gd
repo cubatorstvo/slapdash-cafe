@@ -154,7 +154,7 @@ func success() -> bool: return quality().grade=="S"
 func take_serving() -> Array:
 	if not _assembly_ready() or served: return []
 	served=true; guest_roles[1].chew=0.8
-	return [{"kind":"burger","from":Vector3(ASSEMBLY.x,BASE_Y+0.15,ASSEMBLY.y)},{"kind":"plate","from":Vector3(ASSEMBLY.x,BASE_Y+0.03,ASSEMBLY.y)}]
+	return [{"kind":"burger","dish":dish,"from":Vector3(ASSEMBLY.x,BASE_Y+0.15,ASSEMBLY.y)},{"kind":"plate","dish":dish,"from":Vector3(ASSEMBLY.x,BASE_Y+0.03,ASSEMBLY.y)}]
 
 func held_center(role: int) -> Vector3:
 	var item:String=hands[role]

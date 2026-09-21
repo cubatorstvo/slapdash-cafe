@@ -1,4 +1,7 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/steak_serving_plate.tscn" id="1_steak_plate"]
+[ext_resource type="PackedScene" path="res://scenes/props/pasta_serving_plate.tscn" id="2_pasta_plate"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_wood"]
 albedo_color = Color(0.72549, 0.541176, 0.345098, 1)
@@ -101,16 +104,10 @@ position = Vector3(0, 0.05, 0)
 scale = Vector3(0.74, 0.035, 0.74)
 mesh = SubResource("Mesh_cylinder")
 material_override = SubResource("Mat_hot")
-[node name="SteakPlate" type="MeshInstance3D" parent="."]
+[node name="SteakPlate" parent="." instance=ExtResource("1_steak_plate")]
 position = Vector3(-0.5, 1.03, 0.65)
-scale = Vector3(0.88, 0.025, 0.88)
-mesh = SubResource("Mesh_cylinder")
-material_override = SubResource("Mat_plate")
-[node name="PastaPlate" type="MeshInstance3D" parent="."]
+[node name="PastaPlate" parent="." instance=ExtResource("2_pasta_plate")]
 position = Vector3(0.5, 1.03, 0.65)
-scale = Vector3(0.88, 0.025, 0.88)
-mesh = SubResource("Mesh_cylinder")
-material_override = SubResource("Mat_plate")
 [node name="StationLabel" type="Label3D" parent="."]
 position = Vector3(0, 1.28, -1.2)
 billboard = 1

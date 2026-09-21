@@ -4,6 +4,7 @@ const Policy=preload("res://scripts/laboratory_progression.gd")
 const Layout=preload("res://scripts/laboratory_layout.gd")
 const P=preload("res://scripts/props.gd")
 const Avatar=preload("res://scripts/cook_avatar.gd")
+const SceneRuntime=preload("res://scripts/scene_runtime.gd")
 const BEATS := [1.2,2.2,3.0,4.4,5.3,6.4]
 const ROUND_SECONDS := 7.2
 var game: Node3D
@@ -18,7 +19,7 @@ var state: Dictionary:
 
 func setup(owner_game: Node3D, owner_lab: Node3D) -> void:
 	game=owner_game; laboratory=owner_lab
-	actor=Avatar.new(); add_child(actor); actor.add_to_group("automatic_door_actor")
+	actor=SceneRuntime.instantiate("res://scenes/actors/cook_avatar.tscn",Avatar) as Node3D; add_child(actor); actor.add_to_group("automatic_door_actor")
 	rebuild()
 
 func manual_owner() -> int:
@@ -195,28 +196,22 @@ func prepare_sleep() -> void:
 
 func rebuild() -> void:
 	if is_instance_valid(root): root.free()
-	root=Node3D.new(); add_child(root); root.position=Layout.CHAIR
+	root=SceneRuntime.instantiate("res://scenes/lab/recalibration_chair.tscn") as Node3D
+	add_child(root); root.position=Layout.CHAIR
 	var upgrades: Array=game.service.progress.lab_upgrades
 	stamp=str(upgrades)
 	root.visible="lab_chair" in upgrades
-	lamps.clear()
-	P.solid_box(root,Vector3(0.95,0.16,0.86),Vector3(0,0.6,0),Color("78a99b"))
-	P.box(root,Vector3(0.95,1.0,0.16),Vector3(0,1.13,0.35),Color("8bbca7"))
-	for side in [-1,1]:
-		P.box(root,Vector3(0.11,0.5,0.7),Vector3(side*0.49,0.77,0),Color("b5a078"))
-		P.box(root,Vector3(0.12,0.65,0.12),Vector3(side*0.38,0.30,0.25),Color("4f7169"))
-	P.line(root,Vector3(0,0,0.52),Vector3(0,2.25,0.52),0.06,Color("5b7e70"))
-	P.cylinder(root,0.35,0.22,Vector3(0,2.05,0),Color("c9b788"))
-	for i in range(3):
-		var lamp:=P.ball(root,0.075,Vector3(-0.22+i*0.22,2.10,-0.28),[Color("df997b"),Color("e0ce88"),Color("85c8ac")][i])
-		lamps.append(lamp)
-	P.box(root,Vector3(0.48,0.20,0.32),Vector3(0,0.92,-0.60),Color("42655c"))
-	for side in [-1,1]: P.box(root,Vector3(0.18,0.08,0.18),Vector3(side*0.57,1.02,-0.60),Color("d3b27b"))
-	for id in ["lab_cal_focus","lab_cal_slow","lab_cal_auto","lab_cal_speed"]:
+	lamps=[root.get_node("LampRed"),root.get_node("LampYellow"),root.get_node("LampGreen")]
+	var module_scenes={
+		"lab_cal_focus":"res://scenes/lab/focus_synchronizer.tscn",
+		"lab_cal_slow":"res://scenes/lab/slow_pulse_module.tscn",
+		"lab_cal_auto":"res://scenes/lab/auto_recalibration_module.tscn",
+		"lab_cal_speed":"res://scenes/lab/chair_speed_module.tscn"
+	}
+	for id in module_scenes:
 		if id not in upgrades: continue
-		var at:=Layout.fixture(id)-Layout.CHAIR
-		P.box(root,Vector3(0.3,0.25,0.24),at,Color("a7b685"))
-		for i in range(3): P.ball(root,0.024,at+Vector3(-0.08+i*0.08,0.04,-0.13),Color("e0d595"))
+		var module:=SceneRuntime.instantiate(module_scenes[id]) as Node3D
+		root.add_child(module); module.position=Layout.fixture(id)-Layout.CHAIR
 	caption=P.text(root,"",Vector3(0,2.7,0),20,Color("efdcb3"))
 	caption.billboard=BaseMaterial3D.BILLBOARD_ENABLED; caption.pixel_size=0.0038
 

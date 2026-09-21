@@ -1,4 +1,5 @@
 [gd_scene load_steps=2 format=3]
+
 [sub_resource type="StyleBoxFlat" id="Panel"]
 bg_color = Color(0.090196,0.180392,0.188235,0.96)
 border_width_left = 1
@@ -39,15 +40,23 @@ text = "C A F E"
 [node name="Order" type="VBoxContainer" parent="Root/Top/Row"]
 size_flags_horizontal = 3
 [node name="Goal" type="Label" parent="Root/Top/Row/Order"]
-theme_override_font_sizes/font_size = 18
-text = "Текущая цель"
-[node name="Notice" type="Label" parent="Root/Top/Row/Order"]
+theme_override_font_sizes/font_size = 20
+[node name="CloneStatus" type="Label" parent="Root/Top/Row/Order"]
 theme_override_font_sizes/font_size = 14
-text = "Подсказка / состояние заказа"
+[node name="EquipmentWarning" type="Label" parent="Root/Top/Row/Order"]
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+max_lines_visible = 2
+[node name="Journey" type="Label" parent="Root/Top/Row/Order"]
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 2
+max_lines_visible = 2
+[node name="Progress" type="ProgressBar" parent="Root/Top/Row/Order"]
+visible = false
 [node name="Clock" type="Label" parent="Root/Top/Row"]
 theme_override_font_sizes/font_size = 18
-text = "00:00"
 [node name="CafeButton" type="Button" parent="Root/Top/Row"]
+visible = false
 text = "Кафе"
 [node name="EventFeed" type="PanelContainer" parent="Root"]
 offset_left = 26.0
@@ -55,28 +64,30 @@ offset_top = 204.0
 offset_right = 560.0
 offset_bottom = 310.0
 theme_override_styles/panel = SubResource("Panel")
+visible = false
 [node name="Text" type="Label" parent="Root/EventFeed"]
 theme_override_font_sizes/font_size = 14
-text = "Последние события кафе"
 autowrap_mode = 2
+max_lines_visible = 4
 [node name="RecipePanel" type="PanelContainer" parent="Root"]
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -346.0
 offset_top = 204.0
 offset_right = -26.0
-offset_bottom = 430.0
+offset_bottom = 204.0
+custom_minimum_size = Vector2(320,0)
 theme_override_styles/panel = SubResource("Panel")
+visible = false
 [node name="Scroll" type="ScrollContainer" parent="Root/RecipePanel"]
 horizontal_scroll_mode = 0
+custom_minimum_size = Vector2(300,0)
+mouse_filter = 2
 [node name="Content" type="VBoxContainer" parent="Root/RecipePanel/Scroll"]
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
-[node name="RecipeTitle" type="Label" parent="Root/RecipePanel/Scroll/Content"]
-theme_override_font_sizes/font_size = 18
-text = "РЕЦЕПТ"
-[node name="RecipeLine" type="Label" parent="Root/RecipePanel/Scroll/Content"]
-text = "○ Требование блюда"
+[node name="RecipeText" type="Label" parent="Root"]
+visible = false
 [node name="Bottom" type="PanelContainer" parent="Root"]
 anchor_top = 1.0
 anchor_right = 1.0
@@ -89,10 +100,13 @@ theme_override_styles/panel = SubResource("Panel")
 [node name="Column" type="VBoxContainer" parent="Root/Bottom"]
 [node name="Controls" type="Label" parent="Root/Bottom/Column"]
 theme_override_font_sizes/font_size = 16
-text = "E — взаимодействовать · B — книга"
-[node name="Journey" type="Label" parent="Root/Bottom/Column"]
+horizontal_alignment = 1
+[node name="Supplies" type="Label" parent="Root/Bottom/Column"]
 theme_override_font_sizes/font_size = 14
-text = "Прогресс смены"
+horizontal_alignment = 1
+[node name="Notice" type="Label" parent="Root"]
+visible = false
+theme_override_font_sizes/font_size = 16
 [node name="Crosshair" type="Label" parent="Root"]
 anchors_preset = 8
 anchor_left = 0.5
@@ -103,7 +117,8 @@ offset_left = -8.0
 offset_top = -22.0
 offset_right = 8.0
 offset_bottom = 0.0
-text = "+"
+theme_override_font_sizes/font_size = 32
+text = "·"
 horizontal_alignment = 1
 [node name="Prompt" type="Label" parent="Root"]
 anchors_preset = 8
@@ -116,7 +131,6 @@ offset_top = 42.0
 offset_right = 410.0
 offset_bottom = 80.0
 theme_override_font_sizes/font_size = 17
-text = "(E) Действие"
 horizontal_alignment = 1
 [node name="VisitStatus" type="Label" parent="Root"]
 anchor_top = 1.0
@@ -126,7 +140,6 @@ offset_left = 130.0
 offset_top = -122.0
 offset_right = -130.0
 offset_bottom = -96.0
-text = "Гости / визит"
 horizontal_alignment = 1
 [node name="Toast" type="Label" parent="Root"]
 anchors_preset = 7
@@ -139,8 +152,8 @@ offset_top = -155.0
 offset_right = 390.0
 offset_bottom = -112.0
 theme_override_font_sizes/font_size = 24
-text = "Событие"
 horizontal_alignment = 1
+modulate = Color(1,1,1,0)
 [node name="PausePanel" type="PanelContainer" parent="Root"]
 anchors_preset = 8
 anchor_left = 0.5
@@ -153,6 +166,7 @@ offset_right = 240.0
 offset_bottom = 120.0
 theme_override_styles/panel = SubResource("Panel")
 visible = false
+mouse_filter = 0
 [node name="Pause" type="VBoxContainer" parent="Root/PausePanel"]
 theme_override_constants/separation = 20
 [node name="Heading" type="Label" parent="Root/PausePanel/Pause"]

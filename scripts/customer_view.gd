@@ -1,5 +1,6 @@
 extends Node3D
 const Props = preload("res://scripts/props.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 var meal_items: Array = []
 var meal_age := 0.0
 var meal_root: Node3D
@@ -27,42 +28,23 @@ var following_food := false
 var personality := 0.0
 
 func _ready() -> void:
+	preload("res://scripts/scene_runtime.gd").ensure_children(self, "res://scenes/actors/customer.tscn")
 	personality = float(get_instance_id() % 97) * 0.37
-	for side in [-1, 1]:
-		var leg := Node3D.new()
-		add_child(leg)
-		leg.position = Vector3(side * 0.14, 0.65, 0)
-		Props.box(leg, Vector3(0.18, 0.58, 0.2), Vector3(0, -0.23, 0), Color("293d4b"))
-		Props.box(leg, Vector3(0.21, 0.13, 0.34), Vector3(0, -0.56, -0.06), Color("24323b"))
-		legs.append(leg)
-	Props.box(self, Vector3(0.59, 0.61, 0.33), Vector3(0, 0.96, 0), color)
-	for side in [-1, 1]:
-		var shoulder := Node3D.new()
-		add_child(shoulder)
-		shoulder.position = Vector3(side * 0.36, 1.16, 0)
-		Props.box(shoulder, Vector3(0.14, 0.50, 0.18), Vector3(0, -0.22, 0), color)
-		Props.ball(shoulder, 0.085, Vector3(0, -0.49, 0), Color("e8b893"))
-		shoulders.append(shoulder)
-	head = Node3D.new()
-	add_child(head)
-	head.position.y = 1.51
-	Props.ball(head, 0.24, Vector3.ZERO, Color("e8b893"))
-	for side in [-1, 1]: Props.ball(head, 0.027, Vector3(side * 0.08, 0.04, -0.22), Color("203c40"))
-	if chef:
-		Props.cylinder(head, 0.26, 0.22, Vector3(0, 0.27, 0), Color("fff0cb"))
-		Props.box(self, Vector3(0.38, 0.5, 0.04), Vector3(0, 0.91, -0.185), Color("f3deb1"))
-	else: Props.ball(head, 0.25, Vector3(0, 0.13, 0.025), color.darkened(0.3)).scale.y = 0.48
-	mouth_shape = Props.ball(head,0.205,Vector3(0,-0.035,-0.248),Color("341c25"))
-	mouth_shape.scale = Vector3(0.2,0.06,0.12)
-	drink_label = Props.text(self,"",Vector3(0,2.32,0),17,Color("eacb86"))
-	drink_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	drink_label.pixel_size = 0.005
-	stain = Props.ball(head, 0.13, Vector3(0, -0.01, -0.235), Color("d9483b"))
-	stain.scale.z = 0.15
+	legs = [get_node("LeftLeg"), get_node("RightLeg")]
+	shoulders = [get_node("LeftShoulder"), get_node("RightShoulder")]
+	head = get_node("Head")
+	mouth_shape = get_node("Head/Mouth") as MeshInstance3D
+	drink_label = get_node("DrinkLabel") as Label3D
+	stain = get_node("Head/Stain") as MeshInstance3D
+	caption = get_node("Caption") as Label3D
+	var runtime = preload("res://scripts/scene_runtime.gd")
+	runtime.colorize(get_node("Body") as MeshInstance3D, color)
+	runtime.colorize(get_node("LeftShoulder/Arm") as MeshInstance3D, color)
+	runtime.colorize(get_node("RightShoulder/Arm") as MeshInstance3D, color)
+	runtime.colorize(get_node("Head/Hair") as MeshInstance3D, color.darkened(0.3))
+	get_node("Head/Hair").visible = not chef
+	get_node("ChefVariant").visible = chef
 	stain.hide()
-	caption = Props.text(self, "", Vector3(0, 2.05, 0), 19, Color("f6dfa9"))
-	caption.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	caption.pixel_size = 0.005
 
 func walk_to(target: Vector3, delta: float) -> bool:
 	watching = false
@@ -117,13 +99,32 @@ func _process(delta: float) -> void:
 		shoulders[index].rotation.x = lerpf(shoulders[index].rotation.x, gesture, blend)
 	animate_meal()
 
+func serving_scene(items: Array) -> String:
+	if items.is_empty(): return ""
+	var dish:=str(items[0].get("dish",""))
+	var kinds: Array=[]
+	for entry in items: kinds.append(str(entry.kind))
+	if dish=="wine" and "cup" in kinds and "plate" in kinds and "wine" not in kinds: return "res://scenes/food/wine_serving.tscn"
+	if dish=="potato" and "potato" in kinds and "plate" in kinds: return "res://scenes/food/fried_potato_serving.tscn"
+	if dish=="sausage" and "sausage" in kinds and "plate" in kinds: return "res://scenes/food/sausage_serving.tscn"
+	if dish=="meal" and "steak" in kinds and "pasta" in kinds and "plate" in kinds: return "res://scenes/food/steak_pasta_serving.tscn"
+	if dish=="burger" and "burger" in kinds and "plate" in kinds: return "res://scenes/food/burger_serving.tscn"
+	if dish=="cheeseburger" and "burger" in kinds and "plate" in kinds: return "res://scenes/food/cheeseburger_serving.tscn"
+	if dish=="spicy_burger" and "burger" in kinds and "plate" in kinds: return "res://scenes/food/spicy_burger_serving.tscn"
+	if dish=="solyanka" and "solyanka" in kinds and "plate" in kinds: return "res://scenes/food/solyanka_serving.tscn"
+	return ""
+
 func begin_meal(items: Array) -> void:
 	if not meal_items.is_empty(): return
 	meal_items=items.duplicate(true)
 	meal_age=0.0
 	meal_root=Node3D.new(); add_child(meal_root)
-	for entry in meal_items:
-		var node:=Node3D.new(); meal_root.add_child(node)
+	var plated_scene:=serving_scene(meal_items)
+	for item_index in range(meal_items.size()):
+		var entry: Dictionary=meal_items[item_index]
+		var node:=SceneRuntime.instantiate(plated_scene) as Node3D if item_index==0 and not plated_scene.is_empty() else Node3D.new()
+		meal_root.add_child(node)
+		if not plated_scene.is_empty(): continue
 		match str(entry.kind):
 			"plate": Props.cylinder(node,0.32,0.035,Vector3.ZERO,Color("ecdfb5"))
 			"cup", "jug":

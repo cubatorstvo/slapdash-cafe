@@ -1,4 +1,5 @@
 [gd_scene load_steps=2 format=3]
+
 [sub_resource type="StyleBoxFlat" id="Panel"]
 bg_color = Color(0.090196,0.180392,0.188235,0.96)
 border_width_left = 1
@@ -10,10 +11,10 @@ corner_radius_top_left = 14
 corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
-content_margin_left = 16.0
-content_margin_top = 14.0
-content_margin_right = 16.0
-content_margin_bottom = 14.0
+content_margin_left = 22.0
+content_margin_top = 20.0
+content_margin_right = 22.0
+content_margin_bottom = 20.0
 
 [node name="MainPauseMenu" type="CanvasLayer"]
 [node name="Root" type="Control" parent="."]
@@ -30,24 +31,13 @@ offset_top = -310.0
 offset_right = 380.0
 offset_bottom = 310.0
 theme_override_styles/panel = SubResource("Panel")
+visible = false
 [node name="Scroll" type="ScrollContainer" parent="Root/MenuPanel"]
 horizontal_scroll_mode = 0
-[node name="Column" type="VBoxContainer" parent="Root/MenuPanel/Scroll"]
+size_flags_vertical = 3
+[node name="TrainingBox" type="VBoxContainer" parent="Root/MenuPanel/Scroll"]
+size_flags_horizontal = 3
 theme_override_constants/separation = 9
-[node name="Heading" type="Label" parent="Root/MenuPanel/Scroll/Column"]
-theme_override_font_sizes/font_size = 26
-text = "КАФЕ"
-[node name="Status" type="Label" parent="Root/MenuPanel/Scroll/Column"]
-text = "Состояние станции / обучения"
-autowrap_mode = 2
-[node name="RecipeChoice" type="OptionButton" parent="Root/MenuPanel/Scroll/Column"]
-custom_minimum_size = Vector2(0,42)
-[node name="PrimaryAction" type="Button" parent="Root/MenuPanel/Scroll/Column"]
-custom_minimum_size = Vector2(0,42)
-text = "Начать"
-[node name="SecondaryAction" type="Button" parent="Root/MenuPanel/Scroll/Column"]
-custom_minimum_size = Vector2(0,42)
-text = "Настройки"
 [node name="NetworkPanel" type="PanelContainer" parent="Root"]
 anchors_preset = 8
 anchor_left = 0.5
@@ -63,17 +53,35 @@ visible = false
 [node name="Column" type="VBoxContainer" parent="Root/NetworkPanel"]
 theme_override_constants/separation = 9
 [node name="Heading" type="Label" parent="Root/NetworkPanel/Column"]
-theme_override_font_sizes/font_size = 24
-text = "СЕТЕВАЯ ИГРА"
-[node name="PlayerName" type="LineEdit" parent="Root/NetworkPanel/Column"]
-placeholder_text = "Имя игрока"
+theme_override_font_sizes/font_size = 23
+text = "ИГРАТЬ С ДРУЗЬЯМИ"
+[node name="Invite" type="Button" parent="Root/NetworkPanel/Column"]
+text = "Пригласить друга через Steam"
 [node name="SteamHost" type="Button" parent="Root/NetworkPanel/Column"]
 text = "Создать Steam-кафе"
+[node name="SteamHint" type="Label" parent="Root/NetworkPanel/Column"]
+text = "Shift+Tab → друзья → пригласить в игру"
+[node name="DirectHint" type="Label" parent="Root/NetworkPanel/Column"]
+text = "Прямое подключение по IP (для локальной проверки)"
+[node name="PlayerName" type="LineEdit" parent="Root/NetworkPanel/Column"]
+text = "Повар"
+placeholder_text = "Имя игрока"
 [node name="DirectAddress" type="LineEdit" parent="Root/NetworkPanel/Column"]
-placeholder_text = "IP / адрес"
+text = "127.0.0.1"
+placeholder_text = "IP хоста"
+[node name="Port" type="SpinBox" parent="Root/NetworkPanel/Column"]
+min_value = 1024.0
+max_value = 65535.0
+value = 27666.0
+[node name="Create" type="Button" parent="Root/NetworkPanel/Column"]
+text = "Создать сессию"
+[node name="Join" type="Button" parent="Root/NetworkPanel/Column"]
+text = "Подключиться"
+[node name="Leave" type="Button" parent="Root/NetworkPanel/Column"]
+text = "Отключиться"
 [node name="NetworkStatus" type="Label" parent="Root/NetworkPanel/Column"]
 custom_minimum_size = Vector2(540,62)
-text = "Статус подключения"
+text = "Steam: проверяю подключение…"
 autowrap_mode = 2
 [node name="Back" type="Button" parent="Root/NetworkPanel/Column"]
 text = "Вернуться в кафе"

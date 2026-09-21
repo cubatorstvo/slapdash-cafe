@@ -11,31 +11,14 @@ func _ready() -> void:
 	theme = CafeStyle.make(true)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var paper := ColorRect.new()
-	add_child(paper)
-	paper.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var paper := get_node("Paper") as ColorRect
 	paper.color = Color("f3e6c8") if name.ends_with("L") else Color("f8efd6")
-	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var margin := MarginContainer.new()
-	add_child(margin)
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 24)
-	margin.add_theme_constant_override("margin_right", 24)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_bottom", 16)
-	var hold := VBoxContainer.new()
-	margin.add_child(hold)
-	hold.add_theme_constant_override("separation", 8)
-	column = VBoxContainer.new()
-	hold.add_child(column)
-	column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_theme_constant_override("separation", 6)
-	note = Label.new()
-	hold.add_child(note)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	note.add_theme_font_size_override("font_size", 26)
+	column = get_node("Margin/Hold/Column") as VBoxContainer
+	for child in column.get_children():
+		column.remove_child(child)
+		child.queue_free()
+	note = get_node("Margin/Hold/Note") as Label
 	note.add_theme_color_override("font_color", Color("5a6b62"))
-	note.custom_minimum_size = Vector2(560, 72)
 
 func show_page(page: String, model = null) -> void:
 	var key := "%s:%s" % [page, JSON.stringify(Data.components(page, model)) if page != "index" else "index"]

@@ -395,4 +395,5 @@ func take_serving() -> Array:
 			result.append({"kind":"plate","from":Vector3(p.x,BASE_Y+0.03,p.y)})
 			guest_roles[role].swallowed.append("serving_plate")
 		guest_roles[role].chew=0.8
+	for entry in result: entry.dish="meal"
 	return result

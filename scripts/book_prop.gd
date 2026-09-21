@@ -2,6 +2,7 @@ extends Node3D
 const P = preload("res://scripts/props.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
 const Page = preload("res://scripts/recipe_page.gd")
+const SceneRuntime = preload("res://scripts/scene_runtime.gd")
 const PAGE := Vector2(0.54, 0.76)
 const VIEW := Vector2i(640, 900)
 const SIZE_MULTIPLIER := 1.2
@@ -27,11 +28,13 @@ var last_side := -1
 var pointer_down := false
 
 func _ready() -> void:
-	for side in [-1, 1]:
-		P.box(self, Vector3(0.60, 0.044, 0.84), Vector3(side * 0.31, -0.006, 0), Color("7a3d38"))
-		P.box(self, Vector3(0.56, 0.016, 0.78), Vector3(side * 0.305, 0.028, 0), Color("f3e6c8") if side < 0 else Color("f8efd6"))
-	P.box(self, Vector3(0.038, 0.07, 0.84), Vector3.ZERO, Color("5e322f"))
-	for side in [-1, 1]:
+	SceneRuntime.ensure_children(self, "res://scenes/presentation/physical_cookbook.tscn")
+	var authored_collision:=get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if authored_collision!=null: authored_collision.disabled=true
+	var authored_surfaces: Array[MeshInstance3D] = [get_node("LeftPageSurface") as MeshInstance3D, get_node("RightPageSurface") as MeshInstance3D]
+	hands = [get_node("HandLeft") as Node3D, get_node("HandRight") as Node3D]
+	for index in range(2):
+		var side := -1 if index == 0 else 1
 		var view := SubViewport.new()
 		add_child(view)
 		view.size = VIEW
@@ -40,20 +43,14 @@ func _ready() -> void:
 		view.handle_input_locally = true
 		view.gui_disable_input = false
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
-		var sheet := Page.new()
+		var sheet := SceneRuntime.instantiate("res://scenes/ui/cookbook_ui.tscn", Page) as Control
 		view.add_child(sheet)
 		sheet.name = "L" if side < 0 else "R"
 		sheet.anchor_right = 1
 		sheet.anchor_bottom = 1
 		sheet.chosen.connect(func(page): chosen.emit(page))
 		sheet.closed.connect(func(): chosen.emit("close"))
-		var mesh := MeshInstance3D.new()
-		add_child(mesh)
-		var plane := PlaneMesh.new()
-		plane.size = PAGE
-		plane.orientation = PlaneMesh.FACE_Y
-		mesh.mesh = plane
-		mesh.position = Vector3(side * 0.305, 0.046, 0)
+		var mesh := authored_surfaces[index]
 		var mat := StandardMaterial3D.new()
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.albedo_texture = view.get_texture()
@@ -64,17 +61,7 @@ func _ready() -> void:
 		pages.append(sheet)
 		views.append(view)
 		surfaces.append(mesh)
-		var hand := Node3D.new()
-		add_child(hand)
-		hand.position = Vector3(side * 0.62, 0.04, 0.08)
-		hand.rotation = Vector3(-0.2, -side * 0.55, side * 0.18)
-		P.box(hand, Vector3(0.11, 0.045, 0.14), Vector3(0, 0, 0), Color("e8b893"))
-		for i in range(4):
-			P.box(hand, Vector3(0.026, 0.026, 0.08), Vector3(side * (-0.035 + i * 0.028), 0.018, -0.10), Color("e0ad86"))
-		hands.append(hand)
-	page_mesh = Node3D.new()
-	add_child(page_mesh)
-	P.box(page_mesh, Vector3(0.52, 0.004, 0.72), Vector3(0.26, 0.08, 0), Color("f7eed8"))
+	page_mesh = get_node("RightPageSurface")
 	page_sound = AudioStreamPlayer3D.new()
 	add_child(page_sound)
 	page_sound.stream = preload("res://assets/audio/page.wav")
@@ -121,7 +108,7 @@ func page_top() -> Vector3:
 	return (-global_transform.basis.z).normalized()
 
 func cover_grip(side: float) -> Vector3:
-	return to_global(Vector3(side * 0.64, 0.02, 0.40))
+	return (get_node("LeftGripAnchor") if side < 0 else get_node("RightGripAnchor")).global_position
 
 func ancestors_shown() -> bool:
 	if not is_inside_tree(): return false
