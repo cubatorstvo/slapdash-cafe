@@ -18,7 +18,7 @@
 - [x] Counter station — `scenes/stations/counter_station.tscn`
 - [x] Meat & pasta station — `scenes/stations/meat_pasta_station.tscn`
 - [x] Burger / grill station — `scenes/stations/burger_station.tscn`
-- [ ] Solyanka station
+- [x] Solyanka station — `scenes/stations/solyanka_station.tscn`
 - [ ] Service bell
 - [ ] Sauce ramp upgrade
 - [ ] Counter storage / product shelf module
