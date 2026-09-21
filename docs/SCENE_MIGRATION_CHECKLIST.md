@@ -107,7 +107,7 @@
 ## Постоянный декор кафе
 - [x] “Мы почти умеем” sign — `scenes/decor/almost_ready_sign.tscn`
 - [x] Decorative cafe plant — `scenes/decor/cafe_plant.tscn`
-- [ ] Garland
+- [x] Garland — `scenes/decor/garland.tscn`
 - [ ] “Моё кафе” board
 - [ ] Market computer + desk
 - [ ] Delivery truck
