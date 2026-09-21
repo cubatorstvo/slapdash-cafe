@@ -1,0 +1,48 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_shelf"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.286275,0.423529,0.380392,1)
+[sub_resource type="StandardMaterial3D" id="Mat_label"]
+albedo_color = Color(0.937255,0.862745,0.701961,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_shelf"]
+size = Vector3(0.42,1.0,2.65)
+
+[node name="ToolShelf" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.5,0)
+shape = SubResource("Shape_shelf")
+[node name="Back" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.88,0)
+scale = Vector3(0.42,0.12,2.65)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_shelf")
+[node name="RailL" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.58,-1.26)
+scale = Vector3(0.50,0.75,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="RailR" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.58,1.26)
+scale = Vector3(0.50,0.75,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="SoilAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.03,-0.98)
+[node name="LiquidAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.03,-0.33)
+[node name="WaterAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.03,0.32)
+[node name="FertilizerAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.03,0.97)
+[node name="Title" type="Label3D" parent="."]
+position = Vector3(-0.24,1.48,0)
+rotation = Vector3(0,1.570796,0)
+pixel_size = 0.003
+font_size = 18
+text = "ИНСТРУМЕНТЫ"

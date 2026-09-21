@@ -1,0 +1,78 @@
+[gd_scene load_steps=10 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_cream"]
+albedo_color = Color(0.945098, 0.85098, 0.682353, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_coffee"]
+albedo_color = Color(0.345098, 0.266667, 0.219608, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_paddle"]
+albedo_color = Color(0.733333, 0.458824, 0.396078, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157, 0.423529, 0.309804, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_snack"]
+albedo_color = Color(0.862745, 0.643137, 0.345098, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[node name="CookLoungeAccessories" type="Node3D"]
+
+[node name="Cup" type="Node3D" parent="."]
+
+[node name="Body" type="MeshInstance3D" parent="Cup"]
+scale = Vector3(0.132, 0.13, 0.132)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_cream")
+
+[node name="Coffee" type="MeshInstance3D" parent="Cup"]
+position = Vector3(0, 0.069, 0)
+scale = Vector3(0.104, 0.008, 0.104)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_coffee")
+
+[node name="Grip" type="Marker3D" parent="Cup"]
+position = Vector3(0.08, 0.02, 0)
+
+[node name="Paddle" type="Node3D" parent="."]
+
+[node name="Face" type="MeshInstance3D" parent="Paddle"]
+scale = Vector3(0.221, 0.26, 0.0416)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_paddle")
+
+[node name="Handle" type="MeshInstance3D" parent="Paddle"]
+position = Vector3(0, -0.19, 0)
+scale = Vector3(0.05, 0.3, 0.05)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_wood")
+
+[node name="Grip" type="Marker3D" parent="Paddle"]
+position = Vector3(0, -0.24, 0)
+
+[node name="Snack" type="Node3D" parent="."]
+
+[node name="Bag" type="MeshInstance3D" parent="Snack"]
+scale = Vector3(0.15, 0.22, 0.09)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_snack")
+
+[node name="Label" type="MeshInstance3D" parent="Snack"]
+position = Vector3(0, 0, -0.05)
+scale = Vector3(0.11, 0.07, 0.012)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cream")
+
+[node name="Grip" type="Marker3D" parent="Snack"]
+position = Vector3(0, -0.02, 0)

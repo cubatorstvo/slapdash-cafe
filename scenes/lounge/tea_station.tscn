@@ -1,0 +1,101 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/lounge/stool.tscn" id="1_stool"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_teal"]
+albedo_color = Color(0.258824,0.486275,0.443137,1)
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157,0.423529,0.309804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_cream"]
+albedo_color = Color(0.945098,0.85098,0.682353,1)
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.862745,0.643137,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_pastry"]
+albedo_color = Color(0.72549,0.513725,0.313725,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="TeaStation" type="Node3D"]
+[node name="Cabinet" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.43,0)
+scale = Vector3(3.2,0.86,0.78)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="Counter" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.9,0)
+scale = Vector3(3.3,0.08,0.86)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="DoorL" type="MeshInstance3D" parent="."]
+position = Vector3(-1.05,0.47,-0.405)
+scale = Vector3(0.96,0.61,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="DoorM" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.47,-0.405)
+scale = Vector3(0.96,0.61,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="DoorR" type="MeshInstance3D" parent="."]
+position = Vector3(1.05,0.47,-0.405)
+scale = Vector3(0.96,0.61,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="Kettle" type="MeshInstance3D" parent="."]
+position = Vector3(-1.0,1.08,0)
+scale = Vector3(0.32,0.28,0.32)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_cream")
+[node name="KettleSpout" type="MeshInstance3D" parent="."]
+position = Vector3(-0.79,1.15,0)
+rotation = Vector3(0,0,0.65)
+scale = Vector3(0.06,0.26,0.06)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_cream")
+[node name="Cup1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.35,1.01,-0.18)
+scale = Vector3(0.13,0.13,0.13)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_cream")
+[node name="Cup2" type="MeshInstance3D" parent="."]
+position = Vector3(0.1,1.01,-0.18)
+scale = Vector3(0.13,0.13,0.13)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_cream")
+[node name="Cup3" type="MeshInstance3D" parent="."]
+position = Vector3(0.55,1.01,-0.18)
+scale = Vector3(0.13,0.13,0.13)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_cream")
+[node name="Tray" type="MeshInstance3D" parent="."]
+position = Vector3(1.08,0.97,0)
+scale = Vector3(0.46,0.04,0.46)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_gold")
+[node name="Pastry1" type="MeshInstance3D" parent="."]
+position = Vector3(0.95,1.03,0)
+scale = Vector3(0.10,0.07,0.10)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_pastry")
+[node name="Pastry2" type="MeshInstance3D" parent="."]
+position = Vector3(1.08,1.03,0)
+scale = Vector3(0.10,0.07,0.10)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_pastry")
+[node name="Pastry3" type="MeshInstance3D" parent="."]
+position = Vector3(1.21,1.03,0)
+scale = Vector3(0.10,0.07,0.10)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_pastry")
+[node name="StoolLeft" parent="." instance=ExtResource("1_stool")]
+position = Vector3(-0.7,0,-1.05)
+[node name="StoolRight" parent="." instance=ExtResource("1_stool")]
+position = Vector3(0.7,0,-1.05)
+[node name="CupLeftAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.7,1.0,-0.35)
+[node name="CupRightAnchor" type="Marker3D" parent="."]
+position = Vector3(0.7,1.0,-0.35)

@@ -1,0 +1,100 @@
+[gd_scene load_steps=7 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_base"]
+albedo_color = Color(0.45098,0.67451,0.682353,1)
+[sub_resource type="StandardMaterial3D" id="Mat_glass"]
+albedo_color = Color(0.72549,0.882353,0.862745,1)
+[sub_resource type="StandardMaterial3D" id="Mat_mark"]
+albedo_color = Color(0.937255,0.713725,0.356863,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1
+[sub_resource type="TorusMesh" id="Mesh_rim"]
+inner_radius = 0.224
+outer_radius = 0.25
+[sub_resource type="TorusMesh" id="Mesh_mark"]
+inner_radius = 0.24
+outer_radius = 0.255
+[node name="WineCup" type="Node3D"]
+[node name="Base" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.03,0)
+scale = Vector3(0.52,0.05,0.52)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_base")
+[node name="Ribs" type="Node3D" parent="."]
+[node name="Rib1" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.235000,0.27,0.000000)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib2" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.203516,0.27,0.117500)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib3" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.117500,0.27,0.203516)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib4" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.000000,0.27,0.235000)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib5" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.117500,0.27,0.203516)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib6" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.203516,0.27,0.117500)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib7" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.235000,0.27,0.000000)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib8" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.203516,0.27,-0.117500)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib9" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.117500,0.27,-0.203516)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib10" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(-0.000000,0.27,-0.235000)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib11" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.117500,0.27,-0.203516)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rib12" type="MeshInstance3D" parent="Ribs"]
+position = Vector3(0.203516,0.27,-0.117500)
+scale = Vector3(0.024,0.44,0.024)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_glass")
+[node name="Rim" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.50,0)
+mesh = SubResource("Mesh_rim")
+material_override = SubResource("Mat_glass")
+[node name="Mark200" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.338667,0)
+mesh = SubResource("Mesh_mark")
+material_override = SubResource("Mat_mark")
+[node name="Mark250" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.410333,0)
+mesh = SubResource("Mesh_mark")
+material_override = SubResource("Mat_mark")
+[node name="LiquidAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.052,0)
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0.22,0.25,0)

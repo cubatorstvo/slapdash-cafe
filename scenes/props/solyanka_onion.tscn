@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_onion"]
+albedo_color = Color(0.839216,0.764706,0.627451,1)
+[sub_resource type="StandardMaterial3D" id="Mat_tip"]
+albedo_color = Color(0.470588,0.568627,0.360784,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="SolyankaOnion" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.16,0)
+scale = Vector3(0.32,0.288,0.368)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_onion")
+[node name="Top" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.31,0)
+scale = Vector3(0.05,0.10,0.05)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tip")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.18,0)

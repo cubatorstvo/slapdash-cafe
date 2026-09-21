@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/potato.tscn" id="1_base"]
+
+[node name="SolyankaPotato" type="Node3D"]
+[node name="Potato" parent="." instance=ExtResource("1_base")]
+scale = Vector3(0.73,0.73,0.73)

@@ -1,0 +1,38 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_primary"]
+albedo_color = Color(0.427451,0.698039,0.603922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_secondary"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.227451,0.360784,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.827451,0.705882,0.490196,1)
+[sub_resource type="StandardMaterial3D" id="Mat_glow"]
+albedo_color = Color(0.831373,0.65098,0.8,1)
+emission_enabled = true
+emission = Color(0.745098,0.541176,0.662745,1)
+emission_energy_multiplier = 0.5
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="GrowLamp" type="Node3D"]
+[node name="Housing" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.08,0)
+scale = Vector3(1.2,0.10,0.62)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_dark")
+[node name="Bulb" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,0)
+scale = Vector3(1.05,0.03,0.50)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_glow")
+[node name="LightAnchor" type="Marker3D" parent="."]
+position = Vector3(0,-0.28,0)

@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/actors/cook_avatar.tscn" id="1_actor"]
+
+[node name="RemotePlayer" type="Node3D"]
+
+[node name="Avatar" parent="." instance=ExtResource("1_actor")]
+
+[node name="NetworkPoseAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 0, 0)
+
+[node name="HeldItemAnchor" type="Marker3D" parent="."]
+position = Vector3(0.35, 0.78, -0.2)
+
+[node name="PlayerName" type="Label3D" parent="."]
+position = Vector3(0, 2.35, 0)
+billboard = 1
+pixel_size = 0.005
+text = "Игрок"

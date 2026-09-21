@@ -1,0 +1,24 @@
+[gd_scene load_steps=5 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_reel"]
+albedo_color = Color(0.886275,0.752941,0.501961,1)
+[sub_resource type="StandardMaterial3D" id="Mat_wire"]
+albedo_color = Color(0.2,0.243137,0.223529,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="TorusMesh" id="Mesh_wire"]
+inner_radius = 0.12
+outer_radius = 0.16
+[node name="GarlandReel" type="Node3D"]
+[node name="Spool" type="MeshInstance3D" parent="."]
+rotation = Vector3(1.570796,0,0)
+scale = Vector3(0.40,0.15,0.40)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_reel")
+[node name="Wire" type="MeshInstance3D" parent="."]
+rotation = Vector3(1.570796,0,0)
+mesh = SubResource("Mesh_wire")
+material_override = SubResource("Mat_wire")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.12,0)

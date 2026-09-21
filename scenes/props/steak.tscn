@@ -1,0 +1,56 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_meat"]
+albedo_color = Color(0.737255, 0.388235, 0.333333, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_grill"]
+albedo_color = Color(0.443137, 0.239216, 0.184314, 1)
+
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[sub_resource type="BoxShape3D" id="Shape_steak"]
+size = Vector3(0.62,0.18,0.52)
+
+[node name="Steak" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.09,0)
+shape = SubResource("Shape_steak")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.10,0)
+scale = Vector3(0.64,0.18,0.56)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_meat")
+
+[node name="GrillMark1" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.19,-0.13)
+scale = Vector3(0.40,0.007,0.015)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_grill")
+[node name="GrillMark2" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.19,-0.055)
+scale = Vector3(0.40,0.007,0.015)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_grill")
+[node name="GrillMark3" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.19,0.02)
+scale = Vector3(0.40,0.007,0.015)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_grill")
+[node name="GrillMark4" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.19,0.095)
+scale = Vector3(0.40,0.007,0.015)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_grill")
+
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.18,0)

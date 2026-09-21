@@ -1,0 +1,35 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_mug"]
+albedo_color = Color(0.568627,0.72549,0.717647,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderShape3D" id="Shape_mug"]
+radius = 0.15
+height = 0.25
+
+[node name="SolyankaMug" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.125,0)
+shape = SubResource("Shape_mug")
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.125,0)
+scale = Vector3(0.30,0.25,0.30)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_mug")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(0.18,0.14,0)
+scale = Vector3(0.10,0.15,0.05)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_mug")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0.18,0.14,0)
+[node name="FillAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.24,0)

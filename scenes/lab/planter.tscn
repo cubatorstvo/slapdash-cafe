@@ -1,0 +1,65 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_primary"]
+albedo_color = Color(0.427451,0.698039,0.603922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_secondary"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.227451,0.360784,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.827451,0.705882,0.490196,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="Planter" type="Node3D"]
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.5,0)
+scale = Vector3(1.05,0.95,0.8)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_primary")
+[node name="Hopper" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.2,0)
+scale = Vector3(0.76,0.48,0.76)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_accent")
+[node name="Tray" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.78,-0.5)
+scale = Vector3(0.65,0.12,0.6)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_secondary")
+[node name="SoilPellet1" type="MeshInstance3D" parent="."]
+position = Vector3(-0.23,1.45,0)
+scale = Vector3(0.12,0.06,0.12)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+[node name="SoilPellet2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.13,1.45,0)
+scale = Vector3(0.12,0.06,0.12)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+[node name="SoilPellet3" type="MeshInstance3D" parent="."]
+position = Vector3(-0.03,1.45,0)
+scale = Vector3(0.12,0.06,0.12)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+[node name="SoilPellet4" type="MeshInstance3D" parent="."]
+position = Vector3(0.07,1.45,0)
+scale = Vector3(0.12,0.06,0.12)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+[node name="SoilPellet5" type="MeshInstance3D" parent="."]
+position = Vector3(0.17,1.45,0)
+scale = Vector3(0.12,0.06,0.12)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_dark")
+[node name="PotAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0,-1.0)
+[node name="DispenseAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.05,-0.45)

@@ -1,0 +1,51 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_pot"]
+albedo_color = Color(0.768627,0.52549,0.384314,1)
+[sub_resource type="StandardMaterial3D" id="Mat_leaf1"]
+albedo_color = Color(0.341176,0.47451,0.333333,1)
+[sub_resource type="StandardMaterial3D" id="Mat_leaf2"]
+albedo_color = Color(0.541176,0.666667,0.47451,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.39
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="LoungePlant" type="Node3D"]
+[node name="Pot" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.24,0)
+scale = Vector3(0.64,0.48,0.64)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_pot")
+[node name="Stem" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.67,0)
+scale = Vector3(0.08,0.82,0.08)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_leaf1")
+[node name="Leaf1" type="MeshInstance3D" parent="."]
+position = Vector3(0.18,0.78,0.12)
+rotation = Vector3(0,0,-0.42)
+scale = Vector3(0.24,0.52,0.18)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf2")
+[node name="Leaf2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.18,0.93,-0.05)
+rotation = Vector3(0,0,0.50)
+scale = Vector3(0.24,0.55,0.18)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf1")
+[node name="Leaf3" type="MeshInstance3D" parent="."]
+position = Vector3(0.13,1.12,-0.10)
+rotation = Vector3(0,0,-0.35)
+scale = Vector3(0.22,0.50,0.17)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf2")
+[node name="Leaf4" type="MeshInstance3D" parent="."]
+position = Vector3(-0.08,1.28,0.10)
+rotation = Vector3(0,0,0.25)
+scale = Vector3(0.20,0.46,0.16)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf1")

@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.862745,0.658824,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_cab"]
+albedo_color = Color(0.411765,0.654902,0.6,1)
+[sub_resource type="StandardMaterial3D" id="Mat_tire"]
+albedo_color = Color(0.14902,0.207843,0.211765,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[node name="DeliveryTruck" type="Node3D"]
+[node name="Cargo" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.9,0)
+scale = Vector3(1.2,1.15,1.65)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_body")
+[node name="Cab" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.72,1.0)
+scale = Vector3(1.2,0.8,0.7)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_cab")
+[node name="WheelFL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.65,0.28,0.9)
+scale = Vector3(0.46,0.46,0.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tire")
+[node name="WheelFR" type="MeshInstance3D" parent="."]
+position = Vector3(0.65,0.28,0.9)
+scale = Vector3(0.46,0.46,0.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tire")
+[node name="WheelRL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.65,0.28,-0.55)
+scale = Vector3(0.46,0.46,0.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tire")
+[node name="WheelRR" type="MeshInstance3D" parent="."]
+position = Vector3(0.65,0.28,-0.55)
+scale = Vector3(0.46,0.46,0.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tire")
+[node name="ParcelDropAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0,-1.25)

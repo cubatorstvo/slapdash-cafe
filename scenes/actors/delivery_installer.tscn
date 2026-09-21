@@ -1,0 +1,38 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/actors/cook_avatar.tscn" id="1_actor"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_box"]
+albedo_color = Color(0.698039, 0.541176, 0.34902, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_tape"]
+albedo_color = Color(0.831373, 0.745098, 0.568627, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[node name="DeliveryInstaller" type="Node3D"]
+
+[node name="Actor" parent="." instance=ExtResource("1_actor")]
+
+[node name="ParcelBox" type="Node3D" parent="Actor"]
+position = Vector3(0, 0.94, -0.46)
+
+[node name="Cardboard" type="MeshInstance3D" parent="Actor/ParcelBox"]
+scale = Vector3(0.52, 0.46, 0.44)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_box")
+
+[node name="Tape" type="MeshInstance3D" parent="Actor/ParcelBox"]
+scale = Vector3(0.09, 0.47, 0.45)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tape")
+
+[node name="CarryLeftHand" type="Marker3D" parent="Actor/ParcelBox"]
+position = Vector3(-0.22, 0.08, 0)
+
+[node name="CarryRightHand" type="Marker3D" parent="Actor/ParcelBox"]
+position = Vector3(0.22, 0.08, 0)
+
+[node name="InstallFocus" type="Marker3D" parent="."]
+position = Vector3(0, 0.8, -1.0)

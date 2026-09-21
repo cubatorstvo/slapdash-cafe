@@ -1,0 +1,137 @@
+[gd_scene load_steps=10 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157,0.423529,0.309804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.313725,0.243137,0.207843,1)
+[sub_resource type="StandardMaterial3D" id="Mat_cream"]
+albedo_color = Color(0.945098,0.85098,0.682353,1)
+[sub_resource type="StandardMaterial3D" id="Mat_teal"]
+albedo_color = Color(0.321569,0.552941,0.509804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.862745,0.643137,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+albedo_color = Color(0.14902,0.239216,0.270588,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[node name="TelevisionCabinet" type="Node3D"]
+[node name="Cabinet" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.46,0)
+scale = Vector3(2.75,0.52,0.72)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="ScreenCase" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.57,0)
+scale = Vector3(2.30,1.35,0.16)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_ink")
+[node name="Screen" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.57,-0.087)
+scale = Vector3(2.12,1.16,0.015)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="Horizon" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.12,-0.109)
+scale = Vector3(2.1,0.28,0.014)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_teal")
+[node name="Moon" type="MeshInstance3D" parent="."]
+position = Vector3(-0.3,1.75,-0.115)
+scale = Vector3(0.30,0.30,0.30)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_gold")
+[node name="ScreenDecor" type="Node3D" parent="."]
+[node name="Star1" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.930,1.140,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star2" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.603,1.337,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star3" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.276,1.534,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star4" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.051,1.731,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star5" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.378,1.928,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star6" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.705,1.245,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star7" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.808,1.442,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star8" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.481,1.639,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star9" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.154,1.836,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star10" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.173,1.153,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star11" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.500,1.350,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star12" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.827,1.547,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star13" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.686,1.744,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star14" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.359,1.941,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star15" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(-0.032,1.258,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Star16" type="MeshInstance3D" parent="ScreenDecor"]
+position = Vector3(0.295,1.455,-0.107)
+scale = Vector3(0.026,0.026,0.026)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_cream")
+[node name="Status" type="Label3D" parent="."]
+position = Vector3(0,2.43,0)
+rotation = Vector3(0,3.141593,0)
+pixel_size = 0.003
+font_size = 24
+text = "СВОБОДЕН"
+[node name="ScreenAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.57,-0.10)

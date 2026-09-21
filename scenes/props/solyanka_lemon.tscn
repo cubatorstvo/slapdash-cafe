@@ -1,0 +1,19 @@
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_lemon"]
+albedo_color = Color(0.87451,0.788235,0.313725,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="SolyankaLemon" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.15,0)
+scale = Vector3(0.375,0.255,0.255)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_lemon")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.17,0)

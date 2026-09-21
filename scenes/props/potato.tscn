@@ -1,0 +1,102 @@
+[gd_scene load_steps=6 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_potato"]
+albedo_color = Color(0.85098,0.67451,0.407843,1)
+[sub_resource type="StandardMaterial3D" id="Mat_patch"]
+albedo_color = Color(0.862745,0.686275,0.439216,1)
+[sub_resource type="StandardMaterial3D" id="Mat_eye"]
+albedo_color = Color(0.580392,0.439216,0.286275,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radial_segments = 12
+rings = 6
+radius = 0.5
+height = 1
+[sub_resource type="SphereShape3D" id="Shape_potato"]
+radius = 0.22
+[node name="Potato" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+scale = Vector3(1,0.64,0.68)
+shape = SubResource("Shape_potato")
+[node name="Body" type="MeshInstance3D" parent="."]
+scale = Vector3(0.44,0.28,0.30)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_potato")
+[node name="SidePatch1" type="MeshInstance3D" parent="."]
+position = Vector3(0.198,0,0)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="SidePatch2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.198,0,0)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="SidePatch3" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.128,0)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="SidePatch4" type="MeshInstance3D" parent="."]
+position = Vector3(0,-0.128,0)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="SidePatch5" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,0.137)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="SidePatch6" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,-0.137)
+scale = Vector3(0.085,0.085,0.085)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patch")
+[node name="Eye1" type="MeshInstance3D" parent="."]
+position = Vector3(0.190000,0.000000,0.000000)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye2" type="MeshInstance3D" parent="."]
+position = Vector3(-0.140105,-0.068563,0.087810)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye3" type="MeshInstance3D" parent="."]
+position = Vector3(0.016625,0.081051,-0.129501)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye4" type="MeshInstance3D" parent="."]
+position = Vector3(0.115587,-0.027252,0.103177)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye5" type="MeshInstance3D" parent="."]
+position = Vector3(-0.187091,-0.048836,-0.022662)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye6" type="MeshInstance3D" parent="."]
+position = Vector3(0.160332,0.084982,-0.069754)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye7" type="MeshInstance3D" parent="."]
+position = Vector3(-0.049365,-0.051626,0.125536)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye8" type="MeshInstance3D" parent="."]
+position = Vector3(-0.087529,-0.023953,-0.115384)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="Eye9" type="MeshInstance3D" parent="."]
+position = Vector3(0.178452,0.079942,0.044631)
+scale = Vector3(0.018,0.018,0.018)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_eye")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.12,0)
