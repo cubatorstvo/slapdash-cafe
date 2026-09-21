@@ -541,8 +541,8 @@ func _build_room_shell(stage: int) -> void:
 	layout_stage=stage
 	# Exterior and its collider share one footprint. The exterior top stays below the cafe floor,
 	# so it cannot z-fight with the walkable interior and there is no invisible ground beyond the slab.
-	Props.box(room_shell,Vector3(72.0,0.22,76.0),Vector3(0,-0.22,2.0),Color("56615d"))
-	Props.collision_box(room_shell,Vector3(72.0,0.20,76.0),Vector3(0,-0.18,2.0))
+	Props.box(room_shell,Vector3(92.0,0.22,84.0),Vector3(0,-0.22,-9.0),Color("56615d"))
+	Props.collision_box(room_shell,Vector3(92.0,0.20,84.0),Vector3(0,-0.18,-9.0))
 	var cells:=Expansion.hall_cells_for_stage(stage)
 	_build_room_floor(room_shell,stage)
 	_build_room_perimeter(room_shell,cells,stage)
@@ -557,16 +557,37 @@ func _floor_rect(parent: Node3D,size: Vector2,center: Vector2,color: Color) -> v
 	Props.collision_box(parent,Vector3(size.x,0.20,size.y),Vector3(center.x,-0.10,center.y))
 
 func _build_room_floor(parent: Node3D,stage: int) -> void:
-	# Non-overlapping rectangles give one continuous floor surface without tile seams or stacks of
-	# coplanar meshes/colliders. Each expansion only adds strips outside the previous footprint.
-	_floor_rect(parent,Vector2(16.0,20.0),Vector2(0.0,4.0),Color("6c7c73"))
-	if stage>=2:
-		_floor_rect(parent,Vector2(16.0,20.0),Vector2(-16.0,4.0),Color("70827a"))
-		_floor_rect(parent,Vector2(16.0,20.0),Vector2(16.0,4.0),Color("70827a"))
-	if stage>=3:
-		_floor_rect(parent,Vector2(48.0,8.0),Vector2(0.0,-10.0),Color("667970"))
-	if stage>=4:
-		_floor_rect(parent,Vector2(48.0,18.0),Vector2(0.0,-23.0),Color("748178"))
+	# Preserve the irregular A-D outline without overlapping coplanar floor slabs. Adjacent cells
+	# unlocked in the same expansion are merged into row runs.
+	var colors: Dictionary={1:Color("6c7c73"),2:Color("70827a"),3:Color("667970"),4:Color("748178")}
+	var cells:=Expansion.hall_cells_for_stage(stage)
+	var rows: Dictionary={}
+	for raw_cell in cells:
+		var cell: Vector2i=raw_cell
+		var unlock:=int(cells[cell])
+		var key:=Vector2i(cell.y,unlock)
+		if not rows.has(key): rows[key]=[]
+		rows[key].append(cell.x)
+	for raw_key in rows:
+		var key: Vector2i=raw_key
+		var xs: Array=rows[key]
+		xs.sort()
+		if xs.is_empty(): continue
+		var run_start:=int(xs[0])
+		var previous:=run_start
+		for i in range(1,xs.size()):
+			var current:=int(xs[i])
+			if current!=previous+1:
+				_floor_cell_run(parent,key.x,run_start,previous,colors[key.y])
+				run_start=current
+			previous=current
+		_floor_cell_run(parent,key.x,run_start,previous,colors[key.y])
+
+func _floor_cell_run(parent: Node3D,row: int,start: int,finish: int,color: Color) -> void:
+	var count:=finish-start+1
+	var size:=Vector2(float(count)*Expansion.TILE,Expansion.TILE)
+	var center:=Vector2((float(start)+float(finish)+1.0)*Expansion.TILE*0.5,(float(row)+0.5)*Expansion.TILE)
+	_floor_rect(parent,size,center,color)
 
 func _build_room_perimeter(parent: Node3D,cells: Dictionary,stage: int) -> void:
 	var final_cells:=Expansion.final_hall_cells()
