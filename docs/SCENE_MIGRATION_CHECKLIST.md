@@ -53,7 +53,7 @@
 - [x] Seasoning — `scenes/props/burger_seasoning.tscn`
 - [x] Bun — `scenes/props/burger_bun.tscn`
 - [x] Cheese — `scenes/props/cheese.tscn`
-- [ ] Sauce bottle
+- [x] Sauce bottle — `scenes/props/sauce_bottle.tscn`
 - [ ] Chili sauce bottle
 - [ ] Burger assembly plate
 
