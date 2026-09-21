@@ -125,7 +125,7 @@
 - [x] Arcade machine — `scenes/lounge/arcade_machine.tscn`
 - [x] Table tennis — `scenes/lounge/table_tennis.tscn`
 - [x] Board games — `scenes/lounge/board_games.tscn`
-- [ ] Bookcase
+- [x] Bookcase — `scenes/lounge/bookcase.tscn`
 - [ ] Beanbag
 - [ ] Tea station
 - [ ] Jukebox
