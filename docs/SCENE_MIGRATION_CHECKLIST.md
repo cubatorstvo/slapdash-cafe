@@ -112,7 +112,7 @@
 - [x] Market computer + desk — `scenes/decor/market_computer_desk.tscn`
 - [x] Delivery truck — `scenes/decor/delivery_truck.tscn`
 - [x] Delivery parcel box — `scenes/decor/delivery_parcel_box.tscn`
-- [ ] Garland reel
+- [x] Garland reel — `scenes/decor/garland_reel.tscn`
 
 ## Комната отдыха
 - [ ] Staff lounge authored room
