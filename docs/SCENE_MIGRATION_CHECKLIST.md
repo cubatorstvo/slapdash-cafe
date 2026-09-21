@@ -75,7 +75,7 @@
 - [x] Zucchini — `scenes/props/solyanka_zucchini.tscn`
 - [x] Pickle — `scenes/props/solyanka_pickle.tscn`
 - [x] Lemon — `scenes/props/solyanka_lemon.tscn`
-- [ ] Sausage
+- [x] Sausage — `scenes/props/solyanka_sausage.tscn`
 - [ ] Mushroom
 - [ ] Eggplant
 - [ ] Boot
