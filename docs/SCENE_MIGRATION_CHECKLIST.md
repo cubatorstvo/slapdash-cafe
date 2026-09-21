@@ -44,7 +44,7 @@
 - [x] Meat spatula — `scenes/props/meat_spatula.tscn`
 - [x] Pasta salt tool — `scenes/props/pasta_salt_tool.tscn`
 - [x] Pasta spatula — `scenes/props/pasta_spatula.tscn`
-- [ ] Steak serving plate
+- [x] Steak serving plate — `scenes/props/steak_serving_plate.tscn`
 - [ ] Pasta serving plate
 
 ## Burger props
