@@ -142,7 +142,7 @@
 - [x] Initial assembly bench — `scenes/lab/assembly_bench.tscn`
 - [x] Initial lab module 1 — `scenes/lab/initial_module_1.tscn`
 - [x] Initial lab module 2 — `scenes/lab/initial_module_2.tscn`
-- [ ] Initial lab module 3
+- [x] Initial lab module 3 — `scenes/lab/initial_module_3.tscn`
 - [ ] Initial switches / start button
 - [ ] Cable reel
 - [ ] Formula stabilizer / research apparatus

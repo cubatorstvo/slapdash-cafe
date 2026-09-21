@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_case"]
+albedo_color = Color(0.298039,0.419608,0.392157,1)
+[sub_resource type="StandardMaterial3D" id="Mat_tube"]
+albedo_color = Color(0.745098,0.839216,0.780392,1)
+[sub_resource type="StandardMaterial3D" id="Mat_sample"]
+albedo_color = Color(0.603922,0.839216,0.678431,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="InitialLabModule3" type="Node3D"]
+[node name="Case" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.30,0)
+scale = Vector3(0.78,0.60,0.52)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_case")
+[node name="TubeL" type="MeshInstance3D" parent="."]
+position = Vector3(-0.18,0.72,0)
+scale = Vector3(0.12,0.50,0.12)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_tube")
+[node name="TubeR" type="MeshInstance3D" parent="."]
+position = Vector3(0.18,0.72,0)
+scale = Vector3(0.12,0.50,0.12)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_sample")
+[node name="OutputAnchor" type="Marker3D" parent="."]
+position = Vector3(0,1.02,0)
