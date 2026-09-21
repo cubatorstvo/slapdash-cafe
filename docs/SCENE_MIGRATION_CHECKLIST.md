@@ -58,7 +58,7 @@
 - [x] Burger assembly plate — `scenes/props/burger_assembly_plate.tscn`
 
 ## Solyanka props
-- [ ] Cauldron
+- [x] Cauldron — `scenes/props/solyanka_cauldron.tscn`
 - [ ] Lighter
 - [ ] Stirring paddle
 - [ ] Solyanka salt

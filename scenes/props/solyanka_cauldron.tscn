@@ -1,0 +1,61 @@
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_pot"]
+albedo_color = Color(0.231373,0.254902,0.266667,1)
+metallic = 0.16
+[sub_resource type="StandardMaterial3D" id="Mat_broth"]
+albedo_color = Color(0.65098,0.309804,0.207843,1)
+[sub_resource type="StandardMaterial3D" id="Mat_handle"]
+albedo_color = Color(0.164706,0.188235,0.196078,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderShape3D" id="Shape_cauldron"]
+radius = 0.88
+height = 0.72
+
+[node name="SolyankaCauldron" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 2
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.36,0)
+shape = SubResource("Shape_cauldron")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.36,0)
+scale = Vector3(1.76,0.70,1.76)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_pot")
+
+[node name="Broth" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.70,0)
+scale = Vector3(1.40,0.045,1.40)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_broth")
+
+[node name="LeftHandle" type="MeshInstance3D" parent="."]
+position = Vector3(-1.02,0.52,0)
+rotation = Vector3(0,0,-0.08)
+scale = Vector3(0.50,0.09,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_handle")
+
+[node name="RightHandle" type="MeshInstance3D" parent="."]
+position = Vector3(1.02,0.52,0)
+rotation = Vector3(0,0,0.08)
+scale = Vector3(0.50,0.09,0.12)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_handle")
+
+[node name="IngredientDropPoint" type="Marker3D" parent="."]
+position = Vector3(0,0.86,0)
+[node name="StirPoint" type="Marker3D" parent="."]
+position = Vector3(0,0.78,0)
+[node name="BrothSurface" type="Marker3D" parent="."]
+position = Vector3(0,0.72,0)
+[node name="FireAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.02,0)
