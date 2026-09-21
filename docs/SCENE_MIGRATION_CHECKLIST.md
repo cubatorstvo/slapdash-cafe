@@ -94,7 +94,7 @@
 ## Основное кафе
 - [ ] Authored cafe world / stage roots
 - [x] Stage 1 floor and shell — `scenes/cafe/stage1_shell.tscn`
-- [ ] Zone A
+- [x] Zone A — `scenes/cafe/zone_a.tscn`
 - [ ] Zone B
 - [ ] Zone C
 - [ ] Zone D
