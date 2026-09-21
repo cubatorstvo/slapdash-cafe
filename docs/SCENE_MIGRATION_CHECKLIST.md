@@ -117,7 +117,7 @@
 ## Комната отдыха
 - [ ] Staff lounge authored room
 - [x] Chef bed — `scenes/lounge/chef_bed.tscn`
-- [ ] Sofa
+- [x] Sofa — `scenes/lounge/sofa.tscn`
 - [x] Coffee table — `scenes/lounge/coffee_table.tscn`
 - [ ] Television + cabinet
 - [ ] Rocking chair
