@@ -1,0 +1,94 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.47451,0.443137,0.392157,1)
+[sub_resource type="StandardMaterial3D" id="Mat_slot"]
+albedo_color = Color(0.380392,0.443137,0.415686,0.30)
+transparency = 1
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="ZoneD" type="Node3D"]
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(23,-0.05,-28)
+scale = Vector3(34,0.10,40)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_floor")
+[node name="ZoneCenter" type="Marker3D" parent="."]
+position = Vector3(12,0,-29)
+[node name="ZoneLabel" type="Label3D" parent="."]
+position = Vector3(12,3.2,-29)
+billboard = 1
+pixel_size = 0.014
+text = "ЗОНА D"
+[node name="Slots" type="Node3D" parent="."]
+[node name="Slot01" type="Marker3D" parent="Slots"]
+position = Vector3(12,0,-42)
+[node name="Pad01" type="MeshInstance3D" parent="Slots/Slot01"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot02" type="Marker3D" parent="Slots"]
+position = Vector3(23,0,-43)
+[node name="Pad02" type="MeshInstance3D" parent="Slots/Slot02"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot03" type="Marker3D" parent="Slots"]
+position = Vector3(34,0,-42)
+[node name="Pad03" type="MeshInstance3D" parent="Slots/Slot03"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot04" type="Marker3D" parent="Slots"]
+position = Vector3(36,0,-26)
+[node name="Pad04" type="MeshInstance3D" parent="Slots/Slot04"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot05" type="Marker3D" parent="Slots"]
+position = Vector3(10,0,-16)
+[node name="Pad05" type="MeshInstance3D" parent="Slots/Slot05"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot06" type="Marker3D" parent="Slots"]
+position = Vector3(20,0,-16)
+[node name="Pad06" type="MeshInstance3D" parent="Slots/Slot06"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot07" type="Marker3D" parent="Slots"]
+position = Vector3(31,0,-17)
+[node name="Pad07" type="MeshInstance3D" parent="Slots/Slot07"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot08" type="Marker3D" parent="Slots"]
+position = Vector3(7,0,-29)
+[node name="Pad08" type="MeshInstance3D" parent="Slots/Slot08"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot09" type="Marker3D" parent="Slots"]
+position = Vector3(22,0,-26)
+[node name="Pad09" type="MeshInstance3D" parent="Slots/Slot09"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
+[node name="Slot10" type="Marker3D" parent="Slots"]
+position = Vector3(24,0,-34)
+[node name="Pad10" type="MeshInstance3D" parent="Slots/Slot10"]
+position = Vector3(0,0.015,0)
+scale = Vector3(6.4,0.025,5.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_slot")
