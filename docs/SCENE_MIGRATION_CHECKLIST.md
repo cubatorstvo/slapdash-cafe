@@ -15,7 +15,7 @@
 - [x] Cook lounge accessories: cup, paddle, snack — `scenes/props/cook_lounge_accessories.tscn`
 
 ## Производственные станции
-- [ ] Counter station
+- [x] Counter station — `scenes/stations/counter_station.tscn`
 - [ ] Meat & pasta station
 - [ ] Burger / grill station
 - [ ] Solyanka station
