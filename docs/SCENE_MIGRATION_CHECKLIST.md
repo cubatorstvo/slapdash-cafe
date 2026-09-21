@@ -92,7 +92,7 @@
 - [x] Solyanka serving — `scenes/food/solyanka_serving.tscn`
 
 ## Основное кафе
-- [ ] Authored cafe world / stage roots
+- [x] Authored cafe world / stage roots — `scenes/cafe/cafe_world.tscn`
 - [x] Stage 1 floor and shell — `scenes/cafe/stage1_shell.tscn`
 - [x] Zone A — `scenes/cafe/zone_a.tscn`
 - [x] Zone B — `scenes/cafe/zone_b.tscn`
