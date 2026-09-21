@@ -21,7 +21,7 @@
 - [x] Solyanka station — `scenes/stations/solyanka_station.tscn`
 - [x] Service bell — `scenes/props/service_bell.tscn`
 - [x] Sauce ramp upgrade — `scenes/props/sauce_ramp.tscn`
-- [ ] Counter storage / product shelf module
+- [x] Counter storage / product shelf module — `scenes/props/counter_storage.tscn`
 
 ## Посуда и предметы первой стойки
 - [ ] Plate

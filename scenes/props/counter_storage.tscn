@@ -1,0 +1,107 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.654902,0.435294,0.305882,1)
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.141176,0.25098,0.278431,1)
+[sub_resource type="StandardMaterial3D" id="Mat_holder"]
+albedo_color = Color(0.388235,0.560784,0.572549,1)
+[sub_resource type="StandardMaterial3D" id="Mat_holder_edge"]
+albedo_color = Color(0.670588,0.764706,0.729412,1)
+[sub_resource type="StandardMaterial3D" id="Mat_tray"]
+albedo_color = Color(0.466667,0.556863,0.568627,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_shelf"]
+size = Vector3(1.1,1.45,0.55)
+[sub_resource type="BoxShape3D" id="Shape_tray"]
+size = Vector3(1.16,0.06,1.54)
+
+[node name="CounterStorage" type="Node3D"]
+[node name="ProductShelf" type="Node3D" parent="."]
+[node name="Body" type="StaticBody3D" parent="ProductShelf"]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ProductShelf/Body"]
+position = Vector3(0,0.725,0)
+shape = SubResource("Shape_shelf")
+[node name="ShelfLow" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0,0.32,0)
+scale = Vector3(1.1,0.06,0.55)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="ShelfMid" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0,0.82,0)
+scale = Vector3(1.1,0.06,0.55)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="ShelfHigh" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0,1.37,0)
+scale = Vector3(1.1,0.06,0.55)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="LegFL" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(-0.51,0.725,0.235)
+scale = Vector3(0.07,1.45,0.07)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="LegFR" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0.51,0.725,0.235)
+scale = Vector3(0.07,1.45,0.07)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="LegBL" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(-0.51,0.725,-0.235)
+scale = Vector3(0.07,1.45,0.07)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="LegBR" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0.51,0.725,-0.235)
+scale = Vector3(0.07,1.45,0.07)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="CrockeryShelf" type="MeshInstance3D" parent="."]
+position = Vector3(4.23,0.365,-0.32)
+scale = Vector3(1.3,0.07,0.66)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="RagHolder" type="Node3D" parent="."]
+position = Vector3(4.61,1.00,-0.81)
+[node name="Base" type="MeshInstance3D" parent="RagHolder"]
+position = Vector3(0,-0.0125,0)
+scale = Vector3(0.50,0.025,0.38)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_holder")
+[node name="LeftEdge" type="MeshInstance3D" parent="RagHolder"]
+position = Vector3(-0.25,0.0125,0)
+scale = Vector3(0.02,0.025,0.38)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_holder_edge")
+[node name="RightEdge" type="MeshInstance3D" parent="RagHolder"]
+position = Vector3(0.25,0.0125,0)
+scale = Vector3(0.02,0.025,0.38)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_holder_edge")
+[node name="BackEdge" type="MeshInstance3D" parent="RagHolder"]
+position = Vector3(0,0.0125,-0.19)
+scale = Vector3(0.50,0.025,0.02)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_holder_edge")
+[node name="ServingTray" type="StaticBody3D" parent="."]
+position = Vector3(4.08,1.045,-1.82)
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="ServingTray"]
+shape = SubResource("Shape_tray")
+[node name="Base" type="MeshInstance3D" parent="ServingTray"]
+position = Vector3(0,-0.015,0)
+scale = Vector3(1.16,0.03,1.54)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tray")
+[node name="ProductShelfAnchor" type="Marker3D" parent="."]
+[node name="CrockeryAnchor" type="Marker3D" parent="."]
+position = Vector3(4.23,0.40,-0.32)
+[node name="RagAnchor" type="Marker3D" parent="."]
+position = Vector3(4.61,1.00,-0.81)
+[node name="TrayAnchor" type="Marker3D" parent="."]
+position = Vector3(4.08,1.045,-1.82)
