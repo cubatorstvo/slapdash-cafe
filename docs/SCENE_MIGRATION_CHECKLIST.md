@@ -119,7 +119,7 @@
 - [x] Chef bed — `scenes/lounge/chef_bed.tscn`
 - [x] Sofa — `scenes/lounge/sofa.tscn`
 - [x] Coffee table — `scenes/lounge/coffee_table.tscn`
-- [ ] Television + cabinet
+- [x] Television + cabinet — `scenes/lounge/television_cabinet.tscn`
 - [ ] Rocking chair
 - [ ] Foosball
 - [ ] Arcade machine
