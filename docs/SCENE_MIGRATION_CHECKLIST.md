@@ -96,7 +96,7 @@
 - [x] Stage 1 floor and shell — `scenes/cafe/stage1_shell.tscn`
 - [x] Zone A — `scenes/cafe/zone_a.tscn`
 - [x] Zone B — `scenes/cafe/zone_b.tscn`
-- [ ] Zone C
+- [x] Zone C — `scenes/cafe/zone_c.tscn`
 - [ ] Zone D
 - [ ] Main entrance / exterior apron
 - [ ] Rear spine / annex transition
