@@ -48,7 +48,7 @@
 - [x] Pasta serving plate — `scenes/props/pasta_serving_plate.tscn`
 
 ## Burger props
-- [ ] Patty
+- [x] Patty — `scenes/props/patty.tscn`
 - [ ] Patty spatula
 - [ ] Seasoning
 - [ ] Bun

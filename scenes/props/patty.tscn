@@ -1,0 +1,43 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_patty"]
+albedo_color = Color(0.717647,0.372549,0.298039,1)
+[sub_resource type="StandardMaterial3D" id="Mat_sear"]
+albedo_color = Color(0.407843,0.219608,0.168627,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderShape3D" id="Shape_patty"]
+radius = 0.30
+height = 0.16
+[node name="Patty" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.08,0)
+shape = SubResource("Shape_patty")
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.08,0)
+scale = Vector3(0.62,0.16,0.54)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_patty")
+[node name="Sear1" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.17,-0.12)
+scale = Vector3(0.38,0.006,0.014)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_sear")
+[node name="Sear2" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.17,-0.04)
+scale = Vector3(0.38,0.006,0.014)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_sear")
+[node name="Sear3" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.17,0.04)
+scale = Vector3(0.38,0.006,0.014)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_sear")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.16,0)
