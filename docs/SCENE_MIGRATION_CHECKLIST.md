@@ -147,7 +147,7 @@
 - [x] Cable reel — `scenes/lab/cable_reel.tscn`
 - [x] Formula stabilizer / research apparatus — `scenes/lab/formula_stabilizer.tscn`
 - [x] Sample holder — `scenes/lab/sample_holder.tscn`
-- [ ] Microscope
+- [x] Microscope — `scenes/lab/microscope.tscn`
 - [ ] Tool shelf
 - [ ] Pot rack / grow shelf
 
