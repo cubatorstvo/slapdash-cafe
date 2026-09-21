@@ -20,7 +20,7 @@
 - [x] Burger / grill station — `scenes/stations/burger_station.tscn`
 - [x] Solyanka station — `scenes/stations/solyanka_station.tscn`
 - [x] Service bell — `scenes/props/service_bell.tscn`
-- [ ] Sauce ramp upgrade
+- [x] Sauce ramp upgrade — `scenes/props/sauce_ramp.tscn`
 - [ ] Counter storage / product shelf module
 
 ## Посуда и предметы первой стойки
