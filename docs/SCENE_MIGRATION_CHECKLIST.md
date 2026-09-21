@@ -128,7 +128,7 @@
 - [x] Bookcase — `scenes/lounge/bookcase.tscn`
 - [x] Beanbag — `scenes/lounge/beanbag.tscn`
 - [x] Tea station — `scenes/lounge/tea_station.tscn`
-- [ ] Jukebox
+- [x] Jukebox — `scenes/lounge/jukebox.tscn`
 - [ ] Aquarium
 - [ ] Lounge plant
 - [ ] Floor lamp

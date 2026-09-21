@@ -1,0 +1,68 @@
+[gd_scene load_steps=8 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.592157,0.423529,0.309804,1)
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.862745,0.643137,0.345098,1)
+emission_enabled = true
+emission = Color(0.862745,0.643137,0.345098,1)
+emission_energy_multiplier = 0.35
+[sub_resource type="StandardMaterial3D" id="Mat_ink"]
+albedo_color = Color(0.14902,0.239216,0.270588,1)
+[sub_resource type="StandardMaterial3D" id="Mat_glow"]
+albedo_color = Color(0.811765,0.564706,0.376471,1)
+emission_enabled = true
+emission = Color(0.811765,0.564706,0.376471,1)
+emission_energy_multiplier = 0.45
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+[sub_resource type="BoxShape3D" id="Shape_body"]
+size = Vector3(0.9,1.85,0.68)
+
+[node name="Jukebox" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.925,0)
+shape = SubResource("Shape_body")
+[node name="Cabinet" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.76,0)
+scale = Vector3(0.87,1.51,0.64)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wood")
+[node name="Dome" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.47,0)
+scale = Vector3(0.88,0.88,0.62)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_wood")
+[node name="GlowPanel" type="MeshInstance3D" parent="."]
+position = Vector3(0,1.41,-0.34)
+scale = Vector3(0.63,0.40,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_glow")
+[node name="Speaker" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.53,-0.34)
+scale = Vector3(0.60,0.62,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_ink")
+[node name="LeftGlow" type="MeshInstance3D" parent="."]
+position = Vector3(-0.36,0.84,-0.37)
+scale = Vector3(0.055,1.07,0.06)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_gold")
+[node name="RightGlow" type="MeshInstance3D" parent="."]
+position = Vector3(0.36,0.84,-0.37)
+scale = Vector3(0.055,1.07,0.06)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_gold")
+[node name="Title" type="Label3D" parent="."]
+position = Vector3(0,1.36,-0.39)
+rotation = Vector3(0,3.141593,0)
+pixel_size = 0.003
+font_size = 17
+text = "ТИШЕ, Я ОТДЫХАЮ"
+[node name="ListenerAnchor" type="Marker3D" parent="."]
+position = Vector3(-1.1,0,0)
