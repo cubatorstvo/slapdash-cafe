@@ -24,7 +24,7 @@
 - [x] Counter storage / product shelf module — `scenes/props/counter_storage.tscn`
 
 ## Посуда и предметы первой стойки
-- [ ] Plate
+- [x] Plate — `scenes/props/plate.tscn`
 - [ ] Serving tray
 - [ ] Wine jug
 - [ ] Wine cup
