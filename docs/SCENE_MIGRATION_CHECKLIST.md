@@ -93,7 +93,7 @@
 
 ## Основное кафе
 - [ ] Authored cafe world / stage roots
-- [ ] Stage 1 floor and shell
+- [x] Stage 1 floor and shell — `scenes/cafe/stage1_shell.tscn`
 - [ ] Zone A
 - [ ] Zone B
 - [ ] Zone C

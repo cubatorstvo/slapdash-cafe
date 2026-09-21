@@ -1,0 +1,56 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.423529,0.486275,0.45098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_wall"]
+albedo_color = Color(0.180392,0.32549,0.333333,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_floor"]
+size = Vector3(12,0.20,22)
+[sub_resource type="BoxShape3D" id="Shape_wall"]
+size = Vector3(0.22,4.7,22)
+
+[node name="Stage1Shell" type="Node3D"]
+[node name="FloorBody" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 2
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FloorBody"]
+position = Vector3(0,-0.10,3)
+shape = SubResource("Shape_floor")
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(0,-0.05,3)
+scale = Vector3(12,0.10,22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_floor")
+[node name="WestWall" type="MeshInstance3D" parent="."]
+position = Vector3(-6,2.35,3)
+scale = Vector3(0.22,4.7,22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="EastWall" type="MeshInstance3D" parent="."]
+position = Vector3(6,2.35,3)
+scale = Vector3(0.22,4.7,22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="BackWall" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.35,14)
+scale = Vector3(12,4.7,0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="FrontWallLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-3.45,2.35,-8)
+scale = Vector3(5.1,4.7,0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="FrontWallRight" type="MeshInstance3D" parent="."]
+position = Vector3(3.45,2.35,-8)
+scale = Vector3(5.1,4.7,0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="ChefAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0,5.1)
+[node name="ChefFlow" type="Marker3D" parent="."]
+position = Vector3(0,0,0)
+[node name="EarlyEntrance" type="Marker3D" parent="."]
+position = Vector3(0,0,-8)
