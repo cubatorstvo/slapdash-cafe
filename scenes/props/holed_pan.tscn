@@ -344,7 +344,7 @@ material_override = SubResource("Mat_pan")
 [node name="Tile67" type="MeshInstance3D" parent="BottomTiles"]
 position = Vector3(0.675,-0.018,0.075)
 scale = Vector3(0.151,0.035,0.151)
-mesh = SubResource("Mashs_box")
+mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_pan")
 [node name="Tile68" type="MeshInstance3D" parent="BottomTiles"]
 position = Vector3(0.675,-0.018,0.225)
