@@ -17,7 +17,7 @@
 ## Производственные станции
 - [x] Counter station — `scenes/stations/counter_station.tscn`
 - [x] Meat & pasta station — `scenes/stations/meat_pasta_station.tscn`
-- [ ] Burger / grill station
+- [x] Burger / grill station — `scenes/stations/burger_station.tscn`
 - [ ] Solyanka station
 - [ ] Service bell
 - [ ] Sauce ramp upgrade
