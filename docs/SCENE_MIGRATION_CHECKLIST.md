@@ -30,7 +30,7 @@
 - [x] Wine cup — `scenes/props/wine_cup.tscn`
 - [x] Rag — `scenes/props/rag.tscn`
 - [x] Holed pan — `scenes/props/holed_pan.tscn`
-- [ ] Sauce bowl
+- [x] Sauce bowl — `scenes/props/sauce_bowl.tscn`
 - [ ] Potato
 - [ ] Sausage
 - [ ] Tomato
