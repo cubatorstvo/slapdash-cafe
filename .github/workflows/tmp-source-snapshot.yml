@@ -1,9 +1,9 @@
-name: Temporary scene-migration bootstrap
+name: Temporary scene-runtime bootstrap
 
 on:
   push:
     branches:
-      - work/scene-migration
+      - work/scene-runtime-integration
     paths:
       - ".github/workflows/tmp-source-snapshot.yml"
   workflow_dispatch:
@@ -38,7 +38,7 @@ jobs:
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
-          name: scene-migration-source
+          name: scene-runtime-source
           path: /tmp/slapdash-cafe-source.zip
           if-no-files-found: error
           retention-days: 1
@@ -51,3 +51,5 @@ jobs:
           retention-days: 1
 # sync scene migration snapshot after food scenes
 # refresh snapshot after lounge authoring
+
+# bootstrap runtime integration source snapshot
