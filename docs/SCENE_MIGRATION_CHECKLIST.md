@@ -140,7 +140,7 @@
 ## Лаборатория — помещение и базовая установка
 - [ ] Laboratory authored room
 - [x] Initial assembly bench — `scenes/lab/assembly_bench.tscn`
-- [ ] Initial lab module 1
+- [x] Initial lab module 1 — `scenes/lab/initial_module_1.tscn`
 - [ ] Initial lab module 2
 - [ ] Initial lab module 3
 - [ ] Initial switches / start button
