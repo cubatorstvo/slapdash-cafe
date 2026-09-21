@@ -134,7 +134,7 @@
 - [x] Floor lamp — `scenes/lounge/floor_lamp.tscn`
 - [x] Snack fridge — `scenes/lounge/snack_fridge.tscn`
 - [x] Stool — `scenes/lounge/stool.tscn`
-- [ ] Rug
+- [x] Rug — `scenes/lounge/lounge_rug.tscn`
 - [ ] Lounge ceiling / decorative lights
 
 ## Лаборатория — помещение и базовая установка

@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_rug"]
+albedo_color = Color(0.658824,0.435294,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_inner"]
+albedo_color = Color(0.745098,0.52549,0.423529,1)
+[sub_resource type="StandardMaterial3D" id="Mat_fringe"]
+albedo_color = Color(0.945098,0.85098,0.682353,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="LoungeRug" type="Node3D"]
+[node name="Base" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.006,0)
+scale = Vector3(5.35,0.012,5.0)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_rug")
+[node name="Inner" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.013,0)
+scale = Vector3(5.19,0.007,4.84)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_inner")
+[node name="FringeFront" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.012,-2.545)
+scale = Vector3(4.95,0.01,0.16)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_fringe")
+[node name="FringeBack" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.012,2.545)
+scale = Vector3(4.95,0.01,0.16)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_fringe")
