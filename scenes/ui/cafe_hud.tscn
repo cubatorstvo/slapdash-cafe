@@ -108,6 +108,7 @@ horizontal_alignment = 1
 visible = false
 theme_override_font_sizes/font_size = 16
 [node name="Crosshair" type="Label" parent="Root"]
+mouse_filter = 2
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
