@@ -78,7 +78,7 @@
 - [x] Sausage — `scenes/props/solyanka_sausage.tscn`
 - [x] Mushroom — `scenes/props/solyanka_mushroom.tscn`
 - [x] Eggplant — `scenes/props/solyanka_eggplant.tscn`
-- [ ] Boot
+- [x] Boot — `scenes/props/solyanka_boot.tscn`
 - [ ] Bolt
 
 ## Готовая еда / подача
