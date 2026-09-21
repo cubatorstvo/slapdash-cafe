@@ -1,0 +1,67 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/actors/cook_avatar.tscn" id="1_actor"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_leaf"]
+albedo_color = Color(0.45098, 0.6, 0.407843, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_mouth"]
+albedo_color = Color(0.290196, 0.188235, 0.188235, 1)
+
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_pellet"]
+albedo_color = Color(0.843137, 0.741176, 0.466667, 1)
+
+[node name="CloneSprout" type="Node3D"]
+
+[node name="Actor" parent="." instance=ExtResource("1_actor")]
+position = Vector3(0, 0.58, 0)
+scale = Vector3(0.38, 0.38, 0.38)
+
+[node name="SproutDecor" type="Node3D" parent="."]
+position = Vector3(0, 1.154, 0)
+
+[node name="LeftLeaf" type="MeshInstance3D" parent="SproutDecor"]
+position = Vector3(-0.038, 0.091, 0)
+rotation = Vector3(0, 0, 0.4)
+scale = Vector3(0.10868, 0.018392, 0.0418)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf")
+
+[node name="RightLeaf" type="MeshInstance3D" parent="SproutDecor"]
+position = Vector3(0.038, 0.091, 0)
+rotation = Vector3(0, 0, -0.4)
+scale = Vector3(0.10868, 0.018392, 0.0418)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_leaf")
+
+[node name="HungryMouth" type="MeshInstance3D" parent="SproutDecor"]
+position = Vector3(0, -0.038, -0.084)
+scale = Vector3(0.0456, 0.0228, 0.0114)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_mouth")
+
+[node name="FertilizerPellet" type="MeshInstance3D" parent="."]
+visible = false
+position = Vector3(0, 1.05, -0.22)
+scale = Vector3(0.15, 0.15, 0.15)
+mesh = SubResource("Mesh_sphere")
+material_override = SubResource("Mat_pellet")
+
+[node name="HeadAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 1.154, 0)
+
+[node name="MouthAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 1.116, -0.084)
+
+[node name="PullHeadAnchor" type="Marker3D" parent="."]
+position = Vector3(0, 1.24, -0.05)
+
+[node name="PullShoulderAnchor" type="Marker3D" parent="."]
+position = Vector3(0.11, 1.13, -0.06)
+
+[node name="PullArmpitsAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.11, 1.08, -0.06)

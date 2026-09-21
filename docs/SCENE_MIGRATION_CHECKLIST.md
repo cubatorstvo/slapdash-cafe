@@ -10,7 +10,7 @@
 - [x] Cook / clone avatar — `scenes/actors/cook_avatar.tscn`
 - [x] Cook notebook + pencil — `scenes/props/cook_notebook.tscn`
 - [x] Delivery installer — `scenes/actors/delivery_installer.tscn`
-- [ ] Growing clone / sprout variant
+- [x] Growing clone / sprout variant — `scenes/actors/clone_sprout.tscn`
 - [ ] Remote multiplayer player visual
 - [ ] Cook lounge accessories: cup, paddle, snack
 
