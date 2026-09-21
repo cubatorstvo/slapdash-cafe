@@ -63,7 +63,7 @@
 - [x] Stirring paddle — `scenes/props/solyanka_paddle.tscn`
 - [x] Solyanka salt — `scenes/props/solyanka_salt.tscn`
 - [x] Mug — `scenes/props/solyanka_mug.tscn`
-- [ ] Potato
+- [x] Potato — `scenes/props/solyanka_potato.tscn`
 - [ ] Onion
 - [ ] Tomato
 - [ ] Carrot
