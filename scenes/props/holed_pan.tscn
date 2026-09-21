@@ -1,0 +1,392 @@
+[gd_scene load_steps=6 format=3]
+[sub_resource type="StandardMaterial3D" id="Mat_pan"]
+albedo_color = Color(0.32549,0.396078,0.419608,1)
+[sub_resource type="StandardMaterial3D" id="Mat_edge"]
+albedo_color = Color(0.513725,0.572549,0.552941,1)
+[sub_resource type="StandardMaterial3D" id="Mat_handle"]
+albedo_color = Color(0.654902,0.439216,0.313725,1)
+[sub_resource type="StandardMaterial3D" id="Mat_hole"]
+albedo_color = Color(0.941176,0.682353,0.380392,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[node name="HoledPan" type="Node3D"]
+[node name="BottomTiles" type="Node3D" parent="."]
+[node name="Tile01" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile02" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile03" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile04" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile05" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile06" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile07" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile08" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.675,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile09" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile10" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile11" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile12" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile13" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile14" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile15" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile16" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.525,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile17" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile18" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile19" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile20" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile21" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile22" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.375,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile23" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile24" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile25" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile26" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile27" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile28" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.225,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile29" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile30" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile31" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile32" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile33" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile34" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(-0.075,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile35" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile36" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile37" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile38" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile39" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile40" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile41" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile42" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.075,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile43" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile44" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile45" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile46" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile47" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile48" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.225,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile49" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile50" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile51" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile52" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile53" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile54" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.375,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile55" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile56" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile57" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile58" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile59" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile60" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile61" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile62" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.525,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile63" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,-0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile64" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,-0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile65" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,-0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile66" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,-0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile67" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,0.075)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mashs_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile68" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,0.225)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile69" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,0.375)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="Tile70" type="MeshInstance3D" parent="BottomTiles"]
+position = Vector3(0.675,-0.018,0.525)
+scale = Vector3(0.151,0.035,0.151)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_pan")
+[node name="LeftEdge" type="MeshInstance3D" parent="."]
+position = Vector3(-0.77,0.015,0)
+scale = Vector3(0.045,0.07,1.26)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_edge")
+[node name="RightEdge" type="MeshInstance3D" parent="."]
+position = Vector3(0.77,0.015,0)
+scale = Vector3(0.045,0.07,1.26)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_edge")
+[node name="FrontEdge" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.015,-0.62)
+scale = Vector3(1.58,0.07,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_edge")
+[node name="BackEdge" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.015,0.62)
+scale = Vector3(1.58,0.07,0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_edge")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.03,0.82)
+scale = Vector3(0.14,0.07,0.42)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_handle")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.05,0.98)
+[node name="CookingCenter" type="Marker3D" parent="."]
+position = Vector3(0,0.04,0)
