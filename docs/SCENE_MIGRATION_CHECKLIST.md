@@ -28,7 +28,7 @@
 - [x] Serving tray — `scenes/props/serving_tray.tscn`
 - [x] Wine jug — `scenes/props/wine_jug.tscn`
 - [x] Wine cup — `scenes/props/wine_cup.tscn`
-- [ ] Rag
+- [x] Rag — `scenes/props/rag.tscn`
 - [ ] Holed pan
 - [ ] Sauce bowl
 - [ ] Potato
