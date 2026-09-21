@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_handle"]
+albedo_color = Color(0.611765,0.458824,0.301961,1)
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.658824,0.713725,0.713725,1)
+metallic = 0.2
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_tool"]
+size = Vector3(0.34,0.04,0.76)
+[node name="PattySpatula" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.03,-0.08)
+shape = SubResource("Shape_tool")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.03,0.18)
+scale = Vector3(0.14,0.03,0.52)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_handle")
+[node name="Blade" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.03,-0.34)
+scale = Vector3(0.34,0.025,0.28)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.05,0.31)
+[node name="ToolTip" type="Marker3D" parent="."]
+position = Vector3(0,0.05,-0.48)
