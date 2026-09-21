@@ -70,7 +70,7 @@
 - [x] Garlic — `scenes/props/solyanka_garlic.tscn`
 - [x] Cabbage — `scenes/props/solyanka_cabbage.tscn`
 - [x] Cucumber — `scenes/props/solyanka_cucumber.tscn`
-- [ ] Beet
+- [x] Beet — `scenes/props/solyanka_beet.tscn`
 - [ ] Pepper
 - [ ] Zucchini
 - [ ] Pickle
