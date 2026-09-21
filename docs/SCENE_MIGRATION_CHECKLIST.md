@@ -133,7 +133,7 @@
 - [ ] Lounge plant
 - [ ] Floor lamp
 - [ ] Snack fridge
-- [ ] Stool
+- [x] Stool — `scenes/lounge/stool.tscn`
 - [ ] Rug
 - [ ] Lounge ceiling / decorative lights
 
