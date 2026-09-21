@@ -1,40 +1,60 @@
 extends RefCounted
-## Product-scale physical plan for the production cafe.
-## Stations use a regular four-row layout with generous aisles instead of the old debug clumps.
+## Gameplay-scale implementation of the accepted Zone A-D cafe blockout.
+## The design scene uses compact placeholder tables; gameplay stations are larger, so the courts
+## are scaled while preserving their topology: visitors inside, cooks outside, Chef as the rear
+## centre anchor, and the main flow visible from the central hall.
 const SLOT_COUNT:=20
 const BASE_SLOT_COUNT:=6
 const TILE:=2.0
-const HALL_X_MIN:=-24.0
-const HALL_X_MAX:=24.0
+const HALL_X_MIN:=-40.0
+const HALL_X_MAX:=40.0
 const HALL_BACK_Z:=14.0
-const STAGE_ENTRANCE_Z: Array[float]=[-6.0,-6.0,-14.0,-32.0]
-const CHEF_POSITION:=Vector3(0.0,0.0,8.0)
-# The entrance-to-Chef promenade stays completely clear; production lives in left/right banks.
-const CHEF_FLOW_POINT:=Vector3(0.0,0.0,-4.0)
-const REAR_SPINE_POINT:=Vector3(0.0,0.0,12.2)
-const AISLE_XS: Array[float]=[-13.5,0.0,13.5]
-const LEFT_AISLE_X:=-13.5
-const RIGHT_AISLE_X:=13.5
-const MARKET_POSITION:=Vector3(-7.0,0.0,13.1)
+# Early stages keep a compact front door; the final expansion moves it forward between C/D.
+const EARLY_ENTRANCE_Z:=-8.0
+const FINAL_ENTRANCE_Z:=-32.0
+const CHEF_POSITION:=Vector3(0.0,0.0,5.1)
+const CHEF_FLOW_POINT:=Vector3(0.0,0.0,2.4)
+const FRONT_FLOW_POINT:=Vector3(0.0,0.0,-18.0)
+const REAR_SPINE_POINT:=Vector3(0.0,0.0,11.2)
+# Compatibility aliases for systems that need a coarse central routing spine.
+const AISLE_XS: Array[float]=[-6.0,0.0,6.0]
+const LEFT_AISLE_X:=-6.0
+const RIGHT_AISLE_X:=6.0
+const MARKET_POSITION:=Vector3(6.0,0.0,11.0)
 const DECOR_SIGN_POSITION:=Vector3(1.5,2.8,13.84)
-const DECOR_PLANT_POINTS: Array[Vector2]=[Vector2(-6.8,11.9),Vector2(6.8,11.9),Vector2(22.2,-4.2)]
+const DECOR_PLANT_POINTS: Array[Vector2]=[Vector2(-4.0,12.0),Vector2(4.0,12.0)]
 const STAGE_NAMES:=['Красный','Синий','Зелёный','Жёлтый']
 const SECTION_ROWS: Array=[
-	{"name":"Основной зал · ★3","slots":[6,7,8,9,10,11,12]},
-	{"name":"Передний зал · ★4","slots":[13,14,15,16,17,18,19]}
+	{"name":"Zone B","slots":[6,7,8,9,10,11,12]},
+	{"name":"Zone C","slots":[13,14,15]},
+	{"name":"Zone D","slots":[16,17,18,19]}
 ]
 
-# Slot 1 is the Chef. The remaining positions open symmetrically as the room grows.
-# Rows are 8 m apart; columns are 9 m apart. With a 6.6 x 5.72 m station training
-# footprint this leaves >=2.28 m between rows and >=2.4 m between columns.
-const SLOT_POSITIONS: Array[Vector3]=[
-	Vector3(0.0,0.0,8.0),
-	Vector3(-18.0,0.0,8.0),Vector3(-9.0,0.0,8.0),Vector3(9.0,0.0,8.0),Vector3(18.0,0.0,8.0),
-	Vector3(-9.0,0.0,0.0),
-	Vector3(9.0,0.0,0.0),Vector3(-18.0,0.0,0.0),Vector3(18.0,0.0,0.0),
-	Vector3(-18.0,0.0,-8.0),Vector3(-9.0,0.0,-8.0),Vector3(9.0,0.0,-8.0),Vector3(18.0,0.0,-8.0),
-	Vector3(-18.0,0.0,-16.0),Vector3(-9.0,0.0,-16.0),Vector3(9.0,0.0,-16.0),Vector3(18.0,0.0,-16.0),
-	Vector3(-18.0,0.0,-24.0),Vector3(-9.0,0.0,-24.0),Vector3(9.0,0.0,-24.0)
+const TABLE_SKEWS: Array[float]=[-0.09,0.07,-0.04,0.11,-0.06]
+# A/B are pulled toward the entrance compared with the first gameplay-scale pass: their rear-most
+# tables now begin roughly on the Chef's row, so both courts are visible from behind his counter.
+const ZONE_A_CENTER:=Vector3(20.0,0.0,1.0)
+const ZONE_B_CENTER:=Vector3(-20.0,0.0,1.0)
+const ZONE_C_CENTER:=Vector3(-17.0,0.0,-18.0)
+const ZONE_D_CENTER:=Vector3(17.0,0.0,-18.0)
+
+# Zone A: five-table crooked horseshoe, open on the west side toward Chef and the central plaza.
+const ZONE_A_POSITIONS: Array[Vector3]=[
+	Vector3(13.0,0.0,-4.0),Vector3(24.0,0.0,-4.0),Vector3(31.0,0.0,1.0),
+	Vector3(24.0,0.0,6.0),Vector3(13.0,0.0,6.0)
+]
+# Zone B: seven-table elongated irregular oval.  The east side stays visibly open to Chef.
+const ZONE_B_POSITIONS: Array[Vector3]=[
+	Vector3(-10.0,0.0,6.0),Vector3(-19.0,0.0,6.0),Vector3(-28.0,0.0,6.0),
+	Vector3(-36.0,0.0,0.0),Vector3(-28.0,0.0,-5.0),Vector3(-19.0,0.0,-5.0),Vector3(-10.0,0.0,-5.0)
+]
+# The current 20-slot game occupies only part of the larger documented late-game C/D courts.
+# These positions leave the public pockets open for later capacity growth.
+const ZONE_C_POSITIONS: Array[Vector3]=[
+	Vector3(-24.0,0.0,-13.0),Vector3(-27.0,0.0,-21.0),Vector3(-18.0,0.0,-27.0)
+]
+const ZONE_D_POSITIONS: Array[Vector3]=[
+	Vector3(8.0,0.0,-25.0),Vector3(17.0,0.0,-27.0),Vector3(27.0,0.0,-22.0),Vector3(26.0,0.0,-13.0)
 ]
 
 static func stage_for_progress(p)->int:
@@ -44,10 +64,10 @@ static func stage_for_progress(p)->int:
 	return 4
 
 static func entrance_z(stage: int)->float:
-	return STAGE_ENTRANCE_Z[clampi(stage,1,4)-1]
+	return FINAL_ENTRANCE_Z if stage>=4 else EARLY_ENTRANCE_Z
 
 static func player_spawn(stage: int)->Vector3:
-	return Vector3(0.0,0.02,entrance_z(stage)+1.4)
+	return Vector3(0.0,0.02,entrance_z(stage)+2.6)
 
 static func customer_spawn(stage: int)->Vector3:
 	return Vector3(-1.25,0.0,entrance_z(stage)+0.85)
@@ -68,9 +88,10 @@ static func installer_exit(stage: int,id: int)->Vector3:
 
 static func zone_for_slot(slot_index: int)->String:
 	if slot_index==0: return "Шеф"
-	if slot_index<=5: return "Задний зал"
-	if slot_index<=12: return "Основной зал"
-	return "Передний зал"
+	if slot_index<=5: return "Zone A"
+	if slot_index<=12: return "Zone B"
+	if slot_index<=15: return "Zone C"
+	return "Zone D"
 
 static func unlock_stage_for_slot(slot_index: int)->int:
 	if slot_index==0: return 1
@@ -78,12 +99,40 @@ static func unlock_stage_for_slot(slot_index: int)->int:
 	if slot_index<=12: return 3
 	return 4
 
-static func position(slot_index: int)->Vector3:
-	return SLOT_POSITIONS[clampi(slot_index,0,SLOT_POSITIONS.size()-1)]
+static func zone_center(slot_index: int)->Vector3:
+	return zone_center_named(zone_for_slot(slot_index))
 
-static func rotation_y(_slot_index: int)->float:
-	# Every table faces the entrance. Customer side is local -Z; worker/service side is local +Z.
-	return 0.0
+static func zone_center_named(zone: String)->Vector3:
+	match zone:
+		"Zone A": return ZONE_A_CENTER
+		"Zone B": return ZONE_B_CENTER
+		"Zone C": return ZONE_C_CENTER
+		"Zone D": return ZONE_D_CENTER
+	return CHEF_POSITION
+
+static func zone_for_point(point: Vector3)->String:
+	# Workers stand outside the visitor ring, so choose the nearest court rather than splitting only
+	# by Z; otherwise a cook on the front edge of A/B can be mistaken for C/D.
+	if point.x>7.0:
+		return "Zone A" if point.distance_squared_to(ZONE_A_CENTER)<=point.distance_squared_to(ZONE_D_CENTER) else "Zone D"
+	if point.x<-7.0:
+		return "Zone B" if point.distance_squared_to(ZONE_B_CENTER)<=point.distance_squared_to(ZONE_C_CENTER) else "Zone C"
+	return ""
+
+static func position(slot_index: int)->Vector3:
+	if slot_index==0: return CHEF_POSITION
+	if slot_index<=5: return ZONE_A_POSITIONS[slot_index-1]
+	if slot_index<=12: return ZONE_B_POSITIONS[slot_index-6]
+	if slot_index<=15: return ZONE_C_POSITIONS[slot_index-13]
+	return ZONE_D_POSITIONS[slot_index-16]
+
+static func rotation_y(slot_index: int)->float:
+	if slot_index==0: return 0.0
+	var point:=position(slot_index)
+	var inward:=(zone_center(slot_index)-point).normalized()
+	var skew:=TABLE_SKEWS[(slot_index-1)%TABLE_SKEWS.size()]
+	# WorkStation customers stand on local -Z; cooks therefore occupy the outside of each court.
+	return atan2(-inward.x,-inward.z)+skew
 
 static func section_for(slot_index: int)->String:
 	return zone_for_slot(slot_index)
@@ -102,81 +151,79 @@ static func slot_label(station_id: int)->String:
 	var slot:=station_id-1
 	return "%s · место %d"%[section_for(slot),station_id]
 
-static func aisle_x(point_x: float)->float:
-	var best: float=AISLE_XS[0]
-	var distance:=absf(point_x-best)
-	for candidate in AISLE_XS:
-		var candidate_distance:=absf(point_x-candidate)
-		if candidate_distance<distance:
-			best=candidate
-			distance=candidate_distance
-	return best
-
-static func aisle_gate(point: Vector3)->Vector3:
-	return Vector3(aisle_x(point.x),0.0,point.z)
-
-static func transfer_gate(point: Vector3)->Vector3:
-	return Vector3(aisle_x(point.x),0.0,CHEF_FLOW_POINT.z)
-
 static func zone_gate(point: Vector3)->Vector3:
-	return aisle_gate(point)
+	var side:=6.0 if point.x>0.0 else -6.0
+	var zone:=zone_for_point(point)
+	return Vector3(side,0.0,FRONT_FLOW_POINT.z if zone in ["Zone C","Zone D"] else CHEF_FLOW_POINT.z)
+
+static func _append_unique(route: Array,point: Vector3)->void:
+	if route.is_empty() or Vector3(route.back()).distance_to(point)>0.2: route.append(point)
 
 static func route_from_entrance(target: Vector3,stage: int)->Array:
 	var result: Array=[customer_spawn(stage)]
-	if Vector3(result.back()).distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
-	var transfer:=transfer_gate(target)
-	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(transfer)
-	var gate:=aisle_gate(target)
-	if gate.distance_to(transfer)>0.2: result.append(gate)
-	result.append(target)
+	var zone:=zone_for_point(target)
+	if stage>=4 and zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	else: _append_unique(result,CHEF_FLOW_POINT)
+	if not zone.is_empty(): _append_unique(result,zone_center_named(zone))
+	_append_unique(result,target)
 	return result
 
 static func route_to_exit(start: Vector3,stage: int)->Array:
 	var result: Array=[start]
-	var gate:=aisle_gate(start)
-	if gate.distance_to(start)>0.2: result.append(gate)
-	var transfer:=transfer_gate(start)
-	if transfer.distance_to(gate)>0.2: result.append(transfer)
-	if transfer.distance_to(CHEF_FLOW_POINT)>0.2: result.append(CHEF_FLOW_POINT)
-	result.append(customer_exit(stage))
+	var zone:=zone_for_point(start)
+	if not zone.is_empty(): _append_unique(result,zone_center_named(zone))
+	if stage>=4 and zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	else: _append_unique(result,CHEF_FLOW_POINT)
+	_append_unique(result,customer_exit(stage))
 	return result
 
 static func route_to_rear(start: Vector3,target: Vector3)->Array:
 	var result: Array=[start]
-	var gate:=aisle_gate(start)
-	if gate.distance_to(start)>0.2: result.append(gate)
-	var rear_gate:=Vector3(gate.x,0.0,REAR_SPINE_POINT.z)
-	if rear_gate.distance_to(Vector3(result.back()))>0.2: result.append(rear_gate)
-	if rear_gate.distance_to(REAR_SPINE_POINT)>0.2: result.append(REAR_SPINE_POINT)
-	result.append(target)
+	var zone:=zone_for_point(start)
+	if zone in ["Zone C","Zone D"]:
+		_append_unique(result,zone_center_named(zone))
+		_append_unique(result,FRONT_FLOW_POINT)
+		_append_unique(result,CHEF_FLOW_POINT)
+	elif zone in ["Zone A","Zone B"]:
+		if start.z>8.5: _append_unique(result,REAR_SPINE_POINT)
+		else:
+			_append_unique(result,zone_center_named(zone))
+			_append_unique(result,CHEF_FLOW_POINT)
+	else:
+		if start.z<EARLY_ENTRANCE_Z: _append_unique(result,FRONT_FLOW_POINT)
+		_append_unique(result,CHEF_FLOW_POINT)
+	_append_unique(result,REAR_SPINE_POINT)
+	_append_unique(result,target)
 	return result
 
-static func cafe_route(start: Vector3,target: Vector3,_stage: int,via_chef := true)->Array:
+static func cafe_route(start: Vector3,target: Vector3,stage: int,via_chef := true)->Array:
 	var result: Array=[]
-	var start_gate:=aisle_gate(start)
-	if start.distance_to(start_gate)>0.2: result.append(start_gate)
-	var start_transfer:=transfer_gate(start)
-	if start_transfer.distance_to(start_gate)>0.2: result.append(start_transfer)
-	if via_chef:
-		var cross_start:=Vector3(aisle_x(start.x),0.0,CHEF_FLOW_POINT.z)
-		if result.is_empty() or Vector3(result.back()).distance_to(cross_start)>0.2: result.append(cross_start)
-	var target_transfer:=transfer_gate(target)
-	if result.is_empty() or Vector3(result.back()).distance_to(target_transfer)>0.2: result.append(target_transfer)
-	var target_gate:=aisle_gate(target)
-	if target_gate.distance_to(target_transfer)>0.2: result.append(target_gate)
-	result.append(target)
+	var start_zone:=zone_for_point(start)
+	var target_zone:=zone_for_point(target)
+	# Short movements inside the entrance apron should remain local.
+	if start_zone.is_empty() and target_zone.is_empty() and start.distance_to(target)<=8.0:
+		_append_unique(result,target)
+		return result
+	if not start_zone.is_empty(): _append_unique(result,zone_center_named(start_zone))
+	if stage>=4 and start_zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	if via_chef: _append_unique(result,CHEF_FLOW_POINT)
+	if stage>=4 and target_zone in ["Zone C","Zone D"]: _append_unique(result,FRONT_FLOW_POINT)
+	if not target_zone.is_empty(): _append_unique(result,zone_center_named(target_zone))
+	_append_unique(result,target)
 	return result
 
 static func hall_cells_for_stage(stage: int)->Dictionary:
 	var plan: Dictionary={}
-	# Stage 1: intimate Chef room and entry corridor.
-	_mark_rect(plan,Rect2i(-4,-3,8,10),1)
-	# Stage 2: full-width rear hall for the first production row.
-	_mark_rect(plan,Rect2i(-12,-3,24,10),2)
-	# Stage 3: extend toward the street for the second production bank.
-	_mark_rect(plan,Rect2i(-12,-7,24,14),3)
-	# Stage 4: final front hall, broad lobby and two last production rows.
-	_mark_rect(plan,Rect2i(-12,-16,24,23),4)
+	# Stage 1: compact Chef plaza and its front approach.
+	_mark_rect(plan,Rect2i(-3,-4,6,11),1)
+	# Stage 2: Zone A opens as a recognisable right-hand court.
+	_mark_rect(plan,Rect2i(3,-5,17,12),2)
+	# Stage 3: Zone B opens on the left without moving Chef or Zone A.
+	_mark_rect(plan,Rect2i(-20,-5,17,12),3)
+	# Stage 4: two separate front courts around the same central promenade.
+	_mark_rect(plan,Rect2i(-3,-16,6,12),4)
+	_mark_rect(plan,Rect2i(-17,-16,14,12),4)
+	_mark_rect(plan,Rect2i(3,-16,14,12),4)
 	var cells: Dictionary={}
 	for cell in plan:
 		var unlock:=int(plan[cell])
