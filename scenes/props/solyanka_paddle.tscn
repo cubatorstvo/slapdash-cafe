@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_handle"]
+albedo_color = Color(0.737255,0.576471,0.376471,1)
+[sub_resource type="StandardMaterial3D" id="Mat_blade"]
+albedo_color = Color(0.784314,0.627451,0.423529,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_paddle"]
+size = Vector3(0.30,0.72,0.22)
+
+[node name="SolyankaPaddle" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.36,0)
+shape = SubResource("Shape_paddle")
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.31,0)
+scale = Vector3(0.08,0.62,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_handle")
+[node name="Blade" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.64,0)
+scale = Vector3(0.30,0.07,0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_blade")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.12,0)
+[node name="StirTip" type="Marker3D" parent="."]
+position = Vector3(0,0.70,0)
