@@ -31,7 +31,7 @@
 - [x] Rag — `scenes/props/rag.tscn`
 - [x] Holed pan — `scenes/props/holed_pan.tscn`
 - [x] Sauce bowl — `scenes/props/sauce_bowl.tscn`
-- [ ] Potato
+- [x] Potato — `scenes/props/potato.tscn`
 - [ ] Sausage
 - [ ] Tomato
 
