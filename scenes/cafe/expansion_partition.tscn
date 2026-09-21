@@ -1,0 +1,45 @@
+[gd_scene load_steps=4 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_panel"]
+albedo_color = Color(0.607843,0.505882,0.364706,1)
+[sub_resource type="StandardMaterial3D" id="Mat_frame"]
+albedo_color = Color(0.247059,0.278431,0.278431,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="ExpansionPartition" type="Node3D"]
+[node name="Panel" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.35,0)
+scale = Vector3(8,4.7,0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_panel")
+[node name="TopRail" type="MeshInstance3D" parent="."]
+position = Vector3(0,4.47,-0.17)
+scale = Vector3(8,0.12,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="BottomRail" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.23,-0.17)
+scale = Vector3(8,0.12,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="StudLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-3.8,2.35,-0.17)
+scale = Vector3(0.10,4.35,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="StudMid" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.35,-0.17)
+scale = Vector3(0.10,4.35,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="StudRight" type="MeshInstance3D" parent="."]
+position = Vector3(3.8,2.35,-0.17)
+scale = Vector3(0.10,4.35,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_frame")
+[node name="Sign" type="Label3D" parent="."]
+position = Vector3(0,2.0,-0.24)
+pixel_size = 0.005
+font_size = 22
+text = "РАСШИРЕНИЕ"
