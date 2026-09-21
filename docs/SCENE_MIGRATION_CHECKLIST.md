@@ -131,7 +131,7 @@
 - [x] Jukebox — `scenes/lounge/jukebox.tscn`
 - [x] Aquarium — `scenes/lounge/aquarium.tscn`
 - [x] Lounge plant — `scenes/lounge/lounge_plant.tscn`
-- [ ] Floor lamp
+- [x] Floor lamp — `scenes/lounge/floor_lamp.tscn`
 - [ ] Snack fridge
 - [x] Stool — `scenes/lounge/stool.tscn`
 - [ ] Rug
