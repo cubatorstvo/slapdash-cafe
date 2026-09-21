@@ -73,7 +73,7 @@
 - [x] Beet — `scenes/props/solyanka_beet.tscn`
 - [x] Pepper — `scenes/props/solyanka_pepper.tscn`
 - [x] Zucchini — `scenes/props/solyanka_zucchini.tscn`
-- [ ] Pickle
+- [x] Pickle — `scenes/props/solyanka_pickle.tscn`
 - [ ] Lemon
 - [ ] Sausage
 - [ ] Mushroom
