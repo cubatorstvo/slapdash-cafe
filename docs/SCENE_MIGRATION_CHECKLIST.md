@@ -5,7 +5,7 @@
 Правило работы: каждая законченная сцена коммитится отдельно. В том же коммите обновляется этот чек-лист.
 
 ## Персонажи
-- [ ] Player
+- [x] Player — `scenes/actors/player.tscn`
 - [ ] Customer / taster
 - [ ] Cook / clone avatar
 - [ ] Cook notebook + pencil
