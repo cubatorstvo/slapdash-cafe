@@ -105,7 +105,7 @@
 - [x] Cafe signs / room signs / zone signs — `scenes/cafe/cafe_signs.tscn`
 
 ## Постоянный декор кафе
-- [ ] “Мы почти умеем” sign
+- [x] “Мы почти умеем” sign — `scenes/decor/almost_ready_sign.tscn`
 - [ ] Decorative cafe plant
 - [ ] Garland
 - [ ] “Моё кафе” board
