@@ -95,7 +95,7 @@
 - [ ] Authored cafe world / stage roots
 - [x] Stage 1 floor and shell — `scenes/cafe/stage1_shell.tscn`
 - [x] Zone A — `scenes/cafe/zone_a.tscn`
-- [ ] Zone B
+- [x] Zone B — `scenes/cafe/zone_b.tscn`
 - [ ] Zone C
 - [ ] Zone D
 - [ ] Main entrance / exterior apron
