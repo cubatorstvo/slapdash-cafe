@@ -86,7 +86,7 @@
 - [x] Fried potato serving — `scenes/food/fried_potato_serving.tscn`
 - [x] Sausage serving — `scenes/food/sausage_serving.tscn`
 - [x] Steak & pasta serving — `scenes/food/steak_pasta_serving.tscn`
-- [ ] Burger serving
+- [x] Burger serving — `scenes/food/burger_serving.tscn`
 - [ ] Cheeseburger serving
 - [ ] Spicy burger serving
 - [ ] Solyanka serving
