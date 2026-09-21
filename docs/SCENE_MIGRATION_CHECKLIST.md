@@ -132,7 +132,7 @@
 - [x] Aquarium — `scenes/lounge/aquarium.tscn`
 - [x] Lounge plant — `scenes/lounge/lounge_plant.tscn`
 - [x] Floor lamp — `scenes/lounge/floor_lamp.tscn`
-- [ ] Snack fridge
+- [x] Snack fridge — `scenes/lounge/snack_fridge.tscn`
 - [x] Stool — `scenes/lounge/stool.tscn`
 - [ ] Rug
 - [ ] Lounge ceiling / decorative lights
