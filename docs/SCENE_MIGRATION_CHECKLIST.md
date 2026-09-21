@@ -55,7 +55,7 @@
 - [x] Cheese — `scenes/props/cheese.tscn`
 - [x] Sauce bottle — `scenes/props/sauce_bottle.tscn`
 - [x] Chili sauce bottle — `scenes/props/chili_sauce_bottle.tscn`
-- [ ] Burger assembly plate
+- [x] Burger assembly plate — `scenes/props/burger_assembly_plate.tscn`
 
 ## Solyanka props
 - [ ] Cauldron
