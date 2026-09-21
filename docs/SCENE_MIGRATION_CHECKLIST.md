@@ -33,7 +33,7 @@
 - [x] Sauce bowl — `scenes/props/sauce_bowl.tscn`
 - [x] Potato — `scenes/props/potato.tscn`
 - [x] Sausage — `scenes/props/sausage.tscn`
-- [ ] Tomato
+- [x] Tomato — `scenes/props/tomato.tscn`
 
 ## Meat & pasta props
 - [ ] Steak
