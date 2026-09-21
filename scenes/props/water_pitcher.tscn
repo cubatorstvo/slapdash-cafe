@@ -1,0 +1,60 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.501961,0.709804,0.756863,1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_water"]
+albedo_color = Color(0.458824,0.74902,0.843137,0.75)
+transparency = 1
+
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[sub_resource type="CylinderShape3D" id="Shape_pitcher"]
+radius = 0.20
+height = 0.44
+
+[node name="WaterPitcher" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.22,0)
+shape = SubResource("Shape_pitcher")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.22,0)
+scale = Vector3(0.38,0.43,0.38)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_body")
+
+[node name="Spout" type="MeshInstance3D" parent="."]
+position = Vector3(0.22,0.42,-0.02)
+scale = Vector3(0.12,0.06,0.16)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_body")
+
+[node name="Handle" type="MeshInstance3D" parent="."]
+position = Vector3(-0.25,0.23,0)
+scale = Vector3(0.09,0.30,0.13)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_body")
+
+[node name="WaterPreview" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.40,0)
+scale = Vector3(0.33,0.012,0.33)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_water")
+
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(-0.25,0.24,0)
+[node name="PourAnchor" type="Marker3D" parent="."]
+position = Vector3(0.28,0.44,-0.02)
+[node name="LiquidAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.40,0)

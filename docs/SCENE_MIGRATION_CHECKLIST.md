@@ -38,7 +38,7 @@
 ## Meat & pasta props
 - [x] Steak — `scenes/props/steak.tscn`
 - [x] Pot — `scenes/props/pasta_pot.tscn`
-- [ ] Water pitcher
+- [x] Water pitcher — `scenes/props/water_pitcher.tscn`
 - [ ] Pasta bag
 - [ ] Salt shaker
 - [ ] Meat spatula
