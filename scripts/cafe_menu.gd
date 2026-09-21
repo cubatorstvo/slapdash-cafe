@@ -22,6 +22,7 @@ var port: SpinBox
 func _ready() -> void:
 	layer = 15
 	var root := get_node("Root") as Control
+	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = CafeStyle.make()
 	panel = get_node("Root/MenuPanel") as PanelContainer
 	training_box = get_node("Root/MenuPanel/Scroll/TrainingBox") as VBoxContainer

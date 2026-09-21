@@ -197,6 +197,23 @@ func run() -> void:
 	var live_meal: Array = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
 	check(live_meal[0].lines[0].contains("100%") and live_meal[0].lines[0].contains("0%"), "Live steak sides use the same labels")
 	check(live_meal[1].lines[0].begins_with("Сварить"), "Live pasta cooking keeps the static label")
+	check(live_meal[0].details.size() == live_meal[0].lines.size() and live_meal[1].details.size() == live_meal[1].lines.size(), "Live meal recipe lines keep hover details")
+	game.cookbook.toggle()
+	await process_frame
+	await process_frame
+	var live_row: Label = null
+	for child in game.cookbook.physical.pages[1].column.get_children():
+		if child is Label and str(child.text).contains("Обжарить"):
+			live_row = child
+			break
+	check(live_row != null, "Live meal recipe body lines are hover targets")
+	if live_row:
+		var live_hover := InputEventMouseMotion.new()
+		live_hover.position = game.cookbook.physical.page_to_screen(game.camera, 1, game.cookbook.physical.control_uv(1, live_row))
+		game.cookbook._input(live_hover)
+		await process_frame
+		check(game.cookbook.physical.pages[1].note.text.contains("Обе стороны"), "Live meal hover uses recipe details, not empty quality notes")
+	game.cookbook.close()
 	kitchen.model.stirred = 0.4
 	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
 	check(live_meal[1].lines[2] == "Перемешать [×]", "Unfinished stirring is a mark, not a percent")

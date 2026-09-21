@@ -43,6 +43,13 @@ func run() -> void:
 	game.set_physics_process(false)
 	game.service.clear_world()
 	game.service.initial_stations(true)
+	check((game.menu.get_node("Root") as Control).mouse_filter == Control.MOUSE_FILTER_IGNORE, "Closed station menu does not swallow mouse look")
+	var look_yaw: float = game.player.rotation.y
+	var look := InputEventMouseMotion.new()
+	look.relative = Vector2(80, 12)
+	look.screen_relative = Vector2(80, 12)
+	game._unhandled_input(look)
+	check(game.player.rotation.y < look_yaw - 0.05, "Mouse motion turns the camera")
 	var station = game.service.by_id(4)
 	game.service.request_training(station, "meal", 1)
 	game.menu.show_station(station)

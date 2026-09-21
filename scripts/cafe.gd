@@ -232,15 +232,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE:
 				if player.is_on_floor(): player.velocity.y = 6.2
 	if event is InputEventMouseMotion:
+		var motion: Vector2 = event.screen_relative
+		if motion.is_zero_approx(): motion = event.relative
 		if recording and held_item(station) == "pan" and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			pan_tilt = (pan_tilt + event.screen_relative * 0.003).limit_length(0.18)
+			pan_tilt = (pan_tilt + motion * 0.003).limit_length(0.18)
 		elif recording and not held_item(station).is_empty() and Input.is_physical_key_pressed(KEY_SHIFT):
 			var right: Vector3 = station.global_basis.inverse() * camera.global_basis.x
 			var forward: Vector3 = station.global_basis.inverse() * -camera.global_basis.z
-			target += (Vector2(right.x, right.z).normalized() * event.screen_relative.x - Vector2(forward.x, forward.z).normalized() * event.screen_relative.y) * 0.0035
+			target += (Vector2(right.x, right.z).normalized() * motion.x - Vector2(forward.x, forward.z).normalized() * motion.y) * 0.0035
 			precise = true
 		else:
-			player.look(event.screen_relative)
+			player.look(motion)
 			if recording and precise: anchor(station)
 			precise = false
 	if recording and event is InputEventMouseButton and event.pressed:
