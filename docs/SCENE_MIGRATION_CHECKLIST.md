@@ -135,7 +135,7 @@
 - [x] Snack fridge — `scenes/lounge/snack_fridge.tscn`
 - [x] Stool — `scenes/lounge/stool.tscn`
 - [x] Rug — `scenes/lounge/lounge_rug.tscn`
-- [ ] Lounge ceiling / decorative lights
+- [x] Lounge ceiling / decorative lights — `scenes/lounge/lounge_ceiling_lights.tscn`
 
 ## Лаборатория — помещение и базовая установка
 - [ ] Laboratory authored room
