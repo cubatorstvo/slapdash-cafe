@@ -1,0 +1,39 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_primary"]
+albedo_color = Color(0.427451,0.698039,0.603922,1)
+[sub_resource type="StandardMaterial3D" id="Mat_secondary"]
+albedo_color = Color(0.678431,0.466667,0.34902,1)
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.227451,0.360784,0.345098,1)
+[sub_resource type="StandardMaterial3D" id="Mat_accent"]
+albedo_color = Color(0.827451,0.705882,0.490196,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="CylinderMesh" id="Mesh_cyl"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+[sub_resource type="SphereMesh" id="Mesh_sphere"]
+radius = 0.5
+height = 1.0
+
+[node name="AutoFeeder" type="Node3D"]
+[node name="Post" type="MeshInstance3D" parent="."]
+position = Vector3(0.65,1.225,0.35)
+scale = Vector3(0.09,2.45,0.09)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_primary")
+[node name="Arm" type="MeshInstance3D" parent="."]
+position = Vector3(0.325,2.45,0.175)
+rotation = Vector3(0,0,0.785398)
+scale = Vector3(0.12,0.78,0.12)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_accent")
+[node name="Hopper" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.43,0)
+scale = Vector3(0.24,0.24,0.24)
+mesh = SubResource("Mesh_cyl")
+material_override = SubResource("Mat_accent")
+[node name="FeedDropAnchor" type="Marker3D" parent="."]
+position = Vector3(0,2.28,0)
