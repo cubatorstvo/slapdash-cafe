@@ -565,6 +565,11 @@ func _configure_authored_cafe_world(stage: int) -> void:
 		if pads!=null: pads.visible=false
 	var entrance:=room_shell.get_node_or_null("Entrance") as Node3D
 	if entrance!=null: entrance.position.z=Expansion.entrance_z(stage)-Expansion.FINAL_ENTRANCE_Z
+	var rear:=room_shell.get_node_or_null("RearSpine")
+	if rear!=null:
+		for frame_name in ["LabFrameLeft","LabFrameRight"]:
+			var frame:=rear.get_node_or_null(frame_name)
+			if frame!=null: frame.visible=false
 	var signs:=room_shell.get_node_or_null("Signs")
 	if signs!=null:
 		for name in ["ZoneA","ZoneB","ZoneC","ZoneD"]:

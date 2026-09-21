@@ -13,6 +13,9 @@ size = Vector3(0.828,2.55,0.11)
 [node name="AutomaticSlidingDoor" type="Node3D"]
 [node name="LeftLeaf" type="AnimatableBody3D" parent="."]
 position = Vector3(-0.45,1.275,0)
+collision_layer = 1
+collision_mask = 2
+sync_to_physics = false
 [node name="CollisionShape3D" type="CollisionShape3D" parent="LeftLeaf"]
 shape = SubResource("Shape_leaf")
 [node name="Panel" type="MeshInstance3D" parent="LeftLeaf"]
@@ -26,6 +29,9 @@ mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_glass")
 [node name="RightLeaf" type="AnimatableBody3D" parent="."]
 position = Vector3(0.45,1.275,0)
+collision_layer = 1
+collision_mask = 2
+sync_to_physics = false
 [node name="CollisionShape3D" type="CollisionShape3D" parent="RightLeaf"]
 shape = SubResource("Shape_leaf")
 [node name="Panel" type="MeshInstance3D" parent="RightLeaf"]

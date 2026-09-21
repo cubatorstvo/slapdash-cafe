@@ -17,6 +17,32 @@ func run() -> void:
 	check(Annex.rest_spot(0).position.z>Annex.CAFE_BACK_Z,"Clone rest spots are behind cafe")
 	check(Annex.REST_AREA>100.0,"Rest room is roughly triple the previous area")
 	check(Annex.player_bed_center(3).x<Annex.REST_X_MAX,"Shared chef bed fits inside the room")
+	check(game.annex.doors.has("lab"),"Stage 1 has the laboratory sliding door")
+	var lab_door: Dictionary=game.annex.doors.get("lab",{})
+	for leaf_data in lab_door.leaves:
+		var leaf: Node3D=leaf_data.node
+		check(leaf is AnimatableBody3D,"Laboratory door leaf is the moving collision body")
+		check(leaf.rotation.length()<0.01,"Laboratory door leaf stays axis-aligned")
+		check(not bool(leaf.sync_to_physics),"Scripted door leaves are not physics-interpolated")
+	game.player.global_position=Annex.LAB_DOOR_CAFE
+	game.annex.advance_doors(0.30)
+	check(game.annex.door_openness("lab")>0.9,"Laboratory door opens for approaching player")
+	await physics_frame
+	await physics_frame
+	var doorway:=PhysicsShapeQueryParameters3D.new()
+	var probe:=SphereShape3D.new(); probe.radius=0.22
+	doorway.shape=probe
+	doorway.transform=Transform3D(Basis.IDENTITY,Vector3(Annex.LAB_DOOR_X,1.15,Annex.CAFE_BACK_Z))
+	doorway.collision_mask=1
+	doorway.collide_with_bodies=true
+	var blockers: Array=[]
+	for hit in game.get_world_3d().direct_space_state.intersect_shape(doorway,12):
+		var collider=hit.get("collider")
+		if is_instance_valid(collider): blockers.append(str(collider.get_path()))
+	check(blockers.is_empty(),"Open laboratory doorway is physically clear at stage 1, not %s"%str(blockers))
+	game.player.global_position=Vector3(0,0,0)
+	for i in range(8): game.annex.advance_doors(0.25)
+	check(game.annex.door_openness("lab")<0.1,"Laboratory door closes after player leaves")
 	game.service.progress.stars=1
 	game._refresh_cafe_layout(true)
 	game.player.global_position=Annex.REST_DOOR_CAFE
@@ -26,13 +52,8 @@ func run() -> void:
 	if not rest_door.is_empty():
 		for leaf_data in rest_door.leaves:
 			var leaf: Node3D=leaf_data.node
-			var moving_body: AnimatableBody3D=null
-			var static_body: StaticBody3D=null
-			for child in leaf.get_children():
-				if child is AnimatableBody3D: moving_body=child
-				if child is StaticBody3D and child is not AnimatableBody3D: static_body=child
-			check(moving_body!=null,"Sliding rest door uses an AnimatableBody3D collision")
-			check(static_body==null,"Sliding rest door has no stale StaticBody collision")
+			check(leaf is AnimatableBody3D,"Sliding rest door uses an AnimatableBody3D collision")
+			check(leaf.rotation.length()<0.01,"Rest door leaf stays axis-aligned")
 	game.player.global_position=Vector3(0,0,0)
 	for i in range(8): game.annex.advance_doors(0.25)
 	check(game.annex.door_openness("rest")<0.1,"Rest door closes after player leaves")

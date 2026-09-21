@@ -192,15 +192,15 @@ func _sync_doors() -> void:
 
 func _build_door(id: String, door_x: float, _color: Color) -> void:
 	var root:=SceneRuntime.instantiate("res://scenes/cafe/automatic_sliding_door.tscn") as Node3D
-	root.name="%sDoor"%id.capitalize(); add_child(root); root.position=Vector3(door_x,0,CAFE_BACK_Z-0.015)
+	root.name="%sDoor"%id.capitalize(); add_child(root); root.position=Vector3(door_x,0,CAFE_BACK_Z)
 	var leaves: Array=[]
-	for data in [[-1.0,"LeftLeaf"],[1.0,"RightLeaf"]]:
-		var side: float=float(data[0]); var body:=root.get_node(str(data[1])) as AnimatableBody3D
-		var pivot:=Node3D.new(); pivot.name=str(data[1])+"Pivot"; root.add_child(pivot)
-		body.reparent(pivot,false); body.position=Vector3.ZERO
-		var closed_x: float=side*DOOR_WIDTH*0.25; var open_x: float=side*DOOR_WIDTH*0.69
-		pivot.position=Vector3(closed_x,DOOR_HEIGHT*0.5,0)
-		leaves.append({"node":pivot,"closed":closed_x,"open":open_x})
+	for data in [["LeftLeaf","LeftOpen"],["RightLeaf","RightOpen"]]:
+		var body:=root.get_node(str(data[0])) as AnimatableBody3D
+		body.sync_to_physics=false
+		body.collision_layer=1
+		body.collision_mask=2
+		body.rotation=Vector3.ZERO
+		leaves.append({"node":body,"closed":body.position.x,"open":root.get_node(str(data[1])).position.x})
 	doors[id]={"root":root,"leaves":leaves,"amount":0.0,"hold":0.0}
 
 func _physics_process(delta: float) -> void:
