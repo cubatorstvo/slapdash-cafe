@@ -1,0 +1,95 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/lounge/chef_bed.tscn" id="1_bed"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/sofa.tscn" id="2_sofa"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/television_cabinet.tscn" id="3_tv"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/rocking_chair.tscn" id="4_rocker"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/foosball.tscn" id="5_foosball"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/arcade_machine.tscn" id="6_arcade"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/table_tennis.tscn" id="7_ping"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/board_games.tscn" id="8_board"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/bookcase.tscn" id="9_books"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/beanbag.tscn" id="10_beanbag"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/tea_station.tscn" id="11_tea"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/jukebox.tscn" id="12_music"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/aquarium.tscn" id="13_aquarium"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/lounge_plant.tscn" id="14_plant"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/floor_lamp.tscn" id="15_lamp"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/snack_fridge.tscn" id="16_fridge"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/lounge_rug.tscn" id="17_rug"]
+[ext_resource type="PackedScene" path="res://scenes/lounge/lounge_ceiling_lights.tscn" id="18_lights"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_floor"]
+albedo_color = Color(0.486275,0.45098,0.384314,1)
+[sub_resource type="StandardMaterial3D" id="Mat_wall"]
+albedo_color = Color(0.588235,0.552941,0.458824,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="StaffLounge" type="Node3D"]
+[node name="Floor" type="MeshInstance3D" parent="."]
+position = Vector3(7.45,-0.05,22.2)
+scale = Vector3(14.9,0.10,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_floor")
+[node name="BackWall" type="MeshInstance3D" parent="."]
+position = Vector3(7.45,2.3,30.4)
+scale = Vector3(14.9,4.6,0.15)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="LeftWall" type="MeshInstance3D" parent="."]
+position = Vector3(0,2.3,22.2)
+scale = Vector3(0.15,4.6,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="RightWall" type="MeshInstance3D" parent="."]
+position = Vector3(14.9,2.3,22.2)
+scale = Vector3(0.15,4.6,16.4)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_wall")
+[node name="SofaRug" parent="." instance=ExtResource("17_rug")]
+position = Vector3(3.6,0.016,17.55)
+[node name="Sofa" parent="." instance=ExtResource("2_sofa")]
+position = Vector3(3.6,0,18.1)
+[node name="Television" parent="." instance=ExtResource("3_tv")]
+position = Vector3(2.8,0,15.9)
+rotation = Vector3(0,3.141593,0)
+[node name="RockingChair" parent="." instance=ExtResource("4_rocker")]
+position = Vector3(1.65,0,21.9)
+rotation = Vector3(0,-1.570796,0)
+[node name="Foosball" parent="." instance=ExtResource("5_foosball")]
+position = Vector3(11.1,0,17.3)
+[node name="Arcade" parent="." instance=ExtResource("6_arcade")]
+position = Vector3(13.7,0,15.2)
+rotation = Vector3(0,3.141593,0)
+[node name="TableTennis" parent="." instance=ExtResource("7_ping")]
+position = Vector3(11.1,0,22.2)
+[node name="BoardGames" parent="." instance=ExtResource("8_board")]
+position = Vector3(3.8,0,24.4)
+[node name="Bookcase" parent="." instance=ExtResource("9_books")]
+position = Vector3(0.4,0,24.4)
+rotation = Vector3(0,-1.570796,0)
+[node name="Beanbag" parent="." instance=ExtResource("10_beanbag")]
+position = Vector3(5.3,0,22.0)
+rotation = Vector3(0,3.141593,0)
+[node name="TeaStation" parent="." instance=ExtResource("11_tea")]
+position = Vector3(10.6,0,26.0)
+[node name="Jukebox" parent="." instance=ExtResource("12_music")]
+position = Vector3(14.2,0,19.6)
+rotation = Vector3(0,1.570796,0)
+[node name="Aquarium" parent="." instance=ExtResource("13_aquarium")]
+position = Vector3(0.7,0,20.0)
+rotation = Vector3(0,-1.570796,0)
+[node name="Plant" parent="." instance=ExtResource("14_plant")]
+position = Vector3(0.8,0,14.9)
+[node name="FloorLamp" parent="." instance=ExtResource("15_lamp")]
+position = Vector3(1.3,0,23.2)
+[node name="SnackFridge" parent="." instance=ExtResource("16_fridge")]
+position = Vector3(13.9,0,26.05)
+[node name="ChefBed" parent="." instance=ExtResource("1_bed")]
+position = Vector3(7.5,0,29.1)
+[node name="CeilingLights" parent="." instance=ExtResource("18_lights")]
+[node name="EntranceAnchor" type="Marker3D" parent="."]
+position = Vector3(5.0,0,14.85)
+[node name="MainAisleAnchor" type="Marker3D" parent="."]
+position = Vector3(5.0,0,22.2)

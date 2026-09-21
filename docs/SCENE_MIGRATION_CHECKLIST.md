@@ -115,7 +115,7 @@
 - [x] Garland reel — `scenes/decor/garland_reel.tscn`
 
 ## Комната отдыха
-- [ ] Staff lounge authored room
+- [x] Staff lounge authored room — `scenes/lounge/staff_lounge.tscn`
 - [x] Chef bed — `scenes/lounge/chef_bed.tscn`
 - [x] Sofa — `scenes/lounge/sofa.tscn`
 - [x] Coffee table — `scenes/lounge/coffee_table.tscn`
