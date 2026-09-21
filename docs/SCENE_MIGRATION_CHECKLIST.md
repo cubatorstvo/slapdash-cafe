@@ -84,7 +84,7 @@
 ## Готовая еда / подача
 - [x] Wine serving — `scenes/food/wine_serving.tscn`
 - [x] Fried potato serving — `scenes/food/fried_potato_serving.tscn`
-- [ ] Sausage serving
+- [x] Sausage serving — `scenes/food/sausage_serving.tscn`
 - [ ] Steak & pasta serving
 - [ ] Burger serving
 - [ ] Cheeseburger serving
