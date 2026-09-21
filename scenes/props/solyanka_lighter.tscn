@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.847059,0.360784,0.278431,1)
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.776471,0.752941,0.658824,1)
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+[sub_resource type="BoxShape3D" id="Shape_lighter"]
+size = Vector3(0.14,0.32,0.08)
+
+[node name="SolyankaLighter" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0,0.16,0)
+shape = SubResource("Shape_lighter")
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.13,0)
+scale = Vector3(0.14,0.26,0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_body")
+[node name="Top" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.29,0)
+scale = Vector3(0.10,0.06,0.07)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.15,0)
+[node name="FlameAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.34,0)

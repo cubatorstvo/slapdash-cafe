@@ -59,7 +59,7 @@
 
 ## Solyanka props
 - [x] Cauldron — `scenes/props/solyanka_cauldron.tscn`
-- [ ] Lighter
+- [x] Lighter — `scenes/props/solyanka_lighter.tscn`
 - [ ] Stirring paddle
 - [ ] Solyanka salt
 - [ ] Mug
