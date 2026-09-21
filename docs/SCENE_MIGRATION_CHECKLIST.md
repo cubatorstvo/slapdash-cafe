@@ -89,7 +89,7 @@
 - [x] Burger serving — `scenes/food/burger_serving.tscn`
 - [x] Cheeseburger serving — `scenes/food/cheeseburger_serving.tscn`
 - [x] Spicy burger serving — `scenes/food/spicy_burger_serving.tscn`
-- [ ] Solyanka serving
+- [x] Solyanka serving — `scenes/food/solyanka_serving.tscn`
 
 ## Основное кафе
 - [ ] Authored cafe world / stage roots
