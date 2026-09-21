@@ -1,0 +1,58 @@
+[gd_scene load_steps=2 format=3]
+[sub_resource type="StyleBoxFlat" id="Panel"]
+bg_color = Color(0.090196,0.180392,0.188235,0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.8,0.72,0.5,0.18)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+
+[node name="ShopPanels" type="PanelContainer"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_styles/panel = SubResource("Panel")
+[node name="Column" type="VBoxContainer" parent="."]
+theme_override_constants/separation = 12
+[node name="Categories" type="HFlowContainer" parent="Column"]
+theme_override_constants/h_separation = 6
+[node name="Equipment" type="Button" parent="Column/Categories"]
+text = "Оснащение"
+[node name="Tables" type="Button" parent="Column/Categories"]
+text = "Новые столы"
+[node name="Rooms" type="Button" parent="Column/Categories"]
+text = "Расширения"
+[node name="Lab" type="Button" parent="Column/Categories"]
+text = "Лаборатория"
+[node name="Lounge" type="Button" parent="Column/Categories"]
+text = "Мебель"
+[node name="Decor" type="Button" parent="Column/Categories"]
+text = "Декор"
+[node name="Heading" type="Label" parent="Column"]
+theme_override_font_sizes/font_size = 21
+text = "Оснащение стола"
+[node name="StationPicker" type="OptionButton" parent="Column"]
+custom_minimum_size = Vector2(0,42)
+[node name="ProductCard" type="PanelContainer" parent="Column"]
+theme_override_styles/panel = SubResource("Panel")
+[node name="Row" type="HBoxContainer" parent="Column/ProductCard"]
+theme_override_constants/separation = 12
+[node name="Name" type="Label" parent="Column/ProductCard/Row"]
+size_flags_horizontal = 3
+text = "Оборудование"
+[node name="State" type="Label" parent="Column/ProductCard/Row"]
+custom_minimum_size = Vector2(205,0)
+text = "Не установлено"
+[node name="Buy" type="Button" parent="Column/ProductCard/Row"]
+custom_minimum_size = Vector2(155,40)
+text = "Купить"
+[node name="Deliveries" type="Label" parent="Column"]
+theme_override_font_sizes/font_size = 18
+text = "ДОСТАВКИ"
