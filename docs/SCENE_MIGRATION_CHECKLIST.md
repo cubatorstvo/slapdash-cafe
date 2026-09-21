@@ -120,7 +120,7 @@
 - [x] Sofa — `scenes/lounge/sofa.tscn`
 - [x] Coffee table — `scenes/lounge/coffee_table.tscn`
 - [x] Television + cabinet — `scenes/lounge/television_cabinet.tscn`
-- [ ] Rocking chair
+- [x] Rocking chair — `scenes/lounge/rocking_chair.tscn`
 - [ ] Foosball
 - [ ] Arcade machine
 - [ ] Table tennis
