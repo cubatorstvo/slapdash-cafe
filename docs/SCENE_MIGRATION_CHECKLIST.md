@@ -129,7 +129,7 @@
 - [x] Beanbag — `scenes/lounge/beanbag.tscn`
 - [x] Tea station — `scenes/lounge/tea_station.tscn`
 - [x] Jukebox — `scenes/lounge/jukebox.tscn`
-- [ ] Aquarium
+- [x] Aquarium — `scenes/lounge/aquarium.tscn`
 - [ ] Lounge plant
 - [ ] Floor lamp
 - [ ] Snack fridge
