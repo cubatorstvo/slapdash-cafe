@@ -8,7 +8,7 @@
 - [x] Player — `scenes/actors/player.tscn`
 - [x] Customer / taster — `scenes/actors/customer.tscn`
 - [ ] Cook / clone avatar
-- [ ] Cook notebook + pencil
+- [x] Cook notebook + pencil — `scenes/props/cook_notebook.tscn`
 - [ ] Delivery installer
 - [ ] Growing clone / sprout variant
 - [ ] Remote multiplayer player visual
