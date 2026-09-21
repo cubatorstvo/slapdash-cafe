@@ -146,7 +146,7 @@
 - [x] Initial switches / start button — `scenes/lab/initial_controls.tscn`
 - [x] Cable reel — `scenes/lab/cable_reel.tscn`
 - [x] Formula stabilizer / research apparatus — `scenes/lab/formula_stabilizer.tscn`
-- [ ] Sample holder
+- [x] Sample holder — `scenes/lab/sample_holder.tscn`
 - [ ] Microscope
 - [ ] Tool shelf
 - [ ] Pot rack / grow shelf
