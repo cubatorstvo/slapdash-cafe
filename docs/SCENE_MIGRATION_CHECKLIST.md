@@ -138,7 +138,7 @@
 - [x] Lounge ceiling / decorative lights — `scenes/lounge/lounge_ceiling_lights.tscn`
 
 ## Лаборатория — помещение и базовая установка
-- [ ] Laboratory authored room
+- [x] Laboratory authored room — `scenes/lab/laboratory_room.tscn`
 - [x] Initial assembly bench — `scenes/lab/assembly_bench.tscn`
 - [x] Initial lab module 1 — `scenes/lab/initial_module_1.tscn`
 - [x] Initial lab module 2 — `scenes/lab/initial_module_2.tscn`
@@ -152,49 +152,49 @@
 - [x] Pot rack / grow shelf — `scenes/lab/pot_rack.tscn`
 
 ## Лаборатория — выращивание
-- [ ] Clone pot
-- [ ] Grow lamp
-- [ ] Auto feeder
-- [ ] Irrigation tank
-- [ ] Planter
-- [ ] Extractor
-- [ ] Nutrient dispenser
-- [ ] Climate unit
-- [ ] Production controller
-- [ ] Extra rack section
-- [ ] Soil scoop
-- [ ] Formula/sample pipette
-- [ ] Watering tool
-- [ ] Fertilizer tool
+- [x] Clone pot — `scenes/lab/clone_pot.tscn`
+- [x] Grow lamp — `scenes/lab/grow_lamp.tscn`
+- [x] Auto feeder — `scenes/lab/auto_feeder.tscn`
+- [x] Irrigation tank — `scenes/lab/irrigation_tank.tscn`
+- [x] Planter — `scenes/lab/planter.tscn`
+- [x] Extractor — `scenes/lab/extractor.tscn`
+- [x] Nutrient dispenser — `scenes/lab/nutrient_dispenser.tscn`
+- [x] Climate unit — `scenes/lab/climate_unit.tscn`
+- [x] Production controller — `scenes/lab/production_controller.tscn`
+- [x] Extra rack section — `scenes/lab/extra_rack_section.tscn`
+- [x] Soil scoop — `scenes/lab/soil_scoop.tscn`
+- [x] Formula/sample pipette — `scenes/lab/formula_pipette.tscn`
+- [x] Watering tool — `scenes/lab/watering_tool.tscn`
+- [x] Fertilizer tool — `scenes/lab/fertilizer_tool.tscn`
 
 ## Лаборатория — формула и рекалибровка
-- [ ] Formula power amplifier
-- [ ] Formula turbo block
-- [ ] Formula synthesizer
-- [ ] Precision valve
-- [ ] Damper
-- [ ] Recalibration chair
-- [ ] Focus synchronizer
-- [ ] Slow-pulse module
-- [ ] Auto recalibration module
-- [ ] Chair speed module
+- [x] Formula power amplifier — `scenes/lab/formula_power_amplifier.tscn`
+- [x] Formula turbo block — `scenes/lab/formula_turbo_block.tscn`
+- [x] Formula synthesizer — `scenes/lab/formula_synthesizer.tscn`
+- [x] Precision valve — `scenes/lab/precision_valve.tscn`
+- [x] Damper — `scenes/lab/damper.tscn`
+- [x] Recalibration chair — `scenes/lab/recalibration_chair.tscn`
+- [x] Focus synchronizer — `scenes/lab/focus_synchronizer.tscn`
+- [x] Slow-pulse module — `scenes/lab/slow_pulse_module.tscn`
+- [x] Auto recalibration module — `scenes/lab/auto_recalibration_module.tscn`
+- [x] Chair speed module — `scenes/lab/chair_speed_module.tscn`
 
 ## Мастер-классы / презентация
-- [ ] Masterclass camera rig
-- [ ] Physical cookbook
-- [ ] Presentation accessory anchors
+- [x] Masterclass camera rig — `scenes/presentation/masterclass_camera_rig.tscn`
+- [x] Physical cookbook — `scenes/presentation/physical_cookbook.tscn`
+- [x] Presentation accessory anchors — `scenes/presentation/presentation_accessory_anchors.tscn`
 
 ## UI scenes
-- [ ] Cafe HUD
-- [ ] Main / pause menu
-- [ ] Cafe office
-- [ ] Cookbook UI
-- [ ] Training / course editor
-- [ ] Shop panels
-- [ ] Statistics panels
-- [ ] Development panels
-- [ ] Laboratory panels
-- [ ] Staff lounge panels
+- [x] Cafe HUD — `scenes/ui/cafe_hud.tscn`
+- [x] Main / pause menu — `scenes/ui/main_pause_menu.tscn`
+- [x] Cafe office — `scenes/ui/cafe_office.tscn`
+- [x] Cookbook UI — `scenes/ui/cookbook_ui.tscn`
+- [x] Training / course editor — `scenes/ui/training_course_editor.tscn`
+- [x] Shop panels — `scenes/ui/shop_panels.tscn`
+- [x] Statistics panels — `scenes/ui/statistics_panels.tscn`
+- [x] Development panels — `scenes/ui/development_panels.tscn`
+- [x] Laboratory panels — `scenes/ui/laboratory_panels.tscn`
+- [x] Staff lounge panels — `scenes/ui/staff_lounge_panels.tscn`
 
 ## Остаётся программным
 Динамические эффекты и служебная визуализация: струи и проливы жидкостей, брызги, огонь/частицы, target/grip rings, training bounds, placement ghost/beacon, маршруты, летящая еда при поедании, runtime-позы рук, прокладываемый игроком кабель, динамические Label3D и числовые индикаторы.
