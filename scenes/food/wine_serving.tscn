@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/props/plate.tscn" id="1_plate"]
+[ext_resource type="PackedScene" path="res://scenes/props/wine_cup.tscn" id="2_cup"]
+
+[node name="WineServing" type="Node3D"]
+[node name="Plate" parent="." instance=ExtResource("1_plate")]
+scale = Vector3(0.72,0.72,0.72)
+[node name="Cup" parent="." instance=ExtResource("2_cup")]
+position = Vector3(0,0.06,0)
+scale = Vector3(0.88,0.88,0.88)
+[node name="PickupAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.18,0)

@@ -82,7 +82,7 @@
 - [x] Bolt — `scenes/props/solyanka_bolt.tscn`
 
 ## Готовая еда / подача
-- [ ] Wine serving
+- [x] Wine serving — `scenes/food/wine_serving.tscn`
 - [ ] Fried potato serving
 - [ ] Sausage serving
 - [ ] Steak & pasta serving
