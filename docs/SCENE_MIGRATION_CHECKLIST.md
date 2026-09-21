@@ -102,7 +102,7 @@
 - [x] Rear spine / annex transition — `scenes/cafe/rear_spine.tscn`
 - [x] Expansion partition — `scenes/cafe/expansion_partition.tscn`
 - [x] Automatic sliding door — `scenes/cafe/automatic_sliding_door.tscn`
-- [ ] Cafe signs / room signs / zone signs
+- [x] Cafe signs / room signs / zone signs — `scenes/cafe/cafe_signs.tscn`
 
 ## Постоянный декор кафе
 - [ ] “Мы почти умеем” sign
