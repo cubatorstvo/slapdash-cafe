@@ -66,7 +66,7 @@
 - [x] Potato — `scenes/props/solyanka_potato.tscn`
 - [x] Onion — `scenes/props/solyanka_onion.tscn`
 - [x] Tomato — `scenes/props/solyanka_tomato.tscn`
-- [ ] Carrot
+- [x] Carrot — `scenes/props/solyanka_carrot.tscn`
 - [ ] Garlic
 - [ ] Cabbage
 - [ ] Cucumber

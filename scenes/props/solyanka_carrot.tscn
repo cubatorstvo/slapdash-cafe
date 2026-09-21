@@ -1,0 +1,37 @@
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_carrot"]
+albedo_color = Color(0.843137,0.498039,0.270588,1)
+[sub_resource type="StandardMaterial3D" id="Mat_leaf"]
+albedo_color = Color(0.352941,0.552941,0.301961,1)
+[sub_resource type="CylinderMesh" id="Mesh_cylinder"]
+top_radius = 0.40
+bottom_radius = 0.10
+height = 1.0
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1,1,1)
+
+[node name="SolyankaCarrot" type="RigidBody3D"]
+freeze = true
+collision_layer = 4
+collision_mask = 1
+[node name="Root" type="MeshInstance3D" parent="."]
+position = Vector3(0,0.18,0)
+rotation = Vector3(0,0,1.570796)
+scale = Vector3(0.18,0.38,0.18)
+mesh = SubResource("Mesh_cylinder")
+material_override = SubResource("Mat_carrot")
+[node name="Leaf1" type="MeshInstance3D" parent="."]
+position = Vector3(0.21,0.18,0)
+rotation = Vector3(0,0,-0.35)
+scale = Vector3(0.04,0.18,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_leaf")
+[node name="Leaf2" type="MeshInstance3D" parent="."]
+position = Vector3(0.21,0.18,0.04)
+rotation = Vector3(0,0,0.25)
+scale = Vector3(0.04,0.16,0.025)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_leaf")
+[node name="GripAnchor" type="Marker3D" parent="."]
+position = Vector3(0,0.20,0)
