@@ -6,7 +6,7 @@
 
 ## Персонажи
 - [x] Player — `scenes/actors/player.tscn`
-- [ ] Customer / taster
+- [x] Customer / taster — `scenes/actors/customer.tscn`
 - [ ] Cook / clone avatar
 - [ ] Cook notebook + pencil
 - [ ] Delivery installer
