@@ -11,6 +11,7 @@ const PAN_HANDLE_BOUNDS := AABB(Vector3(-0.08, -0.02, 0.60), Vector3(0.16, 0.09,
 const POTATO_CONTACT_HALF_EXTENTS := Vector3(0.24, 0.17, 0.18)
 const SAUSAGE_CONTACT_RADIUS := 0.10
 const SAUSAGE_HALF_LENGTH := 0.38
+const SAUSAGE_SEGMENT_BASE_ANGLES := [1.43, 1.570796, 1.71]
 var potato_nodes: Array = []
 var potato_bodies: Array = []
 var potato_patches: Array = []
@@ -94,7 +95,7 @@ func _bend_sausage(index: int, phase: float, amplitude: float) -> void:
 		var node := segments[part] as MeshInstance3D
 		node.position.y = sin(phase + part * 0.9) * amplitude
 		node.position.z = cos(phase * 0.7 + part * 0.8) * amplitude
-		node.rotation.z = sin(phase + part) * amplitude * 1.8
+		node.rotation.z = float(SAUSAGE_SEGMENT_BASE_ANGLES[part]) + sin(phase + part) * amplitude * 1.8
 
 func update_view(model) -> void:
 	potato_set.visible = true
