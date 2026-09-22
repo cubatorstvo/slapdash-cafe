@@ -144,57 +144,53 @@ scale = Vector3(0.92, 0.08, 0.035)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_accent")
 
-[node name="ServingTray" type="Node3D" parent="."]
+[node name="ServingTray" type="MeshInstance3D" parent="."]
 position = Vector3(1.35, 1.03, -0.15)
-
-[node name="Base" type="MeshInstance3D" parent="ServingTray"]
 scale = Vector3(1.16, 0.035, 1.54)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
 [node name="RimFront" type="MeshInstance3D" parent="ServingTray"]
-position = Vector3(0, 0.055, 0.75)
-scale = Vector3(1.16, 0.08, 0.04)
+position = Vector3(0, 1.571429, 0.487013)
+scale = Vector3(1, 2.285714, 0.025974)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
 [node name="RimBack" type="MeshInstance3D" parent="ServingTray"]
-position = Vector3(0, 0.055, -0.75)
-scale = Vector3(1.16, 0.08, 0.04)
+position = Vector3(0, 1.571429, -0.487013)
+scale = Vector3(1, 2.285714, 0.025974)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
 [node name="RimLeft" type="MeshInstance3D" parent="ServingTray"]
-position = Vector3(-0.56, 0.055, 0)
-scale = Vector3(0.04, 0.08, 1.46)
+position = Vector3(-0.482759, 1.571429, 0)
+scale = Vector3(0.034483, 2.285714, 0.948052)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
 [node name="RimRight" type="MeshInstance3D" parent="ServingTray"]
-position = Vector3(0.56, 0.055, 0)
-scale = Vector3(0.04, 0.08, 1.46)
+position = Vector3(0.482759, 1.571429, 0)
+scale = Vector3(0.034483, 2.285714, 0.948052)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
-[node name="CrockeryShelf" type="Node3D" parent="."]
+[node name="CrockeryShelf" type="MeshInstance3D" parent="."]
 position = Vector3(1.5, 0.365, 1.35)
-
-[node name="Shelf" type="MeshInstance3D" parent="CrockeryShelf"]
 scale = Vector3(1.3, 0.07, 0.66)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_shelf")
 
 [node name="LeftBracket" type="MeshInstance3D" parent="CrockeryShelf"]
-position = Vector3(-0.54, -0.16, 0)
+position = Vector3(-0.415385, -2.285714, 0)
 rotation = Vector3(0, 0, -0.35)
-scale = Vector3(0.07, 0.38, 0.08)
+scale = Vector3(0.053846, 5.428571, 0.121212)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_metal")
 
 [node name="RightBracket" type="MeshInstance3D" parent="CrockeryShelf"]
-position = Vector3(0.54, -0.16, 0)
+position = Vector3(0.415385, -2.285714, 0)
 rotation = Vector3(0, 0, 0.35)
-scale = Vector3(0.07, 0.38, 0.08)
+scale = Vector3(0.053846, 5.428571, 0.121212)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_metal")
 
