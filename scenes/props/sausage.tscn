@@ -1,34 +1,41 @@
-[gd_scene load_steps=5 format=3]
-[sub_resource type="StandardMaterial3D" id="Mat_skin"]
-albedo_color = Color(0.803922,0.533333,0.411765,1)
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="Shader" id="Shader_skin"]
+code = "shader_type spatial;\nuniform vec4 base_color : source_color = vec4(0.803922, 0.533333, 0.411765, 1.0);\nuniform float bend_phase = 0.0;\nuniform float bend_amplitude = 0.018;\nvoid vertex() {\n\tfloat along = clamp((VERTEX.y + 0.32) / 0.64, 0.0, 1.0);\n\tVERTEX.x -= sin(bend_phase + along * 5.0) * bend_amplitude;\n\tVERTEX.z += cos(bend_phase * 0.7 + along * 5.0) * bend_amplitude;\n}\nvoid fragment() {\n\tALBEDO = base_color.rgb;\n\tROUGHNESS = 0.68;\n}"
+
+[sub_resource type="ShaderMaterial" id="Mat_skin"]
+shader = SubResource("Shader_skin")
+shader_parameter/base_color = Color(0.803922,0.533333,0.411765,1)
+shader_parameter/bend_phase = 0.0
+shader_parameter/bend_amplitude = 0.018
+
 [sub_resource type="CapsuleMesh" id="Mesh_capsule"]
 radius = 0.075
-height = 0.34
+height = 0.64
+radial_segments = 16
+rings = 8
+
 [sub_resource type="CapsuleShape3D" id="Shape_capsule"]
 radius = 0.075
 height = 0.64
+
 [sub_resource type="StandardMaterial3D" id="Mat_tip"]
 albedo_color = Color(0.737255,0.443137,0.345098,1)
+
 [node name="Sausage" type="RigidBody3D"]
 freeze = true
 collision_layer = 4
 collision_mask = 1
+
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 rotation = Vector3(0,0,1.570796)
 shape = SubResource("Shape_capsule")
-[node name="LeftSegment" type="MeshInstance3D" parent="."]
-position = Vector3(-0.20,0,0.018)
-rotation = Vector3(0,0,1.43)
-mesh = SubResource("Mesh_capsule")
-material_override = SubResource("Mat_skin")
-[node name="CenterSegment" type="MeshInstance3D" parent="."]
+
+[node name="Skin" type="MeshInstance3D" parent="."]
 rotation = Vector3(0,0,1.570796)
 mesh = SubResource("Mesh_capsule")
 material_override = SubResource("Mat_skin")
-[node name="RightSegment" type="MeshInstance3D" parent="."]
-position = Vector3(0.20,0,-0.018)
-rotation = Vector3(0,0,1.71)
-mesh = SubResource("Mesh_capsule")
-material_override = SubResource("Mat_skin")
+custom_aabb = AABB(-0.12,-0.40,-0.12,0.24,0.80,0.24)
+
 [node name="GripAnchor" type="Marker3D" parent="."]
 position = Vector3(0,0.10,0)

@@ -65,6 +65,10 @@ func run() -> void:
 
 	model.reset("sausage")
 	kitchen.update_view(model)
+	var authored_sausage := kitchen.sausage_bodies[0] as Node3D
+	var sausage_meshes := authored_sausage.find_children("*", "MeshInstance3D", true, false)
+	check(sausage_meshes.size() == 1, "Sausage scene uses one continuous visible mesh")
+	check(authored_sausage.get_node_or_null("Skin") != null, "Sausage continuous mesh is authored as Skin in sausage.tscn")
 	var sausage_holder := kitchen.sausage_nodes[0] as Node3D
 	var sausage_surface := Model.food_surface("sausage", model.sausages[0].sausage)
 	var sausage_bottom := sausage_holder.position.y + mesh_min_y(sausage_holder)
