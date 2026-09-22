@@ -89,11 +89,8 @@ static func delivery_position(stage: int,id: int)->Vector3:
 	var col:=posmod(id,3)
 	return Vector3(-3.15+col*0.72,0.25,entrance_z(stage)+1.05+row*0.72)
 
-static func installer_spawn(stage: int,id: int)->Vector3:
-	return Vector3(-3.7,0.0,entrance_z(stage)+0.65+float(posmod(id,4))*0.30)
-
-static func installer_exit(stage: int,id: int)->Vector3:
-	return Vector3(-4.9,0.0,entrance_z(stage)-0.55+float(posmod(id,4))*0.28)
+static func delivery_vehicle_spawn(stage: int)->Vector3:
+	return Vector3(-3.7,0.0,entrance_z(stage)+0.65)
 
 static func zone_for_slot(slot_index: int)->String:
 	if slot_index==0: return "Шеф"
@@ -212,7 +209,7 @@ static func route_to_exit(start: Vector3,stage: int)->Array:
 
 static func _court_approach(point: Vector3)->Array:
 	var result:=_court_entry(point)
-	# Staff and installers approach from the back. Go around a table end before crossing
+	# Staff and delivery runners approach from the back. Go around a table end before crossing
 	# between its public and working sides; all models fit the same reserved slot.
 	var nearest:=-1
 	var distance:=INF

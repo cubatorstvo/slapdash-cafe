@@ -79,7 +79,6 @@ var starter_reward := false
 var training_intro_mass_seen := false
 var deliveries: Array = []
 var delivery_history: Array = []
-var installer_jobs: Array = []
 var next_delivery_id := 1
 var garland_owned := false
 var lounge_tier := 0
@@ -261,7 +260,7 @@ func objective(stations: Array, served: int, opened: bool) -> String:
 
 func snapshot() -> Dictionary:
 	var data := {}
-	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "fifth_star_auto_served", "fifth_star_solyanka_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "training_intro_mass_seen", "deliveries", "delivery_history", "installer_jobs", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "orchestration_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
+	for key in ["journey_auto_served", "journey_meals_served", "third_star_auto_served", "fourth_star_auto_served", "fourth_star_specialty_served", "fifth_star_auto_served", "fifth_star_solyanka_served", "visit", "visit_serial", "visit_next_day", "visit_next_kind", "lab_tier", "lab_formula_tempo", "lab_formula_version", "lab_sample", "lab_sample_serial", "lab_pots", "lab_production", "lab_calibration", "lab_auto_calibration", "lounge_tier", "lounge_items", "lounge_upgrades", "rest_multiplier", "rest_report", "night_elapsed", "free_workers", "next_clone_id", "lab_upgrades", "free_clones", "starter_reward", "training_intro_mass_seen", "deliveries", "delivery_history", "next_delivery_id", "garland_owned", "day", "shift", "shift_elapsed", "manual_served", "lab_stage", "lab_step", "tasting_done", "tutorial_served", "garland_points", "garland_builder", "garland_complete", "cash", "popularity", "stars", "decorations", "expanded", "specialized_expanded", "orchestration_expanded", "demand", "phase", "remaining", "banquet_spawned", "banquet_finished", "banquet_served", "banquet_good", "showcase_grade", "orders", "result", "return_open", "event_peer", "revision"]: data[key] = get(key)
 	return data.duplicate(true)
 
 func restore(data: Dictionary, resume_event := false) -> void:
@@ -278,56 +277,18 @@ func restore(data: Dictionary, resume_event := false) -> void:
 
 func recover_deliveries() -> void:
 	for parcel in deliveries:
-		parcel.owner = 0
-	var normalized: Array=[]
-	var known: Array=[]
-	for raw_job in installer_jobs:
-		if not raw_job is Dictionary: continue
-		var job: Dictionary=raw_job.duplicate(true)
-		var id: int=int(job.get("id",job.get("delivery_id",0)))
-		var delivery_id: int=int(job.get("delivery_id",id))
-		if id<=0 or delivery_id<=0 or id in known: continue
-		job.id=id
-		job.delivery_id=delivery_id
-		job.phase=str(job.get("phase","waiting_delivery"))
-		if job.phase not in ["waiting_delivery","approaching_box","carrying","waiting","installing","leaving","finished"]: job.phase="waiting_delivery"
-		var raw_position: Array=job.get("position",[])
-		if raw_position.size()!=3: raw_position=[0.0,0.0,0.0]
-		job.position=[float(raw_position[0]),0.0,float(raw_position[2])]
-		job.yaw=float(job.get("yaw",0.0))
-		job.variant=posmod(int(job.get("variant",id)),4)
-		job.phase_age=maxf(0.0,float(job.get("phase_age",0.0)))
-		job.installed=bool(job.get("installed",false))
-		job.blocked_path=bool(job.get("blocked_path",false))
-		job.erase("path")
-		job.erase("path_phase")
-		normalized.append(job)
-		known.append(id)
-	installer_jobs=normalized
-	for parcel in deliveries:
-		if not bool(parcel.get("installer",false)): continue
-		var id: int=int(parcel.get("id",0))
-		if id<=0 or id in known: continue
-		var legacy_phase: String=str(parcel.get("installer_state","waiting_delivery"))
-		var phase: String="waiting_delivery"
-		if legacy_phase=="walking": phase="carrying"
-		elif legacy_phase=="waiting": phase="waiting"
-		elif legacy_phase=="installing": phase="installing"
-		var raw: Array=parcel.get("installer_position",parcel.get("position",[0.0,0.0,0.0]))
-		var position: Array=[float(raw[0]),0.0,float(raw[2])] if raw.size()==3 else [0.0,0.0,0.0]
-		installer_jobs.append({"id":id,"delivery_id":id,"phase":phase,"position":position,"yaw":0.0,"variant":posmod(int(parcel.get("installer_variant",id)),4),"phase_age":maxf(0.0,float(parcel.get("installer_age",0.0))),"installed":false,"blocked_path":false,"assignment":{"item":str(parcel.get("item","")),"items":parcel.get("items",[]).duplicate(),"station":int(parcel.get("station",0))}})
-		known.append(id)
-	for job in installer_jobs:
-		if bool(job.get("installed",false)): continue
-		var exists: bool=false
-		for parcel in deliveries:
-			if int(parcel.get("id",0))==int(job.get("delivery_id",0)): exists=true; break
-		if not exists:
-			for history in delivery_history:
-				if int(history.get("id",0))==int(job.get("delivery_id",0)) and bool(history.get("installer",false)):
-					job.installed=true
-					job.phase="leaving"
-					job.phase_age=0.0
-					break
-	if garland_complete: garland_owned = true
-	garland_builder = 0
+		parcel.owner=0
+		# Old saves may still contain courier metadata. Deliveries themselves survive;
+		# the current runtime decides whether assigned clones or the player installs them.
+		for key in ["installer","installer_state","installer_position","installer_age","installer_variant"]: parcel.erase(key)
+		var phase:=str(parcel.get("worker_phase",""))
+		if phase not in ["","approaching_box","carrying","installing"]: phase=""
+		parcel.worker_phase=phase
+		parcel.worker_role=int(parcel.get("worker_role",-1))
+		parcel.worker_age=maxf(0.0,float(parcel.get("worker_age",0.0)))
+		parcel.worker_yaw=float(parcel.get("worker_yaw",0.0))
+		var raw: Array=parcel.get("worker_position",parcel.get("position",[0.0,0.0,0.0]))
+		parcel.worker_position=[float(raw[0]),0.0,float(raw[2])] if raw.size()==3 else [0.0,0.0,0.0]
+		for key in ["worker_path","worker_path_index","worker_path_target","worker_path_phase"]: parcel.erase(key)
+	if garland_complete: garland_owned=true
+	garland_builder=0

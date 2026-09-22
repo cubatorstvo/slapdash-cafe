@@ -70,23 +70,23 @@ func run() -> void:
 	office.navigate("videos")
 	await settle()
 	inspect(office.panel,"record-details")
-	var parcel: Dictionary={"id":998,"item":"pan","items":["pan","cup"],"station":1,"remaining":8.0,"position":[0.0,0.3,0.0],"owner":0,"installer":true,"installer_state":"waiting_delivery"}
+	var parcel: Dictionary={"id":998,"item":"sauce_ramp","items":["sauce_ramp"],"station":2,"remaining":8.0,"position":[0.0,0.3,0.0],"owner":0,"worker_phase":"","worker_role":-1,"worker_position":[0.0,0.0,0.0]}
 	p.deliveries.append(parcel)
-	check(not office._item_parcel("cup",1).is_empty(),"bundle item matches parcel")
+	check(not office._item_parcel("sauce_ramp",2).is_empty(),"bundle item matches parcel")
 	check(office._parcel_status(parcel)=="Доставляется","transit state")
 	parcel.remaining=0
-	check(office._parcel_status(parcel)=="Ожидает установки","waiting state")
-	p.installer_jobs.append({"id":998,"delivery_id":998,"phase":"installing"})
-	check(office._parcel_status(parcel)=="Устанавливается","install state")
-	office.shop_station_id=1
+	parcel.worker_phase="carrying"
+	check(office._parcel_status(parcel)=="Работники бегут за коробкой","worker carry state")
+	parcel.worker_phase="installing"
+	check(office._parcel_status(parcel)=="Работники устанавливают","worker install state")
+	office.shop_station_id=2
 	office.open_shop("equipment")
 	await settle()
 	var old_content: Node=office.content.get_child(0)
-	p.installer_jobs.back().phase="waiting"
+	parcel.worker_phase="carrying"
 	office._refresh_delivery_labels()
 	check(is_instance_valid(old_content) and old_content==office.content.get_child(0),"status update preserves controls")
 	p.deliveries.erase(parcel)
-	p.installer_jobs.clear()
 	print("PC_UI_REVIEW ","PASS" if failures.is_empty() else str(failures))
 	game.queue_free()
 	await process_frame

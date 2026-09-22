@@ -382,7 +382,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		return
 	if sleep_scene_active(): return
 	if sleeping_peers.has(sender) and action!="wake": return
-	if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor","installer_owned_parcel"]:
+	if action in ["take_parcel","drop_parcel","install_parcel","unpack_garland","garland_remove","garland_anchor","worker_owned_parcel"]:
 		var error: String = game.shop.action(sender,value)
 		if not error.is_empty(): message_to(sender,error)
 		else: game.save_cafe()
@@ -492,10 +492,10 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		var error := ""
 		match action:
 			"buy_station_batch":
-				if value.get("stations",[]) is Array and value.get("equipment",[]) is Array: error=game.shop.order_station_batch(str(value.get("type","")),value.stations,value.equipment,str(value.get("group","")),bool(value.get("installers",false)))
+				if value.get("stations",[]) is Array and value.get("equipment",[]) is Array: error=game.shop.order_station_batch(str(value.get("type","")),value.stations,value.equipment,str(value.get("group","")))
 			"buy_bundle":
-				if value.get("items") is Array: error=game.shop.order_bundle(value.items,int(value.get("station",0)),bool(value.get("installers",false)))
-			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)),bool(value.get("installers",false)))
+				if value.get("items") is Array: error=game.shop.order_bundle(value.items,int(value.get("station",0)))
+			"buy": error = game.service.purchase(str(value.get("kind", "")), str(value.get("item", "")), int(value.get("station", 0)))
 			"banquet": error = game.service.start_banquet(sender)
 			"cancel_banquet": game.service.finish_banquet(false, "Проверка прервана.")
 			"save":
