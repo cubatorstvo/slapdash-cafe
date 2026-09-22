@@ -33,6 +33,7 @@ const REST_DOOR_CAFE := Vector3(REST_DOOR_X, 0.0, 13.15)
 const REST_DOOR_ROOM := Vector3(REST_DOOR_X, 0.0, 14.85)
 const REST_AREA := (REST_X_MAX - REST_X_MIN) * (REST_BACK_Z - CAFE_BACK_Z)
 const PLAYER_BED_COUNT := 1
+const STARTER_BED := Vector3(2.15, 0.2, 13.12)
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 
 var game: Node3D
@@ -47,17 +48,23 @@ static func place_lab(node: Node3D) -> void:
 	node.position = LAB_ORIGIN
 	node.rotation.y = LAB_ROTATION_Y
 
-static func player_bed_center(_index: int, tier := 0) -> Vector3:
+static func play_stage(p) -> int:
+	return Expansion.stage_for_progress(p)
+
+static func player_bed_center(_index: int, tier := 0, stage := 2) -> Vector3:
+	if stage<2: return STARTER_BED
 	return LoungeLayout.bed_center(tier)
 
-static func player_sleep_position(layer: int, tier := 0) -> Vector3:
-	return player_bed_center(0,tier)+Vector3(-0.95,0.20+layer*0.34,0)
+static func player_sleep_position(layer: int, tier := 0, stage := 2) -> Vector3:
+	if stage<2: return Vector3(STARTER_BED.x,0.05,STARTER_BED.z)
+	return player_bed_center(0,tier,stage)+Vector3(-0.95,0.20+layer*0.34,0)
 
 static func player_sleep_yaw(_index: int) -> float:
 	return 0.0
 
-static func player_bed_exit(layer: int, tier := 0) -> Vector3:
-	var center := player_bed_center(0,tier)
+static func player_bed_exit(layer: int, tier := 0, stage := 2) -> Vector3:
+	if stage<2: return Vector3(STARTER_BED.x,0.02,STARTER_BED.z-1.45)
+	var center := player_bed_center(0,tier,stage)
 	return Vector3(center.x+(layer-1.5)*0.55,0.02,center.z-1.6)
 
 static func rest_spot(index: int) -> Dictionary:
@@ -121,6 +128,8 @@ static func build_shell(owner_game: Node3D) -> void:
 		rest_sign.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		rest_sign.pixel_size = 0.005
 		_build_rest_furniture(parent,owner_game,tier,p)
+	else:
+		_build_starter_bed(parent)
 	for spec in [[Vector3((lab_left+LAB_X_MAX)*0.5,3.25,CAFE_BACK_Z+2.75),Color("b7e0cb")]]:
 		var light := SceneRuntime.instantiate("res://scenes/runtime/omni_light.tscn") as OmniLight3D
 		parent.add_child(light)
@@ -163,6 +172,12 @@ static func _build_cafe_back_wall(parent: Node3D, color: Color, building_stage: 
 		Props.solid_box(parent,Vector3(DOOR_WIDTH,lintel_height,WALL_THICKNESS),Vector3(door_x,DOOR_HEIGHT+lintel_height*0.5-0.05,CAFE_BACK_Z),color)
 		for side in [-1.0,1.0]:
 			Props.box(parent,Vector3(0.13,DOOR_HEIGHT+0.20,0.28),Vector3(door_x+float(side)*(DOOR_WIDTH*0.5+0.05),(DOOR_HEIGHT+0.20)*0.5,CAFE_BACK_Z-0.04),Color("bd9667"))
+
+static func _build_starter_bed(parent: Node3D) -> void:
+	var bag:=SceneRuntime.instantiate("res://scenes/lounge/sleeping_bag.tscn") as Node3D
+	parent.add_child(bag)
+	bag.position=Vector3(STARTER_BED.x,0.0,STARTER_BED.z)
+	Props.collision_box(parent,Vector3(1.72,0.14,0.62),Vector3(STARTER_BED.x,0.07,STARTER_BED.z))
 
 static func _build_rest_furniture(parent: Node3D, owner_game: Node3D, tier: int, p) -> void:
 	var lounge := LoungeFurniture.new()
@@ -251,16 +266,19 @@ func sleep_target(camera: Camera3D, _peer: int) -> Dictionary:
 	if game == null or game.service.progress.shift != "night" or game.session.local_sleeping(): return {}
 	var origin := camera.global_position
 	var direction := -camera.global_basis.z
+	var stage := play_stage(game.service.progress)
 	for index in range(PLAYER_BED_COUNT):
-		var center := player_bed_center(index,game.service.progress.lounge_tier)
-		var box := AABB(center-Vector3(1.34,0.45,0.64),Vector3(2.68,0.90,1.28))
+		var center := player_bed_center(index,game.service.progress.lounge_tier,stage)
+		var box := AABB(center-Vector3(0.9,0.2,0.38),Vector3(1.8,1.15,0.8)) if stage<2 else AABB(center-Vector3(1.34,0.45,0.64),Vector3(2.68,0.90,1.28))
 		var hit = box.intersects_ray(origin,direction)
 		if hit == null or origin.distance_to(hit)>4.2: continue
-		return {"action":"sleep","bed":index,"hint":"(E) В Шеф-кровать · "+game.session.sleep_status_text()}
+		var hint := "(E) В спальный мешок · " if stage<2 else "(E) В Шеф-кровать · "
+		return {"action":"sleep","bed":index,"hint":hint+game.session.sleep_status_text()}
 	return {}
 
 func settle_player_avatar(actor: Node3D, bed_index: int) -> void:
-	actor.global_position = player_sleep_position(bed_index,game.service.progress.lounge_tier)
+	var stage := play_stage(game.service.progress)
+	actor.global_position = player_sleep_position(bed_index,game.service.progress.lounge_tier,stage)
 	actor.rotation = Vector3.ZERO
 	actor.rotation.y = player_sleep_yaw(bed_index)
 	actor.rotation.z = -PI/2

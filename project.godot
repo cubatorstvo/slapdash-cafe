@@ -15,6 +15,10 @@ run/main_scene="res://scenes/cafe.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[autoload]
+
+GodotIQRuntime="*res://addons/godotiq/godotiq_runtime.gd"
+
 [display]
 
 window/size/viewport_width=1440
@@ -25,7 +29,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/steam_export/plugin.cfg")
+enabled=PackedStringArray("res://addons/steam_export/plugin.cfg", "res://addons/godotiq/plugin.cfg")
 
 [rendering]
 

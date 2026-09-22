@@ -2,9 +2,13 @@ extends Node3D
 const Journey=preload("res://scripts/cafe_journey.gd")
 const Lab=preload("res://scripts/laboratory_layout.gd")
 const Lounge=preload("res://scripts/lounge_layout.gd")
+const Annex=preload("res://scripts/cafe_annex.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 var game: Node3D
 var marker: Label3D
 var clock := 0.0
+var goal_clock := 0.0
+var goal: Dictionary = {}
 
 func _ready() -> void:
 	marker=Label3D.new(); add_child(marker)
@@ -18,7 +22,11 @@ func _process(delta: float) -> void:
 	visible=game.journey_markers and p.stars<2 and not game.input_blocked() and game.local_station()==null
 	if not visible: return
 	clock+=delta
-	var next:=Journey.current(p,game.service.stations,game.service.served,game.service.open_for_business)
+	goal_clock-=delta
+	if goal_clock<=0.0 or goal.is_empty():
+		goal_clock=0.35
+		goal=Journey.current(p,game.service.stations,game.service.served,game.service.open_for_business)
+	var next:=goal
 	var point:=Vector3.ZERO
 	var name: String=""
 	match str(next.place):
@@ -31,7 +39,12 @@ func _process(delta: float) -> void:
 		"sample": point=game.laboratory.to_global(game.laboratory.SAMPLE)+Vector3.UP*0.7; name="Образец"
 		"microscope": point=Lab.MICROSCOPE+Vector3.UP*2.1; name="Микроскоп"
 		"pot": point=Lab.pot_point(int(next.pot))+Vector3.UP*2.5; name="Горшок %d"%(int(next.pot)+1)
-		"bed": point=Lounge.bed_center(p.lounge_tier)+Vector3.UP*2; name="Шеф-кровать"
+		"bed":
+			var stage:=Expansion.stage_for_progress(p)
+			if stage<2:
+				point=Annex.player_bed_center(0,p.lounge_tier,stage)+Vector3.UP*1.15; name="Спальный мешок"
+			else:
+				point=Lounge.bed_center(p.lounge_tier)+Vector3.UP*2; name="Шеф-кровать"
 		"delivery":
 			var parcel:=Journey.pending(p,str(next.item),int(next.station))
 			if parcel.is_empty(): hide(); return

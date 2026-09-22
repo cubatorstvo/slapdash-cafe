@@ -17,6 +17,22 @@ func run() -> void:
 	check(Annex.rest_spot(0).position.z>Annex.CAFE_BACK_Z,"Clone rest spots are behind cafe")
 	check(Annex.REST_AREA>100.0,"Rest room is roughly triple the previous area")
 	check(Annex.player_bed_center(3).x<Annex.REST_X_MAX,"Shared chef bed fits inside the room")
+	var starter:=Annex.player_bed_center(0,0,1)
+	check(starter.z>5.1+4.0 and starter.z<Annex.CAFE_BACK_Z-0.4,"Sleeping bag is behind the chef counter and inside the back wall")
+	check(starter.x>0.8,"Sleeping bag stays off the central path to the laboratory")
+	if Annex.play_stage(game.service.progress)<2:
+		var bag:=game.find_child("SleepingBag",true,false) as Node3D
+		check(bag!=null,"Stage 1 places a sleeping bag in the cafe")
+		check(bag!=null and is_equal_approx(bag.global_position.x,starter.x) and is_equal_approx(bag.global_position.z,starter.z),"Sleeping bag stands on the starter bed point")
+		var saved_shift: String=game.service.progress.shift
+		game.service.progress.shift="night"
+		game.camera.global_position=starter+Vector3(0,1.55,-1.7)
+		game.camera.look_at(starter+Vector3(0,0.25,0),Vector3.UP)
+		var sleep_look: Dictionary=game.annex.sleep_target(game.camera,1)
+		check(str(sleep_look.get("action",""))=="sleep" and "мешок" in str(sleep_look.get("hint","")),"Looking at the sleeping bag at night offers sleep")
+		game.service.progress.shift="open"
+		check(game.annex.sleep_target(game.camera,1).is_empty(),"Sleeping bag cannot be used before the shift ends")
+		game.service.progress.shift=saved_shift
 	check(game.annex.doors.has("lab"),"Stage 1 has the laboratory sliding door")
 	var lab_door: Dictionary=game.annex.doors.get("lab",{})
 	for leaf_data in lab_door.leaves:
@@ -45,6 +61,7 @@ func run() -> void:
 	check(game.annex.door_openness("lab")<0.1,"Laboratory door closes after player leaves")
 	game.service.progress.stars=1
 	game._refresh_cafe_layout(true)
+	check(game.find_child("SleepingBag",true,false)==null,"Sleeping bag leaves when the rest room opens")
 	game.player.global_position=Annex.REST_DOOR_CAFE
 	game.annex.advance_doors(0.30)
 	check(game.annex.door_openness("rest")>0.9,"Rest door opens for approaching player")
@@ -111,6 +128,9 @@ func run() -> void:
 	var floor_a:=Lounge.overflow_slot(0,2,[])
 	var floor_b:=Lounge.overflow_slot(1,2,[])
 	check(absf(float(floor_a.yaw)-float(floor_b.yaw))>0.05,"Floor lounge spots face different directions around social groups")
+	game.service.progress.shift="night"
+	for resting in game.service.stations: resting.refresh(1,0.016)
+	check(true,"Ending the shift can hide every resting cook")
 	game._shutdown_tree(game); game.free()
 	print("PASS: rear annex, expanded rest room, automatic doors, clone route and multiplayer bed sleep" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

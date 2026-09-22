@@ -85,7 +85,8 @@ func _process(delta: float) -> void:
 		for leg in legs: leg.rotation.x = lerpf(leg.rotation.x, 0.0, blend)
 	if drinking and mouth_amount>0.05: pitch = maxf(pitch,mouth_amount*0.95)
 	var opening := maxf(mouth_amount,absf(sin(chewing*20))*0.5 if chewing>0 else 0.0)
-	mouth_shape.scale = mouth_shape.scale.lerp(Vector3(0.2+opening*0.95,0.05+opening*1.05,0.12),blend)
+	# X is the lip width, Y opens the mouth, Z stays the thin face normal. A thicker Z reads as a tongue.
+	mouth_shape.scale = mouth_shape.scale.lerp(Vector3(0.1+opening*0.475,0.025+opening*0.525,0.02),blend)
 	drink_label.visible = drunk_ml>0
 	drink_label.text = "Выпито: %.0f мл" % drunk_ml
 	head.rotation.y = lerp_angle(head.rotation.y, yaw, blend)
@@ -145,7 +146,7 @@ func animate_meal() -> void:
 	if meal_items.is_empty() or not is_instance_valid(meal_root): return
 	var t:=clampf(meal_age/0.85,0,1)
 	var mouth:=head.global_position-global_basis.z*0.28
-	mouth_shape.scale=Vector3(1.12,1.1,0.2) if t<1 else Vector3(0.5,0.35+absf(sin(meal_age*24))*0.2,0.15)
+	mouth_shape.scale=Vector3(0.56,0.55,0.04) if t<1 else Vector3(0.25,0.175+absf(sin(meal_age*24))*0.1,0.03)
 	for i in range(meal_items.size()):
 		var node: Node3D=meal_root.get_child(i)
 		var origin: Vector3=meal_items[i].from

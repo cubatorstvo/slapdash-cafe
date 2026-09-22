@@ -334,33 +334,33 @@ func refresh(local_peer: int, delta: float) -> void:
 				if is_team_station(): view.actors[role].hide()
 		if staffed<role_count():
 			view.station_label.text="СТАНЦИЯ %d · НУЖНЫ КЛОНЫ %d/%d"%[station_id,staffed,role_count()]
-			if type_id=="counter":
-				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+			if type_id=="counter": _hide_counter_clone()
 	if get_parent().game != null and is_instance_valid(get_parent().game.laboratory) and get_parent().game.laboratory.reserves_station(station_id): view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,"ПЕРЕКАЛИБРОВКА" if get_parent().game.laboratory.calibrator.reserves_station(station_id) else "СОТРУДНИК ИДЁТ К СТАНЦИИ"]
 	if get_parent().game!=null and is_instance_valid(get_parent().game.laboratory):
 		for role in range(role_count()):
 			if get_parent().game.laboratory.presenting_clone(int(crew[role].get("clone_id",0))):
 				students[role].hide()
 				if is_team_station(): view.actors[role].hide()
-				else:
-					for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+				else: _hide_counter_clone()
 	if not manual_station and not group_training_state.is_empty():
 		var training_text: String={"draining":"ЗАКАНЧИВАЕТ ПРИНЯТЫЙ ЗАКАЗ","assigned":"НАЗНАЧЕНО ОБУЧЕНИЕ","gathering":"ЗАКАНЧИВАЕТ И СОБИРАЕТСЯ","walking":"ИДЁТ К ТЕЛЕВИЗОРУ","watching":"СМОТРИТ ХАЙЛАЙТЫ","returning":"ВОЗВРАЩАЕТСЯ"}.get(group_training_state,"ОБУЧЕНИЕ")
 		view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,training_text]
 		if state!="cooking":
 			for student in students: student.hide()
-			if type_id=="counter":
-				for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+			if type_id=="counter": _hide_counter_clone()
 			else:
 				for actor in view.actors: actor.hide()
 	if is_instance_valid(taster): direct_attention(taster)
 	if get_parent().progress.shift=="night" and not training.active() and not manual_station:
 		for student in students: student.hide()
-		if type_id=="counter":
-			for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]: node.hide()
+		if type_id=="counter": _hide_counter_clone()
 		else:
 			for actor in view.actors: actor.hide()
 		view.station_label.text="СТАНЦИЯ %d · ПОВАРА ОТДЫХАЮТ"%station_id
+
+func _hide_counter_clone() -> void:
+	for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]:
+		if is_instance_valid(node): node.hide()
 
 func direct_attention(person: Node3D) -> void:
 	person.watching = true
@@ -500,4 +500,3 @@ func apply_upgrades() -> void:
 	if is_instance_valid(upgrade_view): return
 	upgrade_view = preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/props/sauce_ramp.tscn") as Node3D
 	add_child(upgrade_view)
-

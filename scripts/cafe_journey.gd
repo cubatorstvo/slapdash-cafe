@@ -4,6 +4,7 @@ const DISH_NAMES := {"sausage":"сосиска в соусе","potato":"карт
 const GEAR := {"sausage":["sauce","plates"],"potato":["pan","plates"],"wine":["jug","cup"],"meal":["meat_kit","pasta_kit"],"burger":["grill_kit","assembly_kit"],"cheeseburger":["grill_kit","assembly_kit"],"spicy_burger":["grill_kit","assembly_kit"],"solyanka":["fire_kit","stir_kit","salt_kit"]}
 const Catalogue=preload("res://scripts/cafe_catalogue.gd")
 const Lounge=preload("res://scripts/lounge_progression.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 const GOODS := {"sauce":"миску соуса","plates":"тарелки","pan":"сковороду","jug":"кувшин","cup":"бокал","meat_kit":"комплект для мяса","pasta_kit":"комплект для макарон","lab_0":"лабораторную колбу","lab_1":"блок питания","lab_2":"стабилизатор","counter":"стол и шкафчик","kitchen":"парную кухню","grill_kit":"общую жарочную поверхность","assembly_kit":"комплект сборки","grill_kitchen":"бургерную кухню","fire_kit":"набор огня и овощей","stir_kit":"мешалку и овощи","salt_kit":"соль и овощи","solyanka_kitchen":"кухню «Солянка»"}
 
 static func step(key: String, title: String, detail: String, place := "computer", station := 0, pot := -1) -> Dictionary:
@@ -373,7 +374,8 @@ static func current(p, stations: Array, served: int, opened: bool, service=null)
 		result.detail="Сначала заверши или отмени добровольный визит в компьютере, затем пригласи проверку."
 	elif p.shift in ["night","closing"]:
 		result.detail="После отдыха: "+result.title+". "+result.detail
-		result.title="Смена завершена · всем в Шеф-кровать" if p.shift=="night" else "Завершаем последние заказы"
+		var night_bed := "ляг в спальный мешок за стойкой" if Expansion.stage_for_progress(p)<2 else "всем в Шеф-кровать"
+		result.title=("Смена завершена · "+night_bed) if p.shift=="night" else "Завершаем последние заказы"
 		result.place="bed" if p.shift=="night" else ""
 	elif not opened and result.place=="station" and result.key not in ["first_guest"] and not result.key.begins_with("teach_"):
 		result.detail="Сначала открой кафе у компьютера. "+result.detail

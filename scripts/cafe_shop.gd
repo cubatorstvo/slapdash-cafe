@@ -65,12 +65,11 @@ func setup(owner_game: Node3D) -> void:
 
 func refresh_layout() -> void:
 	if game==null: return
-	var stage:=Expansion.stage_for_progress(game.service.progress)
 	computer.position=Expansion.MARKET_POSITION
 	for parcel in game.service.progress.deliveries:
 		if int(parcel.get("owner",0))!=0 or float(parcel.get("remaining",0.0))<=0.0: continue
-		var at:=Expansion.delivery_position(stage,int(parcel.get("id",0)))
-		parcel.position=[at.x,0.3,at.z]
+		var at:=parcel_drop_position(int(parcel.get("id",0)))
+		parcel.position=[at.x,at.y,at.z]
 
 
 func computer_hit(camera: Camera3D) -> bool:
@@ -138,8 +137,26 @@ func group_training_plan(group_id: String,type_id: String) -> Dictionary:
 		if id>0: plan[dish]={"id":id,"name":str(current.get("name","Запись #%d"%id)),"revision":int(item.get("revision",1))}
 	return plan
 
+func parcel_drop_position(id: int) -> Vector3:
+	var stage:=Expansion.stage_for_progress(game.service.progress)
+	var base:=Expansion.installer_spawn(stage,0)
+	var arrived:=Vector3(base.x-0.8,0.0,base.z)
+	var anchor:=Vector3(0.0,0.0,-1.25)
+	if is_instance_valid(truck):
+		var marker:=truck.get_node_or_null("ParcelDropAnchor") as Node3D
+		if marker!=null: anchor=marker.position
+	var slot:=posmod(id,9)
+	var col:=posmod(slot,3)
+	var row:=int(slot/3)
+	return arrived+anchor+Vector3((float(col)-1.0)*0.58,0.0,-float(row)*0.5)
+
+func _legacy_drop(parcel: Dictionary) -> bool:
+	var at:=Vector3(float(parcel.position[0]),float(parcel.position[1]),float(parcel.position[2]))
+	var legacy:=Expansion.delivery_position(Expansion.stage_for_progress(game.service.progress),int(parcel.get("id",0)))
+	return Vector2(at.x,at.z).distance_to(Vector2(legacy.x,legacy.z))<0.35
+
 func _delivery_position(id: int) -> Array:
-	var at:=Expansion.delivery_position(Expansion.stage_for_progress(game.service.progress),id)
+	var at:=parcel_drop_position(id)
 	return [at.x,at.y,at.z]
 
 func _new_delivery(item: String,station_id: int,items: Array,installer: bool,delay: float,extra: Dictionary={}) -> Dictionary:
@@ -688,6 +705,8 @@ func advance(delta: float) -> void:
 		if parcel.remaining>0:
 			parcel.remaining=maxf(0,parcel.remaining-delta)
 			if parcel.remaining==0:
+				var dropped:=parcel_drop_position(int(parcel.id))
+				parcel.position=[dropped.x,dropped.y,dropped.z]
 				truck_age=5
 				game.service.progress.revision+=1
 				game.service.announce(("Сборщик приехал: " if parcel_has_installer(parcel) else "Доставка у входа: ")+parcel_name(parcel))
@@ -711,6 +730,9 @@ func _process(delta: float) -> void:
 		var installer_job: Dictionary=installer_job_for_delivery(int(parcel.id)) if parcel_has_installer(parcel) else {}
 		var installer_phase: String=str(installer_job.get("phase","waiting_delivery"))
 		node.visible=parcel.remaining<=0 and (not parcel_has_installer(parcel) or installer_phase in ["waiting_delivery","approaching_box"])
+		if parcel.owner==0 and parcel.remaining<=0 and _legacy_drop(parcel):
+			var dropped:=parcel_drop_position(int(parcel.id))
+			parcel.position=[dropped.x,dropped.y,dropped.z]
 		if parcel.owner==0: node.global_position=Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
 		elif parcel.owner==game.session.local_id(): node.global_transform=game.camera.global_transform; node.position+=-game.camera.global_basis.z*0.85-game.camera.global_basis.y*0.28
 		else:

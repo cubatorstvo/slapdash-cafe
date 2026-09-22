@@ -1,0 +1,9 @@
+---
+description: GodotIQ MCP для .gd/.tscn, Grep/Read для точного текста
+alwaysApply: true
+---
+
+# GodotIQ и Grep
+
+- Перед правкой `.gd`, `.tscn`, `.tres` — `file_context` (`detail="brief"`). Связи и сигналы — `dependency_graph` / `signal_map`. Сцена — `scene_map`. При открытом редакторе писать через `script_ops` / `node_ops`.
+- Grep и Read — для точной строки, короткого куска уже известной функции и файлов, которые не скрипт и не сцена.

@@ -2,4 +2,6 @@
 builds/
 *.tmp
 captures/
+.cursor/mcp.json
 
+.godotiq/

@@ -1,0 +1,45 @@
+[gd_scene load_steps=6 format=3]
+
+[sub_resource type="StandardMaterial3D" id="Mat_canvas"]
+albedo_color = Color(0.42, 0.4, 0.24, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_roll"]
+albedo_color = Color(0.28, 0.27, 0.16, 1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_lining"]
+albedo_color = Color(0.55, 0.42, 0.28, 1)
+
+[sub_resource type="BoxMesh" id="Mesh_box"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_roll"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[node name="SleepingBag" type="Node3D"]
+
+[node name="Body" type="MeshInstance3D" parent="."]
+position = Vector3(0.05, 0.08, 0)
+scale = Vector3(1.72, 0.12, 0.68)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_canvas")
+
+[node name="Lining" type="MeshInstance3D" parent="."]
+position = Vector3(0.18, 0.15, 0)
+scale = Vector3(1.15, 0.03, 0.5)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_lining")
+
+[node name="Roll" type="MeshInstance3D" parent="."]
+position = Vector3(-0.78, 0.16, 0)
+rotation = Vector3(1.570796, 0, 0)
+scale = Vector3(0.34, 0.72, 0.34)
+mesh = SubResource("Mesh_roll")
+material_override = SubResource("Mat_roll")
+
+[node name="Sign" type="Label3D" parent="."]
+position = Vector3(0.15, 0.72, -0.42)
+pixel_size = 0.004
+font_size = 22
+text = "СПАЛЬНЫЙ МЕШОК"

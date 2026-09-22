@@ -132,7 +132,7 @@ material_override = SubResource("Mat_dark")
 
 [node name="Mouth" type="MeshInstance3D" parent="Head"]
 position = Vector3(0, -0.035, -0.248)
-scale = Vector3(0.082, 0.0246, 0.0492)
+scale = Vector3(0.041, 0.025, 0.012)
 mesh = SubResource("Mesh_sphere")
 material_override = SubResource("Mat_mouth")
 

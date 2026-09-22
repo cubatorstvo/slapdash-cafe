@@ -3,6 +3,7 @@ extends Node3D
 const Layout=preload("res://scripts/lounge_layout.gd")
 const Avatar=preload("res://scripts/cook_avatar.gd")
 const Rest=preload("res://scripts/lounge_progression.gd")
+const Expansion=preload("res://scripts/cafe_expansion_layout.gd")
 var game: Node3D
 var shot: Camera3D
 var overlay: CanvasLayer
@@ -132,7 +133,6 @@ func _process(_delta: float) -> void:
 	var scene: Dictionary=game.session.sleep_scene
 	var phase: String=game.session.sleep_scene_phase()
 	var forecast:=Rest.report(game.service.progress,game.evening.workers().size())
-	var back: float=Layout.back_z(game.service.progress.lounge_tier)
 	if phase=="sleep":
 		title.text="СМЕНА ЗАКОНЧЕНА" if age<2.1 else "ТИХИЙ ЧАС ДЛЯ ОЧЕНЬ УСТАВШИХ"
 		hint.text="Завтра: +%d%% к темпу команды\nПробел · пропустить вместе (%d/%d)"%[roundi(float(forecast.bonus)*100),scene.skips.size(),scene.participants.size()]
@@ -152,10 +152,12 @@ func _process(_delta: float) -> void:
 	game.daylight.light_energy=lerpf(0.12,0.75,daylight_blend)
 	game.room_environment.environment.ambient_light_energy=lerpf(0.26,0.35,daylight_blend)
 	var travel: float=smoothstep(0.0,1.0,clampf((age-0.55)/4.3,0,1))
+	var stage: int=Expansion.stage_for_progress(game.service.progress)
 	var right: float=Layout.right_x(game.service.progress.lounge_tier)
-	var camera_start: Vector3=Vector3(right-0.8,4.15,back-1.0)
+	var bed: Vector3=game.annex.player_bed_center(0,game.service.progress.lounge_tier,stage)
+	var camera_start: Vector3=bed+Vector3(-2.4,2.2,-1.5) if stage<2 else Vector3(right-0.8,4.15,Layout.back_z(game.service.progress.lounge_tier)-1.0)
 	var camera_end: Vector3=Vector3(Layout.ENTRANCE.x,3.15,Layout.FRONT_Z+1.0)
-	var look_start: Vector3=Layout.bed_center(game.service.progress.lounge_tier)+Vector3(0,0.5,-2.0)
+	var look_start: Vector3=bed+Vector3(0,0.35,0) if stage<2 else bed+Vector3(0,0.5,-2.0)
 	var look_end: Vector3=Vector3(0.0,1.05,5.1)
 	shot.global_position=camera_start.lerp(camera_end,travel)
 	shot.look_at(look_start.lerp(look_end,travel),Vector3.UP)
@@ -164,5 +166,5 @@ func _process(_delta: float) -> void:
 		if self_avatar.visible:
 			var layer: int=game.session.local_sleep_bed()
 			var rise: float=smoothstep(0.0,1.0,clampf(age/1.15,0,1))
-			self_avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier),0.0,rise,game.session.local_id())
+			self_avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier,stage),0.0,rise,game.session.local_id())
 			self_avatar.caption.hide()

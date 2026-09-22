@@ -321,7 +321,7 @@ func _sleep_action(sender: int, value: Dictionary) -> String:
 	if game.laboratory.blocks_sleep(): return "Сначала заверши опыт, ручную рекалибровку или извлечение клона."
 	var bed := int(value.get("bed",-1))
 	if bed < 0 or bed >= game.annex.PLAYER_BED_COUNT: return "Кровать не найдена."
-	var center: Vector3 = game.annex.player_bed_center(bed,game.service.progress.lounge_tier)
+	var center: Vector3 = game.annex.player_bed_center(bed,game.service.progress.lounge_tier,game.annex.play_stage(game.service.progress))
 	if _peer_world_position(sender).distance_to(center) > 4.5: return "Подойди к кровати."
 	if not sleeping_peers.has(sender): sleeping_peers[sender]=sleeping_peers.size()
 	_broadcast_sleep_state()
@@ -811,7 +811,7 @@ func _draw_players(delta: float) -> void:
 			var layer: int=int(sleeping_peers[id])
 			if sleep_scene_active() and sleep_scene_phase()=="wake":
 				var rise: float=smoothstep(0.0,1.0,clampf(sleep_scene_age()/1.15,0.0,1.0))
-				avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier),0.0,rise,int(id))
+				avatar.morning_wake_pose(game.annex.player_bed_exit(layer,game.service.progress.lounge_tier,game.annex.play_stage(game.service.progress)),0.0,rise,int(id))
 				avatar.caption.text += "\nПросыпается"
 			else:
 				game.annex.settle_player_avatar(avatar,layer)

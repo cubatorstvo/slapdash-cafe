@@ -28,6 +28,16 @@ func _ready() -> void:
 	add_child(book)
 	book.pose_in_hands(false)
 
+func _pose_arm(index: int, start: Vector3, end: Vector3) -> void:
+	var arm: MeshInstance3D = arms[index]
+	var pivot := arm.get_parent() as Node3D
+	# Shoulder markers already carry a pose. Arm coordinates are body-local, so the pivot must not add a second offset.
+	pivot.position = Vector3.ZERO
+	pivot.rotation = Vector3.ZERO
+	P.align_line(arm, start, end)
+	var hand := pivot.get_node_or_null("Hand") as Node3D
+	if hand != null: hand.position = end
+
 func walk_to(target: Vector3, delta: float) -> bool:
 	var offset := target - position
 	phase += delta * 8
@@ -50,8 +60,8 @@ func observe(target: Vector3, neighbor: Vector3, delta: float, index: int) -> vo
 	head.rotation.y = clampf(atan2(-local.x, -local.z), -1.1, 1.1)
 	head.rotation.x = sin(phase * 3.5) * 0.13 if fmod(phase, 6) < 1.8 else -0.1
 	pencil.position = Vector3(sin(phase * 8) * 0.065, 0, cos(phase * 5) * 0.05)
-	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), Vector3(-0.15, 1.02, -0.35))
-	P.align_line(arms[1], Vector3(0.3, 1.2, 0), Vector3(0.1, 1.15, -0.36) + pencil.position)
+	_pose_arm(0, Vector3(-0.3, 1.2, 0), Vector3(-0.15, 1.02, -0.35))
+	_pose_arm(1, Vector3(0.3, 1.2, 0), Vector3(0.1, 1.15, -0.36) + pencil.position)
 
 func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 	reset_lounge_accessories()
@@ -65,11 +75,11 @@ func perform(pose: Dictionary, target: Vector3, holding: bool) -> void:
 	book.pose_for_gaze(head.rotation.x, true, head.position.y)
 	book.set_reading(appearance.get("book", false) == true, str(appearance.get("page", "index")))
 	var hand := to_local(get_parent().to_global(target)) if holding else Vector3(0.35, 0.78, -0.2)
-	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), hand + Vector3(-0.18, 0, 0) if holding else Vector3(-0.35, 0.78, -0.2))
-	P.align_line(arms[1], Vector3(0.3, 1.2, 0), hand)
+	_pose_arm(0, Vector3(-0.3, 1.2, 0), hand + Vector3(-0.18, 0, 0) if holding else Vector3(-0.35, 0.78, -0.2))
+	_pose_arm(1, Vector3(0.3, 1.2, 0), hand)
 	if book.visible:
-		P.align_line(arms[0], Vector3(-0.3, 1.2, 0), to_local(book.cover_grip(-1)))
-		P.align_line(arms[1], Vector3(0.3, 1.2, 0), to_local(book.cover_grip(1)))
+		_pose_arm(0, Vector3(-0.3, 1.2, 0), to_local(book.cover_grip(-1)))
+		_pose_arm(1, Vector3(0.3, 1.2, 0), to_local(book.cover_grip(1)))
 
 # Ambient poses never modify the recorded cooking model.
 func idle(home: Vector3, delta: float, clock: float, identity: int, aisle: float) -> void:
@@ -100,8 +110,8 @@ func idle(home: Vector3, delta: float, clock: float, identity: int, aisle: float
 		var gesture := sin((beat - 15.0) / 4.0 * PI)
 		left = left.lerp(Vector3(-0.16, 1.08, -0.35), gesture)
 		right = right.lerp(Vector3(0.16, 1.08, -0.35), gesture)
-	P.align_line(arms[0], Vector3(-0.3, 1.2, 0), left)
-	P.align_line(arms[1], Vector3(0.3, 1.2, 0), right)
+	_pose_arm(0, Vector3(-0.3, 1.2, 0), left)
+	_pose_arm(1, Vector3(0.3, 1.2, 0), right)
 
 func finished_role_activity(home: Vector3, partner: Vector3, delta: float, clock: float, identity: int) -> void:
 	reset_lounge_accessories()
@@ -144,8 +154,8 @@ func finished_role_activity(home: Vector3, partner: Vector3, delta: float, clock
 				var fuss:=0.5+0.5*sin(clock*5.6+identity)
 				left=left.lerp(Vector3(-0.55,1.18,-0.10),fuss)
 				right=right.lerp(Vector3(0.55,1.18,-0.10),1.0-fuss)
-	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
-	P.align_line(arms[1],Vector3(0.3,1.2,0),right)
+	_pose_arm(0,Vector3(-0.3,1.2,0),left)
+	_pose_arm(1,Vector3(0.3,1.2,0),right)
 
 func celebrate(clock: float, variant: int, throwing: bool) -> void:
 	notebook.hide(); book.set_reading(false)
@@ -158,7 +168,7 @@ func celebrate(clock: float, variant: int, throwing: bool) -> void:
 	for i in range(arms.size()):
 		var side: float=-1 if i==0 else 1
 		var high: bool=throwing or variant!=1
-		P.align_line(arms[i],Vector3(side*0.3,1.2,0),Vector3(side*(0.6 if high else 0.35),1.8+sin(beat+i)*0.12 if high else 0.9,-0.2+sin(beat+i*PI)*0.24))
+		_pose_arm(i,Vector3(side*0.3,1.2,0),Vector3(side*(0.6 if high else 0.35),1.8+sin(beat+i)*0.12 if high else 0.9,-0.2+sin(beat+i*PI)*0.24))
 
 var lounge_legs: Node3D
 var lounge_floor_legs: Node3D
@@ -170,9 +180,10 @@ func build_lounge_accessories() -> void:
 	lounge_legs=Node3D.new()
 	add_child(lounge_legs)
 	for side in [-1,1]:
-		P.line(lounge_legs,Vector3(side*0.14,0.65,0),Vector3(side*0.17,0.62,-0.43),0.095,Color("293d4b"))
-		P.line(lounge_legs,Vector3(side*0.17,0.62,-0.43),Vector3(side*0.17,0.18,-0.44),0.085,Color("293d4b"))
-		P.box(lounge_legs,Vector3(0.22,0.13,0.32),Vector3(side*0.17,0.145,-0.52),Color("24323b"))
+		# Knee stays near the hip so the shin reads as part of the body, not a post in front of the sofa.
+		P.line(lounge_legs,Vector3(side*0.15,0.64,0.02),Vector3(side*0.17,0.46,-0.20),0.095,Color("293d4b"))
+		P.line(lounge_legs,Vector3(side*0.17,0.46,-0.20),Vector3(side*0.17,0.18,-0.28),0.085,Color("293d4b"))
+		P.box(lounge_legs,Vector3(0.22,0.13,0.32),Vector3(side*0.17,0.145,-0.36),Color("24323b"))
 	lounge_floor_legs=Node3D.new()
 	add_child(lounge_floor_legs)
 	for side in [-1,1]:
@@ -277,8 +288,8 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 				rotation.z=sin(clock*9.0+identity)*0.045*laugh
 				left.y-=0.10*laugh
 				right.y-=0.10*laugh
-	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
-	P.align_line(arms[1],Vector3(0.3,1.2,0),right)
+	_pose_arm(0,Vector3(-0.3,1.2,0),left)
+	_pose_arm(1,Vector3(0.3,1.2,0),right)
 
 func lounge_ball_react(target: Vector3, pass_phase: float, throwing: bool) -> void:
 	var local_target: Vector3=to_local(target)
@@ -293,8 +304,8 @@ func lounge_ball_react(target: Vector3, pass_phase: float, throwing: bool) -> vo
 		var catch: float=smoothstep(0.55,1.0,pass_phase)
 		right=right.lerp(Vector3(0.20,1.24,-0.38),catch)
 		left=left.lerp(Vector3(-0.20,1.24,-0.38),catch)
-	P.align_line(arms[0],Vector3(-0.3,1.2,0),left)
-	P.align_line(arms[1],Vector3(0.3,1.2,0),right+Vector3(0,reach*0.04,0))
+	_pose_arm(0,Vector3(-0.3,1.2,0),left)
+	_pose_arm(1,Vector3(0.3,1.2,0),right+Vector3(0,reach*0.04,0))
 
 func morning_wake_pose(at: Vector3, yaw: float, rise: float, identity: int) -> void:
 	reset_lounge_accessories()
@@ -309,7 +320,7 @@ func morning_wake_pose(at: Vector3, yaw: float, rise: float, identity: int) -> v
 		var sleepy:=Vector3(side*0.33,0.84,-0.18)
 		var stretch:=Vector3(side*0.48,1.92,-0.04)
 		var hand:=stretch.lerp(sleepy,eased)
-		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)
+		_pose_arm(i,Vector3(side*0.3,1.2,0),hand)
 
 func morning_run(clock: float, variant: int) -> void:
 	reset_lounge_accessories()
@@ -328,7 +339,7 @@ func morning_run(clock: float, variant: int) -> void:
 		if kind==1 and i==1: hand=Vector3(0.62,1.72,-0.05+sin(beat)*0.12)
 		elif kind==3: hand=Vector3(side*0.72,1.30,-0.12+sin(beat+i)*0.08)
 		elif kind==4 and i==0: hand=Vector3(-0.54,1.55,-0.10)
-		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)
+		_pose_arm(i,Vector3(side*0.3,1.2,0),hand)
 
 func reset_lounge_accessories() -> void:
 	for node in [lounge_legs,lounge_floor_legs,lounge_cup,lounge_paddle,lounge_snack]:
@@ -365,4 +376,4 @@ func sleep_pose(spot: Dictionary, clock: float, identity: int) -> void:
 		if kind=="back": hand=Vector3(side*0.42,0.86,-0.04)
 		elif kind=="headstand": hand=Vector3(side*0.48,1.43,-0.04)
 		elif identity%3==1: hand=Vector3(side*0.38,1.52,0.08)
-		P.align_line(arms[i],Vector3(side*0.3,1.2,0),hand)
+		_pose_arm(i,Vector3(side*0.3,1.2,0),hand)

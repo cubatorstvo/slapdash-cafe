@@ -21,6 +21,10 @@ var save_writer: Node
 var office: CanvasLayer
 var development: Node3D
 var development_stamp := ""
+var hud_refresh_clock := 0.0
+var hud_goal: Dictionary = {}
+var hud_warning := ""
+var hud_warning_revision := -1
 var event_phase_seen := "none"
 var cookbook: Node
 var feedback: Node
@@ -349,12 +353,13 @@ func sync_sleep_pose() -> void:
 	var bed: int = session.local_sleep_bed() if is_instance_valid(session) else -1
 	if bed >= 0:
 		if sleep_bed_bound != bed:
-			player.enter_sleep(Annex.player_sleep_position(bed,service.progress.lounge_tier),Annex.player_sleep_yaw(bed))
+			var stage := Annex.play_stage(service.progress)
+			player.enter_sleep(Annex.player_sleep_position(bed,service.progress.lounge_tier,stage),Annex.player_sleep_yaw(bed))
 			sleep_bed_bound = bed
 	elif sleep_bed_bound >= 0:
 		var previous_bed := sleep_bed_bound
 		sleep_bed_bound = -1
-		player.exit_sleep(Annex.player_bed_exit(previous_bed,service.progress.lounge_tier))
+		player.exit_sleep(Annex.player_bed_exit(previous_bed,service.progress.lounge_tier,Annex.play_stage(service.progress)))
 
 func _physics_process(delta: float) -> void:
 	if session.sleep_scene_active():
@@ -373,7 +378,7 @@ func _physics_process(delta: float) -> void:
 	_refresh_cafe_layout()
 	session.advance(delta)
 	service.refresh_views(delta)
-	refresh_hud()
+	refresh_hud(delta)
 	if event_phase_seen != service.progress.phase:
 		event_phase_seen = service.progress.phase
 		if event_phase_seen in ["won", "lost"]:
@@ -393,9 +398,12 @@ func _physics_process(delta: float) -> void:
 	hud.crosshair.visible = not laboratory.ui.opened() and not cookbook.opened and not menu.opened() and not office.opened() and not session.local_sleeping()
 	if cookbook.opened and not hud.prompt.text.begins_with("(E)"): hud.prompt.text = ""
 
-func refresh_hud() -> void:
+func refresh_hud(delta := 1.0) -> void:
 	hud.clone_status.text = "День %d · %d денег · популярность %d · ★ %d/5 · %d станций · %d гостей" % [service.progress.day, service.progress.cash, service.progress.popularity, service.progress.stars, service.stations.size(), service.served]
-	hud.equipment_warning.text=service.equipment_warning_text(2)
+	if hud_warning_revision!=service.progress.revision:
+		hud_warning_revision=service.progress.revision
+		hud_warning=service.equipment_warning_text(2)
+	hud.equipment_warning.text=hud_warning
 	var feed_lines: Array=[]
 	for entry in service.analytics.feed.slice(0,mini(3,service.analytics.feed.size())):
 		var source: String="ИГРОК · %s: "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "СИСТЕМА: "
@@ -404,9 +412,12 @@ func refresh_hud() -> void:
 	hud.controls.text = ""
 	hud.supplies.text = ""
 	hud.clock.text = "ОТКРЫТО" if service.open_for_business else "НОЧЬ" if service.progress.shift == "night" else "ЗАКРЫВАЕМСЯ" if service.progress.shift == "closing" else "ДО ОТКРЫТИЯ"
-	var next: Dictionary=preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business,service)
-	hud.goal.text=str(next.title)
-	hud.journey.text=str(next.detail)
+	hud_refresh_clock-=delta
+	if hud_refresh_clock<=0.0 or hud_goal.is_empty():
+		hud_refresh_clock=0.35
+		hud_goal=preload("res://scripts/cafe_journey.gd").current(service.progress,service.stations,service.served,service.open_for_business,service)
+	hud.goal.text=str(hud_goal.get("title",""))
+	hud.journey.text=str(hud_goal.get("detail",""))
 	hud.visit_status.text=service.Visits.status(service.progress) if service.progress.visit.get("phase","") in ["offered","scheduled","active"] else ""
 	if service.progress.rest_multiplier>1.0: hud.goal.text+=" · отдых +%d%%"%roundi((service.progress.rest_multiplier-1.0)*100)
 	hud.progress.value = 0
@@ -440,7 +451,7 @@ func refresh_hud() -> void:
 		return
 	hud.notice.text = ""
 	hud.goal.text = station.Definition.DISHES[station.training.dish]
-	hud.journey.text = str(next.title)+". "+str(next.detail) if station.training.purpose=="lesson" else "Цель кафе: "+str(next.title)
+	hud.journey.text = str(hud_goal.get("title",""))+". "+str(hud_goal.get("detail","")) if station.training.purpose=="lesson" else "Цель кафе: "+str(hud_goal.get("title",""))
 	if station.manual_station and not service.manual_order(station).is_empty(): hud.show_chef_request(station.customer_order)
 	hud.clock.text = "%.1f с" % (station.training.tick / 60.0)
 	if service.progress.shift == "open" and not service.progress.busy():
@@ -707,6 +718,10 @@ func new_cafe() -> void:
 	bound_revision = -1
 	last_menu_revision = ""
 	development_stamp = ""
+	hud_refresh_clock=0.0
+	hud_goal={}
+	hud_warning=""
+	hud_warning_revision=-1
 	layout_stage=Expansion.stage_for_progress(service.progress)
 	_build_room_shell(layout_stage)
 	player.position = Expansion.player_spawn(layout_stage)

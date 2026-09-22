@@ -19,6 +19,7 @@ var status: Label
 var timer: Label
 var tab := "overview"
 var stamp := ""
+var page_refresh := 0.0
 var selections := {}
 var confirm_reset := false
 var confirm_delete_masterclass := -1
@@ -488,7 +489,7 @@ func toggle_scale_equipment(id: String,on: bool) -> void:
 	stamp=""
 	rebuild()
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
 	_refresh_delivery_labels()
 	var progress = game.service.progress
@@ -503,9 +504,11 @@ func _process(_delta: float) -> void:
 			if pot.phase!="empty": occupied+=1
 		lab_live_status.text="Занято горшков: %d/%d · свободных клонов: %d\n%s"%[occupied,LabPolicy.pot_count(progress),progress.free_clones,"Кресло: "+str(calibration.state.get("notice","")) if calibration.busy() else "Кресло свободно"]
 	if tab=="overview" and is_instance_valid(visit_live_status): visit_live_status.text=game.service.Visits.status(progress)
+	page_refresh=maxf(0.0,page_refresh-delta)
 	var next := "%s:%d:%d:%s:%s" % [tab, progress.revision, game.service.served, str(game.service.open_for_business), str(game.service.any_training())]
-	if stamp != next:
+	if stamp != next and (page_refresh<=0.0 or not stamp.begins_with(str(tab)+":")):
 		stamp = next
+		page_refresh=0.45
 		rebuild()
 
 func rebuild() -> void:
