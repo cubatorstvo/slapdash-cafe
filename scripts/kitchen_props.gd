@@ -9,15 +9,13 @@ var pick_distance := 3.6
 const PAN_BODY_BOUNDS := AABB(Vector3(-0.80, -0.04, -0.65), Vector3(1.60, 0.10, 1.30))
 const PAN_HANDLE_BOUNDS := AABB(Vector3(-0.08, -0.02, 0.60), Vector3(0.16, 0.09, 0.44))
 const POTATO_CONTACT_HALF_EXTENTS := Vector3(0.24, 0.17, 0.18)
-const SAUSAGE_CONTACT_RADIUS := 0.10
-const SAUSAGE_HALF_LENGTH := 0.38
-const SAUSAGE_SEGMENT_BASE_ANGLES := [1.43, 1.570796, 1.71]
+const SAUSAGE_CONTACT_RADIUS := 0.075
+const SAUSAGE_HALF_LENGTH := 0.32
 var potato_nodes: Array = []
 var potato_bodies: Array = []
 var potato_patches: Array = []
 var sausage_nodes: Array = []
 var sausage_skins: Array = []
-var sausage_segments: Array = []
 var sausage_bodies: Array = []
 var potato_set: Node3D
 var sausage_set: Node3D
@@ -66,13 +64,11 @@ func _ready() -> void:
 		sausage_holder.add_child(sausage_scene)
 		sausage_scene.position.y = SAUSAGE_CONTACT_RADIUS
 		sausage_bodies.append(sausage_scene)
-		var segments: Array = [sausage_scene.get_node("LeftSegment"), sausage_scene.get_node("CenterSegment"), sausage_scene.get_node("RightSegment")]
-		for segment in segments:
-			var mat := (segment as MeshInstance3D).material_override.duplicate() as StandardMaterial3D
-			(segment as MeshInstance3D).material_override = mat
+		var skin := sausage_scene.get_node("Skin") as MeshInstance3D
+		var material := skin.material_override.duplicate() as ShaderMaterial
+		skin.material_override = material
 		sausage_nodes.append(sausage_holder)
-		sausage_segments.append(segments)
-		sausage_skins.append(segments[1])
+		sausage_skins.append(skin)
 	potato = potato_nodes[0]
 	potato_body = potato_bodies[0]
 	sausage = sausage_nodes[0]
@@ -89,13 +85,9 @@ func potato_contact_height(orientation: Quaternion) -> float:
 	return sqrt(x * x + y * y + z * z)
 
 func _bend_sausage(index: int, phase: float, amplitude: float) -> void:
-	var segments: Array = sausage_segments[index]
-	for part in range(segments.size()):
-		var t: float = float(part - 1) * 0.20
-		var node := segments[part] as MeshInstance3D
-		node.position.y = sin(phase + part * 0.9) * amplitude
-		node.position.z = cos(phase * 0.7 + part * 0.8) * amplitude
-		node.rotation.z = float(SAUSAGE_SEGMENT_BASE_ANGLES[part]) + sin(phase + part) * amplitude * 1.8
+	var material := sausage_skins[index].material_override as ShaderMaterial
+	material.set_shader_parameter("bend_phase", phase)
+	material.set_shader_parameter("bend_amplitude", amplitude)
 
 func update_view(model) -> void:
 	potato_set.visible = true
@@ -118,8 +110,8 @@ func update_view(model) -> void:
 		sausage_nodes[i].rotation.z = f.sausage_angle
 		sausage_nodes[i].position.y += absf(sin(f.sausage_angle)) * SAUSAGE_HALF_LENGTH
 		_bend_sausage(i, f.sausage_phase, 0.018 + f.sausage_slip * 0.05)
-		for segment in sausage_segments[i]:
-			(segment as MeshInstance3D).material_override.albedo_color = Color("cd8869").lerp(Color("b8324a"), f.sausage_coating)
+		var material := sausage_skins[i].material_override as ShaderMaterial
+		material.set_shader_parameter("base_color", Color("cd8869").lerp(Color("b8324a"), f.sausage_coating))
 	potato = potato_nodes[model.potato_index]
 	potato_body = potato_bodies[model.potato_index]
 	sausage = sausage_nodes[model.sausage_index]

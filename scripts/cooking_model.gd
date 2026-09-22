@@ -61,6 +61,8 @@ var sausage_slip := 0.0
 var sausage_state := "table"
 var sausage_velocity := Vector2.ZERO
 var previous_sausage := sausage
+const LOOSE_COUNTER_ITEMS := ["jug", "cup", "rag", "tomato", "plate_0", "plate_1", "plate_2"]
+var loose_motion: Dictionary = {}
 
 func _init() -> void:
 	reset("wine")
@@ -114,6 +116,7 @@ func reset(recipe := "") -> void:
 	for i in range(3):
 		plates.append({"point": Vector2(1.30, Layout.CROCKERY_Z), "tilt": 0.0})
 		elevations["plate_%d" % i] = Layout.CROCKERY_Y + i * 0.045 - BASE_Y
+	_reset_loose_motion()
 	potato_index = 0
 	sausage_index = 0
 	potatoes.clear()
@@ -133,6 +136,7 @@ func reset(recipe := "") -> void:
 
 func pick_up(item: String) -> void:
 	if not item_available(item): return
+	if loose_motion.has(item): _clear_loose_motion(item)
 	if item.begins_with("potato_") or item.begins_with("sausage_"):
 		put_down()
 		var kind := item.get_slice("_", 0)
@@ -229,6 +233,7 @@ func step(delta: float, use_item: bool, straighten: bool, squeeze: bool) -> void
 	guest_pour = false
 	guest_serving.chew = maxf(0, float(guest_serving.chew)-delta)
 	super.step(delta, use_item and held in ["jug", "cup"], straighten, squeeze and held == "rag")
+	_step_loose_counter_items(delta)
 	_store_food("potato")
 	_store_food("sausage")
 	var pi := potato_index
@@ -364,6 +369,22 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			elevations.sausage = _food_height(sausage_state, sausage, "sausage") - BASE_Y
 			sausage_slip = 0
 			sausage_launched = false
+	elif sausage_state == "table":
+		if Layout.broken_corner_contains(sausage):
+			sausage_velocity += Layout.broken_corner_roll_acceleration() * delta
+			sausage_velocity *= exp(-0.9 * delta)
+		else:
+			sausage_velocity *= exp(-2.8 * delta)
+		var travel := sausage_velocity * delta
+		sausage += travel
+		if Layout.table_contains(sausage):
+			elevations.sausage = Layout.table_height(sausage) - BASE_Y
+		elif Layout.shelf_contains(sausage):
+			elevations.sausage = support_at(sausage, BASE_Y + float(elevations.sausage)) - BASE_Y
+		else:
+			sausage_state = "falling"
+			sausage_fall_speed = 0.0
+		if sausage_velocity.length() < 0.015: sausage_velocity = Vector2.ZERO
 	if "sauce" in equipment and sausage.distance_to(SAUCE_CENTER) < 0.34 and float(elevations.sausage) <= 0.13:
 		sausage_coating = minf(1, sausage_coating + delta * 1.4)
 	previous_sausage = sausage
@@ -396,6 +417,83 @@ func progress_value() -> float:
 	if dish == "sausage": return sausage_coating * 100
 	return filled / TARGET * 100
 
+func _reset_loose_motion() -> void:
+	loose_motion.clear()
+	for item in LOOSE_COUNTER_ITEMS:
+		loose_motion[item] = {"velocity": Vector2.ZERO, "fall_speed": 0.0, "falling": false}
+
+func _clear_loose_motion(item: String) -> void:
+	if not loose_motion.has(item): return
+	loose_motion[item].velocity = Vector2.ZERO
+	loose_motion[item].fall_speed = 0.0
+	loose_motion[item].falling = false
+
+func _loose_point(item: String) -> Vector2:
+	if item.begins_with("plate_"):
+		return plates[int(item.get_slice("_", 1))].point
+	return get(item)
+
+func _set_loose_point(item: String, point: Vector2) -> void:
+	if item.begins_with("plate_"):
+		plates[int(item.get_slice("_", 1))].point = point
+	else:
+		set(item, point)
+
+func _step_loose_counter_items(delta: float) -> void:
+	for item in LOOSE_COUNTER_ITEMS:
+		if not item_available(item) or held == item: continue
+		if item == "tomato" and (tomato_flying or tomato_hit): continue
+		var motion: Dictionary = loose_motion[item]
+		var point := _loose_point(item)
+		var height := BASE_Y + float(elevations[item])
+		var support := support_at(point, height)
+		if bool(motion.falling):
+			motion.fall_speed = float(motion.fall_speed) + 4.0 * delta
+			point = (point + Vector2(motion.velocity) * delta).clamp(-BOUNDS, BOUNDS)
+			_set_loose_point(item, point)
+			support = support_at(point, BASE_Y + float(elevations[item]))
+			elevations[item] = maxf(support - BASE_Y, float(elevations[item]) - float(motion.fall_speed) * delta)
+			motion.velocity = Vector2(motion.velocity) * exp(-2.0 * delta)
+			if BASE_Y + float(elevations[item]) <= support + 0.001:
+				motion.falling = false
+				motion.fall_speed = 0.0
+				motion.velocity = Vector2.ZERO
+			continue
+		if height > support + 0.08: continue
+		if Layout.broken_corner_contains(point):
+			motion.velocity = Vector2(motion.velocity) + Layout.broken_corner_roll_acceleration() * delta
+			motion.velocity = Vector2(motion.velocity) * exp(-0.9 * delta)
+		else:
+			motion.velocity = Vector2(motion.velocity) * exp(-2.8 * delta)
+		if Vector2(motion.velocity).length() < 0.015:
+			motion.velocity = Vector2.ZERO
+			continue
+		point += Vector2(motion.velocity) * delta
+		_set_loose_point(item, point)
+		if Layout.table_contains(point):
+			elevations[item] = Layout.table_height(point) - BASE_Y
+		elif Layout.shelf_contains(point):
+			elevations[item] = support_at(point, BASE_Y + float(elevations[item])) - BASE_Y
+		else:
+			motion.falling = true
+			motion.fall_speed = 0.0
+
+func _encode_loose_motion() -> Dictionary:
+	var result := {}
+	for item in loose_motion:
+		var motion: Dictionary = loose_motion[item]
+		var velocity := Vector2(motion.velocity)
+		result[item] = {"velocity": [velocity.x, velocity.y], "fall_speed": float(motion.fall_speed), "falling": bool(motion.falling)}
+	return result
+
+func _restore_loose_motion(data: Dictionary) -> void:
+	_reset_loose_motion()
+	for item in data:
+		if not loose_motion.has(item): continue
+		var raw: Dictionary = data[item]
+		var velocity: Array = raw.get("velocity", [0.0, 0.0])
+		loose_motion[item] = {"velocity": Vector2(float(velocity[0]), float(velocity[1])), "fall_speed": float(raw.get("fall_speed", 0.0)), "falling": bool(raw.get("falling", false))}
+
 func snapshot() -> Dictionary:
 	var data := super.snapshot()
 	data.dish = dish
@@ -407,6 +505,7 @@ func snapshot() -> Dictionary:
 	data.plates = plates.map(func(p): return {"point": [p.point.x, p.point.y], "tilt": p.tilt})
 	data.tray_wine = tray_wine
 	data.tomato = {"position": [tomato.x, tomato.y], "velocity": [tomato_velocity.x, tomato_velocity.y, tomato_velocity.z], "flying": tomato_flying, "hit": tomato_hit, "reaction": customer_reaction}
+	data.loose_motion = _encode_loose_motion()
 	_store_food("potato")
 	_store_food("sausage")
 	data.stock = {"potatoes": encode_stock(potatoes), "sausages": encode_stock(sausages), "potato_index": potato_index, "sausage_index": sausage_index}
@@ -435,6 +534,7 @@ func restore(data: Dictionary) -> void:
 	tomato_flying = data.tomato.flying
 	tomato_hit = data.tomato.hit
 	customer_reaction = data.tomato.reaction
+	_restore_loose_motion(data.get("loose_motion", {}))
 	var food: Dictionary = data.food
 	pan_tilt = Vector2(food.pan_tilt[0], food.pan_tilt[1])
 	potato = Vector2(food.potato[0], food.potato[1])
