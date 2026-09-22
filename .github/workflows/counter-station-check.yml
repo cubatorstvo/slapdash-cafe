@@ -1,0 +1,77 @@
+name: Counter station product check
+
+on:
+  push:
+    branches:
+      - work/counter-station-product-visual
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  counter-station:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip libgl1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64
+
+      - name: Download official Godot 4.7.2 stable
+        run: |
+          mkdir -p /tmp/godot /tmp/counter_station_capture
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+          "$GODOT_BIN" --version
+
+      - name: Import and parse project
+        run: |
+          "$GODOT_BIN" --headless --path . --import
+
+      - name: Counter station regressions
+        run: |
+          "$GODOT_BIN" --headless --path . --script res://tests/test_countertop_faces.gd
+          timeout 120s "$GODOT_BIN" --headless --path . --script res://tests/test_stations.gd
+          timeout 120s "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_physical_layout.gd
+
+      - name: Runtime smoke
+        shell: bash
+        run: |
+          set +e
+          timeout 8s "$GODOT_BIN" --headless --path . > /tmp/runtime-smoke.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/runtime-smoke.log
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            exit "$code"
+          fi
+          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access" /tmp/runtime-smoke.log; then
+            exit 1
+          fi
+
+      - name: Capture counter station
+        timeout-minutes: 5
+        run: |
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_counter_station.gd
+
+      - name: Collect captures
+        if: always()
+        run: |
+          cp /tmp/counter-station-*.png /tmp/counter_station_capture/ 2>/dev/null || true
+          cp /tmp/runtime-smoke.log /tmp/counter_station_capture/ 2>/dev/null || true
+
+      - name: Upload captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: counter-station-captures
+          path: /tmp/counter_station_capture
+          if-no-files-found: warn
+          retention-days: 3
