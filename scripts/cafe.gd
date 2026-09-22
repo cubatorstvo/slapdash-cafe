@@ -257,7 +257,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if command.has("grab") and not str(command.grab).is_empty(): taught.grab = true
 				session.send_input(station, {}, command)
 			MOUSE_BUTTON_RIGHT:
-				if not held_item(station).is_empty(): taught.use = true
+				var held := held_item(station)
+				if not held.is_empty() and held != "sausage": taught.use = true
 			MOUSE_BUTTON_WHEEL_UP:
 				taught.height = true
 				if Input.is_physical_key_pressed(KEY_ALT): grip_distance = minf(3.6, grip_distance + 0.10)
@@ -482,7 +483,8 @@ func refresh_hud(delta := 1.0) -> void:
 			hud.prompt.text = ("[ЛКМ] " if allowed else "Красная зона · записывай эту роль отдельно\n") + name
 		else:
 			var name := str(ITEM_NAMES.get(item.get_slice("_", 0) if item.begins_with("potato_") or item.begins_with("sausage_") else item, station.model.NAMES.get(item, "") if station.type_id != "counter" else ""))
-			if not taught.use: hud.prompt.text = "ПКМ · %s" % name
+			if item == "sausage": hud.prompt.text = "Сосиска · выскользнет — поймай ЛКМ\nКолесо · Высота   Alt + колесо · Расстояние   Shift · Точно"
+			elif not taught.use: hud.prompt.text = "ПКМ · %s" % name
 			elif not taught.height: hud.prompt.text = "Колесо · Высота   Alt + колесо · Расстояние   Shift · Точно"
 			else: hud.prompt.text = name
 
