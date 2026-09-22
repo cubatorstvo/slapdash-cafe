@@ -15,9 +15,11 @@ func _initialize() -> void:
 	var corner := station.get_node_or_null("Table/BrokenCorner") as MeshInstance3D
 	var frame := station.get_node_or_null("Table/FrameModel") as MeshInstance3D
 	var shelf := station.get_node_or_null("ProductShelf/ShelfVisual") as MeshInstance3D
+	var tray := station.get_node_or_null("ServingTray") as MeshInstance3D
+	var crockery := station.get_node_or_null("CrockeryShelf") as MeshInstance3D
 	var body := station.get_node_or_null("Table/MainBody") as StaticBody3D
 	var collider := station.get_node_or_null("Table/MainBody/CollisionShape3D") as CollisionShape3D
-	if top == null or corner == null or frame == null or shelf == null or body == null or collider == null: failed = true
+	if top == null or corner == null or frame == null or shelf == null or tray == null or crockery == null or body == null or collider == null: failed = true
 	if top != null:
 		if not (top.mesh is ArrayMesh): failed = true
 		if top.mesh is BoxMesh: failed = true
