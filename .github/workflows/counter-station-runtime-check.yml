@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
