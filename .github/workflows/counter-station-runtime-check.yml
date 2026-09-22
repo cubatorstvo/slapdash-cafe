@@ -1,0 +1,44 @@
+name: Counter station runtime check
+
+on:
+  push:
+    branches:
+      - work/counter-station-runtime-visual
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GODOT_BIN: /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip libgl1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64
+      - name: Install Godot 4.7.2
+        run: |
+          mkdir -p /tmp/godot
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+          "$GODOT_BIN" --version
+      - name: Import
+        run: "$GODOT_BIN" --headless --path . --import
+      - name: Counter regressions
+        run: |
+          "$GODOT_BIN" --headless --path . --script res://tests/test_countertop_faces.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_counter_layout.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_stations.gd
+      - name: Runtime screenshot
+        run: xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_counter_station_runtime.gd
+      - name: Upload screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: counter-runtime-preview
+          path: /tmp/counter_runtime.png
+          retention-days: 3

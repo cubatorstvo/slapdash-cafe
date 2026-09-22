@@ -39,6 +39,9 @@ func build(production: bool) -> void:
 	is_production = production
 	var runtime = preload("res://scripts/scene_runtime.gd")
 	runtime.ensure_children(self, "res://scenes/stations/counter_station.tscn")
+	var art_builder = preload("res://scripts/counter_station_art.gd").new()
+	art_builder.build_into(self, false)
+	art_builder.free()
 	station_label = get_node("StationLabel") as Label3D
 	station_label.text = "КЛОН" if production else "ПОКАЖИ КАК"
 	# The station shell itself is authored in counter_station.tscn. Replace its

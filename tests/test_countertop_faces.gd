@@ -37,7 +37,19 @@ func run() -> void:
 	if station.get_node_or_null("ProductVisual/DamagedFrontLeg") == null:
 		failed = true
 
-	print("PASS: product countertop uses custom broken-corner geometry and keeps authored collision" if not failed else "FAIL: product countertop geometry")
+	var gameplay_station := preload("res://scripts/station_view.gd").new()
+	root.add_child(gameplay_station)
+	gameplay_station.build(false)
+	await process_frame
+	if gameplay_station.get_node_or_null("ProductVisual/IntactCountertop") == null:
+		failed = true
+	if gameplay_station.get_node_or_null("ProductVisual/BrokenCornerFlap") == null:
+		failed = true
+	if gameplay_station.get_node_or_null("ProductVisual/DamagedFrontLeg") == null:
+		failed = true
+
+	print("PASS: product countertop exists both standalone and through runtime station build" if not failed else "FAIL: product countertop runtime geometry")
+	gameplay_station.queue_free()
 	station.queue_free()
 	await process_frame
 	quit(1 if failed else 0)

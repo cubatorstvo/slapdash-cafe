@@ -14,10 +14,13 @@ var mat_shelf: StandardMaterial3D
 var mat_rubber: StandardMaterial3D
 
 func _ready() -> void:
-	if has_node("ProductVisual"):
+	build_into(self, true)
+
+func build_into(parent: Node3D, include_accessories := true) -> void:
+	if parent.has_node("ProductVisual"):
 		return
 	_make_materials()
-	_build_station()
+	_build_station(parent, include_accessories)
 
 func _make_materials() -> void:
 	mat_top = _material(Color(0.929, 0.859, 0.714), 0.0, 0.82)
@@ -36,16 +39,17 @@ func _material(color: Color, metallic: float, roughness: float) -> StandardMater
 	material.roughness = roughness
 	return material
 
-func _build_station() -> void:
+func _build_station(parent: Node3D, include_accessories: bool) -> void:
 	var visual := Node3D.new()
 	visual.name = "ProductVisual"
-	add_child(visual)
+	parent.add_child(visual)
 
 	_build_countertop(visual)
 	_build_frame(visual)
-	_build_serving_tray(visual)
-	_build_crockery_shelf(visual)
-	_build_product_shelf()
+	if include_accessories:
+		_build_serving_tray(visual)
+		_build_crockery_shelf(visual)
+		_build_product_shelf(parent)
 
 func _build_countertop(parent: Node3D) -> void:
 	var intact := PackedVector3Array([
@@ -113,8 +117,8 @@ func _build_crockery_shelf(parent: Node3D) -> void:
 	_add_beam(parent, "CrockeryBracketL", Vector3(1.03, 0.08, 1.23), Vector3(1.03, 0.33, 1.48), 0.045, 0.045, mat_metal)
 	_add_beam(parent, "CrockeryBracketR", Vector3(1.97, 0.08, 1.23), Vector3(1.97, 0.33, 1.48), 0.045, 0.045, mat_metal)
 
-func _build_product_shelf() -> void:
-	var shelf := get_node_or_null("ProductShelf") as Node3D
+func _build_product_shelf(root_node: Node3D) -> void:
+	var shelf := root_node.get_node_or_null("ProductShelf") as Node3D
 	if shelf == null:
 		return
 
