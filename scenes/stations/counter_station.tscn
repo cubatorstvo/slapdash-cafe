@@ -1,25 +1,54 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="ArrayMesh" path="res://assets/models/stations/counter_station_top.obj" id="1_top"]
+[ext_resource type="ArrayMesh" path="res://assets/models/stations/counter_station_broken_corner.obj" id="2_corner"]
+[ext_resource type="ArrayMesh" path="res://assets/models/stations/counter_station_frame.obj" id="3_frame"]
+[ext_resource type="ArrayMesh" path="res://assets/models/stations/counter_station_shelf.obj" id="4_shelf"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_top"]
 albedo_color = Color(0.929412, 0.858824, 0.713725, 1)
+roughness = 0.78
+
+[sub_resource type="StandardMaterial3D" id="Mat_break"]
+albedo_color = Color(0.298039, 0.180392, 0.117647, 1)
+roughness = 0.92
 
 [sub_resource type="StandardMaterial3D" id="Mat_side"]
 albedo_color = Color(0.654902, 0.435294, 0.305882, 1)
+roughness = 0.82
 
 [sub_resource type="StandardMaterial3D" id="Mat_metal"]
 albedo_color = Color(0.141176, 0.25098, 0.278431, 1)
+metallic = 0.48
+roughness = 0.4
 
 [sub_resource type="StandardMaterial3D" id="Mat_accent"]
 albedo_color = Color(0.937255, 0.713725, 0.356863, 1)
+metallic = 0.16
+roughness = 0.56
 
 [sub_resource type="StandardMaterial3D" id="Mat_tray"]
 albedo_color = Color(0.466667, 0.556863, 0.568627, 1)
+metallic = 0.72
+roughness = 0.32
 
 [sub_resource type="StandardMaterial3D" id="Mat_shelf"]
 albedo_color = Color(0.654902, 0.435294, 0.305882, 1)
+roughness = 0.84
+
+[sub_resource type="StandardMaterial3D" id="Mat_rubber"]
+albedo_color = Color(0.0784314, 0.0980392, 0.105882, 1)
+roughness = 0.95
 
 [sub_resource type="BoxMesh" id="Mesh_box"]
 size = Vector3(1, 1, 1)
+
+[sub_resource type="CylinderMesh" id="Mesh_bolt"]
+top_radius = 0.045
+bottom_radius = 0.045
+height = 0.035
+radial_segments = 8
+rings = 1
 
 [sub_resource type="BoxShape3D" id="Shape_main"]
 size = Vector3(4.3, 0.18, 2.25)
@@ -32,17 +61,58 @@ size = Vector3(1.1, 1.45, 0.55)
 [node name="Table" type="Node3D" parent="."]
 
 [node name="MainTop" type="MeshInstance3D" parent="Table"]
-position = Vector3(0.18, 0.925, 0)
-scale = Vector3(3.94, 0.18, 2.25)
-mesh = SubResource("Mesh_box")
+mesh = ExtResource("1_top")
 material_override = SubResource("Mat_top")
 
 [node name="BrokenCorner" type="MeshInstance3D" parent="Table"]
-position = Vector3(-1.79, 0.815, 0.56)
-rotation = Vector3(0, 0, -0.18)
-scale = Vector3(0.78, 0.18, 1.12)
-mesh = SubResource("Mesh_box")
+mesh = ExtResource("2_corner")
 material_override = SubResource("Mat_top")
+
+[node name="BreakFracture" type="MeshInstance3D" parent="Table"]
+position = Vector3(-1.025, 0.977, 0)
+rotation = Vector3(0, -0.785398, 0)
+scale = Vector3(3.08, 0.035, 0.045)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_break")
+
+[node name="FrameModel" type="MeshInstance3D" parent="Table"]
+mesh = ExtResource("3_frame")
+material_override = SubResource("Mat_metal")
+
+[node name="FrontAccent" type="MeshInstance3D" parent="Table"]
+position = Vector3(1.125, 0.78, 1.14)
+scale = Vector3(2.05, 0.18, 0.075)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_accent")
+
+[node name="AccentBoltLeft" type="MeshInstance3D" parent="Table"]
+position = Vector3(0.42, 0.78, 1.19)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_bolt")
+material_override = SubResource("Mat_metal")
+
+[node name="AccentBoltRight" type="MeshInstance3D" parent="Table"]
+position = Vector3(1.83, 0.78, 1.19)
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("Mesh_bolt")
+material_override = SubResource("Mat_metal")
+
+[node name="BreakPatch" type="MeshInstance3D" parent="Table"]
+position = Vector3(-0.68, 0.79, 0.31)
+rotation = Vector3(0, -0.785398, -0.08)
+scale = Vector3(0.72, 0.055, 0.22)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+
+[node name="PatchBoltA" type="MeshInstance3D" parent="Table"]
+position = Vector3(-0.91, 0.83, 0.08)
+mesh = SubResource("Mesh_bolt")
+material_override = SubResource("Mat_accent")
+
+[node name="PatchBoltB" type="MeshInstance3D" parent="Table"]
+position = Vector3(-0.46, 0.80, 0.54)
+mesh = SubResource("Mesh_bolt")
+material_override = SubResource("Mat_accent")
 
 [node name="MainBody" type="StaticBody3D" parent="Table"]
 collision_layer = 1
@@ -51,42 +121,6 @@ collision_mask = 2
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Table/MainBody"]
 position = Vector3(0.18, 0.925, 0)
 shape = SubResource("Shape_main")
-
-[node name="LeftRearLeg" type="MeshInstance3D" parent="Table"]
-position = Vector3(-1.85, 0.4175, -0.85)
-scale = Vector3(0.13, 0.835, 0.13)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_metal")
-
-[node name="RightRearLeg" type="MeshInstance3D" parent="Table"]
-position = Vector3(1.85, 0.4175, -0.85)
-scale = Vector3(0.13, 0.835, 0.13)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_metal")
-
-[node name="LeftFrontLeg" type="MeshInstance3D" parent="Table"]
-position = Vector3(-1.85, 0.2175, 0.85)
-scale = Vector3(0.13, 0.435, 0.13)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_metal")
-
-[node name="RightFrontLeg" type="MeshInstance3D" parent="Table"]
-position = Vector3(1.85, 0.4175, 0.85)
-scale = Vector3(0.13, 0.835, 0.13)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_metal")
-
-[node name="RearStretcher" type="MeshInstance3D" parent="Table"]
-position = Vector3(0, 0.785, -0.85)
-scale = Vector3(3.83, 0.12, 0.09)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_metal")
-
-[node name="FrontAccent" type="MeshInstance3D" parent="Table"]
-position = Vector3(0.56, 0.78, 1.14)
-scale = Vector3(3.18, 0.22, 0.08)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_accent")
 
 [node name="ProductShelf" type="Node3D" parent="."]
 position = Vector3(-2.73, 0, 1.67)
@@ -100,35 +134,69 @@ collision_mask = 2
 position = Vector3(0, 0.725, 0)
 shape = SubResource("Shape_shelf")
 
-[node name="BottomShelf" type="MeshInstance3D" parent="ProductShelf"]
-position = Vector3(0, 0.32, 0)
-scale = Vector3(1.1, 0.06, 0.55)
-mesh = SubResource("Mesh_box")
+[node name="ShelfVisual" type="MeshInstance3D" parent="ProductShelf"]
+mesh = ExtResource("4_shelf")
 material_override = SubResource("Mat_shelf")
 
-[node name="MiddleShelf" type="MeshInstance3D" parent="ProductShelf"]
-position = Vector3(0, 0.82, 0)
-scale = Vector3(1.1, 0.06, 0.55)
+[node name="ShelfBand" type="MeshInstance3D" parent="ProductShelf"]
+position = Vector3(0, 1.405, 0.286)
+scale = Vector3(0.92, 0.08, 0.035)
 mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_shelf")
+material_override = SubResource("Mat_accent")
 
-[node name="TopShelf" type="MeshInstance3D" parent="ProductShelf"]
-position = Vector3(0, 1.37, 0)
-scale = Vector3(1.1, 0.06, 0.55)
-mesh = SubResource("Mesh_box")
-material_override = SubResource("Mat_shelf")
-
-[node name="ServingTray" type="MeshInstance3D" parent="."]
+[node name="ServingTray" type="Node3D" parent="."]
 position = Vector3(1.35, 1.03, -0.15)
-scale = Vector3(1.16, 0.03, 1.54)
+
+[node name="Base" type="MeshInstance3D" parent="ServingTray"]
+scale = Vector3(1.16, 0.035, 1.54)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_tray")
 
-[node name="CrockeryShelf" type="MeshInstance3D" parent="."]
+[node name="RimFront" type="MeshInstance3D" parent="ServingTray"]
+position = Vector3(0, 0.055, 0.75)
+scale = Vector3(1.16, 0.08, 0.04)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tray")
+
+[node name="RimBack" type="MeshInstance3D" parent="ServingTray"]
+position = Vector3(0, 0.055, -0.75)
+scale = Vector3(1.16, 0.08, 0.04)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tray")
+
+[node name="RimLeft" type="MeshInstance3D" parent="ServingTray"]
+position = Vector3(-0.56, 0.055, 0)
+scale = Vector3(0.04, 0.08, 1.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tray")
+
+[node name="RimRight" type="MeshInstance3D" parent="ServingTray"]
+position = Vector3(0.56, 0.055, 0)
+scale = Vector3(0.04, 0.08, 1.46)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_tray")
+
+[node name="CrockeryShelf" type="Node3D" parent="."]
 position = Vector3(1.5, 0.365, 1.35)
+
+[node name="Shelf" type="MeshInstance3D" parent="CrockeryShelf"]
 scale = Vector3(1.3, 0.07, 0.66)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_shelf")
+
+[node name="LeftBracket" type="MeshInstance3D" parent="CrockeryShelf"]
+position = Vector3(-0.54, -0.16, 0)
+rotation = Vector3(0, 0, -0.35)
+scale = Vector3(0.07, 0.38, 0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
+
+[node name="RightBracket" type="MeshInstance3D" parent="CrockeryShelf"]
+position = Vector3(0.54, -0.16, 0)
+rotation = Vector3(0, 0, 0.35)
+scale = Vector3(0.07, 0.38, 0.08)
+mesh = SubResource("Mesh_box")
+material_override = SubResource("Mat_metal")
 
 [node name="StationLabel" type="Label3D" parent="."]
 position = Vector3(0, 0.76, 1.2)
