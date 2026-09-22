@@ -69,9 +69,9 @@ mesh = ExtResource("2_corner")
 material_override = SubResource("Mat_top")
 
 [node name="BreakFracture" type="MeshInstance3D" parent="Table"]
-position = Vector3(-1.025, 0.977, 0)
+position = Vector3(-1.025, 1.024, 0)
 rotation = Vector3(0, -0.785398, 0)
-scale = Vector3(3.08, 0.035, 0.045)
+scale = Vector3(3.08, 0.012, 0.032)
 mesh = SubResource("Mesh_box")
 material_override = SubResource("Mat_break")
 
