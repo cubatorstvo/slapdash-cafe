@@ -43,7 +43,7 @@ jobs:
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_physical_layout.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_expansion_layout.gd
           "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_annex.gd
-          "$GODOT_BIN" --headless --path . --script res://tests/test_delivery_installers.gd
+          "$GODOT_BIN" --headless --path . --script res://tests/test_delivery_workers.gd
 
       - name: Affected cafe regressions
         run: |

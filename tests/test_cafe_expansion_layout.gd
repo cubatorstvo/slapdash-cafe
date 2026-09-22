@@ -63,12 +63,10 @@ func run()->void:
 		if slot>0:
 			check(route_inside(Expansion.route_from_entrance(customer,stage),stage),"Customer route to slot %d stays on opened floor"%(slot+1))
 
-	print("3/5: delivery and installer staging follows active entrance")
+	print("3/5: delivery staging follows active entrance")
 	for stage in range(1,5):
-		for id in range(1,10):
-			check(hall_contains(Expansion.delivery_position(stage,id),stage),"Delivery %d is on opened floor at stage %d"%[id,stage])
-			check(hall_contains(Expansion.installer_spawn(stage,id),stage),"Installer %d spawns on opened floor at stage %d"%[id,stage])
-		check(Expansion.installer_exit(stage,1).z<Expansion.entrance_z(stage),"Installer exit is outside entrance at stage %d"%stage)
+		for id in range(1,10): check(hall_contains(Expansion.delivery_position(stage,id),stage),"Delivery %d is on opened floor at stage %d"%[id,stage])
+		check(hall_contains(Expansion.delivery_vehicle_spawn(stage),stage),"Delivery truck staging is on opened floor at stage %d"%stage)
 
 	print("4/5: real cafe rebuilds through all four stages and rear-room doors stay reachable")
 	var game=preload("res://scenes/cafe.tscn").instantiate(); root.add_child(game); await process_frame; game.set_physics_process(false); game.new_cafe()

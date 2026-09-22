@@ -7,12 +7,14 @@ const LabLayout = preload("res://scripts/laboratory_layout.gd")
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 const Layout = preload("res://scripts/lounge_layout.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
-const Installer = preload("res://scripts/delivery_installer.gd")
+const DeliveryWorker = preload("res://scripts/station_delivery_worker.gd")
 const Definition = preload("res://scripts/station_definition.gd")
 var ITEMS: Dictionary = preload("res://scripts/cafe_catalogue.gd").ITEMS.duplicate(true)
 var game: Node3D
 var boxes := {}
-var installers := {}
+var delivery_workers := {}
+var delivery_worker_states := {}
+var delivery_clock := 0.0
 var local_ghost: MeshInstance3D
 var placement_beacon: MeshInstance3D
 var placement_label: Label3D
@@ -85,10 +87,6 @@ func pending(item: String, station_id: int) -> bool:
 		if item in box.get("items",[box.item]) and box.station == station_id: return true
 	return false
 
-func installer_supported(item: String) -> bool:
-	if not ITEMS.has(item): return false
-	return str(ITEMS[item].kind) in ["station","equipment","lounge"]
-
 func type_available(type_id: String) -> bool:
 	var p=game.service.progress
 	if not ITEMS.has(type_id) or ITEMS[type_id].kind!="station" or p.stars<int(ITEMS[type_id].get("star",0)): return false
@@ -139,7 +137,7 @@ func group_training_plan(group_id: String,type_id: String) -> Dictionary:
 
 func parcel_drop_position(id: int) -> Vector3:
 	var stage:=Expansion.stage_for_progress(game.service.progress)
-	var base:=Expansion.installer_spawn(stage,0)
+	var base:=Expansion.delivery_vehicle_spawn(stage)
 	var arrived:=Vector3(base.x-0.8,0.0,base.z)
 	var anchor:=Vector3(0.0,0.0,-1.25)
 	if is_instance_valid(truck):
@@ -159,208 +157,198 @@ func _delivery_position(id: int) -> Array:
 	var at:=parcel_drop_position(id)
 	return [at.x,at.y,at.z]
 
-func _new_delivery(item: String,station_id: int,items: Array,installer: bool,delay: float,extra: Dictionary={}) -> Dictionary:
+func _new_delivery(item: String,station_id: int,items: Array,delay: float,extra: Dictionary={}) -> Dictionary:
 	var p=game.service.progress
 	var id: int=p.next_delivery_id
 	p.next_delivery_id+=1
 	var delivery_position: Array=_delivery_position(id)
-	var parcel: Dictionary={"id":id,"item":item,"items":items.duplicate(),"station":station_id,"remaining":delay,"owner":0,"position":delivery_position,"installer":installer,"installer_state":"waiting_delivery","installer_position":[delivery_position[0],0.0,delivery_position[2]],"installer_age":0.0,"installer_variant":id%4}
+	var parcel: Dictionary={"id":id,"item":item,"items":items.duplicate(),"station":station_id,"remaining":delay,"owner":0,"position":delivery_position,"worker_phase":"","worker_role":-1,"worker_position":delivery_position.duplicate(),"worker_age":0.0,"worker_yaw":0.0}
 	for key in extra: parcel[key]=extra[key]
 	return parcel
 
-func installer_job_for_delivery(delivery_id: int) -> Dictionary:
-	for job in game.service.progress.installer_jobs:
-		if int(job.get("delivery_id",0))==delivery_id: return job
-	return {}
+func clone_delivery_station(parcel: Dictionary) -> Node3D:
+	if parcel.is_empty() or not ITEMS.has(str(parcel.get("item",""))): return null
+	if str(ITEMS[str(parcel.item)].kind)!="equipment": return null
+	var station: Node3D=game.service.by_id(int(parcel.get("station",0)))
+	if station==null or station.manual_station: return null
+	return station
 
-func installer_job_by_id(id: int) -> Dictionary:
-	for job in game.service.progress.installer_jobs:
-		if int(job.get("id",0))==id: return job
-	return {}
+func clone_delivery_worker_count(parcel: Dictionary) -> int:
+	var station:=clone_delivery_station(parcel)
+	if station==null: return 0
+	if int(station.staffed)<0: return station.role_count()
+	return clampi(int(station.staffed),0,station.role_count())
 
-func _installer_spawn(id: int)->Vector3:
-	return Expansion.installer_spawn(Expansion.stage_for_progress(game.service.progress),id)
+func clone_delivery_claimed(parcel: Dictionary) -> bool:
+	return not parcel.is_empty() and float(parcel.get("remaining",0.0))<=0.0 and int(parcel.get("owner",0))==0 and clone_delivery_worker_count(parcel)>0
 
-func _installer_exit(job: Dictionary)->Vector3:
-	return Expansion.installer_exit(Expansion.stage_for_progress(game.service.progress),int(job.get("id",0)))
+func _station_delivery_parcels(station: Node3D) -> Array:
+	var result: Array=[]
+	for parcel in game.service.progress.deliveries:
+		if int(parcel.get("station",0))!=station.station_id or not clone_delivery_claimed(parcel): continue
+		result.append(parcel)
+	return result
 
-func _ensure_installer_job(parcel: Dictionary) -> Dictionary:
-	if not parcel_has_installer(parcel): return {}
-	var id: int=int(parcel.get("id",0))
-	var job: Dictionary=installer_job_for_delivery(id)
-	if job.is_empty():
-		var spawn: Vector3=_installer_spawn(id)
-		job={"id":id,"delivery_id":id,"phase":"waiting_delivery","position":[spawn.x,0.0,spawn.z],"yaw":0.0,"variant":posmod(id,4),"phase_age":0.0,"installed":false,"blocked_path":false,"assignment":{}}
-		game.service.progress.installer_jobs.append(job)
-		game.service.progress.revision+=1
-	job.assignment={"item":str(parcel.get("item","")),"items":parcel.get("items",[parcel.get("item","")]).duplicate(),"station":int(parcel.get("station",0))}
-	job.variant=posmod(int(job.get("variant",id)),4)
-	return job
-
-func _job_position(job: Dictionary)->Vector3:
-	var raw: Array=job.get("position",[0.0,0.0,0.0])
+func _worker_position(parcel: Dictionary) -> Vector3:
+	var raw: Array=parcel.get("worker_position",parcel.get("position",[0.0,0.0,0.0]))
 	return Vector3(float(raw[0]),0.0,float(raw[2])) if raw.size()==3 else Vector3.ZERO
 
-func _store_job_position(job: Dictionary,point: Vector3)->void:
-	job.position=[point.x,0.0,point.z]
+func _store_worker_position(parcel: Dictionary,point: Vector3) -> void:
+	parcel.worker_position=[point.x,0.0,point.z]
 
-func _installer_assignment_parcel(job: Dictionary)->Dictionary:
-	var parcel: Dictionary=parcel_by_id(int(job.get("delivery_id",0)))
-	if not parcel.is_empty(): return parcel
-	var assignment: Dictionary=job.get("assignment",{}) if job.get("assignment",{}) is Dictionary else {}
-	return {"id":int(job.get("delivery_id",job.get("id",0))),"item":str(assignment.get("item","")),"items":assignment.get("items",[]).duplicate(),"station":int(assignment.get("station",0)),"installer":true}
+func _clear_worker_path(parcel: Dictionary) -> void:
+	parcel.erase("worker_path")
+	parcel.erase("worker_path_index")
+	parcel.erase("worker_path_target")
+	parcel.erase("worker_path_phase")
 
-func _lounge_approach(parcel: Dictionary)->Vector3:
-	var spec: Dictionary=ITEMS.get(str(parcel.get("item","")),{})
-	var lounge_id: String=str(spec.get("lounge_id",""))
-	var tier: int=int(game.service.progress.lounge_tier)
-	var slots: Array=Layout.activity_slots(tier,[lounge_id])
-	if not slots.is_empty(): return Vector3(slots[0].approach)
-	var target: Vector3=Layout.item_position(lounge_id,tier)
-	var yaw: float=0.0
-	for furniture in Layout.catalogue(tier):
-		if str(furniture.id)==lounge_id: yaw=float(furniture.yaw); break
-	return target+Vector3(0,0,-1.35).rotated(Vector3.UP,yaw)
-
-func installer_approach_position(parcel: Dictionary)->Vector3:
-	if parcel.is_empty() or not ITEMS.has(str(parcel.get("item",""))): return Vector3.INF
-	var spec: Dictionary=ITEMS[str(parcel.item)]
-	if spec.kind=="lounge": return _lounge_approach(parcel)
-	if spec.kind in ["station","equipment"]:
-		var station: Node3D=game.service.by_id(int(parcel.get("station",0)))
-		if station!=null:
-			var station_approach: Vector3=station.to_global(Vector3(0,0,2.85))
-			return Vector3(station_approach.x,0.0,station_approach.z)
-		var base: Vector3=game.service.slot_position(int(parcel.get("station",1))-1)
-		var offset:=Vector3(0,0,2.85).rotated(Vector3.UP,Expansion.rotation_y(int(parcel.get("station",1))-1))
-		return Vector3(base.x+offset.x,0.0,base.z+offset.z)
-	var target: Vector3=installation_position(parcel)
-	return Vector3(target.x,0.0,target.z) if target.is_finite() else Vector3.INF
-
-func installer_wait_position(parcel: Dictionary,job: Dictionary)->Vector3:
-	var approach: Vector3=installer_approach_position(parcel)
-	if not approach.is_finite(): return Vector3.INF
-	var variant: int=posmod(int(job.get("id",0)),4)
-	var offsets: Array=[Vector3(-0.85,0,0.55),Vector3(0.85,0,0.55),Vector3(-1.20,0,0.15),Vector3(1.20,0,0.15)]
-	if ITEMS[str(parcel.item)].kind=="lounge":
-		var blockers: Array=Layout.obstacles(game.service.progress.lounge_tier,game.service.progress.lounge_items)
-		for step in range(offsets.size()):
-			var candidate: Vector3=approach+Vector3(offsets[(variant+step)%offsets.size()])
-			if candidate.distance_to(Annex.REST_DOOR_ROOM)<1.20: continue
-			if Layout.walkable(candidate,blockers,game.service.progress.lounge_tier): return candidate
-	return approach+Vector3(offsets[variant])
-
-func _append_route_point(route: Array,point: Vector3)->void:
-	var floor_point: Vector3=Vector3(point.x,0.0,point.z)
-	if route.is_empty() or Vector3(route.back()).distance_to(floor_point)>0.05: route.append(floor_point)
-
-func _cafe_route(start_point: Vector3,target: Vector3)->Array:
-	var stage:=Expansion.stage_for_progress(game.service.progress)
-	return Expansion.cafe_route(Vector3(start_point.x,0,start_point.z),Vector3(target.x,0,target.z),stage,true)
-
-func _installer_route(start_point: Vector3,target: Vector3,parcel: Dictionary,leaving := false)->Array:
-	if not target.is_finite(): return []
-	var route: Array=[]
-	var start: Vector3=Vector3(start_point.x,0.0,start_point.z)
-	var finish: Vector3=Vector3(target.x,0.0,target.z)
-	var tier: int=int(game.service.progress.lounge_tier)
-	var owned: Array=game.service.progress.lounge_items.duplicate()
-	if leaving and start.z>Annex.CAFE_BACK_Z:
-		var room_path: Array=Layout.path_between(start,Annex.REST_DOOR_ROOM,tier,owned)
-		for point in room_path: _append_route_point(route,point)
-		_append_route_point(route,Annex.REST_DOOR_CAFE)
-		for point in _cafe_route(Annex.REST_DOOR_CAFE,finish): _append_route_point(route,point)
-		return route
-	if finish.z>Annex.CAFE_BACK_Z:
-		for point in _cafe_route(start,Annex.REST_DOOR_CAFE): _append_route_point(route,point)
-		_append_route_point(route,Annex.REST_DOOR_ROOM)
-		var room_path: Array=Layout.path_between(Annex.REST_DOOR_ROOM,finish,tier,owned)
-		if room_path.is_empty(): return []
-		for point in room_path: _append_route_point(route,point)
-		return route
-	return _cafe_route(start,finish)
-
-func _clear_installer_path(job: Dictionary)->void:
-	job.erase("path")
-	job.erase("path_index")
-	job.erase("path_target")
-	job.erase("path_phase")
-	job.blocked_path=false
-
-func _set_installer_phase(job: Dictionary,phase: String)->void:
-	if str(job.get("phase",""))==phase: return
-	job.phase=phase
-	job.phase_age=0.0
-	_clear_installer_path(job)
+func _set_worker_phase(parcel: Dictionary,phase: String) -> void:
+	if str(parcel.get("worker_phase",""))==phase: return
+	parcel.worker_phase=phase
+	parcel.worker_age=0.0
+	_clear_worker_path(parcel)
 	game.service.progress.revision+=1
 
-func _ensure_installer_path(job: Dictionary,target: Vector3,parcel: Dictionary,leaving := false)->bool:
-	var signature: Array=[snappedf(target.x,0.05),snappedf(target.z,0.05)]
-	if str(job.get("path_phase",""))==str(job.get("phase","")) and job.get("path_target",[])==signature and job.get("path",[]) is Array and not job.path.is_empty(): return true
-	var route: Array=_installer_route(_job_position(job),target,parcel,leaving)
-	job.path=[]
-	for point in route: job.path.append([point.x,0.0,point.z])
-	job.path_index=0
-	job.path_target=signature
-	job.path_phase=str(job.get("phase",""))
-	job.blocked_path=job.path.is_empty()
-	return not job.blocked_path
+func _reset_worker_claim(parcel: Dictionary,keep_position:=true) -> void:
+	if keep_position and str(parcel.get("worker_phase","")) in ["carrying","installing"]:
+		var at:=_worker_position(parcel)
+		parcel.position=[at.x,0.3,at.z]
+	parcel.worker_phase=""
+	parcel.worker_role=-1
+	parcel.worker_age=0.0
+	parcel.worker_yaw=0.0
+	_clear_worker_path(parcel)
 
-func _follow_installer_path(job: Dictionary,target: Vector3,parcel: Dictionary,delta: float,speed: float,leaving := false)->bool:
-	if not _ensure_installer_path(job,target,parcel,leaving):
-		job.phase_age=float(job.get("phase_age",0.0))+delta
-		if float(job.phase_age)>=0.75:
-			job.phase_age=0.0
-			_clear_installer_path(job)
-		return false
-	var index: int=int(job.get("path_index",0))
-	var path: Array=job.path
-	var at: Vector3=_job_position(job)
+func _worker_start_position(station: Node3D,role: int) -> Vector3:
+	return station.to_global(Vector3(station.role_home_x(role),0.0,1.85))
+
+func _worker_install_approach(station: Node3D,role: int) -> Vector3:
+	var side:=0.0 if station.role_count()==1 else -0.65+1.30*float(role)/maxf(1.0,float(station.role_count()-1))
+	return station.to_global(Vector3(side,0.0,2.55))
+
+func _ensure_worker_path(parcel: Dictionary,target: Vector3) -> bool:
+	var signature: Array=[snappedf(target.x,0.05),snappedf(target.z,0.05)]
+	if str(parcel.get("worker_path_phase",""))==str(parcel.get("worker_phase","")) and parcel.get("worker_path_target",[])==signature and parcel.get("worker_path",[]) is Array and not parcel.worker_path.is_empty(): return true
+	var stage:=Expansion.stage_for_progress(game.service.progress)
+	var route: Array=Expansion.cafe_route(_worker_position(parcel),Vector3(target.x,0.0,target.z),stage,true)
+	parcel.worker_path=[]
+	for point in route: parcel.worker_path.append([point.x,0.0,point.z])
+	parcel.worker_path_index=0
+	parcel.worker_path_target=signature
+	parcel.worker_path_phase=str(parcel.get("worker_phase",""))
+	return not parcel.worker_path.is_empty()
+
+func _follow_worker_path(parcel: Dictionary,target: Vector3,delta: float,speed: float) -> bool:
+	if not _ensure_worker_path(parcel,target): return false
+	var index: int=int(parcel.get("worker_path_index",0))
+	var path: Array=parcel.worker_path
+	var at: Vector3=_worker_position(parcel)
 	while index<path.size():
 		var raw: Array=path[index]
-		var next: Vector3=Vector3(float(raw[0]),0.0,float(raw[2]))
-		var offset: Vector3=next-at
+		var next:=Vector3(float(raw[0]),0.0,float(raw[2]))
+		var offset:=next-at
 		if offset.length()<0.055:
 			at=next
 			index+=1
 			continue
-		job.yaw=atan2(-offset.x,-offset.z)
+		parcel.worker_yaw=atan2(-offset.x,-offset.z)
 		at=at.move_toward(next,delta*speed)
-		_store_job_position(job,at)
-		job.path_index=index
-		job.blocked_path=false
+		_store_worker_position(parcel,at)
+		parcel.worker_path_index=index
 		return false
-	_store_job_position(job,Vector3(target.x,0.0,target.z))
-	job.path_index=index
-	job.blocked_path=false
+	_store_worker_position(parcel,Vector3(target.x,0.0,target.z))
+	parcel.worker_path_index=index
 	return true
 
-func installer_watch_target(job: Dictionary)->Vector3:
-	var parcel: Dictionary=parcel_by_id(int(job.get("delivery_id",0)))
-	if parcel.is_empty(): return Vector3.INF
-	var station: Node3D=game.service.by_id(int(parcel.get("station",0)))
-	if station==null: return Vector3.INF
-	if station.type_id=="counter" and is_instance_valid(station.view) and is_instance_valid(station.view.worker) and station.view.worker.visible:
-		return station.view.worker.global_position+Vector3.UP*1.48
+func _source_worker_tint(station: Node3D,role: int) -> Color:
+	if station.type_id=="counter" and is_instance_valid(station.view) and is_instance_valid(station.view.worker): return station.view.worker.tint
 	if is_instance_valid(station.view):
 		var actors: Variant=station.view.get("actors")
-		if actors is Array:
-			for actor in actors:
-				if actor is Node3D and is_instance_valid(actor) and actor.visible: return actor.global_position+Vector3.UP*1.48
-	return station.global_position+Vector3.UP*1.45
+		if actors is Array and role>=0 and role<actors.size() and actors[role] is Node3D: return actors[role].tint
+	return [Color("63aa98"),Color("7ba2b0"),Color("c4926e")][role%3]
 
-func _sync_legacy_installer(parcel: Dictionary,job: Dictionary)->void:
-	if parcel.is_empty(): return
-	var phase: String=str(job.get("phase","waiting_delivery"))
-	parcel.installer_state="walking" if phase in ["approaching_box","carrying"] else phase
-	parcel.installer_position=job.get("position",[0.0,0.0,0.0]).duplicate()
-	parcel.installer_age=float(job.get("phase_age",0.0))
-	parcel.installer_variant=int(job.get("variant",0))
+func _worker_state(parcel: Dictionary,station: Node3D,role: int) -> Dictionary:
+	return {"phase":str(parcel.get("worker_phase","approaching_box")),"position":parcel.get("worker_position",[_worker_start_position(station,role).x,0.0,_worker_start_position(station,role).z]),"yaw":float(parcel.get("worker_yaw",0.0)),"age":float(parcel.get("worker_age",0.0)),"variant":(int(parcel.id)+role)%4,"name":str(station.crew[role].get("name","Клон")),"station":station.station_id,"role":role,"parcel":int(parcel.id),"tint":_source_worker_tint(station,role)}
+
+func _cheer_state(station: Node3D,role: int) -> Dictionary:
+	var age:=delivery_clock+float(role)*0.71+float(station.station_id)*0.19
+	var center:=station.to_global(Vector3(0.0,0.0,2.45))
+	var angle:=age*1.65+float(role)*TAU/maxf(1.0,float(station.role_count()))
+	var radius:=0.68+0.10*float(role%2)
+	var at:=center+Vector3(cos(angle)*radius,0.0,sin(angle)*0.34)
+	var toward:=center-at
+	return {"phase":"cheering","position":[at.x,0.0,at.z],"yaw":atan2(-toward.x,-toward.z),"age":age,"variant":role+station.station_id,"name":str(station.crew[role].get("name","Клон")),"station":station.station_id,"role":role,"parcel":0,"tint":_source_worker_tint(station,role)}
+
+func _advance_worker_parcel(parcel: Dictionary,station: Node3D,role: int,delta: float) -> void:
+	if int(parcel.get("worker_role",-1))!=role:
+		parcel.worker_role=role
+		parcel.worker_phase="approaching_box"
+		var start:=_worker_start_position(station,role)
+		_store_worker_position(parcel,start)
+		parcel.worker_yaw=station.global_rotation.y+PI
+		parcel.worker_age=0.0
+		_clear_worker_path(parcel)
+	var phase:=str(parcel.get("worker_phase","approaching_box"))
+	if phase.is_empty():
+		_set_worker_phase(parcel,"approaching_box")
+		phase="approaching_box"
+	if phase=="approaching_box":
+		var raw: Array=parcel.get("position",[0.0,0.0,0.0])
+		var box_at:=Vector3(float(raw[0]),0.0,float(raw[2]))
+		if _follow_worker_path(parcel,box_at,delta,7.5): _set_worker_phase(parcel,"carrying")
+	elif phase=="carrying":
+		var target:=_worker_install_approach(station,role)
+		if _follow_worker_path(parcel,target,delta,6.2): _set_worker_phase(parcel,"installing")
+	elif phase=="installing":
+		parcel.worker_age=float(parcel.get("worker_age",0.0))+delta
+		if float(parcel.worker_age)>=1.15:
+			var name:=parcel_name(parcel)
+			var error:=_install_parcel(parcel,true)
+			if error.is_empty(): game.service.announce("Работники сами установили: "+name)
+
+func _delivery_assignments(parcels: Array,count: int) -> Dictionary:
+	var result: Dictionary={}
+	var assigned: Dictionary={}
+	for parcel in parcels:
+		var role:=int(parcel.get("worker_role",-1))
+		if role<0 or role>=count or result.has(role): continue
+		result[role]=parcel
+		assigned[int(parcel.id)]=true
+	for parcel in parcels:
+		if assigned.has(int(parcel.id)): continue
+		for role in range(count):
+			if result.has(role): continue
+			result[role]=parcel
+			assigned[int(parcel.id)]=true
+			break
+	return result
+
+func _advance_clone_deliveries(delta: float) -> void:
+	delivery_clock+=delta
+	delivery_worker_states.clear()
+	for station in game.service.stations: station.delivery_celebration_active=false
+	for parcel in game.service.progress.deliveries:
+		if not clone_delivery_claimed(parcel) and not str(parcel.get("worker_phase","" )).is_empty(): _reset_worker_claim(parcel)
+	for station in game.service.stations:
+		if station.manual_station: continue
+		var count: int=station.role_count() if int(station.staffed)<0 else clampi(int(station.staffed),0,station.role_count())
+		if count<=0: continue
+		var parcels:=_station_delivery_parcels(station)
+		if parcels.is_empty(): continue
+		var assignments:=_delivery_assignments(parcels,count)
+		station.delivery_celebration_active=true
+		for role in range(count):
+			var key:="%d:%d"%[station.station_id,role]
+			if assignments.has(role):
+				var parcel: Dictionary=assignments[role]
+				_advance_worker_parcel(parcel,station,role,delta)
+				if not parcel.is_empty() and parcel in game.service.progress.deliveries: delivery_worker_states[key]=_worker_state(parcel,station,role)
+			else: delivery_worker_states[key]=_cheer_state(station,role)
 
 func equipment_allowed(type_id: String,item: String) -> bool:
 	return Definition.equipment_allowed(type_id,item)
 
-func order(item: String, station_id: int, with_installer := false) -> String:
+func order(item: String, station_id: int) -> String:
 	var p = game.service.progress
 	if not ITEMS.has(item): return "Товар не найден."
 	var spec: Dictionary = ITEMS[item]
@@ -405,9 +393,7 @@ func order(item: String, station_id: int, with_installer := false) -> String:
 	if pending(item,station_id): return "Доставка уже заказана."
 	if p.cash < spec.price: return "Не хватает денег."
 	p.cash -= spec.price
-	var installer: bool=bool(with_installer) and installer_supported(item)
-	p.deliveries.append(_new_delivery(item,station_id,[item],installer,8.0))
-	if installer: _ensure_installer_job(p.deliveries.back())
+	p.deliveries.append(_new_delivery(item,station_id,[item],8.0))
 	p.revision += 1
 	log_event("purchase",{"item":item,"station":station_id,"price":spec.price,"cash":p.cash})
 	return ""
@@ -421,18 +407,6 @@ func parcel_by_id(id: int) -> Dictionary:
 	for parcel in game.service.progress.deliveries:
 		if parcel.id == id: return parcel
 	return {}
-
-func parcel_has_installer(parcel: Dictionary) -> bool:
-	return bool(parcel.get("installer",false))
-
-func station_install_blocked(parcel: Dictionary) -> bool:
-	var spec: Dictionary=ITEMS[parcel.item]
-	if spec.kind=="station": return game.service.by_id(int(parcel.station))!=null
-	if spec.kind=="equipment":
-		var station=game.service.by_id(int(parcel.station))
-		return station==null or station.state not in ["idle","waiting"] or station.customer_id>=0 or station.training.active() or not station.group_training_state.is_empty()
-	if spec.kind=="lounge": return not game.session.sleeping_peers.is_empty()
-	return false
 
 func lab_position(index: int) -> Vector3: return Annex.lab_world(Vector3(-0.85+index*0.85,1.05,8.6))
 func installation_position(parcel: Dictionary) -> Vector3:
@@ -468,13 +442,10 @@ func target(camera: Camera3D, peer: int) -> Dictionary:
 		if not lab_target.is_empty(): return lab_target
 	for parcel in game.service.progress.deliveries:
 		if parcel.remaining <= 0 and parcel.owner == 0:
-			var at_raw: Array=parcel.position
-			if parcel_has_installer(parcel):
-				var job:=installer_job_for_delivery(int(parcel.id))
-				if not job.is_empty() and str(job.get("phase","waiting_delivery")) not in ["waiting_delivery","approaching_box"]: at_raw=job.get("position",parcel.position)
+			var at_raw: Array=parcel.get("worker_position",parcel.position) if clone_delivery_claimed(parcel) and str(parcel.get("worker_phase","")) in ["carrying","installing"] else parcel.position
 			var at := Vector3(float(at_raw[0]),float(at_raw[1]),float(at_raw[2]))
 			if near_ray(camera,at,0.75):
-				if parcel_has_installer(parcel): return {"action":"installer_owned_parcel","id":parcel.id,"hint":"Этой доставкой займется сборщик"}
+				if clone_delivery_claimed(parcel): return {"action":"worker_owned_parcel","id":parcel.id,"hint":"Работники уже бегут за этой коробкой"}
 				return {"action":"take_parcel","id":parcel.id,"hint":"(E) Взять: "+parcel_name(parcel)}
 	var p = game.service.progress
 	if p.garland_owned:
@@ -529,9 +500,9 @@ func action(peer: int, data: Dictionary) -> String:
 		return ""
 	var parcel := parcel_by_id(int(data.get("id",-1)))
 	if parcel.is_empty(): return "Коробка уже разобрана."
-	if action_name=="installer_owned_parcel": return "Этой доставкой займется сборщик."
+	if action_name=="worker_owned_parcel": return "Не отбирай у ребят праздник — они сами хотят распаковать и установить обновку."
 	if action_name == "take_parcel":
-		if parcel_has_installer(parcel): return "Этой доставкой займется сборщик."
+		if clone_delivery_claimed(parcel): return "Не отбирай у ребят праздник — они сами хотят распаковать и установить обновку."
 		if parcel.remaining>0 or parcel.owner!=0 or carried(peer)>=0 or p.garland_builder==peer: return "Освободи руки или дождись доставки."
 		var at := Vector3(parcel.position[0],parcel.position[1],parcel.position[2])
 		if position.distance_to(at)>4.5: return "Подойди к коробке."
@@ -558,7 +529,7 @@ func action(peer: int, data: Dictionary) -> String:
 	log_event(action_name,{"item":parcel.item,"station":parcel.station})
 	return ""
 
-func _install_parcel(parcel: Dictionary) -> String:
+func _install_parcel(parcel: Dictionary,by_workers:=false) -> String:
 	var p=game.service.progress
 	var spec: Dictionary=ITEMS[parcel.item]
 	if spec.kind=="lounge":
@@ -569,7 +540,7 @@ func _install_parcel(parcel: Dictionary) -> String:
 		else: p.lounge_items.append(spec.lounge_id)
 	elif spec.kind=="equipment":
 		var station=game.service.by_id(int(parcel.station))
-		if station==null or station.state not in ["idle","waiting"]: return "Дождись свободной станции."
+		if station==null or (not by_workers and station.state not in ["idle","waiting"]): return "Дождись свободной станции."
 		for item in parcel.get("items",[parcel.item]):
 			if item=="sauce_ramp":
 				if item not in station.upgrades: station.upgrades.append(item)
@@ -604,104 +575,17 @@ func _install_parcel(parcel: Dictionary) -> String:
 		p.lab_stage+=1
 	elif spec.kind=="garland": p.garland_owned=true
 	elif spec.kind=="decor": p.decorations.append(parcel.item); p.popularity+=game.service.Progression.DECOR[parcel.item].popularity
-	var completed_by_installer: bool=parcel_has_installer(parcel)
-	var completed_station_id: int=int(parcel.station) if spec.kind=="station" else 0
-	p.delivery_history.push_front({"id":int(parcel.id),"item":str(parcel.item),"items":parcel.get("items",[parcel.item]).duplicate(),"station":int(parcel.station),"installer":completed_by_installer,"installer_id":int(parcel.id) if completed_by_installer else 0,"day":int(p.day)})
+	var installed_by: String="workers" if by_workers else "player"
+	p.delivery_history.push_front({"id":int(parcel.id),"item":str(parcel.item),"items":parcel.get("items",[parcel.item]).duplicate(),"station":int(parcel.station),"installed_by":installed_by,"day":int(p.day)})
 	while p.delivery_history.size()>12: p.delivery_history.pop_back()
 	p.deliveries.erase(parcel)
 	p.revision+=1
-	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installer":completed_by_installer})
-	if completed_by_installer and completed_station_id>0:
-		var installed=game.service.by_id(completed_station_id)
-		var missing_workers: int=1 if installed!=null and installed.staffed>=0 and installed.staffed<installed.role_count() else 0
-		game.service.feed_system("installer",{"stations":[completed_station_id],"workers_missing":missing_workers},1)
+	log_event("delivery_installed",{"item":parcel.item,"station":parcel.station,"installed_by":installed_by})
+	if by_workers: game.service.feed_system("worker_delivery",{"stations":[int(parcel.station)]},1)
 	return ""
-
-func _advance_installer(job: Dictionary,delta: float) -> void:
-	var delivery_id: int=int(job.get("delivery_id",0))
-	var parcel:=parcel_by_id(delivery_id)
-	var phase: String=str(job.get("phase","waiting_delivery"))
-	if phase=="waiting_delivery":
-		if parcel.is_empty():
-			_set_installer_phase(job,"finished")
-			return
-		_sync_legacy_installer(parcel,job)
-		if float(parcel.get("remaining",0.0))>0.0: return
-		var spawn: Vector3=_installer_spawn(int(job.get("id",delivery_id)))
-		_store_job_position(job,spawn)
-		_set_installer_phase(job,"approaching_box")
-		phase="approaching_box"
-	if phase=="approaching_box":
-		if parcel.is_empty():
-			_set_installer_phase(job,"finished")
-			return
-		var raw_box: Array=parcel.get("position",[0.0,0.0,0.0])
-		var box_floor: Vector3=Vector3(float(raw_box[0]),0.0,float(raw_box[2]))
-		if _follow_installer_path(job,box_floor,parcel,delta,2.45):
-			_set_installer_phase(job,"carrying")
-		_sync_legacy_installer(parcel,job)
-		return
-	if phase=="carrying":
-		if parcel.is_empty():
-			if bool(job.get("installed",false)): _set_installer_phase(job,"leaving")
-			else: _set_installer_phase(job,"finished")
-			return
-		var blocked: bool=station_install_blocked(parcel)
-		var destination: Vector3=installer_wait_position(parcel,job) if blocked else installer_approach_position(parcel)
-		if not destination.is_finite():
-			job.blocked_path=true
-			_sync_legacy_installer(parcel,job)
-			return
-		if _follow_installer_path(job,destination,parcel,delta,3.20):
-			_set_installer_phase(job,"waiting" if blocked else "installing")
-		_sync_legacy_installer(parcel,job)
-		return
-	if phase=="waiting":
-		if parcel.is_empty():
-			if bool(job.get("installed",false)): _set_installer_phase(job,"leaving")
-			else: _set_installer_phase(job,"finished")
-			return
-		job.phase_age=float(job.get("phase_age",0.0))+delta
-		var wait_point: Vector3=installer_wait_position(parcel,job)
-		if wait_point.is_finite(): _store_job_position(job,wait_point)
-		if not station_install_blocked(parcel): _set_installer_phase(job,"carrying")
-		_sync_legacy_installer(parcel,job)
-		return
-	if phase=="installing":
-		if parcel.is_empty():
-			_set_installer_phase(job,"leaving" if bool(job.get("installed",false)) else "finished")
-			return
-		var approach: Vector3=installer_approach_position(parcel)
-		if approach.is_finite(): _store_job_position(job,approach)
-		var install_target: Vector3=installation_position(parcel)
-		if install_target.is_finite(): job.install_target=[install_target.x,install_target.y,install_target.z]
-		job.phase_age=float(job.get("phase_age",0.0))+delta
-		_sync_legacy_installer(parcel,job)
-		if float(job.phase_age)<1.8 or bool(job.get("installed",false)): return
-		var installed_name: String=parcel_name(parcel)
-		var error: String=_install_parcel(parcel)
-		if not error.is_empty():
-			_set_installer_phase(job,"waiting")
-			return
-		job.installed=true
-		_set_installer_phase(job,"leaving")
-		game.service.announce("Сборщик установил: "+installed_name)
-		return
-	if phase=="leaving":
-		job.phase_age=float(job.get("phase_age",0.0))+delta
-		var assignment_parcel: Dictionary=_installer_assignment_parcel(job)
-		var exit: Vector3=_installer_exit(job)
-		if _follow_installer_path(job,exit,assignment_parcel,delta,2.55,true): _set_installer_phase(job,"finished")
-		return
-	if phase=="finished":
-		job.phase_age=float(job.get("phase_age",0.0))+delta
-		if float(job.phase_age)>=0.35:
-			game.service.progress.installer_jobs.erase(job)
-			game.service.progress.revision+=1
 
 func advance(delta: float) -> void:
 	for parcel in game.service.progress.deliveries.duplicate():
-		if parcel_has_installer(parcel): _ensure_installer_job(parcel)
 		if parcel.remaining>0:
 			parcel.remaining=maxf(0,parcel.remaining-delta)
 			if parcel.remaining==0:
@@ -709,9 +593,9 @@ func advance(delta: float) -> void:
 				parcel.position=[dropped.x,dropped.y,dropped.z]
 				truck_age=5
 				game.service.progress.revision+=1
-				game.service.announce(("Сборщик приехал: " if parcel_has_installer(parcel) else "Доставка у входа: ")+parcel_name(parcel))
-				log_event("delivery_arrived",{"item":parcel.item,"installer":parcel_has_installer(parcel)})
-	for job in game.service.progress.installer_jobs.duplicate(): _advance_installer(job,delta)
+				game.service.announce("Доставка у входа: "+parcel_name(parcel))
+				log_event("delivery_arrived",{"item":parcel.item})
+	_advance_clone_deliveries(delta)
 
 func _process(delta: float) -> void:
 	if game==null: return
@@ -727,9 +611,8 @@ func _process(delta: float) -> void:
 			var label := Props.text(box,parcel_name(parcel),Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 			boxes[parcel.id]=box
 		var node: Node3D = boxes[parcel.id]
-		var installer_job: Dictionary=installer_job_for_delivery(int(parcel.id)) if parcel_has_installer(parcel) else {}
-		var installer_phase: String=str(installer_job.get("phase","waiting_delivery"))
-		node.visible=parcel.remaining<=0 and (not parcel_has_installer(parcel) or installer_phase in ["waiting_delivery","approaching_box"])
+		var worker_phase: String=str(parcel.get("worker_phase",""))
+		node.visible=parcel.remaining<=0 and worker_phase not in ["carrying","installing"]
 		if parcel.owner==0 and parcel.remaining<=0 and _legacy_drop(parcel):
 			var dropped:=parcel_drop_position(int(parcel.id))
 			parcel.position=[dropped.x,dropped.y,dropped.z]
@@ -740,21 +623,21 @@ func _process(delta: float) -> void:
 			if pose.has("position"): node.global_position=Vector3(pose.position[0],pose.position[1]+1.15,pose.position[2])+Vector3(0,0,-0.7).rotated(Vector3.UP,float(pose.get("yaw",0)))
 	for id in boxes.keys():
 		if id not in ids: boxes[id].queue_free(); boxes.erase(id)
-	var installer_ids: Array=[]
-	for job in p.installer_jobs:
-		var phase: String=str(job.get("phase","waiting_delivery"))
-		var parcel: Dictionary=parcel_by_id(int(job.get("delivery_id",0)))
-		if phase=="waiting_delivery" and (parcel.is_empty() or float(parcel.get("remaining",0.0))>0.0): continue
-		var id: int=int(job.get("id",0))
-		installer_ids.append(id)
-		if not installers.has(id):
-			var worker_instance: Node3D=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/actors/delivery_installer.tscn",Installer) as Node3D; worker_instance.get_node("Actor").set_script(preload("res://scripts/cook_avatar.gd")); add_child(worker_instance); worker_instance.setup(id); installers[id]=worker_instance
-		var worker: Node3D=installers[id]
-		var raw_target: Array=job.get("install_target",[])
-		var install_target: Vector3=Vector3(float(raw_target[0]),float(raw_target[1]),float(raw_target[2])) if raw_target.size()==3 else installation_position(parcel) if not parcel.is_empty() else _job_position(job)+Vector3.UP
-		worker.apply(job,install_target,installer_watch_target(job),_installer_exit(job),delta)
-	for id in installers.keys():
-		if id not in installer_ids: installers[id].queue_free(); installers.erase(id)
+	var worker_ids: Array=[]
+	for key in delivery_worker_states:
+		worker_ids.append(key)
+		var state: Dictionary=delivery_worker_states[key]
+		if not delivery_workers.has(key):
+			var worker_instance: Node3D=SceneRuntime.instantiate("res://scenes/actors/station_delivery_worker.tscn",DeliveryWorker) as Node3D
+			var worker_actor: Node3D=worker_instance.get_node("Actor") as Node3D
+			worker_actor.set_script(preload("res://scripts/cook_avatar.gd"))
+			worker_actor.tint=state.get("tint",Color("63aa98"))
+			add_child(worker_instance)
+			worker_instance.setup(str(state.get("name","Клон")),state.get("tint",Color("63aa98")))
+			delivery_workers[key]=worker_instance
+		delivery_workers[key].apply(state,delta)
+	for key in delivery_workers.keys():
+		if key not in worker_ids: delivery_workers[key].queue_free(); delivery_workers.erase(key)
 	placement_clock += delta
 	local_ghost.hide()
 	placement_beacon.hide()
@@ -785,7 +668,7 @@ func _process(delta: float) -> void:
 		if id!=p.garland_builder: garland_reels[id].queue_free(); garland_reels.erase(id)
 	truck_age=maxf(0,truck_age-delta)
 	truck.visible=truck_age>0
-	var truck_base:=Expansion.installer_spawn(Expansion.stage_for_progress(p),0)
+	var truck_base:=Expansion.delivery_vehicle_spawn(Expansion.stage_for_progress(p))
 	truck.position=Vector3(truck_base.x-0.8,0,truck_base.z-(5-truck_age)*0.8)
 
 func parcel_name(parcel: Dictionary) -> String:
@@ -793,7 +676,7 @@ func parcel_name(parcel: Dictionary) -> String:
 	for item in parcel.get("items",[parcel.item]): names.append(ITEMS[item].name)
 	return "Комплект · станция %d · %d предметов"%[parcel.station,names.size()] if names.size()>1 else " + ".join(names)
 
-func order_bundle(items: Array, station_id: int, with_installer := false) -> String:
+func order_bundle(items: Array, station_id: int) -> String:
 	var p=game.service.progress
 	var station=game.service.by_id(station_id)
 	if p.stars<1 or station==null or items.is_empty(): return "Комплекты доступны с первой звезды."
@@ -806,15 +689,14 @@ func order_bundle(items: Array, station_id: int, with_installer := false) -> Str
 		if not equipment_allowed(station.type_id,item) or p.stars<int(spec.get("star",0)): return "Этот предмет недоступен станции."
 		unique.append(item); total+=int(spec.price)
 	if p.cash<total: return "Не хватает денег на комплект."
-	var error := order(unique[0],station_id,with_installer)
+	var error := order(unique[0],station_id)
 	if not error.is_empty(): return error
 	p.cash-=total-int(ITEMS[unique[0]].price)
 	p.deliveries.back().items=unique
-	if parcel_has_installer(p.deliveries.back()): _ensure_installer_job(p.deliveries.back())
-	log_event("bundle_ordered",{"station":station_id,"items":unique,"price":total,"installer":bool(with_installer)})
+	log_event("bundle_ordered",{"station":station_id,"items":unique,"price":total})
 	return ""
 
-func order_station_batch(type_id: String,station_ids: Array,equipment: Array,group_id: String,with_installers: bool) -> String:
+func order_station_batch(type_id: String,station_ids: Array,equipment: Array,group_id: String) -> String:
 	var p=game.service.progress
 	if p.busy(): return "Сначала заверши проверку."
 	if not type_available(type_id): return "Этот тип кухни ещё не открыт."
@@ -847,10 +729,9 @@ func order_station_batch(type_id: String,station_ids: Array,equipment: Array,gro
 		var station_id: int=int(unique_ids[index])
 		var contents: Array=[type_id]
 		contents.append_array(chosen_equipment)
-		p.deliveries.append(_new_delivery(type_id,station_id,contents,bool(with_installers),8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"planned_group_snapshot":group_snapshot.duplicate(true),"unit_price":unit_price}))
-		if with_installers: _ensure_installer_job(p.deliveries.back())
+		p.deliveries.append(_new_delivery(type_id,station_id,contents,8.0+index*0.35,{"method_plan":plan.duplicate(true),"planned_group":group_id,"planned_group_snapshot":group_snapshot.duplicate(true),"unit_price":unit_price}))
 	p.revision+=1
-	log_event("station_batch_ordered",{"type":type_id,"stations":unique_ids,"equipment":chosen_equipment,"group":group_id,"installer":with_installers,"price":total})
+	log_event("station_batch_ordered",{"type":type_id,"stations":unique_ids,"equipment":chosen_equipment,"group":group_id,"price":total})
 	game.service.feed_system("batch",{"stations":unique_ids,"group":group_id},unique_ids.size())
 	return ""
 

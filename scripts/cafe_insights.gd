@@ -185,11 +185,8 @@ static func event_text(entry: Dictionary,dish_names: Dictionary)->String:
 			return "%d %s ушли частично обслуженными · %s · %s"%[count,guest_word(count),dish_name,reason_label(str(entry.get("reason","")))]
 		"training":
 			return "Урок завершён · мастер-класс «%s» освоили %d %s"%[str(entry.get("name","Запись")),count,table_word(count)]
-		"installer":
-			var tail: String=""
-			var missing: int=int(entry.get("workers_missing",0))
-			if missing>0: tail=" · %d %s нужны работники"%[missing,table_word(missing)]
-			return ("Сборщик установил %d станцию" if count==1 else "Сборщики установили %d станций")%count+tail
+		"worker_delivery":
+			return ("Работники сами установили обновку на %d столе" if count==1 else "Работники сами установили обновки на %d столах")%count
 		"masterclass":
 			return "Начат мастер-класс · "+dish_name
 		"group_training":

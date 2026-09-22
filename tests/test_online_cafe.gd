@@ -99,10 +99,10 @@ func member_named(name: String) -> int:
 func kitchen_phase() -> String:
 	var kitchen = game.service.by_id(4) if is_instance_valid(game) else null
 	return kitchen.training.phase if kitchen != null else "?"
-func installer_leaving() -> bool:
+func delivery_worker_active() -> bool:
 	if not is_instance_valid(game): return false
-	for job in game.service.progress.installer_jobs:
-		if str(job.get("phase",""))=="leaving": return true
+	for parcel in game.service.progress.deliveries:
+		if str(parcel.get("worker_phase","")) in ["approaching_box","carrying","installing"]: return true
 	return false
 
 func shared_course_count() -> int:
@@ -186,24 +186,20 @@ func host_tick() -> void:
 			if not duplicate_error.is_empty() or game.service.training_queue.courses.size()!=before_courses+1 or shared_course_count()!=1:
 				fail("Repeated T22 command created more than one course")
 				return
-			var t22_parcel: Dictionary=game.shop._new_delivery("counter",20,["counter"],true,0.0,{})
+			var t22_station=game.service.by_id(3)
+			t22_station.staffed=maxi(1,t22_station.staffed)
+			var t22_item: String="sauce" if "sauce" not in t22_station.equipment else "pan"
+			if t22_item in t22_station.equipment: t22_station.equipment.erase(t22_item)
+			var t22_parcel: Dictionary=game.shop._new_delivery(t22_item,3,[t22_item],0.0,{})
 			game.service.progress.deliveries.append(t22_parcel)
-			var t22_job: Dictionary=game.shop._ensure_installer_job(t22_parcel)
-			var install_at: Vector3=game.shop.installer_approach_position(t22_parcel)
-			t22_job.phase="leaving"
-			t22_job.installed=true
-			t22_job.phase_age=0.0
-			t22_job.position=[install_at.x,0.0,install_at.z]
-			game.service.progress.deliveries.erase(t22_parcel)
-			game.service.progress.delivery_history.push_front({"id":int(t22_parcel.id),"item":"counter","items":["counter"],"station":20,"installer":true,"installer_id":int(t22_parcel.id),"day":int(game.service.progress.day)})
-			game.service.progress.revision+=1
+			game.shop._advance_clone_deliveries(0.016)
 			game.shop._process(0.016)
 			started_staff_training=true
 			barrier.send("staff-started")
-			print("CHECK: repeated host command creates exactly one shared course and starts a physical leaving installer")
-		if started_staff_training and first.training.phase=="recording" and second.training.phase=="recording" and game.service.staff_training.phase=="watching" and bool(game.service.movie_state.get("playing",false)) and installer_leaving():
+			print("CHECK: repeated host command creates exactly one shared course and starts a physical clone delivery run")
+		if started_staff_training and first.training.phase=="recording" and second.training.phase=="recording" and game.service.staff_training.phase=="watching" and bool(game.service.movie_state.get("playing",false)) and delivery_worker_active():
 			print("READY: late join")
-			print("CHECK: late join window has a live staff movie and an installer physically leaving")
+			print("CHECK: late join window has a live staff movie and a clone physically handling a delivery")
 			saw_parallel = true
 			stage = 2
 	elif stage == 2 and game.session.members.size() == 3 and second.training.phase == "idle":
@@ -312,17 +308,17 @@ func observer_tick() -> void:
 		if not game.service.staff_training.is_active() or game.service.staff_training.phase!="watching" or not bool(game.service.movie_state.get("playing",false)):
 			fail("T22 late observer did not join during the shared staff movie")
 			return
-		if not installer_leaving():
-			fail("T22 late observer did not receive the leaving installer state")
+		if not delivery_worker_active():
+			fail("T22 late observer did not receive the active clone delivery state")
 			return
 		if shared_course_count()!=1:
 			fail("T22 late observer sees an incorrect shared course count: %d"%shared_course_count())
 			return
 		game.shop._process(0.016)
-		if game.shop.installers.is_empty():
-			fail("T22 late observer did not reconstruct the physical leaving installer")
+		if game.shop.delivery_workers.is_empty():
+			fail("T22 late observer did not reconstruct the physical clone delivery worker")
 			return
-		print("CHECK: T22 late observer matches movie, queue and leaving installer state")
+		print("CHECK: T22 late observer matches movie, queue and clone delivery state")
 		stage = 1
 	elif stage == 1 and kitchen.training.phase == "recording":
 		if kitchen.training.dish != "meal": fail("Observer kitchen dish %s" % kitchen.training.dish)

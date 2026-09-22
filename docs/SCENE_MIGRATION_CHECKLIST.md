@@ -9,7 +9,7 @@
 - [x] Customer / taster — `scenes/actors/customer.tscn`
 - [x] Cook / clone avatar — `scenes/actors/cook_avatar.tscn`
 - [x] Cook notebook + pencil — `scenes/props/cook_notebook.tscn`
-- [x] Delivery installer — `scenes/actors/delivery_installer.tscn`
+- [x] Station delivery worker — `scenes/actors/station_delivery_worker.tscn`
 - [x] Growing clone / sprout variant — `scenes/actors/clone_sprout.tscn`
 - [x] Remote multiplayer player visual — `scenes/actors/remote_player.tscn`
 - [x] Cook lounge accessories: cup, paddle, snack — `scenes/props/cook_lounge_accessories.tscn`

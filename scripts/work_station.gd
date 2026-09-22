@@ -57,8 +57,10 @@ var walls: Array = []
 var zone_edges: Array = []
 var was_resting := true
 var upgrade_view: Node3D
+var delivery_celebration_active := false
 
 func ready_crew() -> bool:
+	if delivery_celebration_active: return false
 	if not group_training_state.is_empty(): return false
 	var game = get_parent().game if is_inside_tree() else null
 	if game != null and is_instance_valid(game.laboratory) and game.laboratory.reserves_station(station_id): return false
@@ -357,6 +359,12 @@ func refresh(local_peer: int, delta: float) -> void:
 		else:
 			for actor in view.actors: actor.hide()
 		view.station_label.text="СТАНЦИЯ %d · ПОВАРА ОТДЫХАЮТ"%station_id
+	if delivery_celebration_active and not manual_station:
+		for student in students: student.hide()
+		if type_id=="counter": _hide_counter_clone()
+		else:
+			for actor in view.actors: actor.hide()
+		view.station_label.text="СТАНЦИЯ %d · ДОСТАВКА! ВСЕ ПОБЕЖАЛИ"%station_id
 
 func _hide_counter_clone() -> void:
 	for node in [view.worker,view.left_hand,view.right_hand,view.left_arm,view.right_arm,view.name_label]:

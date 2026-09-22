@@ -39,7 +39,6 @@ var lab_live_status: Label
 var scale_type := "counter"
 var scale_slots: Array=[]
 var scale_equipment: Array=[]
-var send_installers := false
 var stats_focus: Dictionary={}
 var course_focus_id:=0
 var groups_mode:="overview"
@@ -1374,7 +1373,7 @@ func stats_page()->void:
 			node.tooltip_text=Insights.suggestion(str(reason))
 
 	label(content,"СИСТЕМНАЯ ЛЕНТА",19)
-	if service.analytics.feed.is_empty(): label(content,"Событий пока нет. Потери, обучение и сборщики появятся здесь.",15)
+	if service.analytics.feed.is_empty(): label(content,"Событий пока нет. Потери, обучение и доставки появятся здесь.",15)
 	for entry in service.analytics.feed.slice(0, stats_feed_limit):
 		var source: String="[ИГРОК · %s] "%str(entry.get("source_name","Повар")) if str(entry.get("source","system"))=="player" else "[СИСТЕМА] "
 		var text: String=source+service.feed_text(entry)
@@ -1467,7 +1466,7 @@ func bundle_controls(station: Node3D, catalog: Array) -> void:
 			else: selections[id].erase(item)
 			rebuild())
 	if total > 0:
-		button(content, "Заказать выбранное · %d" % total, func(): send({"action":"buy_bundle", "station":id, "items":selections[id].duplicate(), "installers":send_installers}), game.service.progress.cash >= total and not game.service.progress.busy() and not game.session.is_guest())
+		button(content, "Заказать выбранное · %d" % total, func(): send({"action":"buy_bundle", "station":id, "items":selections[id].duplicate()}), game.service.progress.cash >= total and not game.service.progress.busy() and not game.session.is_guest())
 
 func lounge_page() -> void:
 	var p=game.service.progress
@@ -1588,8 +1587,8 @@ func _shop_batch(host: bool) -> void:
 	var unit_price: int=int(game.shop.ITEMS[scale_type].price)
 	for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
 	var total_price: int=unit_price*scale_slots.size()
-	label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d%s"%[scale_slots.size(),unit_price,total_price," · сборщики +0" if send_installers else ""],18)
-	button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":"","installers":send_installers}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
+	label(content,"Выбрано мест: %d · цена одного комплекта: %d · итого: %d"%[scale_slots.size(),unit_price,total_price],18)
+	button(content,"Заказать выбранные комплекты",func():send({"action":"buy_station_batch","type":scale_type,"stations":scale_slots.duplicate(),"equipment":scale_equipment.duplicate(),"group":""}),host and not scale_slots.is_empty() and progress.cash>=total_price and not progress.busy())
 
 func overview_page(host: bool) -> void:
 	var service = game.service
@@ -1624,7 +1623,7 @@ func settings_page(host: bool) -> void:
 	var help := _fold(content, "pc-help", "Как устроено кафе")
 	if help != null:
 		label(help, "Готовь и записывай мастер-классы за столом Шефа. В разделе «Столы и обучение» выбери столы и открой очередь обучения.", 16)
-		label(help, "Столы и оснащение покупаются в интернет-магазине, клоны выращиваются в лаборатории. Статус заказа указан рядом с товаром. Доставленную коробку установи на отмеченное место или дождись сборщика.", 16)
+		label(help, "Столы и оснащение покупаются в интернет-магазине, клоны выращиваются в лаборатории. Оснащение занятого клонами стола они радостно установят сами; шеф-стол, новые столы, лабораторию и комнату отдыха устанавливай лично.", 16)
 		label(help, "После закрытия смены все игроки ложатся в общую Шеф-кровать. Установленная мебель улучшает отдых клонов со следующего утра.", 16)
 	var testing := _fold(content, "pc-playtest", "Инструменты плейтеста")
 	if testing != null:
@@ -1698,13 +1697,6 @@ func shop_page(host: bool) -> void:
 		var choice := button(categories, str(entry[1]), func():shop_category=key;scroll.scroll_vertical=0;rebuild())
 		choice.toggle_mode = true
 		choice.set_pressed_no_signal(shop_category == key)
-	var installer := CheckBox.new()
-	installer.text = "Сборка при доставке · бесплатно"
-	installer.tooltip_text = "Сборщики устанавливают столы, кухонное оснащение и мебель. Остальные коробки устанавливай вручную."
-	installer.button_pressed = send_installers
-	installer.disabled = not host
-	installer.toggled.connect(func(on):send_installers=on)
-	content.add_child(installer)
 	match shop_category:
 		"equipment":
 			label(content, "Оснащение стола", 21)
@@ -1792,19 +1784,15 @@ func _item_parcel(item: String, station_id: int) -> Dictionary:
 
 func _parcel_status(parcel: Dictionary) -> String:
 	if float(parcel.get("remaining",0.0)) > 0.0: return "Доставляется"
-	var job: Dictionary = game.shop.installer_job_for_delivery(int(parcel.get("id",0)))
-	var phase: String = str(job.get("phase",parcel.get("installer_state","")))
-	if phase == "installing": return "Устанавливается"
+	if game.shop.clone_delivery_claimed(parcel):
+		return "Работники устанавливают" if str(parcel.get("worker_phase",""))=="installing" else "Работники бегут за коробкой"
 	return "Ожидает установки"
 
 func _delivery_tooltip(parcel: Dictionary) -> String:
 	var parts: Array[String] = []
 	if float(parcel.get("remaining",0.0)) > 0: parts.append("До прибытия: %d с"%ceili(float(parcel.remaining)))
 	elif int(parcel.get("owner",0)) > 0: parts.append("Коробку несёт игрок к месту установки.")
-	elif bool(parcel.get("installer",false)):
-		var job: Dictionary = game.shop.installer_job_for_delivery(int(parcel.get("id",0)))
-		var phase: String = str(job.get("phase",parcel.get("installer_state","")))
-		parts.append("Сборщик устанавливает заказ." if phase=="installing" else "Сборщик ждёт освобождения места." if phase=="waiting" else "Сборщик идёт с заказом к месту установки.")
+	elif game.shop.clone_delivery_claimed(parcel): parts.append("Работники этого стола бросили дела и сами побежали за обновкой.")
 	else: parts.append("Забери коробку у входа и установи на отмеченное место.")
 	var note: String = game.shop.parcel_plan_note(parcel)
 	if not note.is_empty(): parts.append(note)
@@ -1830,7 +1818,7 @@ func _product_row(parent: Node, item: String, station_id: int, installed: bool, 
 	delivery_labels.append({"label":state,"item":item,"station":station_id,"fallback":state_text})
 	if not selection and not installed and parcel.is_empty():
 		var enabled: bool = not installed and parcel.is_empty() and reason.is_empty() and p.cash>=int(spec.price) and not p.busy() and not game.session.is_guest()
-		var buy := button(row, "Купить · %d"%int(spec.price), func():send({"action":"buy","kind":"item","item":item,"station":station_id,"installers":send_installers}), enabled)
+		var buy := button(row, "Купить · %d"%int(spec.price), func():send({"action":"buy","kind":"item","item":item,"station":station_id}), enabled)
 		buy.custom_minimum_size.x = 155
 		if not enabled: buy.tooltip_text = "Покупки доступны хозяину кафе" if game.session.is_guest() else "Уже установлено" if installed else _delivery_tooltip(parcel) if not parcel.is_empty() else reason if not reason.is_empty() else "Заверши проверку" if p.busy() else "Не хватает %d"%(int(spec.price)-p.cash)
 	return row
