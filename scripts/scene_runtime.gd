@@ -28,10 +28,25 @@ static func colorize(mesh: MeshInstance3D, color: Color) -> void:
 		instance.albedo_color = color
 		mesh.material_override = instance
 
+static var warmed: Dictionary = {}
+
+static func warm_into(parent: Node, path: String) -> Node:
+	if warmed.has(path) and is_instance_valid(warmed[path]): return warmed[path]
+	var node := instantiate(path)
+	parent.add_child(node)
+	warmed[path] = node
+	return node
+
+static func clone_warm(path: String, script: Script = null) -> Node:
+	var source: Node = warmed.get(path)
+	var node := source.duplicate() if source != null and is_instance_valid(source) else instantiate(path)
+	if script != null: node.set_script(script)
+	return node
+
 static func ensure_children(target: Node, path: String) -> void:
 	if target.get_child_count() > 0:
 		return
-	var source := instantiate(path)
+	var source := clone_warm(path)
 	for child in source.get_children().duplicate():
 		source.remove_child(child)
 		child.owner = null

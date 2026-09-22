@@ -43,7 +43,7 @@ func _ready() -> void:
 		view.handle_input_locally = true
 		view.gui_disable_input = false
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
-		var sheet := SceneRuntime.instantiate("res://scenes/ui/cookbook_ui.tscn", Page) as Control
+		var sheet := SceneRuntime.clone_warm("res://scenes/ui/cookbook_ui.tscn", Page) as Control
 		view.add_child(sheet)
 		sheet.name = "L" if side < 0 else "R"
 		sheet.anchor_right = 1

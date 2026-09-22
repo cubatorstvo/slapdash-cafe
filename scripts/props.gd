@@ -1,6 +1,37 @@
 extends RefCounted
 ## Small original procedural props: the prototype has no external asset dependency.
 
+static var shared_meshes: Dictionary = {}
+
+static func _shared_box(size: Vector3) -> BoxMesh:
+	var key := "b|%.4f|%.4f|%.4f" % [size.x, size.y, size.z]
+	if shared_meshes.has(key): return shared_meshes[key]
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	shared_meshes[key] = mesh
+	return mesh
+
+static func _shared_cylinder(radius: float, height: float, top: float) -> CylinderMesh:
+	var cap := radius if top < 0.0 else top
+	var key := "c|%.4f|%.4f|%.4f" % [radius, height, cap]
+	if shared_meshes.has(key): return shared_meshes[key]
+	var mesh := CylinderMesh.new()
+	mesh.bottom_radius = radius
+	mesh.top_radius = cap
+	mesh.height = height
+	mesh.radial_segments = 32
+	shared_meshes[key] = mesh
+	return mesh
+
+static func _shared_ball(radius: float) -> SphereMesh:
+	var key := "s|%.4f" % radius
+	if shared_meshes.has(key): return shared_meshes[key]
+	var mesh := SphereMesh.new()
+	mesh.radius = radius
+	mesh.height = radius * 2.0
+	shared_meshes[key] = mesh
+	return mesh
+
 static func material(color: Color, metallic := 0.0) -> StandardMaterial3D:
 	var result := StandardMaterial3D.new()
 	result.albedo_color = color
@@ -10,8 +41,7 @@ static func material(color: Color, metallic := 0.0) -> StandardMaterial3D:
 
 static func box(parent: Node3D, size: Vector3, point: Vector3, color: Color) -> MeshInstance3D:
 	var node := preload("res://scenes/runtime/box_mesh.tscn").instantiate() as MeshInstance3D
-	node.mesh = node.mesh.duplicate()
-	(node.mesh as BoxMesh).size = size
+	node.mesh = _shared_box(size)
 	node.material_override = material(color)
 	parent.add_child(node)
 	node.position = point
@@ -33,8 +63,7 @@ static func collision_box(parent: Node3D, size: Vector3, point: Vector3) -> Stat
 static func moving_solid_box(parent: Node3D, size: Vector3, point: Vector3, color: Color) -> AnimatableBody3D:
 	var body := preload("res://scenes/runtime/moving_box.tscn").instantiate() as AnimatableBody3D
 	var visual := body.get_node("Mesh") as MeshInstance3D
-	visual.mesh = visual.mesh.duplicate()
-	(visual.mesh as BoxMesh).size = size
+	visual.mesh = _shared_box(size)
 	visual.material_override = material(color)
 	var collider := body.get_node("CollisionShape3D") as CollisionShape3D
 	collider.shape = collider.shape.duplicate()
@@ -45,12 +74,7 @@ static func moving_solid_box(parent: Node3D, size: Vector3, point: Vector3, colo
 
 static func cylinder(parent: Node3D, radius: float, height: float, point: Vector3, color: Color, top := -1.0) -> MeshInstance3D:
 	var node := preload("res://scenes/runtime/cylinder_mesh.tscn").instantiate() as MeshInstance3D
-	node.mesh = node.mesh.duplicate()
-	var mesh := node.mesh as CylinderMesh
-	mesh.top_radius = radius if top < 0.0 else top
-	mesh.bottom_radius = radius
-	mesh.height = height
-	mesh.radial_segments = 32
+	node.mesh = _shared_cylinder(radius, height, top)
 	node.material_override = material(color)
 	parent.add_child(node)
 	node.position = point
@@ -58,10 +82,7 @@ static func cylinder(parent: Node3D, radius: float, height: float, point: Vector
 
 static func ball(parent: Node3D, radius: float, point: Vector3, color: Color) -> MeshInstance3D:
 	var node := preload("res://scenes/runtime/sphere_mesh.tscn").instantiate() as MeshInstance3D
-	node.mesh = node.mesh.duplicate()
-	var mesh := node.mesh as SphereMesh
-	mesh.radius = radius
-	mesh.height = radius * 2.0
+	node.mesh = _shared_ball(radius)
 	node.material_override = material(color)
 	parent.add_child(node)
 	node.position = point

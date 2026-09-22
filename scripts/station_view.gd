@@ -79,6 +79,7 @@ func build(production: bool) -> void:
 	tray_liquid = Props.box(self, Vector3(Model.Layout.TRAY_HALF.x * 1.85, 0.008, Model.Layout.TRAY_HALF.y * 1.85), Vector3(Model.Layout.TRAY.x, Model.Layout.TRAY_Y + 0.008, Model.Layout.TRAY.y), WINE_COLOR)
 	tray_liquid.name = "RuntimeTrayLiquid"
 	stream = Props.line(self, Vector3.ZERO, Vector3.UP, 0.026, WINE_COLOR)
+	stream.mesh = stream.mesh.duplicate()
 	stream.visible = false
 	var ring := TorusMesh.new()
 	ring.inner_radius = 0.14

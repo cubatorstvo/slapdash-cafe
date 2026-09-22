@@ -116,6 +116,7 @@ func _status(value: String) -> void:
 	game.menu.net_status.text = value
 	game.hud.notice.text = value
 	game.hud.show_toast(value)
+	if is_instance_valid(game.office) and game.office.opened(): game.office.flash_notice(value)
 
 func _peer_left(id: int) -> void:
 	members.erase(id)
@@ -226,6 +227,7 @@ func sleep_status_text() -> String:
 	var ready := 0
 	for id in sleep_participants():
 		if sleeping_peers.has(id): ready += 1
+	if total<=1: return "Спит"
 	return "Спят %d/%d" % [ready,total]
 
 func clear_sleeping() -> void:
@@ -344,6 +346,10 @@ func _presence(pose: Dictionary) -> void:
 	if guest or not members.has(sender) or not M.valid_pose(pose): return
 	player_poses[sender] = clean_pose(pose)
 	player_poses[sender].received_at = Time.get_ticks_msec()
+
+func _host_at_shop(sender: int) -> bool:
+	if sender == 1 and is_instance_valid(game.office) and game.office.opened(): return true
+	return is_instance_valid(game.shop) and is_instance_valid(game.shop.computer) and near_peer(sender, game.shop.computer, 4.5)
 
 func near_peer(id: int, object: Node3D, radius: float) -> bool:
 	if id == 1: return game.player.global_position.distance_to(object.global_position) < radius
@@ -486,7 +492,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 		if sender != 1:
 			message_to(sender, "Общие покупки и проверку подтверждает хозяин кафе.")
 			return
-		if action in ["buy_station_batch","buy_bundle","buy","business","banquet"] and not near_peer(sender,game.shop.computer,4.5):
+		if action in ["buy_station_batch","buy_bundle","buy","business","banquet"] and not _host_at_shop(sender):
 			message_to(sender,"Подойди к компьютеру кафе.")
 			return
 		var error := ""
@@ -784,7 +790,7 @@ func _draw_players(delta: float) -> void:
 	for id in player_poses:
 		if id == local_id() or not members.has(id): continue
 		if not player_avatars.has(id):
-			var remote_root:=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/actors/remote_player.tscn") as Node3D
+			var remote_root:=preload("res://scripts/scene_runtime.gd").clone_warm("res://scenes/actors/remote_player.tscn") as Node3D
 			var avatar:=remote_root.get_node("Avatar") as Node3D
 			avatar.set_script(Avatar)
 			avatar.tint = Color("789fce") if id == 1 else Color("c99a73")

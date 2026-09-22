@@ -124,6 +124,51 @@ func _ready() -> void:
 	development.refresh()
 	hud.office_requested.connect(func(): office.open())
 	sync_mouse_mode()
+	_warm_action_scenes()
+
+func _warm_action_scenes() -> void:
+	var holder := Node3D.new()
+	holder.name = "PreloadedProps"
+	holder.position = Vector3(0, -30, 0)
+	add_child(holder)
+	var pages := CanvasLayer.new()
+	pages.name = "PreloadedPages"
+	pages.visible = false
+	add_child(pages)
+	var world: Array[String] = [
+		"res://scenes/food/wine_serving.tscn", "res://scenes/food/fried_potato_serving.tscn",
+		"res://scenes/food/sausage_serving.tscn", "res://scenes/food/steak_pasta_serving.tscn",
+		"res://scenes/food/burger_serving.tscn", "res://scenes/food/cheeseburger_serving.tscn",
+		"res://scenes/food/spicy_burger_serving.tscn", "res://scenes/food/solyanka_serving.tscn",
+		"res://scenes/runtime/sphere_mesh.tscn", "res://scenes/runtime/cylinder_mesh.tscn",
+		"res://scenes/runtime/box_mesh.tscn", "res://scenes/runtime/label3d.tscn",
+		"res://scenes/actors/customer.tscn", "res://scenes/actors/cook_avatar.tscn",
+		"res://scenes/actors/remote_player.tscn", "res://scenes/actors/station_delivery_worker.tscn",
+		"res://scenes/decor/delivery_parcel_box.tscn", "res://scenes/decor/garland_reel.tscn",
+		"res://scenes/props/cook_lounge_accessories.tscn", "res://scenes/props/sauce_ramp.tscn",
+		"res://scenes/presentation/physical_cookbook.tscn",
+		"res://scenes/lab/soil_scoop.tscn", "res://scenes/lab/formula_pipette.tscn",
+		"res://scenes/lab/watering_tool.tscn", "res://scenes/lab/fertilizer_tool.tscn",
+		"res://scenes/lab/irrigation_tank.tscn", "res://scenes/lab/nutrient_dispenser.tscn",
+		"res://scenes/lab/planter.tscn", "res://scenes/lab/extractor.tscn",
+		"res://scenes/lab/climate_unit.tscn", "res://scenes/lab/production_controller.tscn",
+	]
+	for path in world: SceneRuntime.warm_into(holder, path)
+	var primer := preload("res://scripts/cook_avatar.gd").new()
+	holder.add_child(primer)
+	primer.build_lounge_accessories()
+	primer.queue_free()
+	Props.cylinder(holder, 0.26, 0.22, Vector3.ZERO, Color("fff0cb"))
+	Props.cylinder(holder, 0.29, 0.04, Vector3(0, -0.09, 0), Color("eee0b6"))
+	Props.text(holder, "z Z z", Vector3.ZERO, 22, Color("f1d9ae"))
+	holder.visible = false
+	var screens: Array[String] = [
+		"res://scenes/ui/cookbook_ui.tscn", "res://scenes/ui/development_panels.tscn",
+		"res://scenes/ui/training_course_editor.tscn", "res://scenes/ui/shop_panels.tscn",
+		"res://scenes/ui/statistics_panels.tscn", "res://scenes/ui/laboratory_panels.tscn",
+		"res://scenes/ui/staff_lounge_panels.tscn",
+	]
+	for path in screens: SceneRuntime.warm_into(pages, path)
 
 func input_blocked() -> bool:
 	return (is_instance_valid(laboratory) and is_instance_valid(laboratory.ui) and laboratory.ui.opened()) or (is_instance_valid(session) and session.sleep_scene_active()) or (is_instance_valid(office) and office.opened()) or (is_instance_valid(cookbook) and cookbook.opened) or awaiting_serving_confirmation() or session_paused or menu.opened() or (is_instance_valid(steam) and steam.overlay_open)

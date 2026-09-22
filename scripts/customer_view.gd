@@ -115,6 +115,13 @@ func serving_scene(items: Array) -> String:
 	if dish=="solyanka" and "solyanka" in kinds and "plate" in kinds: return "res://scenes/food/solyanka_serving.tscn"
 	return ""
 
+func _meal_limb(path: String, tint: Color, limb_scale: Vector3) -> MeshInstance3D:
+	var node:=SceneRuntime.clone_warm(path) as MeshInstance3D
+	add_child(node)
+	node.scale=limb_scale
+	node.material_override=Props.material(tint)
+	return node
+
 func begin_meal(items: Array) -> void:
 	if not meal_items.is_empty(): return
 	meal_items=items.duplicate(true)
@@ -123,7 +130,7 @@ func begin_meal(items: Array) -> void:
 	var plated_scene:=serving_scene(meal_items)
 	for item_index in range(meal_items.size()):
 		var entry: Dictionary=meal_items[item_index]
-		var node:=SceneRuntime.instantiate(plated_scene) as Node3D if item_index==0 and not plated_scene.is_empty() else Node3D.new()
+		var node:=SceneRuntime.clone_warm(plated_scene) as Node3D if item_index==0 and not plated_scene.is_empty() else Node3D.new()
 		meal_root.add_child(node)
 		if not plated_scene.is_empty(): continue
 		match str(entry.kind):
@@ -139,8 +146,9 @@ func begin_meal(items: Array) -> void:
 			_:
 				var food:=Props.ball(node,0.18,Vector3.ZERO,{"potato":Color("c79c55"),"sausage":Color("c78561"),"steak":Color("a96b4e"),"tomato":Color("da6250")}.get(entry.kind,Color("d0ac74")))
 				food.scale=Vector3(0.6,0.6,2.4) if entry.kind=="sausage" else Vector3(1.25,0.4,1.0) if entry.kind=="steak" else Vector3(0.85,1,1.25)
-	meal_hand=Props.ball(self,0.1,Vector3.ZERO,Color("e8b893"))
-	meal_arm=Props.line(self,Vector3(0.36,1.16,0),Vector3(0.36,0.7,-0.2),0.065,color)
+	meal_hand=_meal_limb("res://scenes/runtime/sphere_mesh.tscn",Color("e8b893"),Vector3(0.2,0.2,0.2))
+	meal_arm=_meal_limb("res://scenes/runtime/cylinder_mesh.tscn",color,Vector3(0.13,1.0,0.13))
+	Props.align_line(meal_arm,Vector3(0.36,1.16,0),Vector3(0.36,0.7,-0.2))
 
 func animate_meal() -> void:
 	if meal_items.is_empty() or not is_instance_valid(meal_root): return

@@ -39,6 +39,8 @@ var lab_live_status: Label
 var scale_type := "counter"
 var scale_slots: Array=[]
 var scale_equipment: Array=[]
+var action_notice := ""
+var action_notice_left := 0.0
 var stats_focus: Dictionary={}
 var course_focus_id:=0
 var groups_mode:="overview"
@@ -84,6 +86,8 @@ func _ready() -> void:
 		navigation[key] = nav
 	heading = get_node("Panel/Column/Body/Main/Heading") as Label
 	status = get_node("Panel/Column/Body/Main/Status") as Label
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status.add_theme_color_override("font_color", Style.MINT)
 	timer = get_node("Panel/Column/Body/Main/Timer") as Label
 	timer.add_theme_color_override("font_color", Style.GOLD)
@@ -104,7 +108,7 @@ func _page_scene_path() -> String:
 	return ""
 
 func _mount_page_scene(path: String) -> VBoxContainer:
-	var shell := SceneRuntime.instantiate(path) as Control
+	var shell := SceneRuntime.clone_warm(path) as Control
 	content_root.add_child(shell)
 	shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var column := shell.get_node("Column") as VBoxContainer
@@ -201,6 +205,10 @@ func open(page := "overview") -> void:
 func close() -> void:
 	panel.hide()
 	game.sync_mouse_mode()
+
+func flash_notice(text: String) -> void:
+	action_notice = text
+	action_notice_left = 5.0
 
 func send(action: Dictionary, dismiss := false) -> void:
 	if dismiss: close()
@@ -488,11 +496,39 @@ func toggle_scale_equipment(id: String,on: bool) -> void:
 	stamp=""
 	rebuild()
 
+func _set_shop_category(key: String) -> void:
+	shop_category = key
+	scroll.scroll_vertical = 0
+	rebuild()
+
+func _set_lab_branch(branch: String) -> void:
+	lab_branch = branch
+	rebuild()
+
+func _toggle_bundle_item(on: bool, station_id: int, item: String) -> void:
+	if not selections.has(station_id): selections[station_id] = []
+	if on and item not in selections[station_id]: selections[station_id].append(item)
+	elif not on: selections[station_id].erase(item)
+	rebuild()
+
+func _on_scale_slot(on: bool, station_id: int) -> void:
+	toggle_scale_slot(station_id, on)
+
+func _on_scale_equipment(on: bool, item: String) -> void:
+	toggle_scale_equipment(item, on)
+
 func _process(delta: float) -> void:
 	if game == null or not is_instance_valid(game.service) or not opened(): return
 	_refresh_delivery_labels()
 	var progress = game.service.progress
-	status.text = "Деньги: %d    Популярность: %d    Звёзды: %d / 5    Гости: %s" % [progress.cash, progress.popularity, progress.stars, "приходят" if game.service.open_for_business else "приём закрыт"]
+	var ledger := "Деньги: %d    Популярность: %d    Звёзды: %d / 5    Гости: %s" % [progress.cash, progress.popularity, progress.stars, "приходят" if game.service.open_for_business else "приём закрыт"]
+	if action_notice_left > 0.0:
+		action_notice_left = maxf(0.0, action_notice_left - delta)
+		status.text = action_notice + "\n" + ledger
+		status.add_theme_color_override("font_color", Style.GOLD)
+	else:
+		status.text = ledger
+		status.add_theme_color_override("font_color", Style.MINT)
 	timer.text = "%s · %d:%02d" % ["Личный показ" if progress.phase == "showcase" else progress.inspection_name(), ceili(progress.remaining) / 60, ceili(progress.remaining) % 60] if progress.phase in ["showcase", "service"] else ""
 	timer.visible = not timer.text.is_empty()
 	if tab=="laboratory" and is_instance_valid(lab_live_status):
@@ -1461,10 +1497,7 @@ func bundle_controls(station: Node3D, catalog: Array) -> void:
 		check.disabled = unavailable or game.session.is_guest()
 		check.button_pressed = item in selections[id]
 		if check.button_pressed: total += int(spec.price)
-		check.toggled.connect(func(on):
-			if on: selections[id].append(item)
-			else: selections[id].erase(item)
-			rebuild())
+		check.toggled.connect(_toggle_bundle_item.bind(id, str(item)))
 	if total > 0:
 		button(content, "Заказать выбранное · %d" % total, func(): send({"action":"buy_bundle", "station":id, "items":selections[id].duplicate()}), game.service.progress.cash >= total and not game.service.progress.busy() and not game.session.is_guest())
 
@@ -1557,7 +1590,7 @@ func _shop_batch(host: bool) -> void:
 	for type_id in ["counter","kitchen","grill_kitchen","solyanka_kitchen"]:
 		var chosen_type: String=type_id
 		var available: bool=game.shop.type_available(type_id)
-		button(type_row,("✓ " if scale_type==type_id else "")+Definition.TYPES[type_id].title,func():set_scale_type(chosen_type),host and available)
+		button(type_row,("✓ " if scale_type==type_id else "")+Definition.TYPES[type_id].title,set_scale_type.bind(chosen_type),host and available)
 	if not game.shop.type_available(scale_type): scale_type="counter"
 	label(content,"1. Выбери свободные места",18)
 	var free_slots: Array=Expansion.free_slot_ids(service)
@@ -1572,7 +1605,7 @@ func _shop_batch(host: bool) -> void:
 			check.text="Место %d"%station_id+(" · занято" if not free else "")
 			check.button_pressed=free and station_id in scale_slots
 			check.disabled=not host or not free
-			check.toggled.connect(func(on):toggle_scale_slot(station_id,on))
+			check.toggled.connect(_on_scale_slot.bind(station_id))
 	label(content,"2. Оснащение каждого стола",18)
 	for item in game.shop.equipment_catalog(scale_type):
 		var spec: Dictionary=game.shop.ITEMS[item]
@@ -1582,8 +1615,7 @@ func _shop_batch(host: bool) -> void:
 		check.text=str(spec.name)+" · %d"%int(spec.price)+(" · звезда %d"%int(spec.get("star",0)) if not available else "")
 		check.button_pressed=available and item in scale_equipment
 		check.disabled=not host or not available
-		var equip_id: String=item
-		check.toggled.connect(func(on):toggle_scale_equipment(equip_id,on))
+		check.toggled.connect(_on_scale_equipment.bind(str(item)))
 	var unit_price: int=int(game.shop.ITEMS[scale_type].price)
 	for item in scale_equipment: unit_price+=int(game.shop.ITEMS[item].price)
 	var total_price: int=unit_price*scale_slots.size()
@@ -1693,8 +1725,8 @@ func shop_page(host: bool) -> void:
 	categories.add_theme_constant_override("h_separation", 6)
 	content.add_child(categories)
 	for entry in [["equipment","Оснащение"],["tables","Новые столы"],["rooms","Расширения"],["lab","Лаборатория"],["lounge","Мебель"],["decor","Декор"]]:
-		var key: String = entry[0]
-		var choice := button(categories, str(entry[1]), func():shop_category=key;scroll.scroll_vertical=0;rebuild())
+		var key: String = str(entry[0])
+		var choice := button(categories, str(entry[1]), _set_shop_category.bind(key))
 		choice.toggle_mode = true
 		choice.set_pressed_no_signal(shop_category == key)
 	match shop_category:
@@ -1726,7 +1758,7 @@ func shop_page(host: bool) -> void:
 			content.add_child(branches)
 			for entry in [["formula","Формула"],["growing","Выращивание"],["calibration","Рекалибровка"]]:
 				var branch: String = str(entry[0])
-				var choose := button(branches, str(entry[1]), func():lab_branch=branch;rebuild())
+				var choose := button(branches, str(entry[1]), _set_lab_branch.bind(branch))
 				choose.toggle_mode = true
 				choose.set_pressed_no_signal(lab_branch == branch)
 			if lab_branch == "formula":

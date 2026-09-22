@@ -84,7 +84,8 @@ static func activity_slots(tier := 2, owned: Array = []) -> Array:
 static func _base_slots() -> Array:
 	# Interleave areas so even a small crew makes several corners feel inhabited.
 	return [
-		slot("sofa_left","sofa",Vector3(5.95,0.03,14.33),Vector3(5.95,0,13.65),0,"chat","Болтает на диване"),
+		# Torso bottom on the cushion; the back face stays 3 cm in front of the sofa backrest.
+		slot("sofa_left","sofa",Vector3(5.95,-0.005,14.85),Vector3(5.95,0,13.65),0,"chat","Болтает на диване"),
 		slot("football_left","foosball",Vector3(12.85,0,13.9),Vector3(12.85,0,13.9),-PI/2,"foosball","Играет в настольный футбол"),
 		slot("football_right","foosball",Vector3(15.15,0,13.9),Vector3(15.15,0,13.9),PI/2,"foosball","Играет в настольный футбол"),
 		slot("rocker","rocking_chair",Vector3(4.55,-0.10,18.5),Vector3(5.6,0,18.5),-PI/2,"rock","Качается в кресле"),
@@ -99,7 +100,7 @@ static func _base_slots() -> Array:
 		slot("book_reader","bookcase",Vector3(4.25,0,22.3),Vector3(4.25,0,22.3),PI/2,"read","Листает книгу"),
 		slot("music_listener","jukebox",Vector3(16,0,16.2),Vector3(16,0,16.2),-PI/2,"music","Слушает музыку"),
 		slot("tea_right","tea_station",Vector3(14.2,0.10,21.55),Vector3(14.2,0,20.95),PI,"tea","Пьёт чай"),
-		slot("sofa_right","sofa",Vector3(7.05,0.03,14.33),Vector3(7.05,0,13.65),0,"chat","Смеётся с соседом"),
+		slot("sofa_right","sofa",Vector3(7.05,-0.005,14.85),Vector3(7.05,0,13.65),0,"chat","Смеётся с соседом"),
 		slot("board_front","board_games",Vector3(6.7,-0.14,19.8),Vector3(6.7,0,19.1),PI,"board","Играет в настолку"),
 		slot("board_back","board_games",Vector3(6.7,-0.14,22.2),Vector3(6.7,0,22.9),0,"board","Обдумывает ход"),
 		slot("snack_break","snack_fridge",Vector3(16.8,0,21.5),Vector3(16.8,0,21.5),PI,"snack","Выбирает перекус")

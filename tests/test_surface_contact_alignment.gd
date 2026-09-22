@@ -90,32 +90,20 @@ func run() -> void:
 	actor_scene.call("lounge_pose", sofa_spot, 0.0, 0)
 	await process_frame
 	var seat_left := sofa_scene.get_node("SeatL") as MeshInstance3D
-	var seat_right := sofa_scene.get_node("SeatR") as MeshInstance3D
 	var left_bounds := mesh_world_aabb(seat_left)
-	var right_bounds := mesh_world_aabb(seat_right)
 	var seat_top := left_bounds.end.y
-	var seat_front := minf(left_bounds.position.z, right_bounds.position.z)
 	var body := actor_scene.get_node("Body") as MeshInstance3D
-	var body_bottom := mesh_world_aabb(body).position.y
-	check(absf(float(sofa_spot.position.y) - 0.03) < 0.001, "Sofa clone root is raised 3 cm above floor datum")
-	check(absf(float(sofa_spot.position.z) - (sofa_scene.position.z - 0.37)) < 0.001, "Sofa clone root is shifted 12 cm toward the cushion edge")
-	check(body_bottom >= seat_top - 0.005 and body_bottom <= seat_top + 0.06, "Seated clone torso stays just above sofa seat: body %.3f seat %.3f" % [body_bottom, seat_top])
-	var sofa_legs := actor_scene.get("lounge_sofa_legs") as Node3D
-	check(is_instance_valid(sofa_legs) and sofa_legs.visible, "Sofa-specific seated legs are active")
-	if is_instance_valid(sofa_legs):
-		var leg_meshes := sofa_legs.find_children("*", "MeshInstance3D", true, false)
-		check(leg_meshes.size() == 6, "Sofa pose has two thighs, two shins and two shoes")
-		for leg_mesh_raw in leg_meshes:
-			var leg_mesh := leg_mesh_raw as MeshInstance3D
-			var bounds := mesh_world_aabb(leg_mesh)
-			for seat_bounds in [left_bounds, right_bounds]:
-				var overlap := aabb_overlap(bounds, seat_bounds)
-				if overlap.x > 0.001 and overlap.z > 0.001:
-					check(overlap.y <= 0.006, "Sofa leg does not sink into cushion volume: overlap %s" % overlap)
-		for index in [1, 2, 4, 5]:
-			if index >= leg_meshes.size(): continue
-			var front_part := mesh_world_aabb(leg_meshes[index] as MeshInstance3D)
-			check(front_part.end.z <= seat_front + 0.015, "Sofa shin/shoe stays in front of cushion: %.3f <= %.3f" % [front_part.end.z, seat_front + 0.015])
+	var body_bounds := mesh_world_aabb(body)
+	var back := sofa_scene.get_node("Back") as MeshInstance3D
+	var back_front := mesh_world_aabb(back).position.z
+	check(absf(body_bounds.position.y - seat_top) < 0.02, "Seated clone sits on the cushion: body %.3f seat %.3f" % [body_bounds.position.y, seat_top])
+	check(absf((back_front - body_bounds.end.z) - 0.03) < 0.015, "Clone back stays 3 cm from the sofa backrest: gap %.3f" % [back_front - body_bounds.end.z])
+	for leg_name in ["LeftLeg", "RightLeg"]:
+		var leg := actor_scene.get_node(leg_name) as Node3D
+		check(leg.visible, leg_name + " uses the scene leg")
+		check(absf(leg.rotation.x - PI * 0.5) < 0.02, leg_name + " points straight forward")
+		var shoe := mesh_world_aabb(leg.get_node("Shoe") as MeshInstance3D)
+		check(shoe.position.z < body_bounds.position.z - 0.2, leg_name + " sticks straight out in front of the torso")
 
 	kitchen.free()
 	sofa_scene.free()

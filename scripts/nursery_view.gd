@@ -97,13 +97,13 @@ func build_machine(id: String) -> void:
 		"lab_climate":"res://scenes/lab/climate_unit.tscn","lab_production":"res://scenes/lab/production_controller.tscn"
 	}
 	if not paths.has(id): return
-	var root:=preload("res://scripts/scene_runtime.gd").instantiate(str(paths[id])) as Node3D
+	var root:=preload("res://scripts/scene_runtime.gd").clone_warm(str(paths[id])) as Node3D
 	shell.add_child(root); root.position=Layout.fixture(id)
 	text_at(root,str(Policy.ITEMS[id].name).get_slice(" · ",0),Vector3(0,1.95,0),17)
 
 func build_tool(parent: Node3D, type: String) -> void:
 	var paths: Dictionary={"soil":"res://scenes/lab/soil_scoop.tscn","liquid":"res://scenes/lab/formula_pipette.tscn","sample":"res://scenes/lab/formula_pipette.tscn","water":"res://scenes/lab/watering_tool.tscn","fertilizer":"res://scenes/lab/fertilizer_tool.tscn"}
-	if paths.has(type): parent.add_child(preload("res://scripts/scene_runtime.gd").instantiate(str(paths[type])))
+	if paths.has(type): parent.add_child(preload("res://scripts/scene_runtime.gd").clone_warm(str(paths[type])))
 
 func _attention_position(peer: int) -> Vector3:
 	if peer==game.session.local_id(): return game.player.global_position+Vector3(0,1.2,0)

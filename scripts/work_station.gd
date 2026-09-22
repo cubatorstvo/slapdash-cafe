@@ -506,5 +506,5 @@ func apply_upgrades() -> void:
 			upgrade_view = null
 		return
 	if is_instance_valid(upgrade_view): return
-	upgrade_view = preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/props/sauce_ramp.tscn") as Node3D
+	upgrade_view = preload("res://scripts/scene_runtime.gd").clone_warm("res://scenes/props/sauce_ramp.tscn") as Node3D
 	add_child(upgrade_view)

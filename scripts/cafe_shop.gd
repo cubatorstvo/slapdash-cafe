@@ -607,7 +607,7 @@ func _process(delta: float) -> void:
 	for parcel in p.deliveries:
 		ids.append(parcel.id)
 		if not boxes.has(parcel.id):
-			var box := preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/decor/delivery_parcel_box.tscn") as Node3D; add_child(box)
+			var box := SceneRuntime.clone_warm("res://scenes/decor/delivery_parcel_box.tscn") as Node3D; add_child(box)
 			var label := Props.text(box,parcel_name(parcel),Vector3(0,0.4,0),16,Color("f3dfb0")); label.billboard=BaseMaterial3D.BILLBOARD_ENABLED
 			boxes[parcel.id]=box
 		var node: Node3D = boxes[parcel.id]
@@ -628,7 +628,7 @@ func _process(delta: float) -> void:
 		worker_ids.append(key)
 		var state: Dictionary=delivery_worker_states[key]
 		if not delivery_workers.has(key):
-			var worker_instance: Node3D=SceneRuntime.instantiate("res://scenes/actors/station_delivery_worker.tscn",DeliveryWorker) as Node3D
+			var worker_instance: Node3D=SceneRuntime.clone_warm("res://scenes/actors/station_delivery_worker.tscn",DeliveryWorker) as Node3D
 			var worker_actor: Node3D=worker_instance.get_node("Actor") as Node3D
 			worker_actor.set_script(preload("res://scripts/cook_avatar.gd"))
 			worker_actor.tint=state.get("tint",Color("63aa98"))
@@ -657,7 +657,7 @@ func _process(delta: float) -> void:
 				placement_label.text="▼  УСТАНОВИТЬ СЮДА\n%s\n%d м"%[parcel_name(held_parcel),roundi(game.player.global_position.distance_to(install_target))]
 	if p.garland_builder>0:
 		if not garland_reels.has(p.garland_builder):
-			var reel:=SceneRuntime.instantiate("res://scenes/decor/garland_reel.tscn") as Node3D
+			var reel:=SceneRuntime.clone_warm("res://scenes/decor/garland_reel.tscn") as Node3D
 			add_child(reel); garland_reels[p.garland_builder]=reel
 		var reel: Node3D = garland_reels[p.garland_builder]
 		if p.garland_builder==game.session.local_id(): reel.global_transform=game.camera.global_transform; reel.position+=game.camera.global_basis.x*0.35-game.camera.global_basis.z*0.65-game.camera.global_basis.y*0.3

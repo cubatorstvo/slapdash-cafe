@@ -24,7 +24,7 @@ func _ready() -> void:
 	for path in ["Body", "LeftArmPivot/Arm", "RightArmPivot/Arm"]:
 		runtime.colorize(get_node(path) as MeshInstance3D, tint)
 	notebook.hide()
-	book = runtime.instantiate("res://scenes/presentation/physical_cookbook.tscn", preload("res://scripts/book_prop.gd")) as Node3D
+	book = runtime.clone_warm("res://scenes/presentation/physical_cookbook.tscn", preload("res://scripts/book_prop.gd")) as Node3D
 	add_child(book)
 	book.pose_in_hands(false)
 
@@ -171,7 +171,6 @@ func celebrate(clock: float, variant: int, throwing: bool) -> void:
 		_pose_arm(i,Vector3(side*0.3,1.2,0),Vector3(side*(0.6 if high else 0.35),1.8+sin(beat+i)*0.12 if high else 0.9,-0.2+sin(beat+i*PI)*0.24))
 
 var lounge_legs: Node3D
-var lounge_sofa_legs: Node3D
 var lounge_floor_legs: Node3D
 var lounge_cup: Node3D
 var lounge_paddle: Node3D
@@ -185,20 +184,13 @@ func build_lounge_accessories() -> void:
 		P.line(lounge_legs,Vector3(side*0.15,0.64,0.02),Vector3(side*0.17,0.46,-0.20),0.095,Color("293d4b"))
 		P.line(lounge_legs,Vector3(side*0.17,0.46,-0.20),Vector3(side*0.17,0.18,-0.28),0.085,Color("293d4b"))
 		P.box(lounge_legs,Vector3(0.22,0.13,0.32),Vector3(side*0.17,0.145,-0.36),Color("24323b"))
-	lounge_sofa_legs=Node3D.new()
-	add_child(lounge_sofa_legs)
-	for side in [-1,1]:
-		# Sofa thighs stay on the cushion plane; knees and shins continue in front of its leading edge.
-		P.line(lounge_sofa_legs,Vector3(side*0.15,0.71,0.03),Vector3(side*0.17,0.71,-0.34),0.09,Color("293d4b"))
-		P.line(lounge_sofa_legs,Vector3(side*0.17,0.71,-0.34),Vector3(side*0.17,0.16,-0.46),0.08,Color("293d4b"))
-		P.box(lounge_sofa_legs,Vector3(0.22,0.15,0.34),Vector3(side*0.17,0.045,-0.54),Color("24323b"))
 	lounge_floor_legs=Node3D.new()
 	add_child(lounge_floor_legs)
 	for side in [-1,1]:
 		P.line(lounge_floor_legs,Vector3(side*0.14,0.65,0),Vector3(side*0.36,0.57,-0.28),0.095,Color("293d4b"))
 		P.line(lounge_floor_legs,Vector3(side*0.36,0.57,-0.28),Vector3(-side*0.12,0.57,-0.43),0.085,Color("293d4b"))
 		P.box(lounge_floor_legs,Vector3(0.22,0.13,0.28),Vector3(-side*0.12,0.565,-0.46),Color("24323b"))
-	var accessories:=preload("res://scripts/scene_runtime.gd").instantiate("res://scenes/props/cook_lounge_accessories.tscn") as Node3D
+	var accessories:=preload("res://scripts/scene_runtime.gd").clone_warm("res://scenes/props/cook_lounge_accessories.tscn") as Node3D
 	add_child(accessories)
 	lounge_cup=accessories.get_node("Cup") as Node3D
 	lounge_paddle=accessories.get_node("Paddle") as Node3D
@@ -216,11 +208,11 @@ func lounge_pose(spot: Dictionary, clock: float, identity: int) -> void:
 	notebook.hide()
 	book.set_reading(pose=="read")
 	lounge_legs.visible=seated and pose!="floor" and not sofa_seated
-	lounge_sofa_legs.visible=sofa_seated
 	lounge_floor_legs.visible=pose=="floor"
 	for leg in legs:
-		leg.visible=not seated
-		leg.rotation=Vector3.ZERO
+		leg.visible=(not seated) or sofa_seated
+		# Straight scene legs, hip to shoe, pointing forward. No knee.
+		leg.rotation=Vector3(PI*0.5,0,0) if sofa_seated else Vector3.ZERO
 	lounge_cup.visible=pose=="tea"
 	lounge_paddle.visible=pose=="pingpong"
 	lounge_snack.visible=pose=="snack"
@@ -352,7 +344,7 @@ func morning_run(clock: float, variant: int) -> void:
 		_pose_arm(i,Vector3(side*0.3,1.2,0),hand)
 
 func reset_lounge_accessories() -> void:
-	for node in [lounge_legs,lounge_sofa_legs,lounge_floor_legs,lounge_cup,lounge_paddle,lounge_snack]:
+	for node in [lounge_legs,lounge_floor_legs,lounge_cup,lounge_paddle,lounge_snack]:
 		if is_instance_valid(node): node.hide()
 	for leg in legs:
 		leg.show()

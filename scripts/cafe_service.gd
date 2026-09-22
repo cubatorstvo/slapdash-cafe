@@ -35,6 +35,7 @@ var autosave_clock := 0.0
 var banquet_clock := 0.0
 var spawn_clock := 3.0
 var chef_order_clock := 3.0
+var continue_manual_peer := 0
 var game: Node3D
 var rng := RandomNumberGenerator.new()
 var masterclasses: Array=[]
@@ -1382,6 +1383,10 @@ func finish_customer(id: int, accepted: bool, failure_reason := "", portion_numb
 			if paid: progress.banquet_served+=1
 			if paid and report.grade in ["B","A","S"]: progress.banquet_good+=1
 		Visits.settled(self,customer,paid,str(report.grade))
+		if paid and station.manual_station and not chef_queue().is_empty():
+			var lead := int(station.training.lead)
+			continue_manual_peer = lead if lead > 0 else 1
+		else: continue_manual_peer = 0
 		return
 
 func purchase(kind: String, id: String, station_id := 0) -> String:
@@ -1985,6 +1990,7 @@ func toggle_business() -> void:
 	progress.revision += 1
 
 func end_shift() -> void:
+	continue_manual_peer = 0
 	Visits.close_shift(self)
 	trace("shift_closed", {"day":progress.day,"elapsed":progress.shift_elapsed})
 	open_for_business = false
@@ -2151,6 +2157,12 @@ func queue_point(index: int) -> Vector3:
 	var first: Node3D=by_id(1)
 	return first.to_global(Vector3(0,0,-3.0-index*0.95))
 
+func _start_queued_manual(station: Node3D) -> void:
+	if continue_manual_peer<=0 or not station.manual_station: return
+	var peer := continue_manual_peer
+	continue_manual_peer=0
+	request_manual(station, str(station.order_dish), peer)
+
 func assign_customer(station: Node3D, customer: Dictionary) -> void:
 	customer.state="walking"
 	customer.station=station.station_id
@@ -2172,6 +2184,9 @@ func advance_queue(delta: float) -> void:
 	if first==null: return
 	if not line.is_empty() and first.state=="idle" and first.customer_id<0 and not first.training.active() and progress.shift not in ["closing","night"]:
 		assign_customer(first,line.pop_front())
+		_start_queued_manual(first)
+	elif continue_manual_peer>0 and line.is_empty() and first.customer_id<0 and not first.training.active():
+		continue_manual_peer=0
 	for i in range(line.size()-1,-1,-1):
 		var customer: Dictionary=line[i]
 		customer.wait=float(customer.get("wait",0.0))+delta

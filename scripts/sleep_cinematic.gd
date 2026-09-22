@@ -84,6 +84,11 @@ func _set_always_skip(value: bool) -> void:
 	config.save(SETTINGS_PATH)
 	auto_vote_key=""
 
+func _skip_hint(scene: Dictionary) -> String:
+	var total := int(scene.get("participants",[]).size())
+	if total<=1: return "Пробел · пропустить"
+	return "Пробел · пропустить вместе (%d/%d)"%[scene.get("skips",[]).size(),total]
+
 func _auto_skip_vote() -> bool:
 	if not is_instance_valid(always_skip_checkbox) or not always_skip_checkbox.button_pressed or not game.session.sleep_scene_active(): return false
 	var scene: Dictionary=game.session.sleep_scene
@@ -135,7 +140,7 @@ func _process(_delta: float) -> void:
 	var forecast:=Rest.report(game.service.progress,game.evening.workers().size())
 	if phase=="sleep":
 		title.text="СМЕНА ЗАКОНЧЕНА" if age<2.1 else "ТИХИЙ ЧАС ДЛЯ ОЧЕНЬ УСТАВШИХ"
-		hint.text="Завтра: +%d%% к темпу команды\nПробел · пропустить вместе (%d/%d)"%[roundi(float(forecast.bonus)*100),scene.skips.size(),scene.participants.size()]
+		hint.text="Завтра: +%d%% к темпу команды\n%s"%[roundi(float(forecast.bonus)*100),_skip_hint(scene)]
 		shade.color=Color(0,0,0,maxf(clampf(1.0-age/0.4,0,1),clampf((age-6.45)/0.55,0,1)))
 		if is_instance_valid(self_avatar):
 			self_avatar.visible=game.session.local_sleeping()
@@ -146,7 +151,7 @@ func _process(_delta: float) -> void:
 
 	# The black frame at the end of the sleep shot becomes the first frame of morning.
 	title.text="ДОБРОЕ УТРО · ДЕНЬ %d"%int(scene.get("morning_day",game.service.progress.day))
-	hint.text="Клоны уже бегут на рабочие места\nПробел · пропустить вместе (%d/%d)"%[scene.skips.size(),scene.participants.size()]
+	hint.text="Клоны уже бегут на рабочие места\n%s"%_skip_hint(scene)
 	shade.color=Color(0,0,0,clampf(1.0-age/0.65,0,1))
 	var daylight_blend: float=smoothstep(0.0,1.0,clampf(age/1.45,0,1))
 	game.daylight.light_energy=lerpf(0.12,0.75,daylight_blend)

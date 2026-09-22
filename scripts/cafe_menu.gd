@@ -98,8 +98,10 @@ func show_station(station: Node3D) -> void:
 			for recipe in station.dishes():
 				var key: String = recipe
 				_button(training_box, station.Definition.DISHES[key], func(): command_requested.emit({"action": "manual", "station": selected_station, "dish": key}))
+				_recipe_lines(key)
 		else:
 			_label(training_box, station.Definition.DISHES[dish], 20)
+			_recipe_lines(dish)
 			if not station.customer_order.is_empty():
 				var wish: String = preload("res://scripts/chef_orders.gd").special_request(station.customer_order)
 				if not wish.is_empty(): _label(training_box, wish)
@@ -258,6 +260,13 @@ func open_training_group() -> void:
 	game.office.open("groups")
 	game.office.select_group_stations([station_id])
 	game.office.course_editor_open()
+
+func _recipe_lines(dish: String) -> void:
+	var text := preload("res://scripts/cookbook_data.gd").summary(dish)
+	if text.is_empty(): return
+	var note := _label(training_box, text, 15)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.custom_minimum_size.x = 680
 
 func describe(station: Node3D) -> void:
 	var dish: String = station.dishes()[recipe_choice.selected]
