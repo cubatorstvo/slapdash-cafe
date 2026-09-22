@@ -11,12 +11,15 @@ const PAN_HANDLE_BOUNDS := AABB(Vector3(-0.08, -0.02, 0.60), Vector3(0.16, 0.09,
 const POTATO_CONTACT_HALF_EXTENTS := Vector3(0.24, 0.17, 0.18)
 const SAUSAGE_CONTACT_RADIUS := 0.075
 const SAUSAGE_HALF_LENGTH := 0.32
+const SAUSAGE_PICK_BOUNDS := AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))
+const SAUSAGE_CATCH_BOUNDS := AABB(Vector3(-0.48, -0.10, -0.19), Vector3(0.96, 0.40, 0.38))
 var potato_nodes: Array = []
 var potato_bodies: Array = []
 var potato_patches: Array = []
 var sausage_nodes: Array = []
 var sausage_skins: Array = []
 var sausage_bodies: Array = []
+var sausage_states: Array[String] = []
 var potato_set: Node3D
 var sausage_set: Node3D
 var pan: Node3D
@@ -69,6 +72,7 @@ func _ready() -> void:
 		skin.material_override = material
 		sausage_nodes.append(sausage_holder)
 		sausage_skins.append(skin)
+		sausage_states.append("table")
 	potato = potato_nodes[0]
 	potato_body = potato_bodies[0]
 	sausage = sausage_nodes[0]
@@ -106,6 +110,7 @@ func update_view(model) -> void:
 		potato_bodies[i].position.y = potato_contact_height(p.potato_orientation)
 		for face in range(6): potato_patches[i][face].material_override.albedo_color = Color("dcaf70").lerp(Color("875034"), float(p.potato_heat[face]))
 		var f: Dictionary = model.sausages[i]
+		sausage_states[i] = str(f.sausage_state)
 		sausage_nodes[i].position = point(f.sausage, f.elevation)
 		sausage_nodes[i].rotation.z = f.sausage_angle
 		sausage_nodes[i].position.y += absf(sin(f.sausage_angle)) * SAUSAGE_HALF_LENGTH
@@ -117,11 +122,14 @@ func update_view(model) -> void:
 	sausage = sausage_nodes[model.sausage_index]
 	sausage_skin = sausage_skins[model.sausage_index]
 
+static func sausage_pick_bounds(state: String) -> AABB:
+	return SAUSAGE_CATCH_BOUNDS if state == "slipped" else SAUSAGE_PICK_BOUNDS
+
 func pick_item(camera: Camera3D, dish: String) -> String:
 	var entries: Array = []
 	for i in range(3):
 		entries.append(["potato_%d" % i, potato_nodes[i], [AABB(Vector3(-0.25, 0, -0.22), Vector3(0.5, 0.40, 0.44))]])
-		entries.append(["sausage_%d" % i, sausage_nodes[i], [AABB(Vector3(-0.37, -0.03, -0.13), Vector3(0.74, 0.25, 0.26))]])
+		entries.append(["sausage_%d" % i, sausage_nodes[i], [sausage_pick_bounds(sausage_states[i])]])
 	entries.append(["pan", pan, [PAN_BODY_BOUNDS, PAN_HANDLE_BOUNDS]])
 	var selected := ""
 	var nearest := 3.6

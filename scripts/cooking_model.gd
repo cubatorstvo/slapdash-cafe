@@ -33,6 +33,7 @@ var potatoes: Array = []
 var sausages: Array = []
 const POTATO_FIELDS := ["potato_plate_offset","potato", "potato_velocity", "potato_orientation", "potato_heat", "potato_state", "fall_speed"]
 const SAUSAGE_FIELDS := ["sausage_launched", "sausage_high", "sausage_showy", "sausage_plate_offset","sausage", "sausage_angle", "sausage_phase", "sausage_coating", "sausage_slip", "sausage_state", "sausage_velocity", "previous_sausage", "sausage_fall_speed"]
+const SAUSAGE_SLIP_UPWARD_SPEED := 1.8
 var tomato := Vector2(1.85, -0.1)
 var tomato_velocity := Vector3.ZERO
 var tomato_flying := false
@@ -321,18 +322,17 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 	var motion := (sausage - previous_sausage) / maxf(delta, 0.001)
 	sausage_phase += delta * 5.5 + motion.length() * delta * 3
 	if held == "sausage":
-		sausage_angle = move_toward(sausage_angle, PI * 0.5 if use_item else 0.0, 2.8 * delta)
-		var upright := sin(sausage_angle)
+		# Carrying motion alone drives slipping; RMB no longer stabilizes the sausage.
+		sausage_angle = move_toward(sausage_angle, 0.0, 2.8 * delta)
 		if BASE_Y + float(elevations.sausage) <= food_surface("sausage", sausage) + 0.08:
 			sausage_slip = maxf(0, sausage_slip - delta * 2)
 		else:
-			sausage_slip += delta * (0.12 + maxf(0, motion.length() - 0.35) * 0.8) * pow(1.0 - upright, 2)
-			sausage_slip = maxf(0, sausage_slip - upright * delta * 1.5)
+			sausage_slip += delta * (0.12 + maxf(0, motion.length() - 0.35) * 0.8)
 		if sausage_slip >= 1:
 			held = ""
-			sausage_state = "falling"
+			sausage_state = "slipped"
 			sausage_velocity = motion * 0.45 + Vector2(cos(sausage_phase), sin(sausage_phase)) * 0.65
-			sausage_fall_speed = -0.5
+			sausage_fall_speed = -SAUSAGE_SLIP_UPWARD_SPEED
 			falls += 1
 	elif sausage_state == "ramp" and sauce_ramp:
 		sausage.y = minf(RAMP_END, sausage.y + delta * (1.4 + (sausage.y - RAMP_START) * 1.8))
@@ -345,7 +345,7 @@ func _step_sausage(delta: float, use_item: bool) -> void:
 			sausage_velocity = ramp_velocity
 			sausage_launched = true
 			sausage_high = false
-	elif sausage_state == "falling":
+	elif sausage_state in ["falling", "slipped"]:
 		for i in range(plates.size()):
 			if not item_available("plate_%d" % i): continue
 			if sausage_fall_speed >= 0 and sausage.distance_to(plates[i].point) < PLATE_RADIUS - 0.08 and absf(float(elevations.sausage) - float(elevations["plate_%d" % i])) < 0.16:
