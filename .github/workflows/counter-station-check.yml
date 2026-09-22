@@ -38,7 +38,7 @@ jobs:
       - name: Counter station regressions
         run: |
           "$GODOT_BIN" --headless --path . --script res://tests/test_countertop_faces.gd
-          timeout 120s "$GODOT_BIN" --headless --path . --script res://tests/test_stations.gd
+          timeout 120s "$GODOT_BIN" --headless --path . --script res://tests/test_product_layout_geometry.gd
           timeout 120s "$GODOT_BIN" --headless --path . --script res://tests/test_cafe_physical_layout.gd
 
       - name: Runtime smoke
