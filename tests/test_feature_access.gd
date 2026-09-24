@@ -52,6 +52,9 @@ func run() -> void:
 	check(visible(access, "stars"), "First guest introduces development")
 	check(visible(access, "clone_lab"), "First guest introduces the clone lab")
 	check(not visible(access, "staff_roster"), "Staff remains hidden before clone creation")
+	var early_counter := access.item_access("counter", Catalogue.ITEMS.counter, {"is_host":true})
+	check(bool(early_counter.visible) and not bool(early_counter.enabled), "Known star-gated item stays visible before its required star")
+	check(str(early_counter.reason_code) == "star_required", "Item star requirement comes from FeatureAccess")
 
 	# 1★ introduces recording, while training/staff remain hidden until their own facts exist.
 	p.stars = 1
@@ -116,6 +119,10 @@ func run() -> void:
 		var feature_id := str(all_items[id].get("feature", ""))
 		check(not feature_id.is_empty(), "Catalogue item %s declares a feature" % id)
 		check(not FeatureDefinition.definition(feature_id).is_empty(), "Catalogue item %s references a known feature" % id)
+	for action_id in FeatureDefinition.ACTION_FEATURES:
+		var action_feature := FeatureDefinition.feature_for_action(str(action_id))
+		check(not action_feature.is_empty(), "Action %s declares a feature" % action_id)
+		check(not FeatureDefinition.definition(action_feature).is_empty(), "Action %s references a known feature" % action_id)
 
 	service.queue_free()
 	print("PASS: unified feature access progression" if failures == 0 else "FAILURES: %d" % failures)
