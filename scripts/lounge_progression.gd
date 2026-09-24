@@ -34,9 +34,9 @@ static func shop_items() -> Dictionary:
 	var result := {}
 	for id in GOODS:
 		var spec: Dictionary = GOODS[id]
-		result["rest_"+id] = {"name":spec.name,"price":spec.price,"kind":"lounge","lounge_id":id,"upgrade":false}
+		result["rest_"+id] = {"name":spec.name,"price":spec.price,"kind":"lounge","lounge_id":id,"upgrade":false,"feature":"rest_basics"}
 		if float(spec.quality)>0:
-			result["rest_upgrade_"+id] = {"name":"Улучшение: "+spec.name+" · +8% к качеству мест","price":maxi(40,int(spec.price*0.8)),"kind":"lounge","lounge_id":id,"upgrade":true}
+			result["rest_upgrade_"+id] = {"name":"Улучшение: "+spec.name+" · +8% к качеству мест","price":maxi(40,int(spec.price*0.8)),"kind":"lounge","lounge_id":id,"upgrade":true,"feature":"rest_basics"}
 	return result
 
 static func item_error(p, spec: Dictionary) -> String:
