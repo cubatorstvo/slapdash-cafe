@@ -69,7 +69,7 @@ static func apply(game: Node, mode: String) -> void:
 
 static func sync(game: Node) -> String:
 	var next := resolve(game)
-	if current(game) != next: apply(game, next)
+	apply(game, next)
 	return next
 
 static func handle_key(game: Node, event: InputEvent) -> bool:
