@@ -6,6 +6,7 @@ signal closed
 var column: VBoxContainer
 var note: Label
 var stamp := ""
+var allowed_pages: Array = Data.ORDER.duplicate()
 
 func _ready() -> void:
 	theme = CafeStyle.make(true)
@@ -20,14 +21,21 @@ func _ready() -> void:
 	note = get_node("Margin/Hold/Note") as Label
 	note.add_theme_color_override("font_color", Color("5a6b62"))
 
+func set_allowed_pages(values: Array) -> void:
+	var next := values.duplicate()
+	if next == allowed_pages: return
+	allowed_pages = next
+	stamp = ""
+
 func show_page(page: String, model = null) -> void:
-	var key := "%s:%s" % [page, JSON.stringify(Data.components(page, model)) if page != "index" else "index"]
+	var safe_page := page if page == "index" or page in allowed_pages else "index"
+	var key := "%s:%s:%s" % [safe_page, JSON.stringify(Data.components(safe_page, model)) if safe_page != "index" else "index", str(allowed_pages)]
 	if key == stamp: return
 	stamp = key
 	for child in column.get_children(): column.remove_child(child); child.queue_free()
 	note.text = ""
-	if name.ends_with("L"): _left(page, model)
-	else: _right(page, model)
+	if name.ends_with("L"): _left(safe_page, model)
+	else: _right(safe_page, model)
 
 func find_button(text: String) -> Button:
 	for child in column.get_children():
@@ -55,7 +63,7 @@ func _left(page: String, _model) -> void:
 func _right(page: String, model) -> void:
 	if page == "index":
 		_label("Сегодня в меню", 28)
-		for key in Data.ORDER:
+		for key in allowed_pages:
 			var entry := _button(Data.title(key), chosen.emit.bind(key), 34, 76)
 			entry.icon = Data.ICONS[key]
 			entry.expand_icon = true
