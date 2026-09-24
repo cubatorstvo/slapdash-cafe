@@ -138,6 +138,7 @@ func item_access(item_id: String, spec: Dictionary, context: Dictionary = {}) ->
 	var feature_id := str(spec.get("feature", "shop_basic"))
 	var merged := context.duplicate(true)
 	if not merged.has("price"): merged.price = int(spec.get("price", 0))
+	if not merged.has("required_star"): merged.required_star = int(spec.get("star", 0))
 	var result := access(feature_id, merged)
 	result.item = item_id
 	return result
@@ -170,6 +171,7 @@ func reason_text(result: Dictionary) -> String:
 		"unknown_feature": return "Неизвестная игровая возможность."
 		"dependency_locked": return "Сначала освой предыдущую возможность."
 		"chapter_locked": return "Откроется позже по развитию кафе."
+		"star_required": return "Нужна звезда %d." % int(args.get("star", 0))
 		"host_only": return "Покупку и общие изменения подтверждает хозяин кафе."
 		"insufficient_funds": return "Не хватает денег."
 		"pending_delivery": return "Этот товар уже едет."
@@ -190,6 +192,9 @@ func _temporary_block(context: Dictionary) -> Dictionary:
 		return {"code":"busy","args":{"text":str(context.get("busy_reason", "Сейчас действие занято другим процессом."))}}
 	if bool(context.get("requires_clone", false)) and not has_fact("first_clone_created"):
 		return {"code":"no_clone","args":{}}
+	var required_star := int(context.get("required_star", 0))
+	if required_star > chapter():
+		return {"code":"star_required","args":{"star":required_star}}
 	var price := int(context.get("price", 0))
 	if price > 0 and service != null and service.get("progress") != null and int(service.progress.cash) < price:
 		return {"code":"insufficient_funds","args":{"price":price,"cash":int(service.progress.cash)}}
