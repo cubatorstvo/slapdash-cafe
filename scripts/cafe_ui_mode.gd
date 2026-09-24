@@ -40,11 +40,11 @@ static func world_hud(mode: String) -> bool:
 static func apply(game: Node, mode: String) -> void:
 	if game == null or not is_instance_valid(game): return
 	var normalized := mode if mode in MODES else WORLD
+	var show_world := world_hud(normalized)
 	game.set_meta("ui_mode", normalized)
 	var hud: Variant = game.get("hud")
 	if hud != null and is_instance_valid(hud):
-		if "presentation_mode" in hud: hud.presentation_mode = normalized
-		var show_world := world_hud(normalized)
+		hud.set("presentation_mode", normalized)
 		_set_visible(hud, "Root/Top", show_world)
 		_set_visible(hud, "Root/Bottom", show_world)
 		_set_visible(hud, "Root/Crosshair", show_world)
