@@ -22,7 +22,7 @@ const IDS: Array[String] = [
 
 const DEFINITIONS: Dictionary = {
 	"shop_basic": {"id":"shop_basic","dependencies":[],"introduction_events":["new_game"],"min_chapter":0,"contexts":["navigation","shop","purchase"]},
-	"stars": {"id":"stars","dependencies":[],"introduction_events":["first_guest_seen"],"min_chapter":0,"contexts":["development","inspection"]},
+	"stars": {"id":"stars","dependencies":[],"introduction_events":["first_guest_seen"],"min_chapter":0,"contexts":["development","inspection","shop"]},
 	"clone_lab": {"id":"clone_lab","dependencies":["shop_basic"],"introduction_events":["first_guest_seen"],"min_chapter":0,"contexts":["development","shop","world","purchase"]},
 	"clone_growth": {"id":"clone_growth","dependencies":["clone_lab"],"introduction_events":["first_clone_created"],"min_chapter":1,"contexts":["staff","shop","purchase"]},
 	"live_training": {"id":"live_training","dependencies":["clone_growth"],"introduction_events":["first_clone_created"],"min_chapter":1,"contexts":["staff","training","world"]},
@@ -63,7 +63,7 @@ const PAGE_PARENTS: Dictionary = {
 
 const SHOP_CATEGORY_FEATURES: Dictionary = {
 	"equipment":"shop_basic",
-	"tables":"clone_growth",
+	"tables":"stars",
 	"rooms":"stars",
 	"lab":"clone_lab",
 	"lounge":"rest_basics",
@@ -73,7 +73,7 @@ const SHOP_CATEGORY_FEATURES: Dictionary = {
 const ACTION_FEATURES: Dictionary = {
 	"buy":"shop_basic",
 	"buy_bundle":"shop_basic",
-	"buy_station_batch":"clone_growth",
+	"buy_station_batch":"stars",
 	"masterclass":"video_recording",
 	"staff_training":"live_training",
 	"group_training":"group_training",
