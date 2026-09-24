@@ -1748,8 +1748,9 @@ func shop_page(host: bool) -> void:
 			shop_station_id = picker.get_item_id(selected_index)
 			picker.item_selected.connect(func(index):shop_station_id=picker.get_item_id(index);rebuild())
 			var station = game.service.by_id(shop_station_id)
-			label(content, "Отметь нужные предметы и закажи одним комплектом.", 15)
-			bundle_controls(station, game.shop.equipment_catalog(station.type_id))
+			label(content, "Покупай оснащение по одному. Каждая покупка приезжает отдельной коробкой.", 15)
+			for item in game.shop.equipment_catalog(station.type_id):
+				shop_button(item, station.station_id, item in station.equipment or item in station.upgrades)
 		"tables": _shop_tables(host)
 		"rooms": _shop_rooms(host)
 		"lab":
