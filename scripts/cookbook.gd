@@ -1,5 +1,6 @@
 extends Node
 const Data = preload("res://scripts/cookbook_data.gd")
+const UiMode = preload("res://scripts/cafe_ui_mode.gd")
 signal changed
 var opened := false
 var recipe := "index"
@@ -50,6 +51,7 @@ func toggle() -> void:
 	physical.set_reading(true, recipe, _live())
 	changed.emit()
 	game.sync_mouse_mode()
+	UiMode.apply(game, UiMode.COOKBOOK)
 
 func close() -> void:
 	if not opened: return
@@ -57,6 +59,7 @@ func close() -> void:
 	physical.set_reading(false, recipe)
 	changed.emit()
 	game.sync_mouse_mode()
+	UiMode.apply(game, UiMode.resolve(game))
 
 func select(value: String) -> void:
 	_sync_feature_pages()
