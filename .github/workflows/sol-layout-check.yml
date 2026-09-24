@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - sol/cafe-product-layout
-    paths:
-      - ".github/workflows/sol-layout-check.yml"
+      - feature/unified-feature-access
   workflow_dispatch:
 
 permissions:
@@ -36,6 +35,10 @@ jobs:
       - name: Import and parse project
         run: |
           "$GODOT_BIN" --headless --path . --import
+
+      - name: Feature access regression
+        run: |
+          "$GODOT_BIN" --headless --path . --script res://tests/test_feature_access.gd
 
       - name: Targeted layout regressions
         run: |
