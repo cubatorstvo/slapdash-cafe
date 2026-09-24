@@ -8,6 +8,7 @@ const PAUSE := "pause"
 const SLEEP := "sleep"
 const GAMEPLAY := WORLD
 const MODES := [WORLD, STATION, COOKBOOK, OFFICE, INSTRUMENT, PAUSE, SLEEP]
+const WORLD_PROMPT_GROUP := "ui_world_prompt"
 
 static func _opened(target: Variant) -> bool:
 	return target != null and is_instance_valid(target) and target.has_method("opened") and bool(target.call("opened"))
@@ -65,6 +66,7 @@ static func apply(game: Node, mode: String) -> void:
 		_set_visible(hud, "Root/PausePanel", normalized == PAUSE)
 		var reading_alert: CanvasItem = hud.get_node_or_null("Root/ReadingAlert")
 		if reading_alert != null: reading_alert.visible = normalized == COOKBOOK and not str(hud.get("reading_alert_message")).is_empty()
+	_set_group_visible(game, WORLD_PROMPT_GROUP, show_world)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED if show_world else Input.MOUSE_MODE_VISIBLE
 
 static func sync(game: Node) -> String:
@@ -114,3 +116,9 @@ static func handle_key(game: Node, event: InputEvent) -> bool:
 static func _set_visible(hud: Node, path: NodePath, value: bool) -> void:
 	var node: CanvasItem = hud.get_node_or_null(path)
 	if node != null: node.visible = value
+
+static func _set_group_visible(game: Node, group: StringName, value: bool) -> void:
+	if game == null or not game.is_inside_tree(): return
+	for node in game.get_tree().get_nodes_in_group(group):
+		if node is CanvasItem: (node as CanvasItem).visible = value
+		elif node is Node3D: (node as Node3D).visible = value
