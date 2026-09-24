@@ -12,6 +12,27 @@ func attach(owner_game: Node3D) -> void:
 	game.camera.add_child(physical)
 	physical.pose_in_hands(true)
 	physical.chosen.connect(_from_page)
+	_sync_feature_pages()
+
+func _feature_for_recipe(dish: String) -> String:
+	if dish == "meal": return "kitchen_pair"
+	if dish in ["burger","cheeseburger","spicy_burger"]: return "kitchen_grill"
+	if dish == "solyanka": return "kitchen_solyanka"
+	return "shop_basic"
+
+func _allowed_recipes() -> Array:
+	if game == null or not is_instance_valid(game.service) or game.service.get("feature_access") == null: return Data.ORDER.duplicate()
+	var result: Array = []
+	for dish in Data.ORDER:
+		if bool(game.service.feature_access.access(_feature_for_recipe(str(dish))).visible): result.append(dish)
+	return result
+
+func _sync_feature_pages() -> void:
+	if not is_instance_valid(physical): return
+	var allowed := _allowed_recipes()
+	for page in physical.pages:
+		if page.has_method("set_allowed_pages"): page.set_allowed_pages(allowed)
+	if recipe != "index" and recipe not in allowed: recipe = "index"
 
 func _from_page(page: String) -> void:
 	if page == "close": close()
@@ -19,8 +40,9 @@ func _from_page(page: String) -> void:
 
 func toggle() -> void:
 	if opened: close(); return
+	_sync_feature_pages()
 	var station: Node3D = game.local_station()
-	if station != null and station.training.phase == "recording":
+	if station != null and station.training.phase == "recording" and station.training.dish in _allowed_recipes():
 		recipe = station.training.dish
 	else: recipe = "index"
 	opened = true
@@ -37,7 +59,9 @@ func close() -> void:
 	game.sync_mouse_mode()
 
 func select(value: String) -> void:
-	recipe = Data.page(value)
+	_sync_feature_pages()
+	var requested := Data.page(value)
+	recipe = requested if requested == "index" or requested in _allowed_recipes() else "index"
 	physical.set_reading(true, recipe, _live())
 	changed.emit()
 
@@ -48,7 +72,9 @@ func _live():
 	return station.model
 
 func _process(_delta: float) -> void:
-	if opened: physical.set_live(_live())
+	if opened:
+		_sync_feature_pages()
+		physical.set_live(_live())
 
 func _input(event: InputEvent) -> void:
 	if not opened or not is_instance_valid(physical): return

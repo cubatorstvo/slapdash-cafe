@@ -35,6 +35,9 @@ static func catalogue() -> Dictionary:
 	for id in ITEMS:
 		var spec: Dictionary=ITEMS[id].duplicate(true)
 		spec.kind="lab_upgrade"
+		if str(spec.branch)=="calibration": spec.feature="recalibration"
+		elif id in ["lab_feeder","lab_irrigation","lab_planter","lab_extractor","lab_production"]: spec.feature="lab_automation"
+		else: spec.feature="clone_growth"
 		result[id]=spec
 	return result
 
