@@ -1,0 +1,49 @@
+name: PC overview final check
+
+on:
+  push:
+    branches:
+      - work/pc-overview-shift-summary
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GODOT_BIN: /tmp/godot/Godot_v4.7-stable_linux.x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip libgl1 libxcursor1 libxinerama1 libxrandr2 libxi6 libasound2t64
+      - name: Download official Godot 4.7 stable
+        run: |
+          mkdir -p /tmp/godot
+          curl -L --fail --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x "$GODOT_BIN"
+          "$GODOT_BIN" --version
+      - name: Import and parse project
+        run: "$GODOT_BIN" --headless --path . --import
+      - name: PC overview regression
+        run: "$GODOT_BIN" --headless --path . --script res://tests/test_pc_overview_shift_summary.gd
+      - name: Related cafe regressions
+        run: |
+          for test in test_first_star.gd test_third_star.gd test_delivery_workers.gd; do
+            timeout 90s "$GODOT_BIN" --headless --path . --script "res://tests/$test"
+          done
+      - name: Runtime smoke
+        shell: bash
+        run: |
+          set +e
+          timeout 8s "$GODOT_BIN" --headless --path . > /tmp/runtime-smoke.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/runtime-smoke.log
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then exit "$code"; fi
+          if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access" /tmp/runtime-smoke.log; then exit 1; fi
