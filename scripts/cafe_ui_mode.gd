@@ -9,22 +9,27 @@ const SLEEP := "sleep"
 const GAMEPLAY := WORLD
 const MODES := [WORLD, STATION, COOKBOOK, OFFICE, INSTRUMENT, PAUSE, SLEEP]
 
+static func _opened(target: Variant) -> bool:
+	return target != null and is_instance_valid(target) and target.has_method("opened") and bool(target.call("opened"))
+
 static func resolve(game: Node) -> String:
 	if game == null or not is_instance_valid(game): return WORLD
 	var session: Variant = game.get("session")
-	if session != null and is_instance_valid(session) and (session.sleep_scene_active() or session.local_sleeping()): return SLEEP
+	if session != null and is_instance_valid(session) and session.has_method("sleep_scene_active") and session.has_method("local_sleeping") and (session.sleep_scene_active() or session.local_sleeping()): return SLEEP
 	if bool(game.get("session_paused")): return PAUSE
 	var office: Variant = game.get("office")
-	if office != null and is_instance_valid(office) and office.opened(): return OFFICE
+	if _opened(office): return OFFICE
 	var cookbook: Variant = game.get("cookbook")
-	if cookbook != null and is_instance_valid(cookbook) and bool(cookbook.opened): return COOKBOOK
+	if cookbook != null and is_instance_valid(cookbook) and bool(cookbook.get("opened")): return COOKBOOK
 	var laboratory: Variant = game.get("laboratory")
-	if laboratory != null and is_instance_valid(laboratory) and is_instance_valid(laboratory.ui) and bool(laboratory.ui.opened()): return INSTRUMENT
+	if laboratory != null and is_instance_valid(laboratory):
+		var lab_ui: Variant = laboratory.get("ui")
+		if _opened(lab_ui): return INSTRUMENT
 	if game.has_method("awaiting_serving_confirmation") and bool(game.awaiting_serving_confirmation()): return INSTRUMENT
 	var menu: Variant = game.get("menu")
-	if menu != null and is_instance_valid(menu) and bool(menu.opened()): return INSTRUMENT
+	if _opened(menu): return INSTRUMENT
 	var steam: Variant = game.get("steam")
-	if steam != null and is_instance_valid(steam) and bool(steam.overlay_open): return INSTRUMENT
+	if steam != null and is_instance_valid(steam) and bool(steam.get("overlay_open")): return INSTRUMENT
 	if game.has_method("local_station"):
 		var station: Variant = game.local_station()
 		if station != null and is_instance_valid(station) and (bool(station.training.active()) or str(station.state) == "cooking"): return STATION
@@ -89,14 +94,15 @@ static func handle_key(game: Node, event: InputEvent) -> bool:
 		PAUSE:
 			game.toggle_pause()
 		INSTRUMENT:
-			if is_instance_valid(game.laboratory) and is_instance_valid(game.laboratory.ui) and game.laboratory.ui.opened():
-				if not game.laboratory.ui.handle_input(key_event): return false
+			var lab_ui: Variant = game.laboratory.get("ui") if is_instance_valid(game.laboratory) else null
+			if _opened(lab_ui):
+				if not lab_ui.handle_input(key_event): return false
 			elif game.awaiting_serving_confirmation():
 				var station = game.local_station()
 				if station == null or station.training.lead != game.session.local_id(): return false
 				game.menu.close()
 				game.session.request_action({"action":"resume","station":station.station_id})
-			elif is_instance_valid(game.menu) and game.menu.opened(): game.menu.close()
+			elif _opened(game.menu): game.menu.close()
 			else: return false
 		WORLD, STATION:
 			game.toggle_pause()
