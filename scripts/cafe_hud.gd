@@ -1,14 +1,19 @@
 extends CanvasLayer
 const CafeStyle = preload("res://scripts/cafe_theme.gd")
 const Data = preload("res://scripts/cookbook_data.gd")
+const UiMode = preload("res://scripts/cafe_ui_mode.gd")
 signal office_requested
 signal resume_requested
+var presentation_mode := UiMode.WORLD
+var game: Node3D
 var recipe_panel: PanelContainer
 var recipe_text: Label
 var recipe_content: VBoxContainer
 var recipe_scroll: ScrollContainer
 var recipe_stamp := ""
+var recipe_requested := false
 var bottom: PanelContainer
+var top: PanelContainer
 var journey: Label
 var visit_status: Label
 var goal: Label
@@ -26,10 +31,18 @@ var toast: Label
 var toast_tween: Tween
 var event_feed_panel: PanelContainer
 var event_feed_text: Label
+var event_feed_requested := false
+var cookbook_status: PanelContainer
+var cookbook_status_text: Label
+var reading_alert: PanelContainer
+var reading_alert_text: Label
+var reading_alert_message := ""
 
 func _ready() -> void:
+	game = get_parent() as Node3D
 	var root := get_node("Root") as Control
 	root.theme = CafeStyle.make()
+	top = get_node("Root/Top") as PanelContainer
 	goal = get_node("Root/Top/Row/Order/Goal") as Label
 	clone_status = get_node("Root/Top/Row/Order/CloneStatus") as Label
 	clone_status.add_theme_color_override("font_color", CafeStyle.MINT)
@@ -68,10 +81,20 @@ func _ready() -> void:
 	pause_panel = get_node("Root/PausePanel") as PanelContainer
 	var resume := get_node("Root/PausePanel/Pause/Resume") as Button
 	resume.pressed.connect(func(): resume_requested.emit())
+	cookbook_status = get_node("Root/CookbookStatus") as PanelContainer
+	cookbook_status_text = get_node("Root/CookbookStatus/Text") as Label
+	reading_alert = get_node("Root/ReadingAlert") as PanelContainer
+	reading_alert_text = get_node("Root/ReadingAlert/Text") as Label
+	UiMode.apply(game, UiMode.resolve(game))
+
+func _process(_delta: float) -> void:
+	presentation_mode = UiMode.sync(game)
+	_update_cookbook_status()
 
 func show_chef_request(order: Dictionary) -> void:
 	var text: String = preload("res://scripts/chef_orders.gd").special_request(order)
-	recipe_panel.visible = not text.is_empty()
+	recipe_requested = not text.is_empty()
+	recipe_panel.visible = recipe_requested and UiMode.world_hud(presentation_mode)
 	if text.is_empty() or text == recipe_stamp: return
 	recipe_stamp = text
 	for child in recipe_content.get_children(): recipe_content.remove_child(child); child.queue_free()
@@ -91,11 +114,18 @@ func recipe_panel_text() -> String:
 	return " ".join(parts)
 
 func set_event_feed(lines: Array) -> void:
-	if lines.is_empty():
+	event_feed_requested = not lines.is_empty()
+	if not event_feed_requested:
+		event_feed_text.text = ""
 		event_feed_panel.hide()
 		return
 	event_feed_text.text="\n".join(lines)
-	event_feed_panel.show()
+	event_feed_panel.visible = UiMode.world_hud(presentation_mode)
+
+func show_reading_alert(message: String) -> void:
+	reading_alert_message = message.strip_edges()
+	reading_alert_text.text = reading_alert_message
+	reading_alert.visible = presentation_mode == UiMode.COOKBOOK and not reading_alert_message.is_empty()
 
 func show_toast(message: String) -> void:
 	if toast_tween != null: toast_tween.kill()
@@ -104,6 +134,20 @@ func show_toast(message: String) -> void:
 	toast_tween = create_tween()
 	toast_tween.tween_interval(1.5)
 	toast_tween.tween_property(toast,"modulate:a",0.0,0.5)
+
+func _update_cookbook_status() -> void:
+	if not is_instance_valid(cookbook_status): return
+	var station: Variant = game.local_station() if is_instance_valid(game) and is_instance_valid(game.get("service")) and is_instance_valid(game.get("session")) else null
+	var cooking := false
+	if station != null and is_instance_valid(station): cooking = bool(station.training.active()) or str(station.state) == "cooking"
+	cookbook_status.visible = presentation_mode == UiMode.COOKBOOK and cooking
+	if not cookbook_status.visible: return
+	var dish := str(station.training.dish)
+	var seconds := float(station.training.tick) / 60.0 if station.training.active() else 0.0
+	cookbook_status_text.text = "Готовка продолжается · %s · %.1f с" % [Data.title(dish), seconds]
+
+func _input(event: InputEvent) -> void:
+	if UiMode.handle_key(game, event): get_viewport().set_input_as_handled()
 
 func _label(parent: Node, value: String, size: int, color := CafeStyle.CREAM) -> Label:
 	var label := Label.new()

@@ -71,7 +71,7 @@ material_override = SubResource("Mat_post")
 [node name="Interaction" type="Marker3D" parent="RibbonGate"]
 position = Vector3(0,1.0,0)
 
-[node name="Prompt" type="Label3D" parent="RibbonGate"]
+[node name="Prompt" type="Label3D" parent="RibbonGate" groups=["ui_world_prompt"]]
 position = Vector3(0,1.65,0.08)
 billboard = 1
 no_depth_test = true
