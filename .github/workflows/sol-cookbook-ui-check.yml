@@ -29,9 +29,11 @@ jobs:
           chmod +x "$GODOT_BIN"
           "$GODOT_BIN" --version
       - name: Import and parse project
-        run: "$GODOT_BIN" --headless --path . --import
+        run: |
+          "$GODOT_BIN" --headless --path . --import
       - name: Feature-access regression
-        run: timeout 90s "$GODOT_BIN" --headless --path . --script res://tests/test_feature_access.gd
+        run: |
+          timeout 90s "$GODOT_BIN" --headless --path . --script res://tests/test_feature_access.gd
       - name: Cookbook regressions
         shell: bash
         run: |
@@ -50,7 +52,8 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|Invalid call|Invalid access" /tmp/runtime-smoke.log; then exit 1; fi
       - name: Capture cookbook at acceptance resolutions
         timeout-minutes: 5
-        run: xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_cookbook_visibility.gd
+        run: |
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT_BIN" --path . --rendering-method gl_compatibility --script res://tests/capture_cookbook_visibility.gd
       - name: Collect captures and logs
         if: always()
         run: |
