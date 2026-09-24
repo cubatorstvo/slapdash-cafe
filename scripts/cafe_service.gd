@@ -2,7 +2,6 @@ extends "res://scripts/cafe_service_core.gd"
 const ShiftSummary = preload("res://scripts/cafe_shift_summary.gd")
 const OverviewInsights = preload("res://scripts/cafe_insights.gd")
 const FeatureAccess = preload("res://scripts/feature_access.gd")
-const FeatureDefinition = preload("res://scripts/feature_definition.gd")
 const SAVE_VERSION := 24
 var shift_summary = ShiftSummary.new()
 var feature_access = FeatureAccess.new()
@@ -23,8 +22,8 @@ func feature_state(feature_id: String, context: Dictionary = {}) -> Dictionary:
 func feature_reason(state: Dictionary) -> String:
 	return feature_access.reason_text(state)
 
-func _feature_command_error(feature_id: String, context: Dictionary = {}) -> String:
-	var state: Dictionary = feature_access.access(feature_id, context)
+func _action_command_error(action_id: String, context: Dictionary = {}) -> String:
+	var state: Dictionary = feature_access.action_access(action_id, context)
 	if bool(state.get("enabled", false)): return ""
 	var reason := feature_access.reason_text(state)
 	return reason if not reason.is_empty() else "Эта возможность сейчас недоступна."
@@ -51,12 +50,12 @@ func purchase(kind: String, id: String, station_id := 0) -> String:
 	return super(kind, id, station_id)
 
 func request_masterclass(dish: String, peer: int, equipment: Variant = null) -> String:
-	var error := _feature_command_error("video_recording")
+	var error := _action_command_error("masterclass")
 	if not error.is_empty(): return error
 	return super(dish, peer, equipment)
 
 func create_clone(tempo := 1.0, prepaid := false) -> String:
-	var error := _feature_command_error("clone_lab")
+	var error := _action_command_error("clone_create")
 	if not error.is_empty(): return error
 	var result: String = super(tempo, prepaid)
 	if result.is_empty(): feature_access.mark_fact("first_clone_created")
@@ -68,7 +67,7 @@ func save_masterclass_from_run(stage: Node3D, dish: String, tracks: Array) -> bo
 	return saved
 
 func start_banquet(sender: int) -> String:
-	var error := _feature_command_error("stars")
+	var error := _action_command_error("banquet")
 	if not error.is_empty(): return error
 	return super(sender)
 
