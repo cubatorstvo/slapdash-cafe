@@ -14,7 +14,7 @@ const ITEMS := {
 	"pan": {"name":"Дырявая сковорода с горелкой","price":54,"kind":"equipment","feature":"shop_basic"},
 	"jug": {"name":"Кувшин для вина","price":54,"kind":"equipment","feature":"shop_basic"},
 	"sauce_ramp": {"name":"Соусный трамплин","price":75,"kind":"equipment","star":1,"feature":"video_recording"},
-	"counter": {"name":"Стол и шкафчик","price":120,"kind":"station","star":1,"feature":"clone_growth"},
+	"counter": {"name":"Стол и шкафчик","price":120,"kind":"station","star":1,"feature":"stars"},
 	"kitchen": {"name":"Парная кухня","price":250,"kind":"station","star":2,"feature":"kitchen_pair"},
 	"grill_kitchen": {"name":"Специализированная бургерная кухня","price":380,"kind":"station","star":3,"feature":"kitchen_grill"},
 	"solyanka_kitchen": {"name":"Кухня «Солянка» на три роли","price":520,"kind":"station","star":4,"feature":"kitchen_solyanka"},
