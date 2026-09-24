@@ -11,6 +11,7 @@ const THIRD_PERSON_SCALE := SIZE_MULTIPLIER
 const FIRST_PERSON_DISTANCE := 0.74
 const THIRD_PERSON_DISTANCE := 0.68
 const READER_EYE_HEIGHT := 1.55
+const PAGE_TURN_SECONDS := 0.22
 signal chosen(page)
 var page_sound: AudioStreamPlayer3D
 var pages: Array = []
@@ -20,7 +21,7 @@ var hands: Array = []
 var current_page := "index"
 var is_open := false
 var turn := 0.0
-var page_mesh: Node3D
+var page_turn_mesh: MeshInstance3D
 var first_person := false
 var live_model = null
 var last_pointer := Vector2(-1, -1)
@@ -44,8 +45,9 @@ func _ready() -> void:
 		view.gui_disable_input = false
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		var sheet := SceneRuntime.clone_warm("res://scenes/ui/cookbook_ui.tscn", Page) as Control
-		view.add_child(sheet)
+		sheet.configure(side)
 		sheet.name = "L" if side < 0 else "R"
+		view.add_child(sheet)
 		sheet.anchor_right = 1
 		sheet.anchor_bottom = 1
 		sheet.chosen.connect(func(page): chosen.emit(page))
@@ -58,10 +60,19 @@ func _ready() -> void:
 		mat.cull_mode = BaseMaterial3D.CULL_BACK
 		mat.render_priority = 1
 		mesh.material_override = mat
+		mesh.show()
 		pages.append(sheet)
 		views.append(view)
 		surfaces.append(mesh)
-	page_mesh = get_node("RightPageSurface")
+	page_turn_mesh = get_node("PageTurnAnchor/PageTurnLeaf") as MeshInstance3D
+	var turn_mat := StandardMaterial3D.new()
+	turn_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	turn_mat.albedo_texture = views[1].get_texture()
+	turn_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	turn_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	turn_mat.render_priority = 2
+	page_turn_mesh.material_override = turn_mat
+	page_turn_mesh.hide()
 	page_sound = AudioStreamPlayer3D.new()
 	add_child(page_sound)
 	page_sound.stream = preload("res://assets/audio/page.wav")
@@ -84,9 +95,6 @@ func pose_in_hands(first_person_held: bool, look_negative_z := true) -> void:
 		hands[i].visible = true
 
 func pose_for_gaze(pitch: float, look_negative_z := true, eye_height := READER_EYE_HEIGHT) -> void:
-	# Pages face the reader and the spread is centered directly on the gaze ray.
-	# First-person pitch/yaw already live on the Camera3D parent, while avatars
-	# pass their recorded local head pitch here.
 	var forward_zero := Vector3.FORWARD if look_negative_z else Vector3.BACK
 	var gaze_basis := Basis(Vector3.RIGHT, pitch)
 	var forward := (gaze_basis * forward_zero).normalized()
@@ -136,12 +144,15 @@ func set_reading(open: bool, recipe := "index", model = null) -> void:
 		view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if open else SubViewport.UPDATE_DISABLED
 	if not open:
 		_leave_side(last_side)
+		turn = 0.0
+		if is_instance_valid(page_turn_mesh): page_turn_mesh.hide()
 		if page_sound: page_sound.stop()
 	if turned and open and ancestors_shown(): page_sound.play()
-	if open and turned: turn = 0.22
+	if open and turned: turn = PAGE_TURN_SECONDS
 	if open:
 		current_page = page
 		_paint()
+	for surface in surfaces: surface.visible = open
 	for hand in hands: hand.visible = open
 
 func _paint() -> void:
@@ -172,6 +183,7 @@ func hit_from_screen(camera: Camera3D, screen: Vector2) -> Dictionary:
 	var nearest := 8.0
 	for i in range(surfaces.size()):
 		var mesh: MeshInstance3D = surfaces[i]
+		if not mesh.visible: continue
 		var n: Vector3 = mesh.global_transform.basis.y.normalized()
 		var denom := n.dot(ray)
 		if absf(denom) < 0.02: continue
@@ -222,9 +234,13 @@ func feed_pointer(event: InputEvent, hit: Dictionary) -> void:
 	last_side = hit.side
 
 func _process(delta: float) -> void:
-	turn = maxf(0, turn - delta)
-	page_mesh.visible = turn > 0 and visible
-	page_mesh.rotation.z = sin((1 - turn / 0.22) * PI) * 2.4
+	turn = maxf(0.0, turn - delta)
+	if not is_instance_valid(page_turn_mesh): return
+	page_turn_mesh.visible = visible and turn > 0.0
+	if page_turn_mesh.visible:
+		page_turn_mesh.rotation.z = sin((1.0 - turn / PAGE_TURN_SECONDS) * PI) * 2.4
+	else:
+		page_turn_mesh.rotation.z = 0.0
 
 func shutdown() -> void:
 	_leave_side(last_side)
@@ -232,10 +248,11 @@ func shutdown() -> void:
 	if page_sound and is_instance_valid(page_sound):
 		page_sound.stop()
 		page_sound.stream = null
-	for i in range(surfaces.size()):
-		var mesh: MeshInstance3D = surfaces[i]
+	for mesh in surfaces:
 		if is_instance_valid(mesh) and mesh.material_override:
 			mesh.material_override.albedo_texture = null
+	if is_instance_valid(page_turn_mesh) and page_turn_mesh.material_override:
+		page_turn_mesh.material_override.albedo_texture = null
 	for view in views:
 		if not is_instance_valid(view): continue
 		view.render_target_update_mode = SubViewport.UPDATE_DISABLED
