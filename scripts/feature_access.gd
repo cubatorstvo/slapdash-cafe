@@ -59,7 +59,7 @@ func refresh_facts() -> void:
 	if int(p.stars) >= 4: _set_fact("fourth_star")
 	if int(p.stars) >= 5: _set_fact("fifth_star")
 	if int(p.next_clone_id) > 1 or not p.free_workers.is_empty(): _set_fact("first_clone_created")
-	if not service.get("masterclasses") == null and not service.masterclasses.is_empty(): _set_fact("first_recording_saved")
+	if service.get("masterclasses") != null and not service.masterclasses.is_empty(): _set_fact("first_recording_saved")
 	if bool(p.get("training_intro_mass_seen")): _set_fact("personal_lesson_accepted")
 	if int(p.get("journey_auto_served")) > 0 or int(p.get("third_star_auto_served")) > 0: _set_fact("auto_feed_completed")
 
@@ -171,7 +171,7 @@ func reason_text(result: Dictionary) -> String:
 		"dependency_locked": return "Сначала освой предыдущую возможность."
 		"chapter_locked": return "Откроется позже по развитию кафе."
 		"host_only": return "Покупку и общие изменения подтверждает хозяин кафе."
-		"insufficient_funds": return "Не хватает денег: нужно %d, сейчас %d." % [int(args.get("price", 0)), int(args.get("cash", 0))]
+		"insufficient_funds": return "Не хватает денег."
 		"pending_delivery": return "Этот товар уже едет."
 		"already_owned": return "Уже установлено."
 		"busy": return str(args.get("text", "Сейчас действие занято другим процессом."))
