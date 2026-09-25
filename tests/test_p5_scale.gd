@@ -83,6 +83,7 @@ func run() -> void:
 	p.lounge_items.append("television")
 	mark(director,"television_installed",{})
 	check(Journey.current(p,service.stations,99,true,service).key == "scale_single_video","single-table viewing comes before group setup")
+	check(Journey.current(p,service.stations,99,true).key == "scale_single_video","service-free objective follows persisted milestones instead of getting stuck on film lookup")
 
 	mark(director,"video_training_completed",{"station_count":1,"station_ids":[2],"clone_ids":[101],"record_id":41,"dish":"sausage"})
 	check(not director.is_unlocked("group_training"),"completed viewing alone does not unlock group training")
@@ -109,6 +110,7 @@ func run() -> void:
 
 	p.expanded = true
 	var pair := Station.new(4,"kitchen",[201,202])
+	pair.equipment = ["meat_kit","pasta_kit"]
 	pair.bind("meal",[201,202],51)
 	service.stations.append(pair)
 	check(Journey.current(p,service.stations,99,true,service).key == "first_meal","paired kitchen waits for its first real automatic order")
@@ -124,6 +126,7 @@ func run() -> void:
 	check(director.is_unlocked("kitchen_specialty"),"3★ plus proven paired kitchen unlocks specialization")
 	p.specialized_expanded = true
 	var grill := Station.new(5,"grill_kitchen",[301,302])
+	grill.equipment = ["grill_kit","assembly_kit"]
 	for dish in p.SPECIALTY_DISHES: grill.bind(str(dish),[301,302],61)
 	service.stations.append(grill)
 	check(Journey.current(p,service.stations,99,true,service).key == "first_specialty","burger line is introduced before 4★")
@@ -139,6 +142,7 @@ func run() -> void:
 	check(director.is_unlocked("kitchen_orchestration"),"4★ plus proven burger line unlocks orchestration")
 	p.orchestration_expanded = true
 	var solyanka := Station.new(6,"solyanka_kitchen",[401,402,403])
+	solyanka.equipment = ["fire_kit","stir_kit","salt_kit"]
 	solyanka.bind("solyanka",[401,402,403],71)
 	service.stations.append(solyanka)
 	check(Journey.current(p,service.stations,99,true,service).key == "first_solyanka","three-role kitchen requires its first real automatic order")
