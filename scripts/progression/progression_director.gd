@@ -46,10 +46,23 @@ func migrate_from_game_state() -> void:
 	if created_count >= 2: changed = _record_milestone("repeat_manual_clone_growth_completed", {"count":created_count}, false) or changed
 	var history: Variant = p.get("delivery_history")
 	if history is Array and _starter_equipment_was_installed(history): changed = _record_milestone("first_equipment_installed", {}, false) or changed
+	if _formula_improvement_relevant(): changed = _record_milestone("formula_improvement_relevant", {"tempo":float(p.get("lab_formula_tempo"))}, false) or changed
 	if changed:
 		revision += 1
 		_publish_to_progress()
 		progression_changed.emit([])
+
+func _restore_compatibility_unlocks() -> void:
+	super()
+	# Current-format P5.3 progression is action-driven. Legacy compatibility may keep already
+	# installed content visible, but it must not introduce future systems from UI setup alone.
+	if not has_milestone("first_video_trained_auto_served"): unlocked_features.erase("group_training")
+	if not has_milestone("first_group_training_completed"):
+		unlocked_features.erase("formula_research")
+		unlocked_features.erase("formula_upgrades")
+	if not has_milestone("first_group_trained_auto_served") and not bool(service.progress.get("expanded")): unlocked_features.erase("kitchen_pair")
+	if not has_milestone("first_pair_kitchen_auto_served") and not bool(service.progress.get("specialized_expanded")): unlocked_features.erase("kitchen_specialty")
+	if not has_milestone("first_specialty_kitchen_auto_served") and not bool(service.progress.get("orchestration_expanded")): unlocked_features.erase("kitchen_orchestration")
 
 func _starter_equipment_was_installed(history: Array) -> bool:
 	for raw_entry in history:
@@ -63,13 +76,19 @@ func _starter_equipment_was_installed(history: Array) -> bool:
 	return false
 
 func _milestone_for_event(event_id: String, payload: Dictionary) -> String:
-	if event_id == "cafe_opened": return "cafe_opened"
-	if event_id == "starter_equipment_installed": return "first_equipment_installed"
-	if event_id == "standard_formula_available": return "standard_formula_available"
-	if event_id == "manual_clone_growth_completed": return "first_manual_clone_growth_completed" if int(payload.get("ordinal", 0)) <= 1 else "repeat_manual_clone_growth_completed"
-	if event_id == "starter_dish_served":
-		var dish := str(payload.get("dish", ""))
-		return "first_%s_served" % dish if dish in STARTER_DISHES else ""
+	match event_id:
+		"cafe_opened": return "cafe_opened"
+		"starter_equipment_installed": return "first_equipment_installed"
+		"standard_formula_available": return "standard_formula_available"
+		"manual_clone_growth_completed": return "first_manual_clone_growth_completed" if int(payload.get("ordinal", 0)) <= 1 else "repeat_manual_clone_growth_completed"
+		"video_trained_auto_served": return "first_video_trained_auto_served"
+		"group_trained_auto_served": return "first_group_trained_auto_served"
+		"pair_kitchen_auto_served": return "first_pair_kitchen_auto_served"
+		"specialty_kitchen_auto_served": return "first_specialty_kitchen_auto_served"
+		"solyanka_auto_served": return "first_solyanka_auto_served"
+		"starter_dish_served":
+			var dish := str(payload.get("dish", ""))
+			return "first_%s_served" % dish if dish in STARTER_DISHES else ""
 	return super(event_id, payload)
 
 func _event_is_confirmed(event_id: String, payload: Dictionary) -> bool:
@@ -77,5 +96,28 @@ func _event_is_confirmed(event_id: String, payload: Dictionary) -> bool:
 	if event_id == "starter_equipment_installed": return int(payload.get("station_id", 0)) == 1 and str(payload.get("item", "")) in STARTER_EQUIPMENT
 	if event_id == "standard_formula_available": return service != null and service.get("progress") != null and int(service.progress.get("lab_stage")) >= 3 and int(service.progress.get("lab_formula_version")) > 0 and float(service.progress.get("lab_formula_tempo")) >= 1.0
 	if event_id == "manual_clone_growth_completed": return int(payload.get("clone_id", 0)) > 0 and int(payload.get("ordinal", 0)) > 0
+	if event_id in ["video_trained_auto_served", "group_trained_auto_served", "pair_kitchen_auto_served", "specialty_kitchen_auto_served", "solyanka_auto_served"]: return int(payload.get("station_id", 0)) > 0 and not str(payload.get("dish", "")).is_empty()
 	if event_id == "starter_dish_served": return int(payload.get("station_id", 0)) == 1 and str(payload.get("dish", "")) in STARTER_DISHES
 	return super(event_id, payload)
+
+func _formula_improvement_relevant() -> bool:
+	if service == null or service.get("progress") == null: return false
+	var formula := float(service.progress.get("lab_formula_tempo"))
+	if formula <= 0.0: return false
+	var seen_ids: Dictionary = {}
+	var workers: Array = []
+	var free: Variant = service.progress.get("free_workers")
+	if free is Array: workers.append_array(free)
+	var station_list: Variant = service.get("stations")
+	if station_list is Array:
+		for station in station_list:
+			if station == null: continue
+			var crew: Variant = station.get("crew")
+			if crew is Array: workers.append_array(crew)
+	for worker in workers:
+		if not worker is Dictionary: continue
+		var clone_id := int(worker.get("clone_id", 0))
+		if clone_id <= 0 or seen_ids.has(clone_id): continue
+		seen_ids[clone_id] = true
+		if float(worker.get("tempo", 1.0)) < formula: return true
+	return false

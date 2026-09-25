@@ -59,6 +59,56 @@ func _count_completed_customer(customer: Dictionary, station: Node3D) -> void:
 		progression_director.observe("starter_dish_served", {"dish":str(customer.dish), "station_id":station.station_id})
 	_refresh_progression()
 
+func _learned_station_ids(participants: Array, learned_clone_ids: Array) -> Array:
+	var result: Array = []
+	for participant in participants:
+		if not participant is Dictionary: continue
+		var clone_id := int(participant.get("clone_id", 0))
+		if clone_id > 0 and clone_id not in learned_clone_ids: continue
+		var station_id := int(participant.get("station", 0))
+		if station_id > 0 and station_id not in result: result.append(station_id)
+	result.sort()
+	return result
+
+func _milestone_matches_service(milestone_id: String, station_id: int, dish: String) -> bool:
+	if not progression_director.has_milestone(milestone_id): return false
+	var milestone: Variant = progression_director.milestones.get(milestone_id, {})
+	if not milestone is Dictionary: return false
+	var station_ids: Variant = milestone.get("station_ids", [])
+	if station_ids is Array and not station_ids.is_empty():
+		if station_id not in station_ids: return false
+		var taught_dish := str(milestone.get("dish", ""))
+		return taught_dish.is_empty() or taught_dish == dish
+	if milestone_id != "first_video_training_completed": return false
+	var station = by_id(station_id)
+	if station == null or not station.method_sources.has(dish): return false
+	var source: Variant = station.method_sources.get(dish, {})
+	return source is Dictionary and int(source.get("id", source.get("record_id", 0))) > 0
+
+func observe_auto_served(dish: String, station_id: int) -> void:
+	progression_director.observe("auto_served", {"dish":dish,"station_id":station_id})
+	if _milestone_matches_service("first_video_training_completed", station_id, dish):
+		progression_director.observe("video_trained_auto_served", {"dish":dish,"station_id":station_id})
+	if _milestone_matches_service("first_group_training_completed", station_id, dish):
+		progression_director.observe("group_trained_auto_served", {"dish":dish,"station_id":station_id})
+	var station = by_id(station_id)
+	if station != null:
+		match str(station.type_id):
+			"kitchen": progression_director.observe("pair_kitchen_auto_served", {"dish":dish,"station_id":station_id})
+			"grill_kitchen": progression_director.observe("specialty_kitchen_auto_served", {"dish":dish,"station_id":station_id})
+			"solyanka_kitchen": progression_director.observe("solyanka_auto_served", {"dish":dish,"station_id":station_id})
+	_refresh_progression()
+
+func complete_video_lesson(lesson_id: int, record: Dictionary, participants: Array) -> Array:
+	var learned: Array = super(lesson_id, record, participants)
+	if not learned.is_empty():
+		var station_ids := _learned_station_ids(participants, learned)
+		var payload := {"lesson_id":lesson_id,"record_id":int(record.get("id", 0)),"dish":str(record.get("dish", "")),"station_ids":station_ids.duplicate(),"station_count":station_ids.size(),"clone_ids":learned.duplicate()}
+		progression_director.observe("video_training_completed", payload)
+		if station_ids.size() >= 2: progression_director.observe("group_training_completed", payload)
+		_refresh_progression()
+	return learned
+
 func load_data(data: Dictionary) -> bool:
 	if not super(data): return false
 	if progress.shift == "morning":
