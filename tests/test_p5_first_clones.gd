@@ -106,6 +106,11 @@ func run()->void:
 	p.popularity=p.STAR_POPULARITY; service.served=p.REQUIRED_SERVED; p.journey_auto_served=1
 	var requirements: Array=p.star_requirements(service.stations,service.served)
 	check(requirements.all(func(row): return bool(row.done)),"Current workers satisfy all 2★ requirements with B+ live skills")
+	var crew_a: Dictionary=station_a.crew[0]; var crew_b: Dictionary=station_b.crew[0]
+	station_a.crew[0]=crew_b; station_b.crew[0]=crew_a
+	var stale_requirements: Array=p.star_requirements(service.stations,service.served)
+	check(not stale_requirements.all(func(row): return bool(row.done)),"Stale recipe bindings do not count after current workers are swapped")
+	station_a.crew[0]=crew_a; station_b.crew[0]=crew_b
 	check(p.can_attempt(service.stations,service.served),"Three auto serves are not a hidden second-star gate")
 	check(service.masterclasses.is_empty() and "television" not in p.lounge_items,"2★ is reachable with empty masterclasses and no television")
 	check(not bool(service.feature_state("video_recording").get("unlocked",false)),"Video recording remains hidden during 1★ chapter")
