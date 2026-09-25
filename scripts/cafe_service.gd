@@ -2,6 +2,13 @@ extends "res://scripts/cafe_service_feature_core.gd"
 
 const STARTER_DISH_SEQUENCE := ["sausage", "potato", "wine"]
 
+func _ready() -> void:
+	super()
+	if progress.shift == "morning":
+		progress.shift = "open"
+		open_for_business = true
+		spawn_clock = 2.0
+
 func start_highlights(id: int, peer: int) -> String:
 	var error := _action_command_error("masterclass_watch", {"actor_id":peer})
 	if not error.is_empty(): return error
@@ -33,6 +40,10 @@ func _count_completed_customer(customer: Dictionary, station: Node3D) -> void:
 
 func load_data(data: Dictionary) -> bool:
 	if not super(data): return false
+	if progress.shift == "morning":
+		progress.shift = "open"
+		open_for_business = true
+		spawn_clock = 2.0
 	if int(data.get("version", 0)) == SAVE_VERSION and data.get("progression", {}) is Dictionary and data.progression.get("feature_progress", {}) is Dictionary:
 		progress.feature_progress = data.progression.feature_progress.duplicate(true)
 		progression_director.restore(progress.feature_progress, true)
