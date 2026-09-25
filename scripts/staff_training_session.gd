@@ -170,16 +170,22 @@ func _switch_queue_lesson(next: Dictionary)->void:
 	if is_instance_valid(service.training_queue): service.training_queue.executor_watching(lesson_id)
 	revision+=1
 
+func _participants()->Array:
+	var result: Array=[]
+	for key in actor_meta:
+		var meta: Dictionary=actor_meta[key]
+		result.append({"station":int(meta.get("station",0)),"role":int(meta.get("role",-1)),"clone_id":int(meta.get("clone_id",0))})
+	return result
+
 func _complete_legacy()->void:
+	var learned: Array=service.complete_video_lesson(0,record,_participants())
 	for id in station_ids:
 		var station=service.by_id(int(id))
 		if station==null: continue
-		station.recipes[dish]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true),"required_equipment":Masterclasses.required_equipment(record)}
-		station.method_sources[dish]={"id":record_id,"name":str(record.get("name","Запись"))}
 		station.method_plan.erase(dish)
 		station.drafts.erase(dish)
 		station.group_training_state=""
-	service.trace("group_training_complete",{"dish":dish,"record":record_id,"stations":station_ids.duplicate()})
+	service.trace("group_training_complete",{"dish":dish,"record":record_id,"stations":station_ids.duplicate(),"clones":learned.duplicate()})
 	service.feed_system("training",{"dish":dish,"record":record_id,"name":str(record.get("name","Запись")),"stations":station_ids.duplicate()},station_ids.size())
 	service.progress.revision+=1
 	var game=service.game
@@ -263,13 +269,16 @@ func advance(delta: float)->void:
 				actor.caption.text=str(actor_meta[keys[index]].name)+" · конспектирует"
 				actor.observe(tv,tv+Vector3(0.4 if index%2==0 else -0.4,0,0),delta,index)
 			if not bool(service.movie_state.get("playing",false)):
-				if queue_owned and is_instance_valid(service.training_queue):
-					var next: Dictionary=service.training_queue.executor_movie_finished(lesson_id)
+				if not bool(service.movie_state.get("completed",false)):
+					_begin_return()
+				elif queue_owned and is_instance_valid(service.training_queue):
+					var next: Dictionary=service.training_queue.executor_movie_finished(lesson_id,_participants())
 					match str(next.get("action","return")):
 						"next": _switch_queue_lesson(next)
 						"evening": handoff_to_evening()
 						_: _begin_return()
-				else: _begin_return()
+				else:
+					_complete_legacy()
 		"returning":
 			if _advance_paths(delta):
 				if queue_owned and is_instance_valid(service.training_queue):
@@ -277,7 +286,10 @@ func advance(delta: float)->void:
 					var game=service.game
 					reset()
 					if game!=null: game.save_cafe()
-				else: _complete_legacy()
+				else:
+					var game=service.game
+					reset()
+					if game!=null: game.save_cafe()
 
 func snapshot(full_record := false)->Dictionary:
 	if not active: return {"active":false,"revision":revision}

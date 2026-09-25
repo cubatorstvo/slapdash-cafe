@@ -26,6 +26,7 @@ class Station:
 	var pending_teacher := 0
 	func role_count() -> int: return 3 if type_id=="solyanka_kitchen" else 2 if type_id in ["kitchen","grill_kitchen"] else 1
 	func ready_crew() -> bool: return staffed==role_count()
+	func missing_recipe_equipment(_dish: String) -> Array: return []
 
 class Game:
 	extends RefCounted
@@ -91,7 +92,7 @@ func _initialize() -> void:
 	check(Journey.current(p,service.stations,15,true).key=="first_income","First real payout is an explicit milestone")
 	p.journey_auto_served=1
 	check(Journey.current(p,service.stations,15,true).station==3,"Second brigade excludes personal station")
-	var second=Station.new(); second.station_id=3; service.stations.append(second)
+	var second=Station.new(); second.station_id=3; second.recipes={"sausage":{"quality":{"present":true,"grade":"B"}}}; service.stations.append(second)
 	for dish in ["sausage","potato","wine"]: first.recipes[dish]={"quality":{"present":true,"grade":"B"}}
 	p.popularity=30
 	check(Journey.current(p,service.stations,15,true).key=="second_star","Existing preparations are credited")

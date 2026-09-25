@@ -88,20 +88,26 @@ func run() -> void:
 	service.progress.lab_formula_version = 1
 	service.progress.stars = 1
 	director.migrate_from_game_state(); director.reconcile()
-	check(director.is_unlocked("formula_research") and director.is_unlocked("clone_growth"), "assembled lab plus formula and 1 star unlock growth")
+	check(director.is_unlocked("clone_growth") and not director.is_unlocked("formula_research"), "assembled lab and 1 star unlock standard clone growth while formula improvement stays later")
 	service.progress.next_clone_id = 2
 	service.progress.free_workers = [{"clone_id":1,"tempo":0.7}]
 	director.migrate_from_game_state(); director.reconcile()
-	check(director.is_unlocked("staff_roster") and director.is_unlocked("production_tables") and director.is_unlocked("video_recording"), "first clone unlocks staff, production table and recording")
+	check(director.is_unlocked("staff_roster") and director.is_unlocked("production_tables") and director.is_unlocked("live_training") and not director.is_unlocked("video_recording"), "first clone unlocks staff, production table and personal training without early recording")
 	service.progress.next_clone_id = 1
 	service.progress.free_workers.clear()
 	director.migrate_from_game_state(); director.reconcile()
 	check(director.is_unlocked("staff_roster") and access.ui_state("office.staff").visible, "learned Staff section stays after workers disappear")
 
 	var tv_before := access.item_access("rest_television", Lounge.shop_items().rest_television, {"available_funds":999})
-	check(not tv_before.visible, "television stays hidden before video training is introduced")
+	check(not tv_before.visible, "television stays hidden during the 1★ personal-training chapter")
+	director.observe(&"live_lesson_accepted", {"clone_id":1,"dish":"sausage"})
+	director.reconcile()
+	check(not director.is_unlocked("video_recording"), "accepted personal lesson does not unlock filming before 2★")
+	service.progress.stars = 2
+	director.reconcile()
+	check(director.is_unlocked("video_recording"), "2★ introduces filming after a real personal lesson")
 	director.observe(&"masterclass_saved", {"record_id":1})
-	check(director.is_unlocked("video_training"), "saved masterclass unlocks video training")
+	check(director.is_unlocked("video_training"), "saved post-2★ masterclass unlocks single-viewer video training")
 	var tv_after := access.item_access("rest_television", Lounge.shop_items().rest_television, {"available_funds":999})
 	check(tv_after.visible and tv_after.enabled, "television becomes buyable without requiring Rest unlock")
 	check(not director.is_unlocked("rest_basics"), "television availability does not create Rest cycle")
@@ -132,7 +138,7 @@ func run() -> void:
 	restored.setup(service)
 	restored.restore(snapshot)
 	check(restored.cafe_id == original_cafe, "cafe id survives save/load")
-	check(restored.is_unlocked("staff_roster") and restored.is_unlocked("video_training") and restored.is_unlocked("group_training"), "monotonic unlocks survive save/load")
+	check(restored.is_unlocked("staff_roster") and restored.is_unlocked("live_training") and restored.is_unlocked("video_recording") and restored.is_unlocked("video_training") and restored.is_unlocked("group_training"), "monotonic learning unlocks survive save/load")
 	service.progress.free_workers.clear(); service.progress.next_clone_id = 1
 	restored.reconcile()
 	check(restored.is_unlocked("staff_roster"), "temporary state loss never removes a saved unlock")

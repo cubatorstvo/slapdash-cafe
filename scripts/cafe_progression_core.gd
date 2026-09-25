@@ -159,7 +159,11 @@ func _ready_dish_count(stations: Array, dishes: Array) -> int:
 	return count
 
 func _ready_automatic_count(stations: Array) -> int:
-	return stations.filter(func(s): return not s.manual_station and s.ready_crew()).size()
+	return stations.filter(func(s):
+		if s.manual_station or not s.ready_crew(): return false
+		for dish in s.recipes:
+			if s.missing_recipe_equipment(str(dish)).is_empty(): return true
+		return false).size()
 
 func star_requirements(stations: Array, served: int) -> Array:
 	if stars == 0:
@@ -170,15 +174,15 @@ func star_requirements(stations: Array, served: int) -> Array:
 		return [
 			{"text": "Популярность: %d / %d" % [popularity, STAR_POPULARITY], "done": popularity >= STAR_POPULARITY},
 			{"text": "Обслужено гостей: %d / %d" % [served, REQUIRED_SERVED], "done": served >= REQUIRED_SERVED},
-			{"text": "Две бригады: %d / 2" % [mini(crews, 2)], "done": crews >= 2},
-			{"text": "Три блюда с записью B или лучше: %d / 3" % ready, "done": ready == 3}
+			{"text": "Две работающие бригады: %d / 2" % [mini(crews, 2)], "done": crews >= 2},
+			{"text": "Три освоенных способа B или лучше: %d / 3" % ready, "done": ready == 3}
 		]
 	if stars == 2:
 		var all_ready: int = _ready_dish_count(stations, DISHES + ["meal"])
 		var production: int = _ready_automatic_count(stations)
 		return [
 			{"text": "Три работающие станции: %d / 3" % mini(production, 3), "done": production >= 3},
-			{"text": "Четыре блюда с записью B или лучше: %d / 4" % all_ready, "done": all_ready == 4},
+			{"text": "Четыре освоенных способа B или лучше: %d / 4" % all_ready, "done": all_ready == 4},
 			{"text": "Автоподачи после второй звезды: %d / %d" % [mini(third_star_auto_served, THIRD_STAR_AUTO_SERVED), THIRD_STAR_AUTO_SERVED], "done": third_star_auto_served >= THIRD_STAR_AUTO_SERVED},
 			{"text": "Парная кухня обслужила: %d / %d" % [mini(journey_meals_served, THIRD_STAR_MEALS), THIRD_STAR_MEALS], "done": journey_meals_served >= THIRD_STAR_MEALS},
 			{"text": "Популярность: %d / %d" % [popularity, THIRD_STAR_POPULARITY], "done": popularity >= THIRD_STAR_POPULARITY}
@@ -188,7 +192,7 @@ func star_requirements(stations: Array, served: int) -> Array:
 		var grill_crews: int = stations.filter(func(s): return s.type_id=="grill_kitchen" and not s.manual_station and s.ready_crew()).size()
 		return [
 			{"text":"Специализированная кухня работает: %d / 1"%mini(grill_crews,1),"done":grill_crews>=1},
-			{"text":"Три бургера с записью B или лучше: %d / 3"%specialty_ready,"done":specialty_ready==3},
+			{"text":"Три освоенных бургера B или лучше: %d / 3"%specialty_ready,"done":specialty_ready==3},
 			{"text":"Бургерная обслужила: %d / %d"%[mini(fourth_star_specialty_served,FOURTH_STAR_SPECIALTY_SERVED),FOURTH_STAR_SPECIALTY_SERVED],"done":fourth_star_specialty_served>=FOURTH_STAR_SPECIALTY_SERVED},
 			{"text":"Автоподачи после третьей звезды: %d / %d"%[mini(fourth_star_auto_served,FOURTH_STAR_AUTO_SERVED),FOURTH_STAR_AUTO_SERVED],"done":fourth_star_auto_served>=FOURTH_STAR_AUTO_SERVED},
 			{"text":"Популярность: %d / %d"%[popularity,FOURTH_STAR_POPULARITY],"done":popularity>=FOURTH_STAR_POPULARITY}
@@ -198,7 +202,7 @@ func star_requirements(stations: Array, served: int) -> Array:
 		var solyanka_crews: int = stations.filter(func(s): return s.type_id=="solyanka_kitchen" and not s.manual_station and s.ready_crew()).size()
 		return [
 			{"text":"Трёхролевая кухня работает: %d / 1"%mini(solyanka_crews,1),"done":solyanka_crews>=1},
-			{"text":"Солянка с записью B или лучше: %d / 1"%solyanka_ready,"done":solyanka_ready==1},
+			{"text":"Солянка освоена на B или лучше: %d / 1"%solyanka_ready,"done":solyanka_ready==1},
 			{"text":"Солянка обслужила: %d / %d"%[mini(fifth_star_solyanka_served,FIFTH_STAR_SOLYANKA_SERVED),FIFTH_STAR_SOLYANKA_SERVED],"done":fifth_star_solyanka_served>=FIFTH_STAR_SOLYANKA_SERVED},
 			{"text":"Автоподачи после четвёртой звезды: %d / %d"%[mini(fifth_star_auto_served,FIFTH_STAR_AUTO_SERVED),FIFTH_STAR_AUTO_SERVED],"done":fifth_star_auto_served>=FIFTH_STAR_AUTO_SERVED}
 		]

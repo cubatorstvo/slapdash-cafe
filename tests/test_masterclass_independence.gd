@@ -27,7 +27,7 @@ func run()->void:
 	var chef=service.by_id(1)
 
 	print("Masterclass independence 1/3: chef only exposes currently available items")
-	p.stars=1
+	p.stars=2
 	chef.equipment=["rag","plates","sauce"]
 	chef.upgrades=[]
 	chef.apply_equipment()
@@ -38,6 +38,12 @@ func run()->void:
 	print("Masterclass independence 2/3: a cuisine can be recorded without a production kitchen")
 	p.stars=2
 	p.expanded=true
+	p.tutorial_served=["sausage","potato","wine"]
+	p.lab_stage=3
+	p.next_clone_id=2
+	service._refresh_progression()
+	service.progression_director.observe("live_lesson_accepted",{"clone_id":1,"dish":"sausage"})
+	service._refresh_progression()
 	var kitchen_options:=option_ids(service.masterclass_equipment_options("meal"))
 	check("meat_kit" in kitchen_options and "pasta_kit" in kitchen_options,"Unlocked cuisine exposes its chef masterclass kit")
 	var production_kitchens: Array=service.stations.filter(func(station):return not station.manual_station and station.type_id=="kitchen")

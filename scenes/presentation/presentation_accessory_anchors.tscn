@@ -24,3 +24,6 @@ position = Vector3(2.0,0,-3.25)
 position = Vector3(0,1.30,-0.85)
 [node name="CameraRigAnchor" type="Marker3D" parent="."]
 position = Vector3(-2.72,1.42,-1.30)
+
+[node name="LiveStudent" type="Marker3D" parent="."]
+position = Vector3(0,0,-3.25)

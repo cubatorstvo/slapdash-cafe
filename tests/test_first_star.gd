@@ -82,6 +82,7 @@ func run() -> void:
 		first.training.advance(DT)
 		first.training.finish_pass(true)
 	check(p.stars == 1 and p.phase == "won" and first.manual_station and first.recipes.is_empty(), "Three B+ dishes award the first star and keep the personal counter manual")
+	check(is_equal_approx(p.lab_formula_tempo,1.0) and p.lab_formula_version>=1,"First star provides the standard 100% clone formula without the improvement minigame")
 
 	print("[4/4] Clone production unlock")
 	var brigade = service.add_station("counter", 1, false, true)
