@@ -303,7 +303,7 @@ func masterclass_time_available() -> bool:
 
 func masterclass_access(dish: String) -> Dictionary:
 	if dish not in Definition.DISH_ORDER: return {"available":false,"reason":"Неизвестное блюдо."}
-	if progress.stars<1: return {"available":false,"reason":"Мастер-классы откроются после первой звезды."}
+	if progress.stars<2: return {"available":false,"reason":"Съёмка мастер-классов откроется после второй звезды."}
 	if not masterclass_time_available(): return {"available":false,"reason":"Мастер-класс проводится в рабочее время."}
 	var type_id: String=Definition.type_for_dish(dish)
 	if type_id.is_empty(): return {"available":false,"reason":"Для блюда не задан тип кухни."}
@@ -2014,6 +2014,11 @@ func load_data(data: Dictionary) -> bool:
 		if items.is_empty(): progress.deliveries.erase(parcel)
 		else: parcel.item = items[0]; parcel.items = items
 	normalize_workers()
+	if data.get("learning",{}) is Dictionary and int(data.get("learning",{}).get("schema_version",0))==1:
+		if not learning_state.restore(data.learning): return false
+		for record in masterclasses: _ensure_masterclass_method(record)
+	else:
+		migrate_learning_from_runtime()
 	if not data.get("progression",{}).has("lab_formula_tempo"):
 		var known:=0.70
 		for option in clone_options(): known=maxf(known,float(option.tempo))
@@ -2036,11 +2041,6 @@ func load_data(data: Dictionary) -> bool:
 		training_queue.reset()
 		staff_training.reset()
 		training_queue.migrate_from_plans()
-	if data.get("learning",{}) is Dictionary and int(data.get("learning",{}).get("schema_version",0))==1:
-		if not learning_state.restore(data.learning): return false
-		for record in masterclasses: _ensure_masterclass_method(record)
-	else:
-		migrate_learning_from_runtime()
 	rebuild_station_bindings()
 	request_auto_training_reconcile()
 	return true

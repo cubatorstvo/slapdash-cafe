@@ -42,12 +42,18 @@ func run() -> void:
 	game=preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game); await process_frame
 	game.set_physics_process(false)
+	game.new_cafe(); await process_frame
 	var lab=game.laboratory
 	var p=game.service.progress
 	var nursery=lab.nursery
 	game.player.global_position=lab.operator_position()
-	check(not lab.press(1,lab.state.revision).is_empty(),"First star gate")
+	check(not lab.press(1,lab.state.revision).is_empty(),"Research is unavailable before the progression gate")
 	p.stars=1; p.lab_stage=3; p.cash=2000
+	check(not lab.press(1,lab.state.revision).is_empty(),"1★ uses the standard formula and keeps the improvement minigame locked")
+	p.stars=2
+	p.tutorial_served=["sausage","potato","wine"]
+	p.journey_auto_served=1
+	game.service._refresh_progression()
 	var station=game.service.add_station("counter",1,false,true)
 	lab.press(1,lab.state.revision)
 	var paid: int=p.cash

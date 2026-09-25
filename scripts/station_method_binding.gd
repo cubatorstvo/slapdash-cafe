@@ -50,6 +50,7 @@ static func apply(service,station,dish: String)->Dictionary:
 		station.method_sources.erase(dish)
 		return result
 	var method_value: Dictionary=service.learning_state.method_ref(int(result.method_id))
-	station.recipes[dish]=CookingMethod.runtime_record(method_value)
+	if station.state!="cooking" or station.order_dish!=dish or int(station.execution_method_id)<=0:
+		station.recipes[dish]=CookingMethod.runtime_record(method_value)
 	station.method_sources[dish]=source_summary(result)
 	return result

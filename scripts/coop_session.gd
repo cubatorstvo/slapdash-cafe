@@ -600,6 +600,7 @@ func execute_action(sender: int, value: Dictionary) -> void:
 				message_to(sender, run.info)
 		"cancel":
 			if run.purpose=="masterclass": game.service.cancel_masterclass()
+			elif run.purpose=="live_lesson": game.service.cancel_live_lesson(sender)
 			else: run.close()
 			game.save_cafe()
 

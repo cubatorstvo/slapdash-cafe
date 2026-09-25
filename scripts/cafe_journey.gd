@@ -381,7 +381,7 @@ static func current(p, stations: Array, served: int, opened: bool, service=null)
 			inspection_detail="Три личных заказа остаются за шефом. Остальной поток должен выдержать автоматизированный зал."
 		else:
 			inspection_title="Делегация · %d/%d подач · %d/%d довольны"%[p.banquet_served,p.inspection_served_target(),p.banquet_good,p.inspection_good_target()]
-			inspection_detail="Шеф обслуживает личные заказы, бригады повторяют записи. Следи за общим временем."
+			inspection_detail="Шеф обслуживает личные заказы, бригады повторяют освоенные способы. Следи за общим временем."
 		result=step("inspection",inspection_title,inspection_detail,"station",1)
 		result.chapter="ПРОВЕРКА НА ЗВЕЗДУ"
 		if p.phase=="preparing":

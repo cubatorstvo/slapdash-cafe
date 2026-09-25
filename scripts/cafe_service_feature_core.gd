@@ -131,7 +131,12 @@ func observe_auto_served(dish: String,station_id: int) -> void:
 func complete_video_lesson(lesson_id: int, record: Dictionary, participants: Array) -> Array:
 	var learned: Array=super(lesson_id,record,participants)
 	if not learned.is_empty():
-		progression_director.observe("video_training_completed", {"station_count":participants.map(func(p): return int(p.get("station",0))).filter(func(v): return v>0).size()})
+		var station_ids: Array=[]
+		for participant in participants:
+			if not participant is Dictionary: continue
+			var station_id:=int(participant.get("station",0))
+			if station_id>0 and station_id not in station_ids: station_ids.append(station_id)
+		progression_director.observe("video_training_completed", {"station_count":station_ids.size()})
 		_refresh_progression()
 	return learned
 

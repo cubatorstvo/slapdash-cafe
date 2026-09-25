@@ -79,9 +79,30 @@ func run()->void:
 	print("[2/5] Cancellation, replacement and pinned orders")
 	var old_method:=int(skill_a.method_id)
 	check(service.request_live_lesson("sausage",clone_a,1).is_empty(),"Second lesson can be scheduled")
-	service.cancel_live_lesson(1)
+	for i in range(500):
+		service.live_training.advance(0.05)
+		if service.live_training.phase=="ready": break
+	check(service.begin_live_lesson(1).is_empty(),"Second demonstration starts")
+	ready_food(chef.model,"sausage")
+	chef.training.advance(DT); chef.training.finish_pass(true)
+	game.session.execute_action(1,{"action":"cancel","station":chef.station_id,"revision":chef.training.revision})
 	var skill_after_cancel: Dictionary=service.clone_skill(clone_a,"counter","sausage","cook")
-	check(int(skill_after_cancel.get("method_id",0))==old_method,"Cancellation preserves the previous accepted skill")
+	check(int(skill_after_cancel.get("method_id",0))==old_method and service.live_training.phase=="returning","Cancelling from the result screen ends the whole lesson and preserves the previous skill")
+	for i in range(500):
+		service.live_training.advance(0.05)
+		if not service.live_training.is_active(): break
+	check(service.request_live_lesson("sausage",clone_a,1).is_empty(),"Delivery interruption fixture can schedule another lesson")
+	for i in range(500):
+		service.live_training.advance(0.05)
+		if service.live_training.phase=="ready": break
+	check(service.begin_live_lesson(1).is_empty(),"Delivery interruption demonstration starts")
+	ready_food(chef.model,"sausage")
+	chef.training.advance(DT); chef.training.finish_pass(true)
+	station_a.delivery_celebration_active=true
+	check(not chef.training.accept(),"A clone pulled into delivery cannot receive the pending lesson result")
+	station_a.delivery_celebration_active=false
+	check(int(service.clone_skill(clone_a,"counter","sausage","cook").get("method_id",0))==old_method,"Delivery interruption preserves the previous accepted skill")
+	service.cancel_live_lesson(1)
 	for i in range(500):
 		service.live_training.advance(0.05)
 		if not service.live_training.is_active(): break
@@ -101,6 +122,7 @@ func run()->void:
 	service.learning_state.grant_method_to_role(clone_a,0,replacement_method,{"kind":"live","record_id":0,"record_name":""},"replace-during-order",p.day)
 	service.rebuild_station_binding(station_a.station_id,"sausage")
 	check(int(service.execution_record(station_a).get("method_id",0))==pinned_method,"Retraining cannot replace the method of an already accepted order")
+	check(int(station_a.recipes.get("sausage",{}).get("method_id",0))==pinned_method,"Runtime recipe cache also stays pinned until the accepted order ends")
 	service._release_order_station(station_a,4242)
 	check(int(station_a.recipes.get("sausage",{}).get("method_id",0))==replacement_method,"Next order uses the newly accepted skill after the pinned order ends")
 	old_method=replacement_method
@@ -126,6 +148,8 @@ func run()->void:
 	service.masterclasses.append(record); service.next_masterclass_id=2; service._ensure_masterclass_method(record)
 	service.progression_director.observe("masterclass_saved",{"dish":"sausage"}); service._refresh_progression()
 	check(bool(service.feature_state("video_training").get("unlocked",false)),"After first film, single-viewer video training unlocks")
+	var premature_mass: Dictionary=service.queue_training_course([{"record_id":1,"station_ids":[station_a.station_id,station_b.station_id]}],"together","before-first-view",1)
+	check(not str(premature_mass.get("error","")).is_empty(),"Mass assignment stays locked until one clone has completed a video lesson")
 	var before_video: Dictionary=service.clone_skill(clone_b,"counter","sausage","cook")
 	check(before_video.is_empty(),"Second clone does not know the filmed dish before watching")
 	var learned: Array=service.complete_video_lesson(77,record,[{"station":station_b.station_id,"role":0,"clone_id":clone_b}])
@@ -168,6 +192,26 @@ func run()->void:
 			entry.method_sources=current.method_sources.duplicate(true)
 	check(service.load_data(legacy),"Previous current-format save migrates")
 	check(not service.clone_skill(clone_a,"counter","sausage","cook").is_empty(),"Migration restores existing employee knowledge from accepted working configuration")
+
+	var vacancy_legacy: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
+	vacancy_legacy.version=25
+	vacancy_legacy.erase("learning")
+	vacancy_legacy.erase("live_training")
+	var vacancy_entry: Dictionary={}
+	for entry in vacancy_legacy.stations:
+		if int(entry.slot)==1: vacancy_entry=entry; break
+	check(not vacancy_entry.is_empty(),"Legacy vacancy fixture finds the first production counter")
+	var vacancy_method: Dictionary=service.learning_state.method_ref(int(service.clone_skill(clone_a,"counter","sausage","cook").get("method_id",0)))
+	vacancy_entry.staffed=0
+	vacancy_entry.recipes={"sausage":{"tracks":vacancy_method.tracks.duplicate(true),"duration":float(vacancy_method.duration_ticks)/60.0,"quality":vacancy_method.quality.duplicate(true),"required_equipment":vacancy_method.required_equipment.duplicate()}}
+	vacancy_entry.method_sources={"sausage":{"id":0,"name":"Ранее освоенный способ"}}
+	vacancy_legacy.progression.free_workers=[{"id":777,"tempo":1.0,"rest":1.0}]
+	vacancy_legacy.progression.free_clones=1
+	vacancy_legacy.progression.next_clone_id=778
+	check(service.load_data(vacancy_legacy),"Legacy vacancy save migrates before automatic assignment")
+	var vacancy_station=service.by_id(2)
+	check(int(vacancy_station.crew[0].get("clone_id",0))==777,"Free legacy worker is assigned only after migration captured the old occupied roles")
+	check(service.clone_skill(777,"counter","sausage","cook").is_empty() and not vacancy_station.recipes.has("sausage"),"Newly assigned legacy worker does not inherit the empty table's historical method")
 
 	game._shutdown_tree(game); game.free()
 	print("PASS: live clone skills, film-free 2★ and post-2★ video training" if failures==0 else "FAILURES: %d"%failures)

@@ -135,6 +135,9 @@ func begin_demo()->String:
 
 func accept_from_run(stage: Node3D,tracks: Array)->Dictionary:
 	if not active or phase!="demonstrating" or stage!=chef_station() or not attendance_valid or not _assignment_still_valid(): return {"ok":false,"reason":"attendance_interrupted"}
+	var station: Node3D=source_station()
+	if station==null or station.delivery_celebration_active: return {"ok":false,"reason":"attendance_interrupted"}
+	if service.game!=null and is_instance_valid(service.game.laboratory) and service.game.laboratory.presenting_clone(clone_id): return {"ok":false,"reason":"attendance_interrupted"}
 	var quality: Dictionary=stage.model.quality()
 	if not bool(quality.get("present",false)): return {"ok":false,"reason":"result_not_served"}
 	var required: Array=Definition.DISH_EQUIPMENT.get(dish,[]).duplicate()

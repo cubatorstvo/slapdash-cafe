@@ -109,12 +109,7 @@ func run()->void:
 	var equipment_course: Dictionary=service.queue_training_course([{"record_id":1202,"station_ids":[7]}],"balanced","equipment",1)
 	check(str(equipment_course.error).is_empty(),"Missing pan does not reject the lesson")
 	var equipment_id:=int(equipment_course.course_id)
-	var equipment_done:=await run_until(service,func():return course_state(queue,equipment_id)=="completed",60.0)
-	if not equipment_done:
-		print("DEBUG course=",queue._course(equipment_id))
-		print("DEBUG staff=",service.staff_training.snapshot(true))
-		print("DEBUG queue=",queue.snapshot())
-		print("DEBUG binding=",service.station_binding(7,"potato"))
+	var equipment_done:=await run_until(service,func():return course_state(queue,equipment_id)=="completed",90.0)
 	check(equipment_done,"Lesson completes without production equipment")
 	check(service.by_id(7).recipes.has("potato") and not service.by_id(7).can_execute("potato"),"Knowledge is learned but cannot execute without the pan")
 

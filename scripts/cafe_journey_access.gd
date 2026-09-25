@@ -13,7 +13,7 @@ static func current(p, stations: Array, served: int, opened: bool, service=null)
 		if production.is_empty():
 			var slot := 2
 			while stations.any(func(station): return int(station.station_id) == slot): slot += 1
-			var table_step: Dictionary = Legacy.buy(p, "counter", slot, "Подготовь первый производственный стол для созданного клона. После этого откроется знакомство с мастер-классами.")
+			var table_step: Dictionary = Legacy.buy(p, "counter", slot, "Подготовь первый производственный стол для созданного клона. После этого позови его к Шефу на личный урок.")
 			table_step.chapter = "ПЕРВЫЙ ДОХОД КЛОНА"
 			return table_step
 		if production.all(func(station): return Legacy.crew_count(station) <= 0):
