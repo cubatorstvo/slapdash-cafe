@@ -208,7 +208,7 @@ func _restore_compatibility_unlocks() -> void:
 	if service == null or service.get("progress") == null: return
 	var p = service.progress
 	if int(p.get("lab_stage")) >= 1: _grant_compatibility_unlock("clone_lab")
-	if int(p.get("lab_formula_version")) > 0: _grant_compatibility_unlock("formula_research")
+	if int(p.get("lab_formula_version")) > 0 and int(p.get("stars")) >= 2: _grant_compatibility_unlock("formula_research")
 	if int(p.get("next_clone_id")) > 1 or not _workers().is_empty():
 		_grant_compatibility_unlock("clone_growth"); _grant_compatibility_unlock("staff_roster"); _grant_compatibility_unlock("production_tables")
 	if service.get("masterclasses") is Array and not service.masterclasses.is_empty(): _grant_compatibility_unlock("video_recording")

@@ -57,9 +57,13 @@ func make_game():
 func add_sausage_station(service: Node3D,slot := 1)->Node3D:
 	var station=service.add_station("counter",slot,false)
 	station.staffed=1
+	station.crew[0].clone_id=1000+station.station_id
 	station.equipment=["rag","plates","sauce"]
 	station.apply_equipment()
-	station.recipes.sausage=sausage_recipe(station)
+	var recipe:=sausage_recipe(station)
+	var method_id: int=service.learning_state.register_method("sausage","counter",recipe.tracks,recipe.quality,["plates","sauce"],{})
+	service.learning_state.grant_method_to_role(int(station.crew[0].clone_id),0,method_id,{"kind":"legacy","record_id":0,"record_name":""},"test-order:%d"%station.station_id,service.progress.day)
+	service.rebuild_station_binding(station.station_id,"sausage")
 	service.set_group_dish_active(service.group_id_for_station(station.station_id),"sausage",true)
 	return station
 
@@ -125,7 +129,7 @@ func run()->void:
 	var completed_before:=int(service.order_stats.orders_completed)
 	var portions_before:=int(service.order_stats.portions_served)
 	var save7: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(save7.version==22 and save7.customers.size()>0,"T16 v22 contains active customers")
+	check(save7.version==26 and save7.customers.size()>0,"T16 v26 contains active customers")
 	check(service.load_data(save7),"T16 first active-order save reloads")
 	large=customer_by_order(service,order_id)
 	check(not large.is_empty() and int(large.id)==customer_id and int(large.station)==station_id,"T16 same customer and same station survive first reload")
@@ -370,7 +374,7 @@ func run()->void:
 	check(service.load_data(old),"v21 save remains loadable")
 	check(service.customers.is_empty(),"v21 migration does not invent active customers absent from the old format")
 	check(service.order_stats==historical_stats and service.revenue==historical_revenue,"v21 migration preserves historical counters and money")
-	check(service.save_data().version==22,"Migrated old cafe subsequently writes v22")
+	check(service.save_data().version==26,"Migrated old cafe subsequently writes v26")
 	dispose(game)
 
 	print("PASS: T16-T17 active-order persistence, T09 mid-order training wait and chef-order recovery" if failures==0 else "FAILURES: %d"%failures)

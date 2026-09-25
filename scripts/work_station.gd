@@ -58,9 +58,12 @@ var zone_edges: Array = []
 var was_resting := true
 var upgrade_view: Node3D
 var delivery_celebration_active := false
+var pending_teacher := 0
+var execution_method_id := 0
+var execution_crew: Array=[]
 
 func ready_crew() -> bool:
-	if delivery_celebration_active: return false
+	if delivery_celebration_active or pending_teacher>0: return false
 	if not group_training_state.is_empty(): return false
 	var game = get_parent().game if is_inside_tree() else null
 	if game != null and is_instance_valid(game.laboratory) and game.laboratory.reserves_station(station_id): return false
@@ -188,6 +191,9 @@ func missing_recipe_equipment(dish: String) -> Array:
 	return Definition.missing_items(recipe_requirements(dish),equipment,upgrades)
 
 func can_execute(dish: String) -> bool:
+	if not manual_station and is_inside_tree():
+		var service=get_parent()
+		if service!=null and service.has_method("rebuild_station_binding"): service.rebuild_station_binding(station_id,dish)
 	return recipes.has(dish) and missing_recipe_equipment(dish).is_empty()
 
 func reset_model() -> void:
@@ -344,6 +350,14 @@ func refresh(local_peer: int, delta: float) -> void:
 				students[role].hide()
 				if is_team_station(): view.actors[role].hide()
 				else: _hide_counter_clone()
+	if not manual_station and pending_teacher>0 and get_parent().get("live_training")!=null and is_instance_valid(get_parent().live_training) and get_parent().live_training.reserves_clone(pending_teacher):
+		var lesson_phase: String=str(get_parent().live_training.phase)
+		view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,{"draining":"ЗАКАНЧИВАЕТ ЗАКАЗ ПЕРЕД УРОКОМ","walking":"ИДЁТ К ШЕФУ НА УРОК","ready":"НА ЛИЧНОМ УРОКЕ","demonstrating":"СМОТРИТ ШЕФА","returning":"ВОЗВРАЩАЕТСЯ С УРОКА"}.get(lesson_phase,"ЛИЧНЫЙ УРОК")]
+		if state!="cooking":
+			for student in students: student.hide()
+			if type_id=="counter": _hide_counter_clone()
+			else:
+				for actor in view.actors: actor.hide()
 	if not manual_station and not group_training_state.is_empty():
 		var training_text: String={"draining":"ЗАКАНЧИВАЕТ ПРИНЯТЫЙ ЗАКАЗ","assigned":"НАЗНАЧЕНО ОБУЧЕНИЕ","gathering":"ЗАКАНЧИВАЕТ И СОБИРАЕТСЯ","walking":"ИДЁТ К ТЕЛЕВИЗОРУ","watching":"СМОТРИТ ХАЙЛАЙТЫ","returning":"ВОЗВРАЩАЕТСЯ"}.get(group_training_state,"ОБУЧЕНИЕ")
 		view.station_label.text="СТАНЦИЯ %d · %s"%[station_id,training_text]
@@ -401,7 +415,7 @@ func direct_attention(person: Node3D) -> void:
 	person.food_target = to_global(target)
 
 func save_entry() -> Dictionary:
-	var entry: Dictionary={"staffed":staffed,"equipment":equipment,"manual":manual_station,"slot":slot_index,"type":type_id,"crew":crew,"upgrades":upgrades,"recipes":recipes,"drafts":drafts,"method_sources":method_sources,"method_plan":method_plan,"active_dishes":active_dishes,"active_menu_initialized":active_menu_initialized}
+	var entry: Dictionary={"staffed":staffed,"equipment":equipment,"manual":manual_station,"slot":slot_index,"type":type_id,"crew":crew,"upgrades":upgrades,"recipes":recipes,"drafts":drafts,"method_sources":method_sources,"method_plan":method_plan,"active_dishes":active_dishes,"active_menu_initialized":active_menu_initialized,"pending_teacher":pending_teacher,"execution_method_id":execution_method_id,"execution_crew":execution_crew}
 	entry.state=state
 	entry.order_dish=order_dish
 	entry.order_tick=order_tick
@@ -442,6 +456,9 @@ func world_entry() -> Dictionary:
 	data.method_plan=method_plan.duplicate(true)
 	data.active_dishes=active_dishes.duplicate()
 	data.active_menu_initialized=active_menu_initialized
+	data.pending_teacher=pending_teacher
+	data.execution_method_id=execution_method_id
+	data.execution_crew=execution_crew.duplicate(true)
 	return data
 
 func _build_bell() -> void:

@@ -1,10 +1,10 @@
 extends RefCounted
 ## Station types describe the kit; purchased instances own crews and recordings.
 const TYPES := {
-	"counter": {"title": "Тяп-ляп стойка", "roles": ["Повар"], "dishes": ["wine", "potato", "sausage"], "width": 5.5},
-	"kitchen": {"title": "Мясо и макароны", "roles": ["Мясо", "Макароны"], "dishes": ["meal"], "width": 6.1},
-	"grill_kitchen": {"title": "Общая жарочная", "roles": ["Гриль", "Сборка"], "dishes": ["burger", "cheeseburger", "spicy_burger"], "width": 6.1},
-	"solyanka_kitchen": {"title": "Солянка", "roles": ["Огонь", "Мешалка", "Соль"], "dishes": ["solyanka"], "width": 6.1}
+	"counter": {"title": "Тяп-ляп стойка", "roles": ["Повар"], "role_ids":["cook"], "dishes": ["wine", "potato", "sausage"], "width": 5.5},
+	"kitchen": {"title": "Мясо и макароны", "roles": ["Мясо", "Макароны"], "role_ids":["meat","pasta"], "dishes": ["meal"], "width": 6.1},
+	"grill_kitchen": {"title": "Общая жарочная", "roles": ["Гриль", "Сборка"], "role_ids":["grill","assembly"], "dishes": ["burger", "cheeseburger", "spicy_burger"], "width": 6.1},
+	"solyanka_kitchen": {"title": "Солянка", "roles": ["Огонь", "Мешалка", "Соль"], "role_ids":["fire","stir","salt"], "dishes": ["solyanka"], "width": 6.1}
 }
 const DISHES := {"wine": "Бокал вина", "potato": "Жареный картофель", "sausage": "Сосиска в соусе", "meal": "Стейк с макаронами", "burger":"Бургер", "cheeseburger":"Чизбургер", "spicy_burger":"Острый бургер", "solyanka":"Солянка"}
 const DISH_ORDER := ["wine","potato","sausage","meal","burger","cheeseburger","spicy_burger","solyanka"]
@@ -41,6 +41,13 @@ static func crew(type_id: String, station_id: int) -> Array:
 	for role in range(TYPES[type_id].roles.size()):
 		result.append({"name": "%s №%d.%d" % [names[(station_id + role - 1) % names.size()], station_id, role + 1]})
 	return result
+
+static func role_ids(type_id: String) -> Array:
+	return TYPES.get(type_id,{}).get("role_ids",[]).duplicate()
+
+static func role_id(type_id: String,index: int) -> String:
+	var ids:=role_ids(type_id)
+	return str(ids[index]) if index>=0 and index<ids.size() else ""
 
 static func type_for_dish(dish: String) -> String:
 	for type_id in TYPES:

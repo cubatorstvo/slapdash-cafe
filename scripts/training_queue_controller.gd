@@ -76,7 +76,11 @@ func _legacy_assignment_key(station_id: int,dish: String,version: int)->String:
 	return "%d|%s|%d"%[station_id,dish,version]
 
 func _actual_matches(station,record_id: int,dish: String)->bool:
-	return station!=null and station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id
+	if station==null: return false
+	var record: Dictionary=service.masterclass_by_id(record_id)
+	if record.is_empty(): return false
+	var binding: Dictionary=service.station_binding(station.station_id,dish)
+	return bool(binding.get("learned",false)) and int(binding.get("method_id",0))==int(record.get("method_id",0))
 
 func _record_valid_for_station(record: Dictionary,station)->bool:
 	return station!=null and not station.manual_station and not station.masterclass_station and station.type_id==str(record.get("source_type","")) and str(record.get("dish","")) in station.dishes()
@@ -685,28 +689,24 @@ func executor_watching(lesson_id: int)->void:
 	revision+=1
 	service.progress.revision+=1
 
-func _apply_lesson(lesson: Dictionary)->void:
+func _apply_lesson(lesson: Dictionary,participants: Array)->void:
 	if bool(lesson.get("applied",false)): return
 	var record: Dictionary=lesson.record
-	for station_id in lesson.station_ids:
-		var station=service.by_id(int(station_id))
-		if station==null: continue
-		station.recipes[str(lesson.dish)]={"tracks":record.get("tracks",[]).duplicate(true),"duration":float(record.get("duration",0.0)),"quality":record.get("quality",{}).duplicate(true),"required_equipment":Masterclasses.required_equipment(record)}
-		station.method_sources[str(lesson.dish)]={"id":int(lesson.record_id),"name":str(record.get("name","Запись"))}
-		station.drafts.erase(str(lesson.dish))
+	var learned: Array=service.complete_video_lesson(int(lesson.id),record,participants)
+	lesson.learned_clone_ids=learned.duplicate()
 	lesson.applied=true
 	lesson.state="completed"
 	var lesson_batch:=_batch(int(lesson.batch_id))
 	if not lesson_batch.is_empty(): lesson_batch.movies=int(lesson_batch.get("movies",0))+1
-	service.trace("training_lesson_complete",{"lesson":int(lesson.id),"dish":str(lesson.dish),"record":int(lesson.record_id),"stations":lesson.station_ids.duplicate()})
+	service.trace("training_lesson_complete",{"lesson":int(lesson.id),"dish":str(lesson.dish),"record":int(lesson.record_id),"stations":lesson.station_ids.duplicate(),"clones":learned.duplicate()})
 	service.feed_system("training",{"dish":str(lesson.dish),"record":int(lesson.record_id),"name":str(record.get("name","Запись")),"stations":lesson.station_ids.duplicate()},lesson.station_ids.size())
 	service.progress.revision+=1
 	request_auto_reconcile()
 
-func executor_movie_finished(lesson_id: int)->Dictionary:
+func executor_movie_finished(lesson_id: int,participants: Array=[])->Dictionary:
 	var lesson:=_lesson(lesson_id)
 	if lesson.is_empty(): return {"action":"return"}
-	_apply_lesson(lesson)
+	_apply_lesson(lesson,participants)
 	var batch:=_batch(int(lesson.batch_id))
 	if batch.is_empty(): return {"action":"return"}
 	batch.current_lesson_id=0

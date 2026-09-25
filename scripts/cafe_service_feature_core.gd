@@ -6,7 +6,7 @@ const ProgressionDirector = preload("res://scripts/progression/progression_direc
 const LabProgress = preload("res://scripts/laboratory_progression.gd")
 const LoungeProgress = preload("res://scripts/lounge_progression.gd")
 const ProgressionPolicy = preload("res://scripts/cafe_progression.gd")
-const SAVE_VERSION := 25
+const SAVE_VERSION := 26
 var shift_summary = ShiftSummary.new()
 var progression_director = ProgressionDirector.new()
 var feature_access = FeatureAccess.new()
@@ -114,6 +114,27 @@ func request_masterclass(dish: String, peer: int, equipment: Variant = null) -> 
 	if not error.is_empty(): return error
 	return super(dish, peer, equipment)
 
+func request_live_lesson(dish: String, clone_id: int, peer: int) -> String:
+	var error := _action_command_error("live_lesson_start", {"actor_id":peer})
+	if not error.is_empty(): return error
+	return super(dish,clone_id,peer)
+
+func begin_live_lesson(peer: int) -> String:
+	var error := _action_command_error("live_lesson_begin", {"actor_id":peer})
+	if not error.is_empty(): return error
+	return super(peer)
+
+func observe_auto_served(dish: String,station_id: int) -> void:
+	progression_director.observe("auto_served", {"dish":dish,"station_id":station_id})
+	_refresh_progression()
+
+func complete_video_lesson(lesson_id: int, record: Dictionary, participants: Array) -> Array:
+	var learned: Array=super(lesson_id,record,participants)
+	if not learned.is_empty():
+		progression_director.observe("video_training_completed", {"station_count":participants.map(func(p): return int(p.get("station",0))).filter(func(v): return v>0).size()})
+		_refresh_progression()
+	return learned
+
 func rename_masterclass(id: int, value: String) -> String:
 	var error := _action_command_error("masterclass_rename")
 	if not error.is_empty(): return error
@@ -159,6 +180,8 @@ func queue_training_course(assignments: Array, mode := "together", command_id :=
 				if station_id not in station_ids: station_ids.append(station_id)
 	var error := _action_command_error("training_course_confirm", {"actor_id":peer,"station_ids":station_ids})
 	if not error.is_empty(): return {"error":error,"course_id":0}
+	if station_ids.size()>1 and not bool(feature_access.feature_state("group_training").get("unlocked",false)):
+		return {"error":"Сначала обучи одного клона по фильму. Массовое назначение откроется после его завершённого просмотра.","course_id":0}
 	return super(assignments, mode, command_id, peer, group_order)
 
 func edit_training_course(course_id: int, assignments: Array, mode := "together", peer := 1, group_order: Array = []) -> String:
@@ -170,6 +193,8 @@ func edit_training_course(course_id: int, assignments: Array, mode := "together"
 				if station_id not in station_ids: station_ids.append(station_id)
 	var error := _action_command_error("training_course_edit", {"actor_id":peer,"station_ids":station_ids})
 	if not error.is_empty(): return error
+	if station_ids.size()>1 and not bool(feature_access.feature_state("group_training").get("unlocked",false)):
+		return "Сначала обучи одного клона по фильму. Массовое назначение откроется после его завершённого просмотра."
 	return super(course_id, assignments, mode, peer, group_order)
 
 func create_table_group(ids: Array, name := "") -> String:
@@ -206,10 +231,10 @@ func save_data() -> Dictionary:
 
 func load_data(data: Dictionary) -> bool:
 	var source_version:=int(data.get("version",0))
-	if source_version>22 and source_version not in [23,24,SAVE_VERSION]: return false
+	if source_version>22 and source_version not in [23,24,25,SAVE_VERSION]: return false
 	if source_version>=23 and not data.get("shift_summary",{}) is Dictionary: return false
 	if source_version==SAVE_VERSION:
-		if not data.get("progression",{}) is Dictionary or not data.progression.get("feature_progress",{}) is Dictionary: return false
+		if not data.get("progression",{}) is Dictionary or not data.progression.get("feature_progress",{}) is Dictionary or not data.get("learning",{}) is Dictionary: return false
 	var compatible: Dictionary=data.duplicate(true)
 	if source_version>=23: compatible.version=22
 	if not super(compatible): return false

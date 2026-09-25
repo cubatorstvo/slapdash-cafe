@@ -91,8 +91,27 @@ static func television_step(p) -> Dictionary:
 	result.item="rest_television"
 	return result
 
+static func live_training_step(p, station, dish: String, quality: bool, service) -> Dictionary:
+	if service==null: return teach(station,dish,quality)
+	var existing: Dictionary=station.recipes.get(dish,{})
+	var report: Dictionary=existing.get("quality",{})
+	if report.get("present",false) and (not quality or str(report.get("grade","D")) in ["B","A","S"]): return {}
+	if is_instance_valid(service.live_training) and service.live_training.is_active():
+		var session=service.live_training
+		var phase_text: String={"draining":"заканчивает принятый заказ","walking":"идёт к Шефу","ready":"уже на месте","demonstrating":"смотрит показ","returning":"возвращается"}.get(str(session.phase),str(session.phase))
+		return step("live_lesson_wait_"+dish,"Личный урок: "+phase_text,"Ученик физически участвует в уроке. Если он уйдёт до принятия результата, прежний навык сохранится.","station",1)
+	var clone_id:=0
+	var clone_name:="клона"
+	var roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+	if roles>0:
+		clone_id=int(station.crew[0].get("clone_id",0))
+		clone_name=str(station.crew[0].get("name","клона"))
+	var quality_text:=" на B или лучше" if quality else ""
+	return step("live_lesson_"+dish,"Позови на урок: "+str(DISH_NAMES[dish]),"E у шеф-станции → «Позвать на урок» → %s. Дождись его прихода, покажи блюдо%s и прими результат. Фильм и телевизор для этого не нужны."%[clone_name,quality_text],"station",1)
+
 static func masterclass_training_step(p, station, dish: String, quality: bool, service) -> Dictionary:
 	if service==null: return teach(station,dish,quality)
+	if p.stars<2: return live_training_step(p,station,dish,quality,service)
 	var existing: Dictionary=station.recipes.get(dish,{})
 	var report: Dictionary=existing.get("quality",{})
 	if report.get("present",false) and (not quality or str(report.get("grade","D")) in ["B","A","S"]): return {}
@@ -150,7 +169,7 @@ static func _course_target_learned(service, target: Dictionary)->bool:
 	return station.recipes.has(dish) and int(station.method_sources.get(dish,{}).get("id",0))==record_id
 
 static func _post_star_training_intro(p, stations: Array, service) -> Dictionary:
-	if p.stars<1 or service==null: return {}
+	if p.stars<2 or service==null: return {}
 	if service.masterclasses.is_empty():
 		return step("training_intro_masterclass","1/5 · Сними первый мастер-класс","Подойди к шеф-станции → E → МАСТЕР-КЛАСС. Приготовь блюдо и сохрани принятую запись в видеотеку.","station",1)
 	if "television" not in p.lounge_items:
@@ -344,7 +363,7 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 
 static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	var result:=next_step(p,stations,served,opened,service)
-	result.chapter="НОВОЕ ОБУЧЕНИЕ · МАСТЕР-КЛАССЫ" if str(result.get("key","")).begins_with("training_intro_") else "ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
+	result.chapter="ВИДЕООБУЧЕНИЕ · 2★" if str(result.get("key","")).begins_with("training_intro_") else "ПЕРВАЯ ЗВЕЗДА" if p.stars==0 else "ПЕРВЫЙ ДОХОД КЛОНА" if p.journey_auto_served<1 else "ВТОРАЯ ЗВЕЗДА" if p.stars==1 else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ" if p.stars==4 else "КАФЕ · 5★"
 	if p.busy():
 		var inspection_title: String
 		var inspection_detail: String

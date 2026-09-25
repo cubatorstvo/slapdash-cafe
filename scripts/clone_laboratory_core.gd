@@ -166,6 +166,10 @@ func pull_held(peer: int) -> bool:
 
 func target(camera: Camera3D, peer: int) -> Dictionary:
 	var p=game.service.progress
+	if p.stars<2:
+		var early_nursery: Dictionary=nursery.target(camera,peer)
+		if not early_nursery.is_empty(): return early_nursery
+		return {}
 	if game.shop.near_ray(camera,Layout.MICROSCOPE+Vector3(0,1.5,0.1),0.42):
 		return {"action":"lab_scan","sample":int(p.lab_sample.get("serial",-1)),"hint":"(E) Капнуть образец в микроскоп" if nursery.tool(peer)=="sample" else "(E) Посмотреть лучшую формулу"}
 	if not p.lab_sample.is_empty() and int(p.lab_sample.get("carrier",0))==0 and game.shop.near_ray(camera,to_global(SAMPLE),0.25):
@@ -211,6 +215,7 @@ func action(peer: int, data: Dictionary) -> String:
 
 func sample_action(peer: int, data: Dictionary) -> String:
 	var p=game.service.progress
+	if game.service.progress.stars<2: return "Микроскоп для улучшения формулы откроется после второй звезды."
 	if game.service.training_for(peer)!=null or researching(peer) or calibrator.manual_owner()==peer: return "Сначала заверши текущую работу."
 	if data.action=="lab_sample":
 		if peer_position(peer).distance_to(to_global(SAMPLE))>3.2: return "Подойди к образцу."
@@ -239,7 +244,7 @@ func press(peer: int, revision: int, observed_age := -1.0) -> String:
 	if not inside(peer_position(peer)): return "Подойди к столу исследования."
 	if hands_busy(peer) or game.service.training_for(peer)!=null or calibrator.manual_owner()==peer: return "Сначала освободи руки."
 	var p=game.service.progress
-	if p.lab_stage<3 or p.stars<1: return "Нужны готовая лаборатория и первая звезда."
+	if p.lab_stage<3 or p.stars<2: return "Исследование формулы откроется после второй звезды."
 	if int(state.owner) not in [0,peer]: return "Стол занят напарником."
 	if revision!=int(state.revision): return ""
 	match str(state.phase):
