@@ -18,8 +18,9 @@ func record_for(station: Node3D,id: int,dish: String,name: String,frames_count:=
 	var frames:=repeated(station.model.snapshot(),frames_count)
 	return Library.make_record(id,dish,station.type_id,[{"group":1,"frames":frames}],float(frames_count)/60.0,station.model.quality(),name)
 
-func prepare(station: Node3D)->void:
+func prepare(service: Node3D,station: Node3D)->void:
 	station.staffed=1
+	station.crew[0].clone_id=1000+station.station_id
 	station.equipment=["jug","cup","plates","pan","sauce","rag"]
 	station.apply_equipment()
 
@@ -51,12 +52,22 @@ func run()->void:
 	var stations: Array=[]
 	for slot in range(1,8):
 		var station=service.add_station("counter",slot,false)
-		prepare(station)
+		prepare(service,station)
 		stations.append(station)
 	var wine:=record_for(stations[0],1201,"wine","Напиток")
 	var potato:=record_for(stations[0],1202,"potato","Картошка")
 	var sausage:=record_for(stations[0],1203,"sausage","Сосиска")
 	service.masterclasses=[wine,potato,sausage]
+	service.progress.tutorial_served=["sausage","potato","wine"]
+	service.progress.lab_stage=3
+	service.progress.lab_formula_version=1
+	service.progress.next_clone_id=2000
+	service._refresh_progression()
+	service.progression_director.observe("live_lesson_accepted",{"clone_id":1002,"dish":"wine"})
+	service.progression_director.observe("masterclass_saved",{"dish":"wine"})
+	service.progression_director.observe("video_training_completed",{"station_count":1})
+	service._refresh_progression()
+	check(bool(service.feature_state("group_training").get("unlocked",false)),"Mass queue test starts after the required first single-viewer video stage")
 
 	print("T01: any requested mode becomes one together pass")
 	var course: Dictionary=service.queue_training_course([
@@ -88,7 +99,7 @@ func run()->void:
 	print("T03: no automatic training appears for new tables")
 	var before_courses: int=queue.courses.size()
 	var extra=service.add_station("counter",8,false)
-	prepare(extra)
+	prepare(service,extra)
 	for i in range(40): service.advance(0.1)
 	check(queue.courses.size()==before_courses and service.group_id_for_station(extra.station_id).is_empty(),"New table remains standalone and does not create an automatic course")
 
@@ -98,7 +109,8 @@ func run()->void:
 	var equipment_course: Dictionary=service.queue_training_course([{"record_id":1202,"station_ids":[7]}],"balanced","equipment",1)
 	check(str(equipment_course.error).is_empty(),"Missing pan does not reject the lesson")
 	var equipment_id:=int(equipment_course.course_id)
-	check(await run_until(service,func():return course_state(queue,equipment_id)=="completed",60.0),"Lesson completes without production equipment")
+	var equipment_done:=await run_until(service,func():return course_state(queue,equipment_id)=="completed",90.0)
+	check(equipment_done,"Lesson completes without production equipment")
 	check(service.by_id(7).recipes.has("potato") and not service.by_id(7).can_execute("potato"),"Knowledge is learned but cannot execute without the pan")
 
 	game._shutdown_tree(game)

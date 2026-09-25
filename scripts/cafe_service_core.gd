@@ -6,6 +6,10 @@ const Masterclasses = preload("res://scripts/masterclass_library.gd")
 const MasterclassLiveScene = preload("res://scripts/masterclass_live_scene.gd")
 const StaffTrainingSession = preload("res://scripts/staff_training_session.gd")
 const TrainingQueueController = preload("res://scripts/training_queue_controller.gd")
+const LearningState = preload("res://scripts/cafe_learning_state.gd")
+const StationMethodBinding = preload("res://scripts/station_method_binding.gd")
+const CookingMethod = preload("res://scripts/cooking_method.gd")
+const LiveTrainingSession = preload("res://scripts/live_training_session.gd")
 const Expansion = preload("res://scripts/cafe_expansion_layout.gd")
 const Insights = preload("res://scripts/cafe_insights.gd")
 const TableGroupRegistry = preload("res://scripts/table_group_registry.gd")
@@ -45,10 +49,13 @@ var masterclass_selected_equipment: Array=[]
 var masterclass_station: Node3D
 var chef_station_backup: Node3D
 var masterclass_live_scene: Node3D
-var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false}
+var movie_state: Dictionary={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false,"completed":false}
 var remote_movie_record: Dictionary={}
 var staff_training: Node3D
 var training_queue: Node
+var live_training: Node3D
+var learning_state=LearningState.new()
+var learning_restore_in_progress:=false
 var table_group_names: Dictionary={} # v19 migration only
 var group_registry=TableGroupRegistry.new()
 
@@ -63,6 +70,9 @@ func _ready() -> void:
 	staff_training=StaffTrainingSession.new()
 	add_child(staff_training)
 	staff_training.setup(self)
+	live_training=LiveTrainingSession.new()
+	add_child(live_training)
+	live_training.setup(self)
 
 func slot_position(slot_index: int) -> Vector3:
 	return Expansion.position(slot_index)
@@ -100,6 +110,7 @@ func training_for(peer: int) -> Node3D:
 	return null
 
 func any_training() -> bool:
+	if is_instance_valid(live_training) and live_training.is_active(): return true
 	if is_instance_valid(training_queue) and int(training_queue.active_batch_id)>0: return true
 	if is_instance_valid(staff_training) and staff_training.is_active(): return true
 	for station in stations:
@@ -107,7 +118,123 @@ func any_training() -> bool:
 	return not masterclass_pending.is_empty()
 
 func masterclass_active() -> bool: return is_instance_valid(masterclass_station)
-func masterclass_locked() -> bool: return masterclass_active() or not masterclass_pending.is_empty()
+func masterclass_locked() -> bool: return masterclass_active() or not masterclass_pending.is_empty() or (is_instance_valid(live_training) and live_training.is_active())
+
+
+func station_binding(station_id: int,dish: String) -> Dictionary:
+	return StationMethodBinding.binding(self,by_id(station_id),dish)
+
+func rebuild_station_binding(station_id: int,dish: String) -> Dictionary:
+	var station:=by_id(station_id)
+	if station==null or station.manual_station or station.masterclass_station: return {"learned":false,"reason":"not_production"}
+	return StationMethodBinding.apply(self,station,dish)
+
+func rebuild_station_bindings(station_id := 0) -> void:
+	for station in stations:
+		if station.manual_station or station.masterclass_station or (station_id>0 and station.station_id!=station_id): continue
+		for dish in station.dishes(): StationMethodBinding.apply(self,station,str(dish))
+
+func clone_skill(clone_id: int,type_id: String,dish: String,role_id: String) -> Dictionary:
+	return learning_state.clone_skill(clone_id,type_id,dish,role_id)
+
+func method_summary(method_id: int) -> Dictionary:
+	return learning_state.method_summary(method_id)
+
+func _ensure_masterclass_method(record: Dictionary) -> int:
+	var existing:=int(record.get("method_id",0))
+	if existing>0 and not learning_state.method_ref(existing).is_empty(): return existing
+	var required:=Masterclasses.required_equipment(record)
+	var method_id:=learning_state.register_method(str(record.get("dish","")),str(record.get("source_type","")),record.get("tracks",[]),record.get("quality",{}),required,record.get("scene_config",{}))
+	if method_id>0: record.method_id=method_id
+	return method_id
+
+func migrate_learning_from_runtime() -> void:
+	if not learning_state.methods.is_empty() or not learning_state.clone_skills.is_empty(): return
+	for record in masterclasses: _ensure_masterclass_method(record)
+	for station in stations:
+		if station.manual_station or station.masterclass_station: continue
+		var roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		for raw_dish in station.recipes.keys():
+			var dish:=str(raw_dish)
+			var recipe: Dictionary=station.recipes[dish]
+			var source: Dictionary=station.method_sources.get(dish,{}) if station.method_sources.get(dish,{}) is Dictionary else {}
+			var record_id:=int(source.get("id",0))
+			var method_id:=0
+			if record_id>0:
+				var record:=masterclass_by_id(record_id)
+				if not record.is_empty(): method_id=_ensure_masterclass_method(record)
+			if method_id<=0:
+				method_id=learning_state.register_method(dish,station.type_id,recipe.get("tracks",[]),recipe.get("quality",{}),recipe.get("required_equipment",Definition.DISH_EQUIPMENT.get(dish,[])),{"equipment":station.equipment.duplicate(),"upgrades":station.upgrades.duplicate()})
+			if method_id<=0: continue
+			for role in range(roles):
+				var clone_id:=int(station.crew[role].get("clone_id",0))
+				if clone_id<=0: continue
+				var kind:="video" if record_id>0 else "legacy"
+				var name:=str(source.get("name",""))
+				learning_state.grant_method_to_role(clone_id,role,method_id,{"kind":kind,"record_id":record_id,"record_name":name},"legacy:%d:%s:%d:%d"%[station.station_id,dish,clone_id,role],progress.day)
+	rebuild_station_bindings()
+
+func live_lesson_options() -> Array:
+	var result: Array=[]
+	for station in stations:
+		if station.manual_station or station.masterclass_station or station.type_id!="counter": continue
+		var roles: int=station.role_count() if station.staffed<0 else mini(station.staffed,station.role_count())
+		for role in range(roles):
+			var clone_id:=int(station.crew[role].get("clone_id",0))
+			if clone_id<=0: continue
+			result.append({"clone_id":clone_id,"station_id":station.station_id,"role":role,"name":str(station.crew[role].get("name","Клон"))})
+	return result
+
+func request_live_lesson(dish: String,clone_id: int,peer: int) -> String:
+	if not is_instance_valid(live_training): return "Система личного обучения недоступна."
+	return live_training.start(clone_id,dish,peer)
+
+func begin_live_lesson(peer: int) -> String:
+	if not is_instance_valid(live_training) or not live_training.is_active() or live_training.teacher_peer!=peer: return "Личный урок не найден."
+	return live_training.begin_demo()
+
+func cancel_live_lesson(peer: int) -> String:
+	if not is_instance_valid(live_training) or not live_training.is_active(): return ""
+	if live_training.teacher_peer!=peer: return "Уроком управляет другой игрок."
+	live_training.cancel()
+	return ""
+
+func accept_live_lesson_from_run(stage: Node3D,tracks: Array) -> Dictionary:
+	if not is_instance_valid(live_training): return {"ok":false,"reason":"lesson_stale"}
+	return live_training.accept_from_run(stage,tracks)
+
+func complete_video_lesson(lesson_id: int,record: Dictionary,participants: Array) -> Array:
+	var method_id:=_ensure_masterclass_method(record)
+	if method_id<=0: return []
+	var learned: Array=[]
+	for raw in participants:
+		if not raw is Dictionary: continue
+		var clone_id:=int(raw.get("clone_id",0))
+		var station:=by_id(int(raw.get("station",0)))
+		var role:=int(raw.get("role",-1))
+		if station==null or role<0 or role>=station.role_count() or clone_id<=0: continue
+		if int(station.crew[role].get("clone_id",0))!=clone_id: continue
+		var acquisition:="video:%d:%d:%d:%d"%[lesson_id,int(movie_state.get("id",0)),clone_id,role]
+		var result:=learning_state.grant_method_to_role(clone_id,role,method_id,{"kind":"video","record_id":int(record.get("id",0)),"record_name":str(record.get("name","Запись"))},acquisition,progress.day)
+		if bool(result.get("ok",false)) and clone_id not in learned: learned.append(clone_id)
+	for raw in participants:
+		if raw is Dictionary: rebuild_station_binding(int(raw.get("station",0)),str(record.get("dish","")))
+	if not learned.is_empty():
+		var trained_stations: Array=[]
+		for raw in participants:
+			if raw is Dictionary:
+				var station_id:=int(raw.get("station",0))
+				if station_id>0 and station_id not in trained_stations: trained_stations.append(station_id)
+		if trained_stations.size()>1: progress.training_intro_mass_seen=true
+		trace("video_training_skills",{"lesson":lesson_id,"record":int(record.get("id",0)),"clones":learned.duplicate()})
+		progress.revision+=1
+	return learned
+
+func execution_record(station: Node3D) -> Dictionary:
+	if station==null: return {}
+	if station.execution_method_id>0:
+		return CookingMethod.runtime_record(learning_state.method_ref(station.execution_method_id))
+	return station.recipes.get(station.order_dish,{})
 
 func sync_masterclass_live_scene() -> void:
 	var stage: Node3D=by_id(1)
@@ -176,7 +303,7 @@ func masterclass_time_available() -> bool:
 
 func masterclass_access(dish: String) -> Dictionary:
 	if dish not in Definition.DISH_ORDER: return {"available":false,"reason":"Неизвестное блюдо."}
-	if progress.stars<1: return {"available":false,"reason":"Мастер-классы откроются после первой звезды."}
+	if progress.stars<2: return {"available":false,"reason":"Съёмка мастер-классов откроется после второй звезды."}
 	if not masterclass_time_available(): return {"available":false,"reason":"Мастер-класс проводится в рабочее время."}
 	var type_id: String=Definition.type_for_dish(dish)
 	if type_id.is_empty(): return {"available":false,"reason":"Для блюда не задан тип кухни."}
@@ -287,7 +414,10 @@ func save_masterclass_from_run(stage: Node3D,dish: String,tracks: Array) -> bool
 		if str(record.get("dish",""))==dish and not bool(record.get("archived",false)): number+=1
 	var required: Array=masterclass_selected_equipment.duplicate()
 	var scene_config: Dictionary={"equipment":stage.equipment.duplicate(),"upgrades":stage.upgrades.duplicate(),"roles":Definition.TYPES[stage.type_id].roles.duplicate(),"required_equipment":required.duplicate()}
+	var method_id:=learning_state.register_method(dish,stage.type_id,tracks,quality,required,scene_config)
+	if method_id<=0: return false
 	var record:=Masterclasses.make_record(next_masterclass_id,dish,stage.type_id,tracks,stage.Run.duration_ticks(tracks)/60.0,quality,Masterclasses.default_name(dish,number),false,stage.station_id,scene_config)
+	record.method_id=method_id
 	next_masterclass_id+=1
 	masterclasses.append(record)
 	progress.revision+=1
@@ -296,7 +426,9 @@ func save_masterclass_from_run(stage: Node3D,dish: String,tracks: Array) -> bool
 
 func masterclass_by_id(id: int) -> Dictionary:
 	for record in masterclasses:
-		if int(record.get("id",0))==id: return record
+		if int(record.get("id",0))==id:
+			_ensure_masterclass_method(record)
+			return record
 	return {}
 
 func rename_masterclass(id: int, value: String) -> String:
@@ -331,7 +463,7 @@ func start_highlights(id: int, peer: int) -> String:
 	if record.is_empty(): return "Запись не найдена."
 	Masterclasses.ensure_highlights(record)
 	if float(record.get("highlight_duration",0.0))<=0.0: return "В этой записи нет кадров для фильма."
-	movie_state={"id":id,"playing":true,"elapsed":0.0,"duration":float(record.highlight_duration),"started_by":peer,"loop":false}
+	movie_state={"id":id,"playing":true,"elapsed":0.0,"duration":float(record.highlight_duration),"started_by":peer,"loop":false,"completed":false}
 	remote_movie_record={}
 	progress.revision+=1
 	trace("highlights_started",{"id":id,"dish":record.dish,"seconds":record.highlight_duration,"peer":peer})
@@ -341,12 +473,12 @@ func start_training_movie(value: Dictionary) -> void:
 	var lesson: Dictionary=value.duplicate(true)
 	Masterclasses.ensure_highlights(lesson)
 	remote_movie_record=lesson
-	movie_state={"id":int(lesson.get("id",0)),"playing":true,"elapsed":0.0,"duration":Masterclasses.TRAINING_WATCH_SECONDS,"started_by":0,"loop":float(lesson.get("highlight_duration",0.0))<Masterclasses.TRAINING_WATCH_SECONDS}
+	movie_state={"id":int(lesson.get("id",0)),"playing":true,"elapsed":0.0,"duration":Masterclasses.TRAINING_WATCH_SECONDS,"started_by":0,"loop":float(lesson.get("highlight_duration",0.0))<Masterclasses.TRAINING_WATCH_SECONDS,"completed":false}
 	progress.revision+=1
 
 func stop_highlights() -> void:
 	movie_state.playing=false
-	movie_state.elapsed=float(movie_state.get("duration",0.0))
+	movie_state.completed=false
 	progress.revision+=1
 
 func movie_record() -> Dictionary:
@@ -358,7 +490,7 @@ func movie_snapshot() -> Dictionary:
 
 func apply_movie_snapshot(data: Dictionary) -> void:
 	if not data is Dictionary: return
-	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0)),"loop":bool(data.get("loop",false))}
+	movie_state={"id":int(data.get("id",0)),"playing":bool(data.get("playing",false)),"elapsed":float(data.get("elapsed",0.0)),"duration":float(data.get("duration",0.0)),"started_by":int(data.get("started_by",0)),"loop":bool(data.get("loop",false)),"completed":bool(data.get("completed",false))}
 
 func _method_source(station: Node3D,dish: String,overrides: Dictionary={}) -> Dictionary:
 	if overrides.has(station.station_id):
@@ -632,11 +764,14 @@ func source_label(station_id: int,dish: String) -> String:
 	if station==null: return "—"
 	var source: Dictionary=_method_source(station,dish)
 	if source.is_empty(): return "—"
-	if bool(source.get("legacy",false)): return "Локальный способ"
+	var kind:=str(source.get("kind",""))
+	if bool(source.get("legacy",false)) or kind=="legacy": return "Ранее освоенный способ"
+	if kind=="live": return "Личный урок"
+	if kind=="mixed": return "Освоенный способ"
 	var id: int=int(source.get("id",0))
 	var current:=masterclass_by_id(id)
 	if not current.is_empty(): return str(current.get("name",source.get("name","Запись")))+(" · запланировано" if bool(source.get("planned",false)) else "")
-	return str(source.get("name","Запись"))+" · Запись удалена"
+	return str(source.get("name","Запись"))+" · запись удалена"
 
 func desired_source(group_id: String,dish: String) -> Dictionary:
 	var group: Dictionary=group_registry.by_id(group_id)
@@ -992,6 +1127,11 @@ func _update_multi_caption(customer: Dictionary) -> void:
 	customer.view.caption.text="%s ×%d\nГотово %d/%d · +%d\n%s · %d с"%[Definition.DISHES[customer.dish],total,done,total,paid,suffix,left]
 
 func _start_automatic_order(station: Node3D,customer: Dictionary) -> void:
+	if station.execution_method_id<=0:
+		var binding:=rebuild_station_binding(station.station_id,str(customer.dish))
+		if not bool(binding.get("learned",false)): return
+		station.execution_method_id=int(binding.method_id)
+		station.execution_crew=binding.get("roles",[]).duplicate(true)
 	station.state="cooking"
 	station.order_dish=customer.dish
 	station.order_tick=0.0
@@ -1011,6 +1151,9 @@ func _release_order_station(station: Node3D,customer_id: int) -> void:
 	station.order_portions_total=1
 	station.order_portions_done=0
 	station.order_paid=0
+	station.execution_method_id=0
+	station.execution_crew.clear()
+	rebuild_station_bindings(station.station_id)
 
 func _count_completed_customer(customer: Dictionary,station: Node3D) -> void:
 	served+=1
@@ -1029,6 +1172,7 @@ func _count_completed_customer(customer: Dictionary,station: Node3D) -> void:
 			progress.fifth_star_auto_served+=1
 			if customer.dish in Progression.ORCHESTRATION_DISHES: progress.fifth_star_solyanka_served+=1
 		if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
+		if has_method("observe_auto_served"): call("observe_auto_served",str(customer.dish),station.station_id)
 	progress.record_demand(customer.dish,"served")
 
 func _record_failed_order(customer: Dictionary,reason := "busy") -> void:
@@ -1099,12 +1243,15 @@ func advance(delta: float) -> void:
 	_try_begin_masterclass()
 	if bool(movie_state.get("playing",false)):
 		movie_state.elapsed=minf(float(movie_state.elapsed)+delta,float(movie_state.duration))
-		if float(movie_state.elapsed)>=float(movie_state.duration): movie_state.playing=false
+		if float(movie_state.elapsed)>=float(movie_state.duration):
+			movie_state.playing=false
+			movie_state.completed=true
 	# Shift closure is resolved before the queue may start another lesson. This makes
 	# the boundary between two films deterministic.
 	advance_shift(delta)
 	if is_instance_valid(training_queue): training_queue.advance(delta)
 	if is_instance_valid(staff_training): staff_training.advance(delta)
+	if is_instance_valid(live_training): live_training.advance(delta)
 	if game != null and is_instance_valid(game.laboratory): game.laboratory.advance(delta)
 	advance_event(delta)
 	Visits.advance(self,delta)
@@ -1125,7 +1272,10 @@ func advance(delta: float) -> void:
 		station.training.advance(delta)
 		if station.delivery_celebration_active: continue
 		if station.state != "cooking": continue
-		var record: Dictionary = station.recipes[station.order_dish]
+		var record: Dictionary = execution_record(station)
+		if record.is_empty():
+			_release_order_station(station,station.customer_id)
+			continue
 		station.order_tick += delta * 60.0 * station.order_tempo
 		station.show_tracks(record.tracks, mini(int(station.order_tick), station.Run.duration_ticks(record.tracks)-1))
 		if station.type_id == "counter":
@@ -1158,7 +1308,11 @@ func advance(delta: float) -> void:
 				customer.state="leaving"; customer.path=Expansion.route_to_exit(customer.view.position,Expansion.stage_for_progress(progress)).slice(1)
 				var table: Node3D=by_id(customer.station)
 				if table!=null and table.customer_id==customer.id:
-					table.customer_id=-1; table.state="idle"
+					table.customer_id=-1
+					table.state="idle"
+					table.execution_method_id=0
+					table.execution_crew.clear()
+					rebuild_station_bindings(table.station_id)
 			continue
 		if not customer.path.is_empty():
 			if customer.view.walk_to(customer.path[0], delta): customer.path.pop_front()
@@ -1383,6 +1537,10 @@ func finish_customer(id: int, accepted: bool, failure_reason := "", portion_numb
 			if paid: progress.banquet_served+=1
 			if paid and report.grade in ["B","A","S"]: progress.banquet_good+=1
 		Visits.settled(self,customer,paid,str(report.grade))
+		if not station.manual_station and station.state=="idle":
+			station.execution_method_id=0
+			station.execution_crew.clear()
+			rebuild_station_bindings(station.station_id)
 		if paid and station.manual_station and not chef_queue().is_empty():
 			var lead := int(station.training.lead)
 			continue_manual_peer = lead if lead > 0 else 1
@@ -1677,7 +1835,7 @@ func save_data() -> Dictionary:
 		entry.crew = entry.crew.duplicate(true)
 		entry.equipment = entry.equipment.duplicate()
 		entry.upgrades = entry.upgrades.duplicate()
-		entry.recipes = entry.recipes.duplicate()
+		entry.recipes = entry.recipes.duplicate() if station.manual_station else {}
 		entry.drafts = entry.drafts.duplicate()
 		entry.method_sources=entry.method_sources.duplicate(true)
 		entry.method_plan=entry.method_plan.duplicate(true)
@@ -1686,20 +1844,24 @@ func save_data() -> Dictionary:
 	_ensure_groups()
 	var saved_customers: Array=[]
 	for customer in customers: saved_customers.append(_customer_save_entry(customer))
-	return {"format":"station-cafe","version":22,"progression":progress.snapshot(),"stations":entries,"customers":saved_customers,"next_customer_id":next_customer_id,"next_order_id":next_order_id,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot(),"training_queue":training_queue.snapshot(),"staff_training":staff_training.snapshot(true),"movie":movie_state.duplicate(true),"remote_movie_record":remote_movie_record.duplicate(true)}
+	return {"format":"station-cafe","version":22,"progression":progress.snapshot(),"stations":entries,"customers":saved_customers,"next_customer_id":next_customer_id,"next_order_id":next_order_id,"served":served,"revenue":revenue,"missed":missed,"guests_arrived":guests_arrived,"order_stats":order_stats.duplicate(true),"analytics":analytics.duplicate(true),"open":open_for_business,"chef_order_clock":chef_order_clock,"masterclasses":masterclasses.duplicate(true),"next_masterclass_id":next_masterclass_id,"table_group_names":table_group_names.duplicate(true),"table_group_registry":group_registry.snapshot(),"training_queue":training_queue.snapshot(),"staff_training":staff_training.snapshot(true),"movie":movie_state.duplicate(true),"remote_movie_record":remote_movie_record.duplicate(true),"learning":learning_state.snapshot(),"live_training":live_training.snapshot() if is_instance_valid(live_training) else {}}
 
 func clear_world() -> void:
 	if is_instance_valid(staff_training): staff_training.reset()
+	if is_instance_valid(live_training): live_training.reset()
+	learning_state.reset()
 	if is_instance_valid(training_queue): training_queue.reset()
 	if is_instance_valid(chef_station_backup):
 		chef_station_backup.queue_free()
 		chef_station_backup=null
 	masterclass_station=null
+	masterclasses.clear()
+	next_masterclass_id=1
 	masterclass_pending.clear()
 	masterclass_selected_equipment.clear()
 	if is_instance_valid(masterclass_live_scene): masterclass_live_scene.queue_free()
 	masterclass_live_scene=null
-	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false}
+	movie_state={"id":0,"playing":false,"elapsed":0.0,"duration":0.0,"started_by":0,"loop":false,"completed":false}
 	remote_movie_record={}
 	table_group_names.clear()
 	group_registry.reset()
@@ -1805,6 +1967,8 @@ func load_data(data: Dictionary) -> bool:
 			station.order_paid=maxi(0,int(entry.get("order_paid",0)))
 			station.customer_id=int(entry.get("customer_id",-1))
 			station.customer_order=entry.get("customer_order",{}).duplicate(true)
+			station.execution_method_id=int(entry.get("execution_method_id",0))
+			station.execution_crew=entry.get("execution_crew",[]).duplicate(true)
 			if entry.get("order_model",{}) is Dictionary and not entry.get("order_model",{}).is_empty(): station.model.restore(entry.order_model)
 		for role in range(station.role_count()): station.students[role].caption.text = station.crew[role].name
 	served=int(data.get("served",0))
@@ -1850,6 +2014,11 @@ func load_data(data: Dictionary) -> bool:
 		if items.is_empty(): progress.deliveries.erase(parcel)
 		else: parcel.item = items[0]; parcel.items = items
 	normalize_workers()
+	if data.get("learning",{}) is Dictionary and int(data.get("learning",{}).get("schema_version",0))==1:
+		if not learning_state.restore(data.learning): return false
+		for record in masterclasses: _ensure_masterclass_method(record)
+	else:
+		migrate_learning_from_runtime()
 	if not data.get("progression",{}).has("lab_formula_tempo"):
 		var known:=0.70
 		for option in clone_options(): known=maxf(known,float(option.tempo))
@@ -1872,6 +2041,7 @@ func load_data(data: Dictionary) -> bool:
 		training_queue.reset()
 		staff_training.reset()
 		training_queue.migrate_from_plans()
+	rebuild_station_bindings()
 	request_auto_training_reconcile()
 	return true
 
@@ -1922,7 +2092,7 @@ func manual_order(station: Node3D) -> String:
 	return ""
 
 func request_manual(station: Node3D, dish: String, peer: int) -> bool:
-	if station == null or station.state=="serving" or not station.manual_station or station.training.active() or training_for(peer) != null or (progress.busy() and progress.phase!="service"): return false
+	if station == null or station.state=="serving" or not station.manual_station or station.pending_teacher>0 or station.training.active() or training_for(peer) != null or (progress.busy() and progress.phase!="service"): return false
 	var ordered := manual_order(station)
 	if progress.phase=="service" and ordered.is_empty(): return false
 	if not ordered.is_empty(): dish = ordered
@@ -1956,8 +2126,10 @@ func finish_manual(station: Node3D, report: Dictionary) -> void:
 			station.finish_taster(false)
 			progress.stars = 1
 			progress.cash += 120
+			progress.lab_formula_tempo=1.0
+			progress.lab_formula_version=maxi(1,progress.lab_formula_version)
 			progress.phase = "won"
-			progress.result = "Первая звезда! +120. Открыты мастер-классы и видеотека. Покажи блюдо на шеф-станции, сохрани фильм, установи телевизор и назначь запись первому производственному столу. Лаборатория тоже готова для выращивания работников."
+			progress.result = "Первая звезда! +120. Лаборатория получила стандартную формулу 100%: вырасти клона, поставь его за производственную стойку и позови на личный урок у Шефа."
 			progress.revision += 1
 			open_for_business = progress.return_open
 			announce(progress.result)
@@ -2116,7 +2288,9 @@ func assign_clones() -> void:
 			changed=true
 			progress.revision+=1
 	progress.free_clones=progress.free_workers.size()
-	if changed: request_auto_training_reconcile()
+	if changed:
+		rebuild_station_bindings()
+		request_auto_training_reconcile()
 
 func clone_options() -> Array:
 	var options: Array=[]

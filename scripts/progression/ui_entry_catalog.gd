@@ -25,9 +25,10 @@ const ALIASES := {"overview":"office.cafe","stations":"office.shop","star":"offi
 
 const ACTION_FEATURES := {
 	"buy":[],"buy_bundle":[],"buy_station_batch":[],
+	"live_lesson_start":["live_training"],"live_lesson_begin":["live_training"],"live_lesson_cancel":["live_training"],
 	"masterclass_start":["video_recording"],"masterclass_rename":["video_recording"],"masterclass_delete":["video_recording"],
 	"video_watch":["video_training"],"masterclass_watch":["video_training"],"training_course_confirm":["video_training"],"training_course_edit":["video_training"],
-	"group_train":["video_training"],"group_create":["group_training"],"group_dissolve":["group_training"],"group_rename":["group_training"],"group_active":["group_training"],
+	"group_train":["group_training"],"group_create":["group_training"],"group_dissolve":["group_training"],"group_rename":["group_training"],"group_active":["group_training"],
 	"clone_create":["clone_growth"],"lab_clone_growth":["clone_growth"],"lab_tool":["clone_growth"],"lab_pot":["clone_growth"],"lab_pull":["clone_growth"],"lab_research":["formula_research"],"lab_sample":["formula_research"],"lab_scan":["formula_research"],"lab_restart":["formula_research"],"lab_press":["formula_research"],"lab_formula_upgrade":["formula_upgrades"],"lab_recalibrate":["recalibration"],"lab_cal_select":["recalibration"],"lab_cal_start":["recalibration"],"lab_cal_hit":["recalibration"],"lab_cal_cancel":["recalibration"],"lab_cal_auto":["recalibration"],"lab_automation":["lab_automation"],"lab_controls":["lab_automation"],"lab_production_config":["lab_automation"],"banquet":["stars"],
 	"take_parcel":[],"drop_parcel":[],"install_parcel":[],"manual":[],"sleep":[],"wake":[],"save":[]
 }

@@ -22,7 +22,7 @@ func setup(owner_station: Node3D) -> void:
 	participants.fill(0)
 
 func active() -> bool: return phase != "idle"
-func records_method() -> bool: return purpose in ["lesson","masterclass"]
+func records_method() -> bool: return purpose in ["lesson","masterclass","live_lesson"]
 func role_for(peer: int) -> int: return participants.find(peer) if active() and peer > 0 else -1
 
 func open(recipe: String, peer: int, mode := "lesson") -> void:
@@ -37,7 +37,9 @@ func open(recipe: String, peer: int, mode := "lesson") -> void:
 	station.state = "training"
 	if purpose not in ["manual","masterclass"] or station.customer_id >= 0: station.ensure_taster()
 	configure_order()
-	info = "Выбери роль и напарника. Без напарника — последовательная запись." if purpose!="masterclass" else "Мастер-класс: выбери исполнителей ролей. В соло записывай роли последовательными дублями."
+	if purpose=="masterclass": info="Мастер-класс: выбери исполнителей ролей. В соло записывай роли последовательными дублями."
+	elif purpose=="live_lesson": info="Ученик на месте. Покажи приготовление целиком; запись движений начинается только сейчас."
+	else: info="Выбери роль и напарника. Без напарника — последовательная запись."
 	revision += 1
 
 func start_pass(assignments: Array) -> bool:
@@ -141,8 +143,18 @@ func finish_pass(confirmed := false) -> void:
 	if station.get_parent().is_showcase(station):
 		station.get_parent().finish_showcase(station.model.quality())
 		return
+	if purpose=="live_lesson":
+		tracks=pending_tracks.duplicate(true)
+		station.show_tracks(tracks,duration_ticks(tracks)-1)
+		phase="ready"
+		participants.fill(0)
+		info="Показ готов. Прими результат или покажи ещё раз; прошлый навык ученика пока не изменён."
+		revision+=1
+		return
 	phase = "review"
-	info = "Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний." if purpose!="masterclass" else "Дубль готов. Сохрани роли или повтори попытку; мастер-класс появится в видеотеке после принятия всех ролей."
+	if purpose=="masterclass": info="Дубль готов. Сохрани роли или повтори попытку; мастер-класс появится в видеотеке после принятия всех ролей."
+	elif purpose=="live_lesson": info="Показ готов. Проверь оценку: принятие обучит только присутствующего ученика; повтор не затронет его прошлый навык."
+	else: info="Проход готов. Сохрани роли или повтори попытку; рабочий рецепт пока прежний."
 
 func resume_pass() -> void:
 	if phase != "confirm_finish": return
@@ -180,12 +192,18 @@ func accept() -> bool:
 		close()
 		service.finish_masterclass_layout(station)
 		return true
-	station.recipes[dish] = {"tracks": tracks.duplicate(true), "duration": duration_ticks(tracks) / 60.0, "quality": station.model.quality()}
-	station.drafts.erase(dish)
-	station.get_parent().progress.revision += 1
-	station.finish_taster(true)
-	close()
-	return true
+	if purpose=="live_lesson":
+		var service=station.get_parent()
+		var result: Dictionary=service.accept_live_lesson_from_run(station,tracks)
+		if not bool(result.get("ok",false)):
+			info={"attendance_interrupted":"Ученик больше не присутствует — прежний навык сохранён.","result_not_served":"Блюдо не подано. Покажи результат ещё раз; прежний навык сохранён.","method_invalid":"Показ неполный — повтори его."}.get(str(result.get("reason","")),"Урок не принят; прежний навык сохранён.")
+			return false
+		station.drafts.erase(dish)
+		station.finish_taster(true)
+		close()
+		return true
+	info="Локальная запись стола больше не является обучением. Используй личный урок у Шефа или видеообучение."
+	return false
 
 func close() -> void:
 	if active(): station.get_parent().trace("cooking_close", {"station":station.station_id,"dish":dish,"phase":phase,"purpose":purpose})

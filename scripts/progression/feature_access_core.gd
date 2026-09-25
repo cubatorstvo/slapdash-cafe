@@ -241,7 +241,7 @@ func _next_condition(definition: Dictionary) -> String:
 	return ""
 
 func _milestone_hint(milestone_id: String) -> String:
-	return {"basic_dishes_served":"Обслужить три базовых блюда","lab_assembled":"Собрать лабораторию","first_formula_obtained":"Получить первую формулу","first_clone_created":"Создать первого клона","first_masterclass_saved":"Сохранить первый мастер-класс","first_video_training_completed":"Завершить первое видеообучение","two_compatible_stations_seen":"Установить два совместимых стола","first_auto_served":"Выполнить первую автоподачу","first_staff_rest_completed":"Завершить отдых сотрудников","formula_improvement_relevant":"Получить формулу быстрее текущего клона"}.get(milestone_id, "Продолжить развитие кафе")
+	return {"basic_dishes_served":"Обслужить три базовых блюда","lab_assembled":"Собрать лабораторию","first_formula_obtained":"Получить первую формулу","first_clone_created":"Создать первого клона","first_live_lesson_accepted":"Принять первый личный урок","first_masterclass_saved":"Сохранить первый мастер-класс","first_video_training_completed":"Завершить первое видеообучение","two_compatible_stations_seen":"Установить два совместимых стола","first_auto_served":"Выполнить первую автоподачу","first_staff_rest_completed":"Завершить отдых сотрудников","formula_improvement_relevant":"Получить формулу быстрее текущего клона"}.get(milestone_id, "Продолжить развитие кафе")
 
 func _route_for_feature(feature_id: String) -> String:
 	for definition in UiEntryCatalog.ENTRIES.values():

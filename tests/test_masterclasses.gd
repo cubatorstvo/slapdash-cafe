@@ -32,17 +32,23 @@ func run()->void:
 	game.new_cafe()
 	var service=game.service
 	var p=service.progress
-	p.stars=1
+	p.stars=2
 	p.shift="morning"
+	p.expanded=true
+	p.tutorial_served=["sausage","potato","wine"]
+	p.lab_stage=3
+	p.next_clone_id=2
+	service._refresh_progression()
+	service.progression_director.observe("live_lesson_accepted",{"clone_id":1,"dish":"wine"})
+	service._refresh_progression()
 	var chef: Node3D=service.by_id(1)
 	chef.equipment=["jug","cup","plates","pan","sauce","rag"]
 	chef.apply_equipment()
 
-	print("1/6: access belongs to the single chef station and follows installed kitchens")
-	check(bool(service.masterclass_access("wine").available),"Starter masterclass uses learned chef equipment")
-	check(not bool(service.masterclass_access("meal").available),"Complex dish stays locked without its production kitchen")
+	print("1/6: recording opens after 2★ and follows unlocked cuisine/equipment")
+	check(bool(service.masterclass_access("wine").available),"Starter masterclass uses chef equipment after 2★")
+	check(bool(service.masterclass_access("meal").available),"Unlocked meal cuisine can be recorded without depending on an installed production kitchen")
 	var kitchen=service.add_station("kitchen",3,false)
-	check(bool(service.masterclass_access("meal").available),"Installed equipped kitchen unlocks its dish at the chef station")
 
 	print("2/6: a complex chef masterclass supports sequential solo role takes")
 	check(service.request_masterclass("meal",1).is_empty(),"Chef accepts the complex masterclass")
@@ -81,23 +87,27 @@ func run()->void:
 	check(service.request_manual(chef,"wine",1),"Normal chef cooking still starts after masterclasses")
 	chef.training.close()
 
-	print("5/6: v22 persists the shared library")
+	print("5/6: current save persists the shared library and canonical learning state")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
-	check(saved.version==22 and saved.masterclasses.size()==1,"Current v22 save writes the masterclass library")
-	check(service.load_data(saved),"v22 save reloads")
+	check(saved.version==26 and saved.masterclasses.size()==1 and saved.learning is Dictionary,"Current v26 save writes library and learning state")
+	check(service.load_data(saved),"v26 save reloads")
 	check(service.masterclasses.size()==1 and service.masterclasses[0].name=="Быстрый обед","Library survives save/load")
 
-	print("6/6: v13 working recipes migrate to archive records")
+	print("6/6: old working recipes migrate to employee knowledge without inventing films")
 	kitchen=service.by_id(4)
-	kitchen.recipes.meal={"tracks":service.masterclasses[0].tracks.duplicate(true),"duration":service.masterclasses[0].duration,"quality":service.masterclasses[0].quality.duplicate(true)}
+	var legacy_recipe={"tracks":service.masterclasses[0].tracks.duplicate(true),"duration":service.masterclasses[0].duration,"quality":service.masterclasses[0].quality.duplicate(true),"required_equipment":["meat_kit","pasta_kit"]}
 	var legacy: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	legacy.version=13
 	legacy.erase("masterclasses")
 	legacy.erase("next_masterclass_id")
+	legacy.erase("learning")
+	legacy.erase("live_training")
+	for entry in legacy.stations:
+		if int(entry.slot)==3: entry.recipes={"meal":legacy_recipe.duplicate(true)}
 	check(service.load_data(legacy),"Old v13 cafe still loads")
-	var archives: Array=service.masterclasses.filter(func(record):return bool(record.get("archived",false)) and record.dish=="meal")
-	check(archives.size()>=1 and str(archives[0].name).contains("Архив"),"Old production method appears as an archive masterclass")
-	check(service.by_id(4).recipes.has("meal"),"Migrated station keeps its original working recipe")
+	check(service.masterclasses.is_empty(),"Legacy station knowledge does not manufacture an archive film")
+	var migrated_kitchen=service.by_id(4)
+	check(migrated_kitchen.recipes.has("meal"),"Migrated current employees keep their working meal method")
 
 	game._shutdown_tree(game)
 	game.free()

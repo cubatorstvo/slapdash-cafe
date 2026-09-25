@@ -190,7 +190,9 @@ func toggle_pause() -> void:
 		for voice in loops.values(): voice.stream_paused = session_paused and not session.online()
 	sync_mouse_mode()
 
-func local_station() -> Node3D: return service.training_for(session.local_id())
+func local_station() -> Node3D:
+	if not is_instance_valid(service) or not is_instance_valid(session): return null
+	return service.training_for(session.local_id())
 
 func nearest_station() -> Node3D:
 	var best: Node3D
