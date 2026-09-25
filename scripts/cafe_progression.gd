@@ -9,22 +9,38 @@ func available_dishes() -> Array:
 	if "potato" in tutorial_served: result.append("wine")
 	return result
 
+func _p5_has_property(target, property_name: String) -> bool:
+	if target == null: return false
+	for property in target.get_property_list():
+		if str(property.get("name", "")) == property_name: return true
+	return false
+
 func _p5_structural_crew_ready(station) -> bool:
-	if station == null or station.manual_station or station.masterclass_station: return false
+	if station == null or bool(station.manual_station): return false
+	if _p5_has_property(station, "masterclass_station") and bool(station.get("masterclass_station")): return false
+	if station.has_method("ready_crew") and not station.ready_crew(): return false
+	if not _p5_has_property(station, "crew"): return true
+	var crew: Variant = station.get("crew")
 	var roles := int(station.role_count())
-	if roles <= 0 or station.crew.size() < roles: return false
+	if roles <= 0 or not crew is Array or crew.size() < roles: return false
 	for role in range(roles):
-		if role >= station.crew.size() or not station.crew[role] is Dictionary or int(station.crew[role].get("clone_id", 0)) <= 0: return false
+		if role >= crew.size() or not crew[role] is Dictionary or int(crew[role].get("clone_id", 0)) <= 0: return false
 	return true
 
 func _p5_station_has_current_method(station, dish: String, require_b_plus := true) -> bool:
 	if not _p5_structural_crew_ready(station): return false
-	if not station.recipes.has(dish) or not station.missing_recipe_equipment(dish).is_empty(): return false
-	var source: Dictionary = station.method_sources.get(dish, {}) if station.method_sources.get(dish, {}) is Dictionary else {}
-	var clone_ids: Variant = source.get("clone_ids", [])
-	if not clone_ids is Array or clone_ids.size() != station.role_count(): return false
-	for role in range(station.role_count()):
-		if role >= station.crew.size() or int(station.crew[role].get("clone_id", 0)) <= 0 or int(clone_ids[role]) != int(station.crew[role].get("clone_id", 0)): return false
+	if not station.recipes.has(dish): return false
+	if station.has_method("missing_recipe_equipment") and not station.missing_recipe_equipment(dish).is_empty(): return false
+	if _p5_has_property(station, "method_sources") and _p5_has_property(station, "crew"):
+		var source: Variant = station.get("method_sources")
+		var crew: Variant = station.get("crew")
+		if not source is Dictionary or not crew is Array: return false
+		var binding: Variant = source.get(dish, {})
+		if not binding is Dictionary: return false
+		var clone_ids: Variant = binding.get("clone_ids", [])
+		if not clone_ids is Array or clone_ids.size() != station.role_count(): return false
+		for role in range(station.role_count()):
+			if role >= crew.size() or int(crew[role].get("clone_id", 0)) <= 0 or int(clone_ids[role]) != int(crew[role].get("clone_id", 0)): return false
 	var report: Dictionary = station.recipes.get(dish, {}).get("quality", {})
 	if not bool(report.get("present", false)): return false
 	return not require_b_plus or str(report.get("grade", "D")) in ["B", "A", "S"]
@@ -42,7 +58,8 @@ func _p5_operating_crew_count(stations: Array) -> int:
 	var count := 0
 	for station in stations:
 		if not _p5_structural_crew_ready(station): continue
-		if station.dishes().any(func(dish): return _p5_station_has_current_method(station, str(dish), false)): count += 1
+		var dishes: Array = station.dishes() if station.has_method("dishes") else station.recipes.keys()
+		if dishes.any(func(dish): return _p5_station_has_current_method(station, str(dish), false)): count += 1
 	return count
 
 func _p5_type_crew_count(stations: Array, type_id: String) -> int:
