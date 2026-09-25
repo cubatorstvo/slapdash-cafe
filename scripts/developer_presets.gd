@@ -33,7 +33,7 @@ static func apply(game: Node, requested_stage: int) -> void:
 	p.popularity = int(preset.popularity)
 	p.manual_served = int(preset.manual_served)
 	p.day = 1 + stage * 3
-	p.shift = "morning"
+	p.shift = "open"
 	p.lab_stage = 0 if stage == 0 else 3
 	p.lab_step = -1
 	p.lab_tier = int(preset.lab_tier)
@@ -74,7 +74,8 @@ static func apply(game: Node, requested_stage: int) -> void:
 		p.next_clone_id += 1
 	p.free_clones = p.free_workers.size()
 	service.assign_clones()
-	service.open_for_business = false
+	service.open_for_business = true
+	service.spawn_clock = 2.0
 	service._refresh_progression()
 	if is_instance_valid(game.laboratory): game.laboratory.recover()
 	game._refresh_cafe_layout(true)
