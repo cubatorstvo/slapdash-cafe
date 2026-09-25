@@ -8,6 +8,12 @@ func _feature_access():
 func _request_is_host() -> bool:
 	return multiplayer.get_remote_sender_id() <= 1
 
+func target(camera: Camera3D, peer: int) -> Dictionary:
+	if game != null and is_instance_valid(game.get("laboratory")):
+		var lab_target: Dictionary = game.laboratory.target(camera, peer)
+		if not lab_target.is_empty(): return lab_target
+	return super(camera, peer)
+
 func _access_error(state: Dictionary) -> String:
 	var access = _feature_access()
 	if access == null or bool(state.get("enabled", state.get("allowed", false))): return ""
