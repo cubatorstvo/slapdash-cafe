@@ -47,6 +47,14 @@ func teach_live(service,chef,station,dish: String,clone_id: int)->void:
 		if not service.live_training.is_active(): break
 	check(station.recipes.has(dish),"Accepted skill binds to current clone station")
 
+func install_counter(service,p)->Node3D:
+	check(game.shop.order("counter",0).is_empty(),"Production table can be ordered through normal shop")
+	var parcel: Dictionary=p.deliveries.back()
+	parcel.remaining=0.0
+	var station_id:=int(parcel.station)
+	check(game.shop._install_parcel(parcel).is_empty(),"Production table can be installed through delivery path")
+	return service.by_id(station_id)
+
 func run()->void:
 	game=Scene.instantiate(); root.add_child(game); await process_frame; game.set_physics_process(false)
 	game.new_cafe(); await process_frame
@@ -72,7 +80,8 @@ func run()->void:
 	check(has_milestone(service,"first_manual_clone_growth_completed"),"First manual growth cycle fact is recorded")
 	check(bool(service.feature_state("production_tables").get("unlocked",false)),"Production table shop unlocks after first clone")
 	check(bool(service.feature_state("rest_basics").get("unlocked",false)),"Basic sofa rest unlocks with first worker")
-	var station_a=service.add_station("counter",1,false,true)
+	var station_a=install_counter(service,p)
+	check(station_a!=null and has_milestone(service,"first_production_station_installed"),"Installed first production table records its host milestone")
 	station_a.equipment=["jug","cup","plates","pan","sauce","rag"]; station_a.apply_equipment(); service.assign_clones(); service._refresh_progression()
 	var clone_a:=int(station_a.crew[0].get("clone_id",0))
 	check(clone_a>0,"First clone is assigned to first production table")
@@ -85,7 +94,7 @@ func run()->void:
 	print("[3/5] Familiar cycle requires second clone knowledge")
 	check(service.create_clone(1.0,true).is_empty(),"Second clone uses the familiar 100% formula")
 	check(has_milestone(service,"repeat_manual_clone_growth_completed"),"Repeat manual growth cycle fact is recorded")
-	var station_b=service.add_station("counter",2,false,true)
+	var station_b=install_counter(service,p)
 	station_b.equipment=["jug","cup","plates","pan","sauce","rag"]; station_b.apply_equipment(); service.assign_clones(); service._refresh_progression()
 	var clone_b:=int(station_b.crew[0].get("clone_id",0))
 	check(clone_b>0 and service.clone_skill(clone_b,"counter","sausage","cook").is_empty(),"Second clone does not inherit first clone knowledge")
@@ -101,9 +110,9 @@ func run()->void:
 	check(service.masterclasses.is_empty() and "television" not in p.lounge_items,"2★ is reachable with empty masterclasses and no television")
 	check(not bool(service.feature_state("video_recording").get("unlocked",false)),"Video recording remains hidden during 1★ chapter")
 
-	print("[5/5] Rest fact and save/load persistence")
-	p.rest_report={"workers":2,"places":2,"covered":2,"bonus":0.08,"multiplier":1.08}; service._refresh_progression()
-	check(has_milestone(service,"first_staff_rest_completed"),"First night rest with workers is recorded from host rest report")
+	print("[5/5] Real rest path and save/load persistence")
+	game.evening.apply_rest(); service._refresh_progression()
+	check(int(p.rest_report.get("workers",0))>=2 and has_milestone(service,"first_staff_rest_completed"),"First real night rest with workers records its progression fact")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	check(service.load_data(saved),"Current save reloads")
 	check(is_equal_approx(p.lab_formula_tempo,1.0) and has_milestone(service,"standard_formula_available") and has_milestone(service,"repeat_manual_clone_growth_completed"),"Formula and chapter facts survive current save/load")
