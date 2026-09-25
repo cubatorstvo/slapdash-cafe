@@ -1,6 +1,7 @@
 extends "res://scripts/cafe_service_feature_core.gd"
 
 const STARTER_DISH_SEQUENCE := ["sausage", "potato", "wine"]
+const STANDARD_FORMULA_TEMPO := 1.0
 
 func _ready() -> void:
 	super()
@@ -9,10 +10,30 @@ func _ready() -> void:
 		open_for_business = true
 		spawn_clock = 2.0
 
+func _ensure_standard_formula() -> void:
+	if progress.stars < 1 or progress.lab_stage < 3 or progress.lab_formula_version > 0: return
+	progress.lab_formula_tempo = STANDARD_FORMULA_TEMPO
+	progress.lab_formula_version = 1
+	progress.revision += 1
+	progression_director.observe("standard_formula_available", {"tempo":STANDARD_FORMULA_TEMPO,"version":progress.lab_formula_version})
+
+func _refresh_progression() -> void:
+	_ensure_standard_formula()
+	super()
+
 func start_highlights(id: int, peer: int) -> String:
 	var error := _action_command_error("masterclass_watch", {"actor_id":peer})
 	if not error.is_empty(): return error
 	return super(id, peer)
+
+func create_clone(tempo := 1.0, prepaid := false) -> String:
+	var clone_id := int(progress.next_clone_id)
+	var manual_growth := progress.stars == 1 and "lab_production" not in progress.lab_upgrades
+	var result: String = super(tempo, prepaid)
+	if result.is_empty() and manual_growth:
+		progression_director.observe("manual_clone_growth_completed", {"clone_id":clone_id,"ordinal":clone_id,"tempo":tempo})
+		_refresh_progression()
+	return result
 
 func _starter_equipped(station: Node3D, dish: String) -> bool:
 	return Definition.missing_equipment(dish, station.equipment, station.upgrades).is_empty()
