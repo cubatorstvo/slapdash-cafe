@@ -17,25 +17,43 @@ static func _p5_milestone_data(p, id: String) -> Dictionary:
 	var value: Variant = milestones.get(id, {})
 	return value if value is Dictionary else {}
 
+static func _p5_has_property(target, property_name: String) -> bool:
+	if target == null: return false
+	for property in target.get_property_list():
+		if str(property.get("name", "")) == property_name: return true
+	return false
+
+static func _p5_has_action_snapshot(p) -> bool:
+	var snapshot: Variant = p.get("feature_progress")
+	if not snapshot is Dictionary: return false
+	var milestones: Variant = snapshot.get("milestones", {})
+	return milestones is Dictionary and not milestones.is_empty()
+
 static func _p5_counters(stations: Array) -> Array:
 	var result: Array=[]
 	for station in stations:
-		if not station.manual_station and not station.masterclass_station and station.type_id=="counter": result.append(station)
+		if not station.manual_station and (not _p5_has_property(station,"masterclass_station") or not bool(station.get("masterclass_station"))) and station.type_id=="counter": result.append(station)
 	result.sort_custom(func(a,b): return a.station_id < b.station_id)
 	return result
 
 static func _p5_station_of_type(stations: Array, type_id: String):
 	for station in stations:
-		if not station.manual_station and not station.masterclass_station and str(station.type_id)==type_id: return station
+		if not station.manual_station and (not _p5_has_property(station,"masterclass_station") or not bool(station.get("masterclass_station"))) and str(station.type_id)==type_id: return station
 	return null
 
 static func _p5_current_b_plus(station, dish: String) -> bool:
-	if station==null or not station.ready_crew() or not station.recipes.has(dish) or not station.missing_recipe_equipment(dish).is_empty(): return false
-	var source: Dictionary=station.method_sources.get(dish,{}) if station.method_sources.get(dish,{}) is Dictionary else {}
-	var clone_ids: Variant=source.get("clone_ids",[])
-	if not clone_ids is Array or clone_ids.size()!=station.role_count(): return false
-	for role in range(station.role_count()):
-		if role>=station.crew.size() or int(station.crew[role].get("clone_id",0))<=0 or int(clone_ids[role])!=int(station.crew[role].get("clone_id",0)): return false
+	if station==null or not station.ready_crew() or not station.recipes.has(dish): return false
+	if station.has_method("missing_recipe_equipment") and not station.missing_recipe_equipment(dish).is_empty(): return false
+	if _p5_has_property(station,"method_sources") and _p5_has_property(station,"crew"):
+		var sources: Variant=station.get("method_sources")
+		var crew: Variant=station.get("crew")
+		if not sources is Dictionary or not crew is Array: return false
+		var source: Variant=sources.get(dish,{})
+		if not source is Dictionary: return false
+		var clone_ids: Variant=source.get("clone_ids",[])
+		if not clone_ids is Array or clone_ids.size()!=station.role_count(): return false
+		for role in range(station.role_count()):
+			if role>=crew.size() or int(crew[role].get("clone_id",0))<=0 or int(clone_ids[role])!=int(crew[role].get("clone_id",0)): return false
 	var report: Dictionary=station.recipes.get(dish,{}).get("quality",{})
 	return bool(report.get("present",false)) and str(report.get("grade","D")) in ["B","A","S"]
 
@@ -185,7 +203,9 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 
 static func next_step(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	if p.stars==1: return _p5_first_clones_step(p,stations,served,service)
-	if p.stars>=2 and p.stars<=4: return _p5_scale_step(p,stations,served,service)
+	if p.stars>=2 and p.stars<=4:
+		if not _p5_has_action_snapshot(p): return super.next_step(p,stations,served,opened,service)
+		return _p5_scale_step(p,stations,served,service)
 	if p.stars != 0: return super.next_step(p, stations, served, opened, service)
 	var personal
 	for station in stations:
@@ -216,6 +236,7 @@ static func _p5_night_wrap(p, result: Dictionary) -> Dictionary:
 
 static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	if p.stars>=2 and p.stars<=4:
+		if not _p5_has_action_snapshot(p): return super.current(p,stations,served,opened,service)
 		if p.busy(): return super.current(p,stations,served,opened,service)
 		var scale_result:=_p5_scale_step(p,stations,served,service)
 		scale_result.chapter="ВИДЕООБУЧЕНИЕ · 2★" if p.stars==2 and not _p5_milestone(p,"first_group_trained_auto_served") else "ТРЕТЬЯ ЗВЕЗДА · МАСШТАБ" if p.stars==2 else "ЧЕТВЁРТАЯ ЗВЕЗДА · СПЕЦИАЛИЗАЦИЯ" if p.stars==3 else "ПЯТАЯ ЗВЕЗДА · ОРКЕСТРАЦИЯ"
