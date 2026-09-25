@@ -54,6 +54,10 @@ static func apply(game: Node, requested_stage: int) -> void:
 	p.fourth_star_auto_served = 0 if stage < 4 else 14
 	p.fourth_star_specialty_served = 0 if stage < 4 else 6
 	service.initial_stations()
+	var chef = service.by_id(1)
+	if stage >= 1 and chef != null:
+		chef.equipment = Definition.equipment_for_type("counter")
+		chef.apply_equipment()
 	var required_workers := 0
 	for station_spec in preset.stations:
 		var type_id := str(station_spec[0])
