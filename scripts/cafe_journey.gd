@@ -111,12 +111,13 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 			tv.key="scale_television"
 			return tv
 		var record:=_p5_video_record(service,stations)
-		if record.is_empty():
+		if service!=null and record.is_empty():
 			return step("scale_matching_film","Сними запись для действующего стола","В видеотеке пока нет фильма, совместимого с установленным производственным столом. Сними мастер-класс его блюда на шеф-стойке.","station",1)
 		if not _p5_milestone(p,"first_video_training_completed"):
-			var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0))) if service!=null else []
+			var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0))) if service!=null and not record.is_empty() else []
 			var target_id:=int(compatible[0]) if not compatible.is_empty() else (int(counters[0].station_id) if not counters.is_empty() else 0)
-			return step("scale_single_video","Назначь фильм одному столу","Компьютер → Столы и обучение → выбери один совместимый стол → добавь «%s» в очередь. Просмотр считается только после реальной выдачи навыка присутствовавшему работнику."%str(record.get("name","Запись")),"computer",target_id)
+			var record_name:=str(record.get("name","Запись")) if not record.is_empty() else "сохранённую запись"
+			return step("scale_single_video","Назначь фильм одному столу","Компьютер → Столы и обучение → выбери один совместимый стол → добавь «%s» в очередь. Просмотр считается только после реальной выдачи навыка присутствовавшему работнику."%record_name,"computer",target_id)
 		if not _p5_milestone(p,"first_video_trained_auto_served"):
 			var trained=_p5_video_station(service,stations)
 			return step("scale_single_video_work","Дождись автоподачи после просмотра","Пусть работник, реально получивший навык у телевизора, завершит заказ. Сам запуск фильма не закрепляет этап.","station",int(trained.station_id) if trained!=null else 0)
