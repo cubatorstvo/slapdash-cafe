@@ -13,3 +13,11 @@ func open(page := "overview") -> void:
 func navigate(page: String) -> void:
 	super(page)
 	_mark_opened_feature_seen()
+
+func overview_page(host: bool) -> void:
+	super(host)
+	var service = game.service
+	var p = service.progress
+	if not service.open_for_business or str(p.shift) != "open": return
+	var shift_button := button(content, "Закончить смену досрочно", func(): send({"action":"business"}, true), host and not p.busy(), "Сначала заверши текущее событие." if p.busy() else "")
+	content.move_child(shift_button, mini(1, content.get_child_count() - 1))
