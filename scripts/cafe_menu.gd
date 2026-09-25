@@ -1,5 +1,7 @@
 extends "res://scripts/cafe_menu_core.gd"
 
+const DeveloperPresets = preload("res://scripts/developer_presets.gd")
+
 func _feature_visible(feature_id: String) -> bool:
 	if game == null or not is_instance_valid(game.service) or game.service.get("feature_access") == null: return false
 	return bool(game.service.feature_access.access(feature_id).get("visible", false))
@@ -8,6 +10,7 @@ func show_station(station: Node3D) -> void:
 	super(station)
 	_append_live_training(station)
 	_apply_feature_visibility()
+	_append_developer_entry()
 
 func _append_live_training(station: Node3D) -> void:
 	if not station.manual_station or not _feature_visible("live_training"): return
@@ -70,3 +73,25 @@ func _apply_feature_visibility() -> void:
 			node.hide()
 			continue
 		if not training and (text == "Обучение и группа" or "обучение бригад" in lowered): node.hide()
+
+func _append_developer_entry() -> void:
+	_label(training_box,"DEVELOPER",16)
+	_button(training_box,"Выбрать этап игры",open_developer_presets)
+
+func open_developer_presets() -> void:
+	rebuild()
+	_label(training_box,"DEVELOPER · ЭТАП ИГРЫ",23)
+	_label(training_box,"Пресет заменяет текущее сохранение. На каждом этапе деньги = 10 000.",15)
+	for stage in range(5):
+		_button(training_box,DeveloperPresets.label(stage),_apply_developer_stage.bind(stage))
+	_button(training_box,"Отмена",close)
+	panel.show()
+	Input.mouse_mode=Input.MOUSE_MODE_VISIBLE
+
+func _apply_developer_stage(stage: int) -> void:
+	if game.session.is_guest():
+		game.hud.show_toast("Developer-пресеты доступны только хосту.")
+		return
+	DeveloperPresets.apply(game,stage)
+	close()
+	game.hud.show_toast("Developer: загружен этап %d ★ · деньги 10 000"%stage)
