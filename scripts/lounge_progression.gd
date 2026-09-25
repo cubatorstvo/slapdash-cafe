@@ -30,13 +30,20 @@ const GOODS := {
 static func stamp(p) -> String:
 	return "%d:%s:%s" % [p.lounge_tier,str(p.lounge_items),str(p.lounge_upgrades)]
 
+static func _feature_for(id: String) -> String:
+	if id=="television": return "video_training"
+	if id in ["bookcase","board_games","tea_station","snack_fridge","foosball","arcade","textiles"]: return "rest_extended"
+	if id in ["table_tennis","jukebox","aquarium","ambient"]: return "rest_large"
+	return "rest_basics"
+
 static func shop_items() -> Dictionary:
 	var result := {}
 	for id in GOODS:
 		var spec: Dictionary = GOODS[id]
-		result["rest_"+id] = {"name":spec.name,"price":spec.price,"kind":"lounge","lounge_id":id,"upgrade":false,"feature":"rest_basics"}
+		var feature := _feature_for(str(id))
+		result["rest_"+id] = {"name":spec.name,"price":spec.price,"kind":"lounge","lounge_id":id,"upgrade":false,"feature":feature}
 		if float(spec.quality)>0:
-			result["rest_upgrade_"+id] = {"name":"Улучшение: "+spec.name+" · +8% к качеству мест","price":maxi(40,int(spec.price*0.8)),"kind":"lounge","lounge_id":id,"upgrade":true,"feature":"rest_basics"}
+			result["rest_upgrade_"+id] = {"name":"Улучшение: "+spec.name+" · +8% к качеству мест","price":maxi(40,int(spec.price*0.8)),"kind":"lounge","lounge_id":id,"upgrade":true,"feature":feature}
 	return result
 
 static func item_error(p, spec: Dictionary) -> String:

@@ -15,17 +15,21 @@ func attach(owner_game: Node3D) -> void:
 	physical.chosen.connect(_from_page)
 	_sync_feature_pages()
 
-func _feature_for_recipe(dish: String) -> String:
-	if dish == "meal": return "kitchen_pair"
-	if dish in ["burger","cheeseburger","spicy_burger"]: return "kitchen_grill"
-	if dish == "solyanka": return "kitchen_solyanka"
-	return "shop_basic"
+func _known_recipe(dish: String) -> bool:
+	if game == null or not is_instance_valid(game.service): return false
+	for station in game.service.stations:
+		if station != null and station.get("recipes") is Dictionary and station.recipes.has(dish): return true
+		if station != null and station.get("training") != null and str(station.training.get("dish")) == dish and str(station.training.get("phase")) != "idle": return true
+	for customer in game.service.customers:
+		if customer is Dictionary and str(customer.get("dish", "")) == dish and str(customer.get("state", "")) != "leaving": return true
+	return false
 
 func _allowed_recipes() -> Array:
 	if game == null or not is_instance_valid(game.service) or game.service.get("feature_access") == null: return Data.ORDER.duplicate()
 	var result: Array = []
 	for dish in Data.ORDER:
-		if bool(game.service.feature_access.access(_feature_for_recipe(str(dish))).visible): result.append(dish)
+		var state: Dictionary = game.service.feature_access.recipe_access(str(dish), {"known_recipe":_known_recipe(str(dish))})
+		if bool(state.get("visible", false)): result.append(dish)
 	return result
 
 func _sync_feature_pages() -> void:
@@ -43,8 +47,7 @@ func toggle() -> void:
 	if opened: close(); return
 	_sync_feature_pages()
 	var station: Node3D = game.local_station()
-	if station != null and station.training.phase == "recording" and station.training.dish in _allowed_recipes():
-		recipe = station.training.dish
+	if station != null and station.training.phase == "recording" and station.training.dish in _allowed_recipes(): recipe = station.training.dish
 	else: recipe = "index"
 	opened = true
 	game.taught.book = true
@@ -84,8 +87,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouse:
 		var hit: Dictionary = physical.hit_from_screen(game.camera, event.position)
 		physical.feed_pointer(event, hit)
-		if not hit.is_empty() or event is InputEventMouseButton:
-			get_viewport().set_input_as_handled()
+		if not hit.is_empty() or event is InputEventMouseButton: get_viewport().set_input_as_handled()
 
 func shutdown() -> void:
 	close()
