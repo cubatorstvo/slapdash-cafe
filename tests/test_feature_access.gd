@@ -1,129 +1,159 @@
 extends SceneTree
 
-const FeatureAccess = preload("res://scripts/feature_access.gd")
-const FeatureDefinition = preload("res://scripts/feature_definition.gd")
-const Progression = preload("res://scripts/cafe_progression.gd")
-const Catalogue = preload("res://scripts/cafe_catalogue.gd")
+const Director = preload("res://scripts/progression/progression_director.gd")
+const Access = preload("res://scripts/progression/feature_access.gd")
+const Reasons = preload("res://scripts/progression/access_reasons.gd")
+const Catalog = preload("res://scripts/progression/feature_catalog.gd")
+const UiCatalog = preload("res://scripts/progression/ui_entry_catalog.gd")
+const BaseCatalogue = preload("res://scripts/cafe_catalogue.gd")
 const Laboratory = preload("res://scripts/laboratory_progression.gd")
 const Lounge = preload("res://scripts/lounge_progression.gd")
 
+class FakeProgress extends RefCounted:
+	var day := 1
+	var feature_progress: Dictionary = {}
+	var world_epoch := "epoch-a"
+	var stars := 0
+	var cash := 20
+	var manual_served := 0
+	var tutorial_served: Array = []
+	var lab_stage := 0
+	var lab_formula_version := 0
+	var lab_formula_tempo := 0.7
+	var next_clone_id := 1
+	var free_workers: Array = []
+	var journey_auto_served := 0
+	var third_star_auto_served := 0
+	var fourth_star_auto_served := 0
+	var fifth_star_auto_served := 0
+	var rest_report: Dictionary = {}
+	var lab_calibration: Dictionary = {}
+	var deliveries: Array = []
+	var delivery_history: Array = []
+	var lab_upgrades: Array = []
+	var lounge_tier := 0
+	var lounge_items: Array = ["sofa"]
+	var lounge_upgrades: Array = []
+	var expanded := false
+	var specialized_expanded := false
+	var orchestration_expanded := false
+
 class FakeService extends Node:
-	var progress = Progression.new()
-	var guests_arrived := 0
-	var served := 0
+	var progress := FakeProgress.new()
 	var masterclasses: Array = []
+	var stations: Array = []
+	var group_registry = null
+	var progression_director
 
 var failures := 0
 
 func _initialize() -> void:
 	run.call_deferred()
 
-func check(ok: bool, text: String) -> void:
-	if not ok:
+func check(condition: bool, text: String) -> void:
+	if not condition:
 		failures += 1
 		printerr("FAIL: ", text)
-
-func visible(access: FeatureAccess, id: String) -> bool:
-	return bool(access.access(id).visible)
-
-func enabled(access: FeatureAccess, id: String) -> bool:
-	return bool(access.access(id).enabled)
 
 func run() -> void:
 	var service := FakeService.new()
 	root.add_child(service)
-	var access := FeatureAccess.new()
-	access.setup(service)
-	var p = service.progress
+	var director := Director.new()
+	service.progression_director = director
+	director.setup(service)
+	var access := Access.new()
+	access.setup(service, director)
 
-	# New cafe: only the permanent shell and basic shop are known.
-	check(visible(access, "shop_basic"), "Basic shop is introduced on a new game")
-	check(not visible(access, "stars"), "Star system is not introduced before the first guest")
-	check(not visible(access, "staff_roster"), "Staff is hidden before the first clone")
-	check(not visible(access, "video_training"), "Training is hidden before recordings are introduced")
-	check(access.nearest_visible_page("videos") == "star", "A hidden deep link falls back to the nearest visible parent")
+	check(Catalog.validate().is_empty(), "feature catalogue validates")
+	check(UiCatalog.validate(Catalog).is_empty(), "UI/action catalogue validates")
+	check(director.is_unlocked("cafe_core") and director.is_unlocked("shop_basic") and director.is_unlocked("stars"), "new cafe has three base systems")
+	check(not director.is_unlocked("clone_lab") and not director.is_unlocked("staff_roster") and not director.is_unlocked("video_recording"), "future systems stay locked on new cafe")
+	var roots := access.visible_entries("")
+	check(roots.size() == 3, "new cafe exposes only Cafe, Shop and Development roots")
+	check(access.nearest_visible_route("office.training.groups") == "office.cafe", "closed deep link falls back to Cafe")
+	var future := access.check_action("clone_create", {})
+	check(not future.allowed and future.reason_code == Reasons.FEATURE_LOCKED, "hidden future command is rejected directly")
+	var unknown := access.check_action("client_says_allowed", {"allowed":true,"stars":99})
+	check(not unknown.allowed and unknown.reason_code == Reasons.UNKNOWN_ACTION, "client-provided decisions cannot invent commands")
 
-	# A hidden future item cannot be enabled by a direct request context.
-	var future_kitchen := access.item_access("kitchen", Catalogue.ITEMS.kitchen, {"is_host":true})
-	check(not bool(future_kitchen.visible) and not bool(future_kitchen.enabled), "Future kitchen is hidden and disabled")
+	var poor_jug := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":40,"host_required":true,"is_host":true})
+	check(poor_jug.visible and not poor_jug.enabled and poor_jug.reason_code == Reasons.INSUFFICIENT_FUNDS and int(poor_jug.reason_args.missing) == 14, "insufficient funds block without hiding item")
+	var guest_jug := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":100,"host_required":true,"is_host":false})
+	check(guest_jug.visible and not guest_jug.enabled and guest_jug.reason_code == Reasons.HOST_ONLY, "guest can browse but host owns purchase")
 
-	# First guest introduces development and the lab without dumping later systems into navigation.
-	service.guests_arrived = 1
-	check(visible(access, "stars"), "First guest introduces development")
-	check(visible(access, "clone_lab"), "First guest introduces the clone lab")
-	check(not visible(access, "staff_roster"), "Staff remains hidden before clone creation")
-	var early_counter := access.item_access("counter", Catalogue.ITEMS.counter, {"is_host":true})
-	check(bool(early_counter.visible) and not bool(early_counter.enabled), "Known star-gated item stays visible before its required star")
-	check(str(early_counter.reason_code) == "star_required", "Item star requirement comes from FeatureAccess")
+	service.progress.tutorial_served = ["sausage", "potato", "wine"]
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("clone_lab"), "three base dishes introduce laboratory")
+	service.progress.lab_stage = 3
+	service.progress.lab_formula_version = 1
+	service.progress.stars = 1
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("formula_research") and director.is_unlocked("clone_growth"), "assembled lab plus formula and 1 star unlock growth")
+	service.progress.next_clone_id = 2
+	service.progress.free_workers = [{"clone_id":1,"tempo":0.7}]
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("staff_roster") and director.is_unlocked("production_tables") and director.is_unlocked("video_recording"), "first clone unlocks staff, production table and recording")
+	service.progress.next_clone_id = 1
+	service.progress.free_workers.clear()
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("staff_roster") and access.ui_state("office.staff").visible, "learned Staff section stays after workers disappear")
 
-	# 1★ introduces recording, while training/staff remain hidden until their own facts exist.
-	p.stars = 1
-	check(enabled(access, "video_recording"), "First star enables recording")
-	check(not visible(access, "staff_roster"), "1 star alone does not reveal staff")
-	check(not visible(access, "video_training"), "1 star alone does not reveal training")
+	var tv_before := access.item_access("rest_television", Lounge.shop_items().rest_television, {"available_funds":999})
+	check(not tv_before.visible, "television stays hidden before video training is introduced")
+	director.observe(&"masterclass_saved", {"record_id":1})
+	check(director.is_unlocked("video_training"), "saved masterclass unlocks video training")
+	var tv_after := access.item_access("rest_television", Lounge.shop_items().rest_television, {"available_funds":999})
+	check(tv_after.visible and tv_after.enabled, "television becomes buyable without requiring Rest unlock")
+	check(not director.is_unlocked("rest_basics"), "television availability does not create Rest cycle")
 
-	# Money is a temporary command condition, not a visibility rule.
-	p.cash = 0
-	var poor_item := access.item_access("plants", Catalogue.ITEMS.plants, {"is_host":true})
-	check(bool(poor_item.visible), "Unaffordable introduced item remains visible")
-	check(not bool(poor_item.enabled), "Unaffordable item is disabled")
-	check(str(poor_item.reason_code) == "insufficient_funds", "Unaffordable item exposes a concrete reason code")
+	var one_table := access.check_action("buy_station_batch", {"items":[{"item_id":"counter","spec":BaseCatalogue.ITEMS.counter}],"station_ids":[2],"available_funds":999})
+	check(one_table.allowed, "single production table batch does not require group training")
+	var two_tables := access.check_action("buy_station_batch", {"items":[{"item_id":"counter","spec":BaseCatalogue.ITEMS.counter}],"station_ids":[2,3],"available_funds":999})
+	check(not two_tables.allowed and two_tables.reason_code == Reasons.FEATURE_LOCKED, "multi-table batch cannot bypass group training")
+	service.stations = [{"manual_station":false,"masterclass_station":false,"type_id":"counter"},{"manual_station":false,"masterclass_station":false,"type_id":"counter"}]
+	director.observe(&"video_training_completed", {"station_count":1})
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("group_training"), "completed video training plus compatible tables unlock group training")
+	var two_tables_after := access.check_action("buy_station_batch", {"items":[{"item_id":"counter","spec":BaseCatalogue.ITEMS.counter}],"station_ids":[2,3],"available_funds":999})
+	check(two_tables_after.allowed, "multi-table batch becomes valid after group training unlock")
 
-	# Guests can browse introduced goods, but host ownership is an explicit disabled state.
-	p.cash = 500
-	var guest_item := access.item_access("plants", Catalogue.ITEMS.plants, {"host_required":true,"is_host":false})
-	check(bool(guest_item.visible) and not bool(guest_item.enabled), "Guest can see introduced item but cannot buy it")
-	check(str(guest_item.reason_code) == "host_only", "Guest purchase exposes host-only reason")
+	var repeatable := access.item_access("counter", BaseCatalogue.ITEMS.counter, {"available_funds":999})
+	check(repeatable.visible and repeatable.enabled and repeatable.state == "ready", "installed production table does not make all future tables owned")
+	var pending := access.item_access("counter", BaseCatalogue.ITEMS.counter, {"available_funds":999,"pending_delivery":true})
+	check(pending.visible and not pending.enabled and pending.state == "pending" and pending.reason_code == Reasons.DELIVERY_PENDING, "pending delivery keeps card visible with pending state")
+	var empty_page := access.ui_state("office.staff", {"empty":true})
+	check(empty_page.visible, "open empty section stays visible")
 
-	# First clone monotonically reveals staff/rest/growth systems.
-	p.next_clone_id = 2
-	p.free_workers = [{"id":1,"tempo":1.0,"rest":1.0}]
-	check(visible(access, "staff_roster"), "First clone reveals Staff")
-	check(visible(access, "rest_basics"), "First clone reveals Rest")
-	check(enabled(access, "live_training"), "First clone enables personal training")
-	p.free_workers.clear()
-	p.next_clone_id = 1
-	check(visible(access, "staff_roster"), "Losing the temporary clone state does not hide a learned section")
-
-	# Personal lesson is its own monotonic introduction fact.
-	p.training_intro_mass_seen = true
-	check(visible(access, "group_training"), "Accepted personal lesson introduces group training")
-
-	# 2★ plus a saved recording reveals the fifth top-level section.
-	p.stars = 2
-	service.masterclasses = [{"id":1,"dish":"wine"}]
-	check(visible(access, "video_training"), "2 stars plus recording reveal Training")
-	check(visible(access, "kitchen_pair"), "Second star introduces pair kitchen")
-
-	# Mature cafe reveals later kitchens only in order.
-	p.stars = 3
-	check(visible(access, "kitchen_grill"), "Third star introduces grill kitchen")
-	check(not visible(access, "kitchen_solyanka"), "Solyanka remains hidden at three stars")
-	p.stars = 4
-	check(visible(access, "kitchen_solyanka"), "Fourth star introduces solyanka kitchen")
-
-	# Facts and per-player hints survive a feature-access snapshot.
-	access.mark_player_fact(42, "hint:staff_opened")
-	var stored := access.export_state()
-	var restored := FeatureAccess.new()
+	var snapshot := director.snapshot()
+	var original_cafe := director.cafe_id
+	check(not snapshot.has("world_epoch"), "world epoch is not persisted inside feature_progress")
+	var restored := Director.new()
+	service.progression_director = restored
 	restored.setup(service)
-	restored.import_state(stored)
-	check(restored.has_fact("first_clone_created"), "Cafe facts survive save/load snapshot")
-	check(restored.has_player_fact(42, "hint:staff_opened"), "Per-player hint facts survive save/load snapshot")
+	restored.restore(snapshot)
+	check(restored.cafe_id == original_cafe, "cafe id survives save/load")
+	check(restored.is_unlocked("staff_roster") and restored.is_unlocked("video_training") and restored.is_unlocked("group_training"), "monotonic unlocks survive save/load")
+	service.progress.free_workers.clear(); service.progress.next_clone_id = 1
+	restored.reconcile()
+	check(restored.is_unlocked("staff_roster"), "temporary state loss never removes a saved unlock")
 
-	# Every product source consumed by the shop owns a declared feature ID.
-	var all_items: Dictionary = Catalogue.ITEMS.duplicate(true)
+	access.setup(service, restored)
+	access.mark_seen("staff_roster")
+	check(access.has_seen("staff_roster"), "seen is stored per cafe/player UI state")
+
+	var all_items: Dictionary = BaseCatalogue.ITEMS.duplicate(true)
 	all_items.merge(Laboratory.catalogue(), true)
 	all_items.merge(Lounge.shop_items(), true)
-	for id in all_items:
-		var feature_id := str(all_items[id].get("feature", ""))
-		check(not feature_id.is_empty(), "Catalogue item %s declares a feature" % id)
-		check(not FeatureDefinition.definition(feature_id).is_empty(), "Catalogue item %s references a known feature" % id)
-	for action_id in FeatureDefinition.ACTION_FEATURES:
-		var action_feature := FeatureDefinition.feature_for_action(str(action_id))
-		check(not action_feature.is_empty(), "Action %s declares a feature" % action_id)
-		check(not FeatureDefinition.definition(action_feature).is_empty(), "Action %s references a known feature" % action_id)
+	for raw_id in all_items:
+		var item_id := str(raw_id)
+		var features := Catalog.item_features(item_id, all_items[item_id])
+		check(not features.is_empty(), "item %s has access rule" % item_id)
+		for feature_id in features: check(not Catalog.definition(str(feature_id)).is_empty(), "item %s references known feature %s" % [item_id, feature_id])
+	for dish_id in Catalog.RECIPE_FEATURES:
+		check(not Catalog.definition(Catalog.recipe_feature(str(dish_id))).is_empty(), "recipe %s references known feature" % dish_id)
+	for action_id in UiCatalog.ACTION_FEATURES:
+		for feature_id in UiCatalog.action_features(str(action_id)): check(not Catalog.definition(feature_id).is_empty(), "action %s references known feature %s" % [action_id, feature_id])
 
 	service.queue_free()
-	print("PASS: unified feature access progression" if failures == 0 else "FAILURES: %d" % failures)
+	print("PASS: unified feature access contract" if failures == 0 else "FAILURES: %d" % failures)
 	quit(0 if failures == 0 else 1)
