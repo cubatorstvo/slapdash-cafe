@@ -3,6 +3,10 @@ const Legacy = preload("res://scripts/cafe_journey.gd")
 
 static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
 	if p.stars >= 1 and p.journey_auto_served < 1:
+		if p.lab_stage < 3:
+			var lab_step: Dictionary = Legacy.buy(p, "lab_%d" % p.lab_stage, 0, "Лаборатория открылась после первой звезды. Собери её, чтобы перейти к базовому выращиванию.")
+			lab_step.chapter = "БАЗОВОЕ ВЫРАЩИВАНИЕ · 1★"
+			return lab_step
 		var production: Array = []
 		for station in stations:
 			if not station.manual_station and not station.masterclass_station: production.append(station)

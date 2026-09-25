@@ -37,8 +37,17 @@ func click_control(game, side: int, control: Control) -> void:
 	game.cookbook._input(up)
 
 func set_stars(game, stars: int) -> void:
-	game.service.progress.stars = stars
-	game.service.feature_access.refresh_facts()
+	var p = game.service.progress
+	p.stars = stars
+	if stars >= 1:
+		p.cafe_inaugurated = true
+		p.tutorial_served = ["sausage", "potato", "wine"]
+		p.lab_stage = 3
+		p.next_clone_id = maxi(p.next_clone_id, 2)
+	if stars >= 2: p.expanded = true
+	if stars >= 3: p.specialized_expanded = true
+	if stars >= 4: p.orchestration_expanded = true
+	game.service._refresh_progression()
 
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
@@ -66,14 +75,15 @@ func run() -> void:
 	check(game.cookbook.physical.surfaces[0].visible and game.cookbook.physical.surfaces[1].visible, "Both readable surfaces stay visible at 0.05 seconds")
 	check(game.cookbook.physical.page_turn_mesh.visible, "Dedicated page-turn leaf animates separately")
 	var right = game.cookbook.physical.pages[1]
-	check(right.find_button("вина") != null and right.find_button("картофель") != null and right.find_button("Сосиска") != null, "Starter contents lists introduced recipes")
+	check(right.find_button("Сосиска") != null, "Fresh-cafe contents lists the introduced sausage recipe")
+	check(right.find_button("вина") == null and right.find_button("картофель") == null, "Potato and wine stay hidden until their starter steps")
 	check(right.find_button("Стейк") == null and right.find_button("Бургер") == null and right.find_button("Солянка") == null, "Future recipes are hidden by FeatureAccess")
 	game.cookbook.select("solyanka")
 	check(game.cookbook.recipe == "index", "Hidden direct recipe request falls back to contents")
-	var wine: Button = right.find_button("вина")
-	click_control(game, 1, wine)
+	var sausage: Button = right.find_button("Сосиска")
+	click_control(game, 1, sausage)
 	await process_frame
-	check(game.cookbook.recipe == "wine", "Visible recipe remains mouse-clickable")
+	check(game.cookbook.recipe == "sausage", "Visible starter recipe remains mouse-clickable")
 	await create_timer(0.25).timeout
 	check(game.cookbook.physical.surfaces[0].visible and game.cookbook.physical.surfaces[1].visible, "Both readable surfaces stay visible after 0.3 seconds")
 	check(not game.cookbook.physical.page_turn_mesh.visible, "Turn leaf hides after its own lifetime")

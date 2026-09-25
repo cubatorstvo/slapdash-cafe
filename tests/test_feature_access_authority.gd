@@ -8,6 +8,7 @@ class FakeProgress extends RefCounted:
 	var day := 1
 	var feature_progress: Dictionary = {}
 	var world_epoch := "local-epoch"
+	var cafe_inaugurated := false
 	var stars := 0
 	var cash := 20
 	var manual_served := 0

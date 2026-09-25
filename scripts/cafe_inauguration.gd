@@ -1,9 +1,9 @@
 extends Node3D
 ## One-time world interaction that opens a brand-new cafe before the first guest.
-const INTRO_DISH := "potato"
+const INTRO_DISH := "sausage"
 const INTERACTION_RADIUS := 4.5
 const INTRO_ORDER_DELAY := 0.35
-const HOLD_BACK_CHEF_ORDERS := 3600.0
+const HOLD_BACK_ORDERS := 3600.0
 var retry_clock := 0.0
 var migrated := false
 
@@ -34,7 +34,7 @@ func _ensure_intro_equipment(game: Node3D) -> void:
 	var station: Node3D = game.service.by_id(1)
 	if station == null or not station.manual_station: return
 	var changed := false
-	for item in ["pan", "plates", "rag"]:
+	for item in ["sauce", "plates", "rag"]:
 		if item not in station.equipment:
 			station.equipment.append(item)
 			changed = true
@@ -67,6 +67,7 @@ func _finish_intro_gate(game: Node3D) -> void:
 	var p = game.service.progress
 	if not p.inauguration_first_service_pending: return
 	p.inauguration_first_service_pending = false
+	game.service.spawn_clock = p.arrival_interval()
 	game.service.chef_order_clock = p.chef_order_delay(game.service.rng)
 	p.revision += 1
 	game.save_cafe()
@@ -74,7 +75,8 @@ func _finish_intro_gate(game: Node3D) -> void:
 func _advance_host_intro(game: Node3D, delta: float) -> void:
 	var p = game.service.progress
 	if not p.inauguration_first_service_pending: return
-	game.service.chef_order_clock = maxf(game.service.chef_order_clock, HOLD_BACK_CHEF_ORDERS)
+	game.service.spawn_clock = maxf(game.service.spawn_clock, HOLD_BACK_ORDERS)
+	game.service.chef_order_clock = maxf(game.service.chef_order_clock, HOLD_BACK_ORDERS)
 	if p.starter_reward or p.manual_served > 0:
 		_finish_intro_gate(game)
 		return
@@ -124,10 +126,12 @@ func _host_inaugurate(peer: int) -> void:
 	p.shift = "open"
 	p.shift_elapsed = 0.0
 	game.service.open_for_business = true
-	game.service.spawn_clock = p.arrival_interval()
-	game.service.chef_order_clock = HOLD_BACK_CHEF_ORDERS
+	game.service.spawn_clock = HOLD_BACK_ORDERS
+	game.service.chef_order_clock = HOLD_BACK_ORDERS
 	p.revision += 1
 	visible = false
+	game.service.progression_director.observe("cafe_opened", {"day":p.day})
+	game.service._refresh_progression()
 	_spawn_intro_guest(game)
 	retry_clock = INTRO_ORDER_DELAY
 	game.service.trace("cafe_inaugurated", {"day": p.day, "peer": peer})

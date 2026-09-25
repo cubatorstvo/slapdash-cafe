@@ -1,5 +1,7 @@
 extends "res://scripts/cafe_shop_core.gd"
 
+const STARTER_EQUIPMENT := ["sauce", "plates", "pan", "jug", "cup"]
+
 func _feature_access():
 	return game.service.feature_access if game != null and is_instance_valid(game.service) else null
 
@@ -11,6 +13,12 @@ func _access_error(state: Dictionary) -> String:
 	if access == null or bool(state.get("enabled", state.get("allowed", false))): return ""
 	var reason: String = str(access.reason_text(state))
 	return reason if not reason.is_empty() else "Эта покупка пока недоступна."
+
+func reward_sauce() -> void:
+	var p = game.service.progress
+	if p.starter_reward: return
+	p.starter_reward = true
+	p.revision += 1
 
 func type_available(type_id: String) -> bool:
 	if not super(type_id): return false
@@ -28,6 +36,20 @@ func order(item: String, station_id: int) -> String:
 	var result: String = super(item, station_id)
 	if result.is_empty() and game.service.has_method("_refresh_progression"): game.service._refresh_progression()
 	return result
+
+func _install_parcel(parcel: Dictionary, by_workers := false) -> String:
+	var station_id := int(parcel.get("station", 0))
+	var items: Array = parcel.get("items", [parcel.get("item", "")]).duplicate()
+	var result: String = super(parcel, by_workers)
+	if not result.is_empty(): return result
+	if station_id == 1:
+		for raw_item in items:
+			var item := str(raw_item)
+			if item in STARTER_EQUIPMENT:
+				game.service.progression_director.observe("starter_equipment_installed", {"item":item,"station_id":station_id})
+				break
+	game.service._refresh_progression()
+	return ""
 
 func order_bundle(items: Array, station_id: int) -> String:
 	var access = _feature_access()

@@ -1,5 +1,5 @@
 extends SceneTree
-## Current first-star regression: personal chef orders, preparation gate, tasting retry and clone unlock.
+## Stage 5.1 regression: ribbon gate -> sausage -> delivered gear -> potato -> wine -> 15 manual orders -> 1★.
 const Scene = preload("res://scenes/cafe.tscn")
 const Progress = preload("res://scripts/cafe_progression.gd")
 var failures := 0
@@ -38,58 +38,124 @@ func ready_food(model, dish: String) -> void:
 		model.elevations.sausage = model.Layout.TRAY_Y - model.BASE_Y + 0.035
 	check(model.quality().present and model.quality().grade in ["B","A","S"], "Prepared fixture " + dish)
 
+func clear_serving(service, station) -> void:
+	station.state = "idle"
+	station.customer_id = -1
+	for customer in service.customers:
+		if is_instance_valid(customer.get("view")): customer.view.queue_free()
+	service.customers.clear()
+
+func serve_manual(service, station, dish: String) -> void:
+	check(service.spawn_customer(dish, false, true), "Chef accepts manual order " + dish)
+	check(service.request_manual(station, dish, 1), "Chef starts manual order " + dish)
+	ready_food(station.model, dish)
+	station.training.advance(DT)
+	station.training.finish_pass(true)
+	clear_serving(service, station)
+
+func install_ordered(game, item: String) -> void:
+	var p = game.service.progress
+	var before_history := p.delivery_history.size()
+	check(game.shop.order(item, 1).is_empty(), "Order starter equipment " + item)
+	check(not p.deliveries.is_empty(), "Delivery exists for " + item)
+	if p.deliveries.is_empty(): return
+	var parcel: Dictionary = p.deliveries.back()
+	parcel.remaining = 0.0
+	check(game.shop._install_parcel(parcel).is_empty(), "Player installs starter equipment " + item)
+	check(p.delivery_history.size() == before_history + 1, "Installation is recorded for " + item)
+
 func run() -> void:
 	var game = Scene.instantiate()
 	root.add_child(game)
+	await process_frame
 	await process_frame
 	game.set_physics_process(false)
 	var service = game.service
 	var p = service.progress
 	var first = service.by_id(1)
+	var access = service.feature_access
 
-	print("[1/4] Opening personal chef order")
-	check(first.manual_station and first.equipment == ["rag"] and p.stars == 0, "New campaign starts at the manual counter")
-	first.equipment = ["jug","cup","plates","pan","sauce","rag"]
-	first.apply_equipment()
-	check(service.spawn_customer("sausage", false, true), "Personal chef order is accepted")
-	check(service.request_manual(first, "sausage", 1), "Chef can start the queued personal order")
-	ready_food(first.model, "sausage")
-	first.training.advance(DT)
-	first.training.finish_pass(true)
-	check(p.manual_served == 1 and service.served == 1, "A completed chef order counts as manual service")
-	# Eating animation is unrelated to the preparation gate; clear it for this focused progression test.
-	first.state = "idle"
-	first.customer_id = -1
-	service.customers.clear()
+	print("[1/5] New cafe and first real serving")
+	check(first.manual_station and p.stars == 0 and p.lab_stage == 0, "New campaign starts manual with no laboratory")
+	check("sauce" in first.equipment and "plates" in first.equipment and "rag" in first.equipment, "Starter counter can really prepare sausage")
+	check("pan" not in first.equipment and "jug" not in first.equipment and "cup" not in first.equipment, "Future dish equipment is not preinstalled")
+	check(p.available_dishes() == ["sausage"], "Only sausage is in the initial menu")
+	check(bool(access.feature_state("dish_sausage").unlocked), "Sausage is introduced at start")
+	check(not bool(access.feature_state("dish_potato").unlocked) and not bool(access.feature_state("dish_wine").unlocked), "Potato and wine stay hidden before their steps")
+	check(not bool(access.feature_state("clone_lab").unlocked), "Laboratory stays hidden before 1★")
+	check(str(preload("res://scripts/cafe_journey.gd").current(p,service.stations,service.served,service.open_for_business,service).key) == "inaugurate", "HUD route starts at the ribbon")
 
-	print("[2/4] First-star preparation gate")
+	# Use the same authoritative state transition as the ribbon after proving the initial gate.
+	p.cafe_inaugurated = true
+	p.inauguration_first_service_pending = true
+	p.shift = "open"
+	service.open_for_business = true
+	service.progression_director.observe(&"cafe_opened")
+	service._refresh_progression()
+	serve_manual(service, first, "sausage")
+	p.inauguration_first_service_pending = false
+	service._refresh_progression()
+	check(p.manual_served == 1 and "sausage" in p.tutorial_served, "First accepted sausage is one manual learning order")
+	check(service.progression_director.has_milestone("first_sausage_served"), "First sausage milestone comes from completed service")
+	check(bool(access.feature_state("dish_potato").unlocked) and not bool(access.feature_state("dish_wine").unlocked), "Successful sausage introduces potato only")
+	check(p.available_dishes() == ["sausage","potato"], "Ordinary menu grows only through potato")
+	check(service.chef_order_recipe() == "sausage", "Without a pan the chef can keep earning on mastered sausage")
+
+	print("[2/5] Delivered equipment introduces potato and wine")
+	p.cash = 300
+	install_ordered(game, "pan")
+	service._refresh_progression()
+	check(service.progression_director.has_milestone("first_equipment_installed"), "First starter-equipment install is a persisted milestone")
+	serve_manual(service, first, "potato")
+	service._refresh_progression()
+	check("potato" in p.tutorial_served and service.progression_director.has_milestone("first_potato_served"), "Real potato service confirms its learning step")
+	check(bool(access.feature_state("dish_wine").unlocked), "Successful potato introduces wine")
+	install_ordered(game, "jug")
+	install_ordered(game, "cup")
+	service._refresh_progression()
+	serve_manual(service, first, "wine")
+	service._refresh_progression()
+	check(["sausage","potato","wine"].all(func(dish): return dish in p.tutorial_served), "All three starter dishes require real successful service")
+	check(p.available_dishes() == ["sausage","potato","wine"], "All starter dishes enter normal flow after introduction")
+	check(not bool(access.feature_state("clone_lab").unlocked) and p.lab_stage == 0, "Three dishes do not reveal or assemble the laboratory before 1★")
+
+	print("[3/5] First-star preparation has no laboratory gate")
 	p.manual_served = 15
-	p.lab_stage = 3
 	p.shift = "morning"
-	check(p.can_attempt(service.stations, service.served), "Fifteen personal services and the completed laboratory unlock tasting")
+	check(p.can_attempt(service.stations, service.served), "Fifteen manual services and three learned dishes unlock tasting without lab")
+	var requirements := p.star_requirements(service.stations, service.served)
+	check(requirements.size() == 2 and requirements.all(func(row): return bool(row.done)), "Zero-star checklist contains only manual work and starter dishes")
 
-	print("[3/4] Tasting retry and three dishes")
+	print("[4/5] Three B+ tasting dishes award 1★")
 	check(service.start_banquet(1).is_empty(), "Invite the first-star taster")
 	service.advance_event(0.0)
 	check(p.phase == "tasting" and first.training.purpose == "tasting", "Tasting starts on the personal counter")
 	var first_dish: String = str(first.training.dish)
 	first.training.advance(DT)
 	first.training.finish_pass(true)
-	check(p.phase == "tasting" and first.training.dish == first_dish and p.tasting_done.is_empty(), "A bad dish retries without failing the whole tasting")
+	check(p.phase == "tasting" and first.training.dish == first_dish and p.tasting_done.is_empty(), "Bad tasting attempt retries without failing the whole inspection")
 	for dish in Progress.DISHES:
 		check(first.training.dish == dish, "Taster requests starter dish " + dish)
 		ready_food(first.model, dish)
 		first.training.advance(DT)
 		first.training.finish_pass(true)
-	check(p.stars == 1 and p.phase == "won" and first.manual_station and first.recipes.is_empty(), "Three B+ dishes award the first star and keep the personal counter manual")
-	check(is_equal_approx(p.lab_formula_tempo,1.0) and p.lab_formula_version>=1,"First star provides the standard 100% clone formula without the improvement minigame")
+	service._refresh_progression()
+	check(p.stars == 1 and p.phase == "won" and p.lab_stage == 0, "Three B+ dishes award first star with laboratory still unassembled")
+	check(service.progression_director.has_milestone("first_star_earned"), "First-star milestone follows the real awarded star")
+	check(bool(access.feature_state("clone_lab").unlocked), "Laboratory is introduced only after 1★")
+	check(not bool(access.feature_state("clone_growth").unlocked), "Clone growth still waits for the laboratory to be assembled")
 
-	print("[4/4] Clone production unlock")
-	var brigade = service.add_station("counter", 1, false, true)
-	check(service.create_clone(1.0, true).is_empty(), "First star permits creating a clone")
-	check(brigade.staffed == 1 and not brigade.manual_station, "Created clone staffs the automatic counter")
+	print("[5/5] Handoff to the laboratory chapter")
+	var next_goal: Dictionary = preload("res://scripts/cafe_journey.gd").current(p,service.stations,service.served,service.open_for_business,service)
+	check(str(next_goal.get("item","")) == "lab_0", "After 1★ the next route starts basic laboratory assembly")
+	var snapshot := service.progression_director.snapshot()
+	var restored = preload("res://scripts/progression/progression_director.gd").new()
+	restored.setup(service)
+	restored.restore(snapshot, true)
+	check(restored.has_milestone("first_sausage_served") and restored.has_milestone("first_star_earned"), "Current-format progression facts survive authoritative save/load")
+	check(restored.is_unlocked("clone_lab") and not restored.is_unlocked("clone_growth"), "Current-format unlock boundary survives authoritative save/load")
 
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: current first-star personal order, tasting and clone unlock" if failures == 0 else "FAILURES: %d" % failures)
+	print("PASS: P5.01 start-to-first-star progression" if failures == 0 else "FAILURES: %d" % failures)
 	quit(0 if failures == 0 else 1)

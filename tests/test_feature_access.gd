@@ -13,6 +13,7 @@ class FakeProgress extends RefCounted:
 	var day := 1
 	var feature_progress: Dictionary = {}
 	var world_epoch := "epoch-a"
+	var cafe_inaugurated := false
 	var stars := 0
 	var cash := 20
 	var manual_served := 0
@@ -67,6 +68,7 @@ func run() -> void:
 	check(Catalog.validate().is_empty(), "feature catalogue validates")
 	check(UiCatalog.validate(Catalog).is_empty(), "UI/action catalogue validates")
 	check(director.is_unlocked("cafe_core") and director.is_unlocked("shop_basic") and director.is_unlocked("stars"), "new cafe has three base systems")
+	check(director.is_unlocked("dish_sausage") and not director.is_unlocked("dish_potato") and not director.is_unlocked("dish_wine"), "new cafe introduces only the first starter dish")
 	check(not director.is_unlocked("clone_lab") and not director.is_unlocked("staff_roster") and not director.is_unlocked("video_recording"), "future systems stay locked on new cafe")
 	var roots := access.visible_entries("")
 	check(roots.size() == 3, "new cafe exposes only Cafe, Shop and Development roots")
@@ -76,17 +78,35 @@ func run() -> void:
 	var unknown := access.check_action("client_says_allowed", {"allowed":true,"stars":99})
 	check(not unknown.allowed and unknown.reason_code == Reasons.UNKNOWN_ACTION, "client-provided decisions cannot invent commands")
 
-	var poor_jug := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":40,"host_required":true,"is_host":true})
-	check(poor_jug.visible and not poor_jug.enabled and poor_jug.reason_code == Reasons.INSUFFICIENT_FUNDS and int(poor_jug.reason_args.missing) == 14, "insufficient funds block without hiding item")
-	var guest_jug := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":100,"host_required":true,"is_host":false})
-	check(guest_jug.visible and not guest_jug.enabled and guest_jug.reason_code == Reasons.HOST_ONLY, "guest can browse but host owns purchase")
+	var hidden_jug := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":999,"host_required":true,"is_host":true})
+	check(not hidden_jug.visible, "future wine equipment stays hidden before wine is introduced")
+	var poor_sauce := access.item_access("sauce", BaseCatalogue.ITEMS.sauce, {"available_funds":20,"host_required":true,"is_host":true})
+	check(poor_sauce.visible and not poor_sauce.enabled and poor_sauce.reason_code == Reasons.INSUFFICIENT_FUNDS and int(poor_sauce.reason_args.missing) == 4, "known starter item stays visible when funds are low")
+	var guest_sauce := access.item_access("sauce", BaseCatalogue.ITEMS.sauce, {"available_funds":100,"host_required":true,"is_host":false})
+	check(guest_sauce.visible and not guest_sauce.enabled and guest_sauce.reason_code == Reasons.HOST_ONLY, "guest can browse introduced goods but host owns purchase")
 
-	service.progress.tutorial_served = ["sausage", "potato", "wine"]
+	service.progress.cafe_inaugurated = true
+	director.observe(&"cafe_opened")
+	check(director.has_milestone("cafe_opened"), "ribbon completion is a persisted domain milestone")
+	service.progress.tutorial_served = ["sausage"]
 	director.migrate_from_game_state(); director.reconcile()
-	check(director.is_unlocked("clone_lab"), "three base dishes introduce laboratory")
+	check(director.is_unlocked("dish_potato") and not director.is_unlocked("dish_wine"), "successful sausage introduces potato only")
+	check(not director.is_unlocked("clone_lab"), "laboratory remains hidden after first dish")
+	service.progress.tutorial_served.append("potato")
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.is_unlocked("dish_wine"), "successful potato introduces wine")
+	service.progress.tutorial_served.append("wine")
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.has_milestone("first_sausage_served") and director.has_milestone("first_potato_served") and director.has_milestone("first_wine_served"), "starter dish facts are persisted independently")
+	check(not director.is_unlocked("clone_lab"), "three base dishes do not introduce laboratory before 1★")
+	var wine_after_intro := access.item_access("jug", BaseCatalogue.ITEMS.jug, {"available_funds":40,"host_required":true,"is_host":true})
+	check(wine_after_intro.visible and not wine_after_intro.enabled and wine_after_intro.reason_code == Reasons.INSUFFICIENT_FUNDS and int(wine_after_intro.reason_args.missing) == 14, "introduced wine equipment remains visible with a concrete funds reason")
+
+	service.progress.stars = 1
+	director.migrate_from_game_state(); director.reconcile()
+	check(director.has_milestone("first_star_earned") and director.is_unlocked("clone_lab"), "real 1★ introduces the laboratory")
 	service.progress.lab_stage = 3
 	service.progress.lab_formula_version = 1
-	service.progress.stars = 1
 	director.migrate_from_game_state(); director.reconcile()
 	check(director.is_unlocked("clone_growth") and not director.is_unlocked("formula_research"), "assembled lab and 1 star unlock standard clone growth while formula improvement stays later")
 	service.progress.next_clone_id = 2
@@ -136,8 +156,9 @@ func run() -> void:
 	var restored := Director.new()
 	service.progression_director = restored
 	restored.setup(service)
-	restored.restore(snapshot)
+	restored.restore(snapshot, true)
 	check(restored.cafe_id == original_cafe, "cafe id survives save/load")
+	check(restored.has_milestone("cafe_opened") and restored.has_milestone("first_star_earned"), "early progression milestones survive current-format save/load")
 	check(restored.is_unlocked("staff_roster") and restored.is_unlocked("live_training") and restored.is_unlocked("video_recording") and restored.is_unlocked("video_training") and restored.is_unlocked("group_training"), "monotonic learning unlocks survive save/load")
 	service.progress.free_workers.clear(); service.progress.next_clone_id = 1
 	restored.reconcile()
