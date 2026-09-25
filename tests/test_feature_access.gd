@@ -139,7 +139,10 @@ func run() -> void:
 	service.stations = [{"manual_station":false,"masterclass_station":false,"type_id":"counter"},{"manual_station":false,"masterclass_station":false,"type_id":"counter"}]
 	director.observe(&"video_training_completed", {"station_count":1})
 	director.migrate_from_game_state(); director.reconcile()
-	check(director.is_unlocked("group_training"), "completed video training plus compatible tables unlock group training")
+	check(not director.is_unlocked("group_training"), "completed video training alone does not unlock group training")
+	director.observe(&"video_trained_auto_served", {"station_id":2,"dish":"sausage"})
+	director.reconcile()
+	check(director.is_unlocked("group_training"), "completed video training, its automatic serving and compatible tables unlock group training")
 	var two_tables_after := access.check_action("buy_station_batch", {"items":[{"item_id":"counter","spec":BaseCatalogue.ITEMS.counter}],"station_ids":[2,3],"available_funds":999})
 	check(two_tables_after.allowed, "multi-table batch becomes valid after group training unlock")
 
