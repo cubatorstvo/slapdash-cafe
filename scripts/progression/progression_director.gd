@@ -40,6 +40,10 @@ func migrate_from_game_state() -> void:
 		for dish in STARTER_DISHES:
 			if dish in tutorial: changed = _record_milestone("first_%s_served" % dish, {"dish":dish}, false) or changed
 	if int(p.get("stars")) >= 1: changed = _record_milestone("first_star_earned", {"stars":int(p.get("stars"))}, false) or changed
+	if int(p.get("lab_stage")) >= 3 and int(p.get("lab_formula_version")) > 0 and float(p.get("lab_formula_tempo")) >= 1.0: changed = _record_milestone("standard_formula_available", {"tempo":float(p.get("lab_formula_tempo")),"version":int(p.get("lab_formula_version"))}, false) or changed
+	var created_count := maxi(0, int(p.get("next_clone_id")) - 1)
+	if created_count >= 1: changed = _record_milestone("first_manual_clone_growth_completed", {"count":created_count}, false) or changed
+	if created_count >= 2: changed = _record_milestone("repeat_manual_clone_growth_completed", {"count":created_count}, false) or changed
 	var history: Variant = p.get("delivery_history")
 	if history is Array and _starter_equipment_was_installed(history): changed = _record_milestone("first_equipment_installed", {}, false) or changed
 	if changed:
@@ -61,6 +65,8 @@ func _starter_equipment_was_installed(history: Array) -> bool:
 func _milestone_for_event(event_id: String, payload: Dictionary) -> String:
 	if event_id == "cafe_opened": return "cafe_opened"
 	if event_id == "starter_equipment_installed": return "first_equipment_installed"
+	if event_id == "standard_formula_available": return "standard_formula_available"
+	if event_id == "manual_clone_growth_completed": return "first_manual_clone_growth_completed" if int(payload.get("ordinal", 0)) <= 1 else "repeat_manual_clone_growth_completed"
 	if event_id == "starter_dish_served":
 		var dish := str(payload.get("dish", ""))
 		return "first_%s_served" % dish if dish in STARTER_DISHES else ""
@@ -69,5 +75,7 @@ func _milestone_for_event(event_id: String, payload: Dictionary) -> String:
 func _event_is_confirmed(event_id: String, payload: Dictionary) -> bool:
 	if event_id == "cafe_opened": return service != null and service.get("progress") != null and bool(service.progress.get("cafe_inaugurated"))
 	if event_id == "starter_equipment_installed": return int(payload.get("station_id", 0)) == 1 and str(payload.get("item", "")) in STARTER_EQUIPMENT
+	if event_id == "standard_formula_available": return service != null and service.get("progress") != null and int(service.progress.get("lab_stage")) >= 3 and int(service.progress.get("lab_formula_version")) > 0 and float(service.progress.get("lab_formula_tempo")) >= 1.0
+	if event_id == "manual_clone_growth_completed": return int(payload.get("clone_id", 0)) > 0 and int(payload.get("ordinal", 0)) > 0
 	if event_id == "starter_dish_served": return int(payload.get("station_id", 0)) == 1 and str(payload.get("dish", "")) in STARTER_DISHES
 	return super(event_id, payload)
