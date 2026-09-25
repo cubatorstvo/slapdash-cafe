@@ -28,7 +28,7 @@ func start_highlights(id: int, peer: int) -> String:
 
 func create_clone(tempo := 1.0, prepaid := false) -> String:
 	var clone_id := int(progress.next_clone_id)
-	var manual_growth := progress.stars == 1 and "lab_production" not in progress.lab_upgrades
+	var manual_growth: bool = progress.stars == 1 and "lab_production" not in progress.lab_upgrades
 	var result: String = super(tempo, prepaid)
 	if result.is_empty() and manual_growth:
 		progression_director.observe("manual_clone_growth_completed", {"clone_id":clone_id,"ordinal":clone_id,"tempo":tempo})
