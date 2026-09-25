@@ -45,9 +45,15 @@ func order(item: String, station_id: int) -> String:
 
 func _install_parcel(parcel: Dictionary, by_workers := false) -> String:
 	var station_id := int(parcel.get("station", 0))
-	var items: Array = parcel.get("items", [parcel.get("item", "")]).duplicate()
+	var item_id := str(parcel.get("item", ""))
+	var items: Array = parcel.get("items", [item_id]).duplicate()
+	var station_delivery := ITEMS.has(item_id) and str(ITEMS[item_id].get("kind", "")) == "station"
 	var result: String = super(parcel, by_workers)
 	if not result.is_empty(): return result
+	if station_delivery:
+		var installed_station = game.service.by_id(station_id)
+		if installed_station != null and not installed_station.manual_station:
+			game.service.progression_director.observe("production_station_installed", {"station_id":station_id,"type_id":str(installed_station.type_id)})
 	if station_id == 1:
 		for raw_item in items:
 			var item := str(raw_item)

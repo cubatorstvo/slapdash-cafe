@@ -1,5 +1,5 @@
 extends "res://scripts/progression/feature_catalog_legacy.gd"
-## Stage 5.1 keeps the shared catalog and narrows only the first-game unlock gates.
+## Stage 5.1 narrows the first-game unlock gates; stage 5.2 continues the 1★ clone route.
 
 static func definition(feature_id: String) -> Dictionary:
 	var normalized := normalize_feature_id(feature_id)
@@ -15,4 +15,7 @@ static func definition(feature_id: String) -> Dictionary:
 		"clone_lab":
 			result.min_stars = 1
 			result.requires_milestones = ["first_star_earned"]
+		"rest_basics":
+			result.min_stars = 1
+			result.requires_milestones = ["first_clone_created"]
 	return result
