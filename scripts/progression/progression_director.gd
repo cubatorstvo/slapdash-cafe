@@ -52,14 +52,16 @@ func migrate_from_game_state() -> void:
 		_publish_to_progress()
 		progression_changed.emit([])
 
+
 func _restore_compatibility_unlocks() -> void:
 	super()
 	# Current-format P5.3 progression is action-driven. Legacy compatibility may keep already
 	# installed content visible, but it must not introduce future systems from UI setup alone.
-	if not has_milestone("first_video_trained_auto_served"): unlocked_features.erase("group_training")
+	if not (has_milestone("first_video_training_completed") and has_milestone("first_video_trained_auto_served") and has_milestone("two_compatible_stations_seen")): unlocked_features.erase("group_training")
 	if not has_milestone("first_group_training_completed"):
 		unlocked_features.erase("formula_research")
 		unlocked_features.erase("formula_upgrades")
+	if not has_milestone("formula_improvement_relevant"): unlocked_features.erase("recalibration")
 	if not has_milestone("first_group_trained_auto_served") and not bool(service.progress.get("expanded")): unlocked_features.erase("kitchen_pair")
 	if not has_milestone("first_pair_kitchen_auto_served") and not bool(service.progress.get("specialized_expanded")): unlocked_features.erase("kitchen_specialty")
 	if not has_milestone("first_specialty_kitchen_auto_served") and not bool(service.progress.get("orchestration_expanded")): unlocked_features.erase("kitchen_orchestration")
