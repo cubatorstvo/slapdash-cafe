@@ -14,7 +14,9 @@ func _p5_station_has_current_method(station, dish: String, require_b_plus := tru
 	if not station.recipes.has(dish) or not station.missing_recipe_equipment(dish).is_empty(): return false
 	var source: Dictionary = station.method_sources.get(dish, {}) if station.method_sources.get(dish, {}) is Dictionary else {}
 	var clone_ids: Variant = source.get("clone_ids", [])
-	if not clone_ids is Array or clone_ids.is_empty(): return false
+	if not clone_ids is Array or clone_ids.size() != station.role_count(): return false
+	for role in range(station.role_count()):
+		if role >= station.crew.size() or int(station.crew[role].get("clone_id", 0)) <= 0 or int(clone_ids[role]) != int(station.crew[role].get("clone_id", 0)): return false
 	var report: Dictionary = station.recipes.get(dish, {}).get("quality", {})
 	if not bool(report.get("present", false)): return false
 	return not require_b_plus or str(report.get("grade", "D")) in ["B", "A", "S"]
