@@ -2,6 +2,22 @@ extends "res://scripts/progression/feature_access_core.gd"
 
 var _retired_generations: Dictionary = {}
 
+func _milestone_hint(milestone_id: String) -> String:
+	var hints := {
+		"first_sausage_served":"Обслужить первый заказ сосиски",
+		"first_potato_served":"Обслужить первый заказ картофеля",
+		"first_star_earned":"Получить первую звезду",
+		"repeat_manual_clone_growth_completed":"Завершить два ручных выращивания",
+		"first_video_trained_auto_served":"Получить автоподачу от обученного по видео состава",
+		"first_group_training_completed":"Обучить минимум два стола одним просмотром",
+		"first_group_trained_auto_served":"Получить автоподачу после группового просмотра",
+		"first_recalibration_completed":"Реально повысить темп работника рекалибровкой",
+		"first_pair_kitchen_auto_served":"Получить автоподачу парной кухни",
+		"first_specialty_kitchen_auto_served":"Получить автоподачу бургерной",
+		"first_solyanka_auto_served":"Получить автоподачу солянки",
+	}
+	return str(hints[milestone_id]) if hints.has(milestone_id) else super(milestone_id)
+
 func setup(owner_service: Node, director = null) -> void:
 	_retired_generations.clear()
 	super(owner_service, director)

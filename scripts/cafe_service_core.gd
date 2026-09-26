@@ -1670,6 +1670,8 @@ func advance_event(delta: float) -> void:
 func finish_banquet(won: bool, reason := "") -> void:
 	if not progress.busy(): return
 	var attempted_from_star: int = progress.stars
+	if won and attempted_from_star == 4:
+		won = progress.phase == "service" and progress.banquet_served >= progress.FINAL_INSPECTION_SERVED and progress.banquet_good >= progress.FINAL_INSPECTION_GOOD
 	var served_target: int = progress.inspection_served_target()
 	var good_target: int = progress.inspection_good_target()
 	var event_name: String = progress.inspection_name()
@@ -1683,7 +1685,7 @@ func finish_banquet(won: bool, reason := "") -> void:
 		progress.stars = 2
 		progress.cash += 200
 		progress.third_star_auto_served = 0
-		progress.result = "Вторая звезда! +200. Открыты расширение зала и кухня «Мясо и макароны»."
+		progress.result = "Вторая звезда! +200. Теперь можно снимать мастер-классы и обучать по видео."
 	elif won and attempted_from_star == 2:
 		progress.stars = 3
 		progress.cash += Progression.BIG_LUNCH_REWARD
@@ -1697,7 +1699,11 @@ func finish_banquet(won: bool, reason := "") -> void:
 		progress.fifth_star_solyanka_served = 0
 		progress.result = "Четвёртая звезда! +%d. Открыт сектор оркестрации и кухня «Солянка» на три роли." % Progression.FOURTH_STAR_REWARD
 	elif won and attempted_from_star == 4:
-		progress.result = "День пяти звёзд завершён успешно. Каркас финальной смены работает; итоговая шкала и выдача 5★ подключаются следующим этапом."
+		progress.stars = 5
+		progress.campaign_result = load("res://scripts/campaign_summary.gd").capture(self)
+		progress.result = "Пять звёзд! Кампания завершена. Можно продолжать работу и улучшать кафе."
+		if game != null and is_instance_valid(game.get("office")):
+			game.office.call_deferred("show_campaign_result")
 	elif not won and attempted_from_star == 0:
 		progress.result = reason + " Можно пригласить дегустатора снова бесплатно."
 	else:
@@ -2126,10 +2132,8 @@ func finish_manual(station: Node3D, report: Dictionary) -> void:
 			station.finish_taster(false)
 			progress.stars = 1
 			progress.cash += 120
-			progress.lab_formula_tempo=1.0
-			progress.lab_formula_version=maxi(1,progress.lab_formula_version)
 			progress.phase = "won"
-			progress.result = "Первая звезда! +120. Лаборатория получила стандартную формулу 100%: вырасти клона, поставь его за производственную стойку и позови на личный урок у Шефа."
+			progress.result = "Первая звезда! +120. Собери базовую лабораторию: она даст стандартную формулу 100%. Затем вырасти первого помощника."
 			progress.revision += 1
 			open_for_business = progress.return_open
 			announce(progress.result)

@@ -123,6 +123,7 @@ func run()->void:
 	service.rebuild_station_binding(station_a.station_id,"sausage")
 	check(int(service.execution_record(station_a).get("method_id",0))==pinned_method,"Retraining cannot replace the method of an already accepted order")
 	check(int(station_a.recipes.get("sausage",{}).get("method_id",0))==pinned_method,"Runtime recipe cache also stays pinned until the accepted order ends")
+	service._count_completed_customer(fake_order,station_a)
 	service._release_order_station(station_a,4242)
 	check(int(station_a.recipes.get("sausage",{}).get("method_id",0))==replacement_method,"Next order uses the newly accepted skill after the pinned order ends")
 	old_method=replacement_method
@@ -157,7 +158,10 @@ func run()->void:
 	check(clone_b in learned and str(after_video.get("source",{}).get("kind",""))=="video","Completed film teaches only the attending clone")
 	check(service.clone_skill(999,"counter","sausage","cook").is_empty(),"Absent replacement clone receives no video skill")
 	service._refresh_progression()
-	check(bool(service.feature_state("group_training").get("unlocked",false)),"Mass assignment follows the first completed video lesson when compatible tables exist")
+	check(not bool(service.feature_state("group_training").get("unlocked",false)),"Completed viewing alone does not open mass assignment")
+	service._count_completed_customer({"dish":"sausage","automatic_serving":true},station_b)
+	service._refresh_progression()
+	check(bool(service.feature_state("group_training").get("unlocked",false)),"Mass assignment follows completed viewing and real automatic service with compatible tables")
 
 	var team=service.add_station("kitchen",3,false,true)
 	team.equipment=["meat_kit","pasta_kit"]; team.apply_equipment()

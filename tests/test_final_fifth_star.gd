@@ -70,22 +70,55 @@ func run() -> void:
 	p.fifth_star_auto_served=p.FIFTH_STAR_AUTO_SERVED
 	var live_solyanka=service.add_station("solyanka_kitchen",5,false)
 	live_solyanka.staffed=3
+	live_solyanka.equipment=["fire_kit","stir_kit","salt_kit"]
+	live_solyanka.apply_equipment()
+	for role in range(3): live_solyanka.crew[role].clone_id = 101 + role
+	live_solyanka.method_sources.solyanka = {"clone_ids":[101,102,103]}
 	live_solyanka.recipes.solyanka={"quality":{"present":true,"grade":"B"}}
-	check(service.start_banquet(1).is_empty(),"Host can launch Day of Five Stars")
+	var start_error: String = service.start_banquet(1)
+	check(start_error.is_empty(),"Host can launch Day of Five Stars: " + start_error)
 	check(p.phase=="preparing" and p.orders.size()==p.FINAL_INSPECTION_GUESTS,"Launch freezes ordinary business and prepares all final orders")
 	service.advance_event(0.1)
 	check(p.phase=="service","Final day enters timed service after stations are free")
 	check(is_equal_approx(p.remaining,p.FINAL_INSPECTION_SECONDS),"Final day owns an independent event timer")
 
-	print("4/4: failure is retryable and stage 1 does not prematurely award the fifth star")
+	print("4/4: failure, real threshold award, immutable result and save/load")
 	service.finish_banquet(false,"Тестовый провал.")
-	check(p.phase=="lost" and p.stars==4,"Failure keeps the fourth star and ends the event cleanly")
-	check(p.can_attempt(service.stations,service.served),"Failed final day can be retried immediately when preparation remains valid")
-	check(service.start_banquet(1).is_empty(),"Retry starts through the same event path")
+	check(p.phase=="lost" and p.stars==4,"Failure keeps 4★")
+	check(service.start_banquet(1).is_empty(),"Retry is free")
+	service.advance_event(0.0)
 	service.finish_banquet(true)
-	check(p.phase=="won" and p.stars==4,"Stage 1 success freezes the event result without awarding 5★ before the scoring/ending stages")
-	check(p.result.contains("итоговая шкала"),"Temporary success text makes the unfinished score layer explicit")
+	check(p.stars==4 and p.campaign_result.is_empty(),"Success flag without real totals cannot award 5★")
+	check(service.start_banquet(1).is_empty(),"Second retry starts normally")
+	service.advance_event(0.0)
+	p.banquet_finished=p.FINAL_INSPECTION_GUESTS
+	p.banquet_served=p.FINAL_INSPECTION_SERVED
+	p.banquet_good=p.FINAL_INSPECTION_GOOD
+	service.served=123; service.revenue=4567; p.cash=890
+	service.advance_event(0.0)
+	await process_frame
+	check(p.phase=="won" and p.stars==5,"Existing event evaluator awards 5★ at the exact thresholds")
+	check(p.campaign_result.guests_served==123 and p.campaign_result.order_revenue==4567,"Campaign result uses cumulative guest/revenue totals")
+	check(game.office.opened() and game.office.tab=="star","Completion opens its result once")
+	var result_panel = game.office.content.get_node("CampaignResult")
+	check(result_panel != null,"Result is mounted from its UI scene")
+	result_panel.get_node("Margin/Column/Continue").pressed.emit()
+	check(not game.office.opened() and p.stars==5 and p.cash==890,"Continue returns to cafe and retains star/cash")
+	var earned: Dictionary=p.campaign_result.duplicate(true)
+	service.served+=1; service.revenue+=25; p.cash+=25
+	service.finish_banquet(true)
+	check(p.campaign_result==earned,"Completed event cannot re-award or rewrite final totals")
+	var save: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
+	check(service.load_data(save),"Completed cafe saves and loads")
+	await process_frame
+	p=service.progress
+	check(p.stars==5 and p.cash==915 and service.revenue==4592 and p.campaign_result==earned,"Save preserves 5★, continuing income and frozen campaign result")
+	check(not game.office.opened(),"Loading completed cafe does not force result popup")
+	game.office.open("star")
+	check(game.office.content.get_node_or_null("CampaignResult")!=null,"Result can be reopened from Development")
+	check(not p.can_attempt(service.stations,service.served),"There is no sixth required chapter")
+
 	game._shutdown_tree(game)
 	game.free()
-	print("PASS: final fifth-star day structural framework" if failures==0 else "FAILURES: %d"%failures)
+	print("PASS: final fifth-star campaign completion" if failures==0 else "FAILURES: %d"%failures)
 	quit(0 if failures==0 else 1)

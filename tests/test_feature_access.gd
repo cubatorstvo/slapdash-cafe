@@ -124,13 +124,14 @@ func run() -> void:
 	director.reconcile()
 	check(not director.is_unlocked("video_recording"), "accepted personal lesson does not unlock filming before 2★")
 	service.progress.stars = 2
+	director.observe(&"auto_served", {"station_id":2,"dish":"sausage"})
 	director.reconcile()
 	check(director.is_unlocked("video_recording"), "2★ introduces filming after a real personal lesson")
 	director.observe(&"masterclass_saved", {"record_id":1})
 	check(director.is_unlocked("video_training"), "saved post-2★ masterclass unlocks single-viewer video training")
 	var tv_after := access.item_access("rest_television", Lounge.shop_items().rest_television, {"available_funds":999})
 	check(tv_after.visible and tv_after.enabled, "television becomes buyable without requiring Rest unlock")
-	check(not director.is_unlocked("rest_basics"), "television availability does not create Rest cycle")
+	check(Catalog.item_features("rest_television", Lounge.shop_items().rest_television) == ["video_training"], "television has no rest feature dependency")
 
 	var one_table := access.check_action("buy_station_batch", {"items":[{"item_id":"counter","spec":BaseCatalogue.ITEMS.counter}],"station_ids":[2],"available_funds":999})
 	check(one_table.allowed, "single production table batch does not require group training")
