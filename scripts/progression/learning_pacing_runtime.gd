@@ -32,6 +32,9 @@ func _process(_delta:float)->void:
 	_collect(snap)
 	if current.is_empty() and not pending.is_empty(): current=pending.pop_front(); queued.erase(str(current.get("id",""))); _save()
 	if current.is_empty() or not Core.can_present(_state()): panel.hide(); return
+	# The main task can wrap; keep the secondary explanation below its actual bounds.
+	if is_instance_valid(game.get("hud")) and is_instance_valid(game.hud.top):
+		panel.position.y = game.hud.top.get_global_rect().end.y + 16.0
 	title.text=str(current.get("title","Новая возможность")); body.text=str(current.get("text",""))+"\nF1 — понятно"; panel.show()
 
 func _unhandled_input(event:InputEvent)->void:
@@ -77,8 +80,17 @@ func _bind_cafe(next_cafe:String,snap:Dictionary)->void:
 
 func _collect(snap:Dictionary)->void:
 	var added:=false
+	var sets := Core.snapshot_sets(snap)
+	# Facts can advance while the player is cooking or the computer is open.
+	# Retire completed instructions before showing any queued explanation, including after reload.
+	if not current.is_empty() and not Core.applicable(current,sets):
+		seen[str(current.id)]=true; current.clear(); panel.hide(); added=true
+	for index in range(pending.size()-1,-1,-1):
+		if Core.applicable(pending[index],sets): continue
+		var id:=str(pending[index].id)
+		seen[id]=true; queued.erase(id); pending.remove_at(index); added=true
 	for definition in Core.collect_new(snap,known,seen,queued): _enqueue(definition); added=true
-	known=Core.snapshot_sets(snap)
+	known=sets
 	if added: _save()
 
 func _enqueue(definition:Dictionary)->void:
@@ -91,21 +103,24 @@ func _state()->Dictionary:
 	var active:=false; var teaching:=false
 	if is_instance_valid(station):
 		var training:Variant=station.get("training")
-		if training!=null and training.has_method("active"): active=bool(training.call("active")); teaching=active and str(training.get("purpose"))=="lesson"
+		if training!=null and training.has_method("active"): active=bool(training.call("active")); teaching=active and str(training.get("purpose")) in ["lesson","live_lesson","masterclass"]
 	var session:Variant=game.get("session")
 	var sleeping:bool=is_instance_valid(session) and ((session.has_method("local_sleeping") and bool(session.call("local_sleeping"))) or (session.has_method("sleep_scene_active") and bool(session.call("sleep_scene_active"))))
 	var service:Variant=game.get("service"); var inspection:=false
 	if is_instance_valid(service) and service.get("progress")!=null:
-		var visit:Variant=service.get("progress").get("visit"); inspection=visit is Dictionary and str(visit.get("phase",""))=="active"
+		var visit:Variant=service.get("progress").get("visit")
+		inspection=service.progress.busy() or (visit is Dictionary and str(visit.get("phase",""))=="active")
+		if is_instance_valid(service.live_training) and service.live_training.is_active() and is_instance_valid(session):
+			teaching=teaching or service.live_training.teacher_peer==session.local_id()
 	var hud:Variant=game.get("hud"); var notice:Variant=hud.get("notice") if is_instance_valid(hud) else null
 	var urgent:bool=is_instance_valid(notice) and not str(notice.get("text")).strip_edges().is_empty()
 	return {"ui_mode":"world" if UiMode.resolve(game)==UiMode.WORLD else "busy","input_blocked":bool(game.call("input_blocked")) if game.has_method("input_blocked") else false,"holding_item":not str(game.get("anchored_item")).is_empty() if _has_property(game,"anchored_item") else false,"cooking":active and not teaching,"teaching":teaching,"confirming":bool(game.call("awaiting_serving_confirmation")) if game.has_method("awaiting_serving_confirmation") else false,"inspection":inspection,"sleep":sleeping,"urgent_notice":urgent}
 
 func _build_overlay()->void:
 	var layer:=CanvasLayer.new(); layer.layer=20; add_child(layer)
-	panel=PanelContainer.new(); panel.set_anchors_preset(Control.PRESET_TOP_RIGHT); panel.position=Vector2(-390,96); panel.custom_minimum_size=Vector2(360,0); panel.mouse_filter=Control.MOUSE_FILTER_IGNORE; panel.theme=CafeStyle.make(); layer.add_child(panel)
+	panel=PanelContainer.new(); layer.add_child(panel); panel.set_anchors_preset(Control.PRESET_TOP_RIGHT); panel.offset_left=-390; panel.offset_right=-30; panel.offset_top=206; panel.offset_bottom=206; panel.custom_minimum_size=Vector2(360,0); panel.mouse_filter=Control.MOUSE_FILTER_IGNORE; panel.theme=CafeStyle.make(); panel.add_theme_stylebox_override("panel",CafeStyle.box(CafeStyle.INK,12,16))
 	var column:=VBoxContainer.new(); column.mouse_filter=Control.MOUSE_FILTER_IGNORE; panel.add_child(column)
-	title=Label.new(); title.add_theme_font_size_override("font_size",20); title.add_theme_color_override("font_color",CafeStyle.GOLD); column.add_child(title)
+	title=Label.new(); title.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; title.add_theme_font_size_override("font_size",20); title.add_theme_color_override("font_color",CafeStyle.GOLD); column.add_child(title)
 	body=Label.new(); body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; body.custom_minimum_size.x=330; body.mouse_filter=Control.MOUSE_FILTER_IGNORE; column.add_child(body); panel.hide()
 
 func _load_identity()->void:

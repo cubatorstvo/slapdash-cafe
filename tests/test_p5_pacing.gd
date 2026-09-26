@@ -46,7 +46,7 @@ func _initialize() -> void:
 	var personal = Station.new(); personal.manual_station = true
 	personal.equipment = ["sauce","plates","pan","jug","cup"]
 	var stations: Array = [personal]
-	check(str(Journey.current(p, stations, 15, true).get("key", "")) == "formula", "first unfinished real step selected")
+	check(str(Journey.current(p, stations, 15, true).get("key", "")) == "standard_formula", "first unfinished real step selected")
 	p.lab_formula_version = 1; p.lab_pots = [{"id":0,"phase":"growing_sprout"}]
 	check(str(Journey.current(p, stations, 15, true).get("key", "")) == "buy_counter", "already completed formula skipped without repetition")
 	p.deliveries = [{"item":"counter","station":2,"owner":0,"remaining":8}]
@@ -69,7 +69,7 @@ func _initialize() -> void:
 	var after_late := snapshot(["kitchen_orchestration","lab_automation","recalibration_automation"], [])
 	queue = Pacing.collect_new(after_late, Pacing.snapshot_sets(before_late), {})
 	check(queue.size() == 1 and str(queue[0].id) == "p5.orchestration", "three features of one late bundle produce one explanation")
-	var catchup := Pacing.collapse_catchup(snapshot(["clone_growth","video_training","kitchen_orchestration"],["first_clone_created","first_video_training_completed"]), {})
+	var catchup := Pacing.collapse_catchup(snapshot(["clone_lab","video_training","kitchen_orchestration"],["first_clone_created","first_video_training_completed"]), {})
 	check(not catchup.current.is_empty() and str(catchup.current.id) == "p5.orchestration", "developed cafe collapses history to latest applicable context")
 	check(catchup.skip_ids.size() >= 2, "older catch-up explanations are not replayed in a dump")
 

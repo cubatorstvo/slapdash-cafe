@@ -25,7 +25,7 @@ static func buy(p, item: String, station: int, reason: String) -> Dictionary:
 	elif p.cash<int(spec.price):
 		result=step("earn_"+item,"Накопи на "+title+" · %d/%d"%[p.cash,spec.price],"Обслуживай гостей шефом. "+reason,"station",1)
 	else:
-		result=step("buy_"+item,"Закажи "+title+" · %d"%spec.price,"Компьютер → Интернет-магазин. "+reason,"computer",station)
+		result=step("buy_"+item,"Закажи "+title+" · %d"%spec.price,"Компьютер → Магазин. "+reason,"computer",station)
 	result.item=item
 	return result
 
@@ -126,7 +126,7 @@ static func masterclass_training_step(p, station, dish: String, quality: bool, s
 		return step("training_"+dish,"Дождись окончания обучения","Сотрудники закончат текущий заказ, соберутся у телевизора с блокнотами, посмотрят хайлайты и вернутся к столу.","television",station.station_id)
 	var compatible: Array=service.compatible_training_station_ids(int(record.id))
 	var mass: bool=compatible.size()>1
-	var detail: String="Компьютер → Столы и обучение → выбери стол %d → «Обучение» → добавь «%s» в очередь."%[station.station_id,str(record.get("name","Запись"))]
+	var detail: String="Компьютер → Обучение → выбери стол %d → «Обучение» → добавь «%s» в очередь."%[station.station_id,str(record.get("name","Запись"))]
 	if mass: detail+=" Можно выбрать сразу несколько столов одного типа: все они уйдут на один общий просмотр."
 	return step("assign_masterclass_"+dish,"Назначь запись столу: "+str(DISH_NAMES[dish]),detail,"computer",station.station_id)
 
@@ -188,7 +188,7 @@ static func _post_star_training_intro(p, stations: Array, service) -> Dictionary
 	if target.is_empty():
 		var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0)))
 		var station_id: int=int(compatible[0]) if not compatible.is_empty() else int(production[0].station_id)
-		return step("training_intro_course","3/5 · Добавь первое обучение","Открой компьютер → «Столы и обучение» → выбери столы → «Обучение». Добавь «%s» в очередь."%str(record.get("name","Запись")),"station",station_id)
+		return step("training_intro_course","3/5 · Добавь первое обучение","Открой компьютер → «Обучение» → выбери столы → «Обучение». Добавь «%s» в очередь."%str(record.get("name","Запись")),"station",station_id)
 	if not _course_target_learned(service,target):
 		var station_id: int=int(target.get("station_id",0))
 		var status: String=service.training_queue.station_status(station_id,str(target.get("dish","")))
@@ -267,7 +267,7 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 					return step("try_"+dish,"Освой блюдо: "+str(DISH_NAMES[dish]),"Обслужи настоящий заказ этим блюдом. Требования и управление — в книге B.","station",1)
 		if p.lab_stage<3: return buy(p,"lab_%d"%p.lab_stage,0,"Собери три детали лаборатории; после первой звезды здесь появятся твои работники.")
 		if p.manual_served<15: return step("practice","Подготовься к дегустации · %d/15 гостей"%p.manual_served,"Закрепи три блюда: дегустатор попросит каждое на B или лучше. Лаборатория уже собрана.","station",1)
-		return step("first_star","Пригласи дегустатора","Компьютер → Звёзды. Три стандартных блюда на B. Неудачное блюдо можно повторить бесплатно.")
+		return step("first_star","Пригласи дегустатора","Компьютер → Развитие. Три стандартных блюда на B. Неудачное блюдо можно повторить бесплатно.")
 	var training_intro: Dictionary=_post_star_training_intro(p,stations,service)
 	if not training_intro.is_empty(): return training_intro
 	if p.journey_auto_served<1:
@@ -301,10 +301,10 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 			if not equipment.is_empty(): return equipment
 			return masterclass_training_step(p,selected,dish,true,service)
 		if p.popularity<30: return step("popularity","Подними популярность · %d/30"%p.popularity,"Выбери украшения: вывеска +10, гирлянда +15, зелёный уголок +20. Покупки — в компьютере.")
-		if p.can_attempt(stations,served): return step("second_star","Пригласи делегацию второй звезды","Компьютер → Звёзды. За 4 минуты: 8 подач, 6 оценок B; три гостя заказывают лично шефу.")
-		return step("ready_crews","Дождись готовности двух бригад","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Звёзды.")
+		if p.can_attempt(stations,served): return step("second_star","Пригласи делегацию второй звезды","Компьютер → Развитие. За 4 минуты: 8 подач, 6 оценок B; три гостя заказывают лично шефу.")
+		return step("ready_crews","Дождись готовности двух бригад","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Развитие.")
 	if p.stars==2:
-		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Дальше одинаковые столы удобно собирать в группы и покупать комплектами; оснащение уже работающих столов клоны с удовольствием установят сами. Третья звезда проверит мощность всего кафе.")
+		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Магазин → расширение. Дальше одинаковые столы удобно собирать в группы и покупать комплектами; оснащение уже работающих столов клоны с удовольствием установят сами. Третья звезда проверит мощность всего кафе.")
 		if kitchen==null: return buy(p,"kitchen",4,"Парная кухня нужна как третья производственная линия перед Большим обедом.")
 		if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
 		var kitchen_equipment:=equip(p,kitchen,"meal")
@@ -330,10 +330,10 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 			return step("scale_service","Проверь мощность кафе · %d/%d автоподач"%[p.third_star_auto_served,p.THIRD_STAR_AUTO_SERVED],"Оставь кафе работать и наблюдай за узкими местами. Если поток копится, можно сократить запись, улучшить темп клонов или отдых — конкретный способ не обязателен.","station",kitchen.station_id)
 		if p.popularity<p.THIRD_STAR_POPULARITY:
 			return step("third_popularity","Подними популярность · %d/%d"%[p.popularity,p.THIRD_STAR_POPULARITY],"Большому обеду нужен заметный поток. Украшения и добровольные визиты повышают популярность; выбери удобный путь.")
-		if p.can_attempt(stations,served): return step("third_star","Пригласи гостей на Большой обед","Компьютер → Звёзды. За 4 минуты придут 14 гостей: нужно 11 подач и 8 оценок B или выше. Три заказа остаются за шефом.")
-		return step("third_ready","Подготовь три производственные линии","Заверши обучение или рекалибровку. Компьютер → Звёзды показывает, чего не хватает перед Большим обедом.")
+		if p.can_attempt(stations,served): return step("third_star","Пригласи гостей на Большой обед","Компьютер → Развитие. За 4 минуты придут 14 гостей: нужно 11 подач и 8 оценок B или выше. Три заказа остаются за шефом.")
+		return step("third_ready","Подготовь три производственные линии","Заверши обучение или рекалибровку. Компьютер → Развитие показывает, чего не хватает перед Большим обедом.")
 	if p.stars==3:
-		if not p.specialized_expanded: return step("specialty_expand","Открой специализированный сектор · %d"%p.SPECIALTY_EXPANSION_PRICE,"Компьютер → Интернет-магазин. Новый сектор добавляет пятую станцию в глубине зала и открывает взаимозависимую кухню.")
+		if not p.specialized_expanded: return step("specialty_expand","Открой специализированный сектор · %d"%p.SPECIALTY_EXPANSION_PRICE,"Компьютер → Магазин. Новый сектор добавляет пятую станцию в глубине зала и открывает взаимозависимую кухню.")
 		if specialty==null: return buy(p,"grill_kitchen",5,"Это первая кухня, где обе роли делят один физический ресурс — жарочную поверхность.")
 		if crew_count(specialty)<specialty.role_count(): return grow(p,stations)
 		var burger_gear:=equip(p,specialty,"burger")
@@ -345,10 +345,10 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 		if p.fourth_star_specialty_served<p.FOURTH_STAR_SPECIALTY_SERVED: return step("specialty_capacity","Дай бургерной поработать · %d/%d"%[p.fourth_star_specialty_served,p.FOURTH_STAR_SPECIALTY_SERVED],"Наблюдай, где запись ждёт общую плиту. При необходимости перезапиши одну роль, сохранив тайминг другой.","station",specialty.station_id)
 		if p.fourth_star_auto_served<p.FOURTH_STAR_AUTO_SERVED: return step("specialty_scale","Проверь весь зал · %d/%d автоподач"%[p.fourth_star_auto_served,p.FOURTH_STAR_AUTO_SERVED],"Четвёртая звезда проверяет не одну кухню, а способность старых и новых линий переживать смену профиля спроса.","station",specialty.station_id)
 		if p.popularity<p.FOURTH_STAR_POPULARITY: return step("fourth_popularity","Подними популярность · %d/%d"%[p.popularity,p.FOURTH_STAR_POPULARITY],"Для трёх волн нужен более заметный поток. Подойдут обустройство и добровольные визиты.")
-		if p.can_attempt(stations,served): return step("fourth_star","Начни испытание «Три волны»","Компьютер → Звёзды. Смешанный поток сменится бургерным пиком, затем придёт общий финал: 18 гостей, 15 подач, 11 B+.")
-		return step("fourth_ready","Подготовь специализированную линию","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Звёзды.")
+		if p.can_attempt(stations,served): return step("fourth_star","Начни испытание «Три волны»","Компьютер → Развитие. Смешанный поток сменится бургерным пиком, затем придёт общий финал: 18 гостей, 15 подач, 11 B+.")
+		return step("fourth_ready","Подготовь специализированную линию","Заверши обучение или рекалибровку. Полный список условий — Компьютер → Развитие.")
 	if p.stars==4:
-		if not p.orchestration_expanded: return step("orchestration_expand","Открой сектор оркестрации · %d"%p.ORCHESTRATION_EXPANSION_PRICE,"Компьютер → Интернет-магазин. Здесь появится шестая станция на три роли.")
+		if not p.orchestration_expanded: return step("orchestration_expand","Открой сектор оркестрации · %d"%p.ORCHESTRATION_EXPANSION_PRICE,"Компьютер → Магазин. Здесь появится шестая станция на три роли.")
 		if solyanka==null: return buy(p,"solyanka_kitchen",6,"Солянка — первая кухня на три одновременные записи: огонь, мешалка и соль работают вокруг одного котла.")
 		if crew_count(solyanka)<solyanka.role_count(): return grow(p,stations)
 		var solyanka_gear:=equip(p,solyanka,"solyanka")
@@ -357,8 +357,8 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 		if not report.get("present",false) or not report.get("grade","D") in ["B","A","S"]: return masterclass_training_step(p,solyanka,"solyanka",true,service)
 		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Дождись заказов солянки. Три клона одновременно повторяют свои записи; следи, чтобы котёл получил минимум 13 вещей, огонь, соль и перемешивание.","station",solyanka.station_id)
 		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к финалу проверяет, что трёхролевая кухня не вытеснила старые производственные линии.","station",solyanka.station_id)
-		if p.can_attempt(stations,served): return step("fifth_star","Начни «День пяти звёзд»","Компьютер → Звёзды. Финальная смена идёт тремя фазами: общий наплыв → критики → общая кульминация. Провал можно повторить бесплатно.","computer")
-		return step("fifth_ready","Подготовь кафе к финальной смене","Полный список условий перед Днём пяти звёзд — Компьютер → Звёзды.","computer")
+		if p.can_attempt(stations,served): return step("fifth_star","Начни «День пяти звёзд»","Компьютер → Развитие. Финальная смена идёт тремя фазами: общий наплыв → критики → общая кульминация. Провал можно повторить бесплатно.","computer")
+		return step("fifth_ready","Подготовь кафе к финальной смене","Полный список условий перед Днём пяти звёзд — Компьютер → Развитие.","computer")
 	return step("complete","Пять звёзд получены","Кафе завершило основную кампанию.")
 
 static func current(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:

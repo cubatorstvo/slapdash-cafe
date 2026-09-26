@@ -1,5 +1,5 @@
 extends SceneTree
-## Stage 5.1 regression: ribbon gate -> sausage -> delivered gear -> potato -> wine -> 15 manual orders -> 1★.
+## First-star regression: starter dishes, current manual threshold, tasting and paid reward.
 const Scene = preload("res://scenes/cafe.tscn")
 const Progress = preload("res://scripts/cafe_progression.gd")
 var failures := 0
@@ -120,13 +120,19 @@ func run() -> void:
 	check(not bool(access.feature_state("clone_lab").unlocked) and p.lab_stage == 0, "Three dishes do not reveal or assemble the laboratory before 1★")
 
 	print("[3/5] First-star preparation has no laboratory gate")
-	p.manual_served = 15
 	p.shift = "morning"
-	check(p.can_attempt(service.stations, service.served), "Fifteen manual services and three learned dishes unlock tasting without lab")
+	p.manual_served = Progress.FIRST_STAR_MANUAL_SERVED - 1
+	check(not p.can_attempt(service.stations, service.served), "One service below the threshold cannot start tasting")
+	p.manual_served = Progress.FIRST_STAR_MANUAL_SERVED
+	p.tutorial_served.erase("wine")
+	check(not p.can_attempt(service.stations, service.served), "Enough orders still require all three starter dishes")
+	p.tutorial_served.append("wine")
+	check(p.can_attempt(service.stations, service.served), "Current manual threshold and three dishes unlock tasting without lab")
 	var requirements: Array = p.star_requirements(service.stations, service.served)
 	check(requirements.size() == 2 and requirements.all(func(row): return bool(row.done)), "Zero-star checklist contains only manual work and starter dishes")
 
 	print("[4/5] Three B+ tasting dishes award 1★")
+	var cash_before: int = p.cash
 	check(service.start_banquet(1).is_empty(), "Invite the first-star taster")
 	service.advance_event(0.0)
 	check(p.phase == "tasting" and first.training.purpose == "tasting", "Tasting starts on the personal counter")
@@ -141,6 +147,7 @@ func run() -> void:
 		first.training.finish_pass(true)
 	service._refresh_progression()
 	check(p.stars == 1 and p.phase == "won" and p.lab_stage == 0, "Three B+ dishes award first star with laboratory still unassembled")
+	check(p.cash == cash_before + Progress.FIRST_STAR_REWARD, "Tasting pays the configured first-star reward exactly once")
 	check(service.progression_director.has_milestone("first_star_earned"), "First-star milestone follows the real awarded star")
 	check(bool(access.feature_state("clone_lab").unlocked), "Laboratory is introduced only after 1★")
 	check(not bool(access.feature_state("clone_growth").unlocked), "Clone growth still waits for the laboratory to be assembled")

@@ -1,8 +1,16 @@
 {
   "schema_version": 1,
   "baseline_sha": "166b950cfb72c08e983bddb9f03437165ce58bdf",
+  "campaign_balance": {
+    "review_base_sha": "fdc38865a247eda9783216fc5861f073cdeb8df9",
+    "first_star_manual_served": 8,
+    "first_star_reward": 300,
+    "item_prices": "unchanged; the 52 item rows below remain authoritative",
+    "source": "scripts/cafe_progression_core.gd::FIRST_STAR_MANUAL_SERVED/FIRST_STAR_REWARD",
+    "report": "P5_07_BALANCE_REVIEW.md"
+  },
   "implementation_targets": {
-    "ownership": "P5.04 implements event provenance/graph repairs and 5★. P5.05 implements every target catalogue rule in this JSON after this PR is merged; no runtime JSON interpreter.",
+    "ownership": "P5.04 implemented event provenance, graph repairs and 5★. P5.05 implemented the catalogue rules; P5.07 verified paid campaign reachability and adjusted the first-star threshold/reward. No runtime JSON interpreter.",
     "files": [
       "scripts/progression/feature_catalog.gd",
       "scripts/progression/progression_director.gd",

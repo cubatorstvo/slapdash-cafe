@@ -1,0 +1,510 @@
+{
+  "engine": "4.7.2.stable.official.ed1daf0bf",
+  "base_sha": "fdc38865a247eda9783216fc5861f073cdeb8df9",
+  "seed": 57007,
+  "measurement": "paid domain traversal; accelerated physical recipes, travel, growth, video and inspections; no human timing measurement",
+  "order_bound": 180,
+  "day_bound": 16,
+  "scenarios": [
+    {
+      "cash": 2048,
+      "days": 6,
+      "extra_manual_orders": 34,
+      "failed_orders": 0,
+      "order_revenue": 5137,
+      "rewards": 1450,
+      "rows": [
+        {
+          "cash_in": 20,
+          "cash_out": 42,
+          "cost": 138,
+          "day": 1,
+          "extra_manual_orders": 5,
+          "order_income": 160,
+          "point": "starter_dishes",
+          "rewards": 0,
+          "served": 8
+        },
+        {
+          "cash_in": 42,
+          "cash_out": 342,
+          "cost": 0,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 0,
+          "point": "star1",
+          "rewards": 300,
+          "served": 8
+        },
+        {
+          "cash_in": 342,
+          "cash_out": 102,
+          "cost": 240,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 0,
+          "point": "first_clone",
+          "rewards": 0,
+          "served": 8
+        },
+        {
+          "cash_in": 102,
+          "cash_out": 45,
+          "cost": 174,
+          "day": 1,
+          "extra_manual_orders": 3,
+          "order_income": 117,
+          "point": "first_auto",
+          "rewards": 0,
+          "served": 12
+        },
+        {
+          "cash_in": 45,
+          "cash_out": 393,
+          "cost": 527,
+          "day": 1,
+          "extra_manual_orders": 13,
+          "order_income": 675,
+          "point": "star2",
+          "rewards": 200,
+          "served": 37
+        },
+        {
+          "cash_in": 393,
+          "cash_out": 318,
+          "cost": 90,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 15,
+          "point": "single_video",
+          "rewards": 0,
+          "served": 38
+        },
+        {
+          "cash_in": 318,
+          "cash_out": 64,
+          "cost": 790,
+          "day": 1,
+          "extra_manual_orders": 9,
+          "order_income": 536,
+          "point": "pair_kitchen",
+          "rewards": 0,
+          "served": 49
+        },
+        {
+          "cash_in": 64,
+          "cash_out": 807,
+          "cost": 40,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 483,
+          "point": "star3",
+          "rewards": 300,
+          "served": 70
+        },
+        {
+          "cash_in": 807,
+          "cash_out": 2105,
+          "cost": 1040,
+          "day": 6,
+          "extra_manual_orders": 4,
+          "order_income": 1688,
+          "point": "star4",
+          "rewards": 650,
+          "served": 120
+        },
+        {
+          "cash_in": 2105,
+          "cash_out": 1077,
+          "cost": 1520,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 492,
+          "point": "final_ready",
+          "rewards": 0,
+          "served": 136
+        },
+        {
+          "cash_in": 1077,
+          "cash_out": 2048,
+          "cost": 0,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 971,
+          "point": "star5",
+          "rewards": 0,
+          "served": 160
+        }
+      ],
+      "scenario": "focused",
+      "spending": 4559,
+      "stress_loss": 0
+    },
+    {
+      "cash": 2024,
+      "days": 6,
+      "extra_manual_orders": 34,
+      "failed_orders": 3,
+      "order_revenue": 5148,
+      "rewards": 1450,
+      "rows": [
+        {
+          "cash_in": 20,
+          "cash_out": 42,
+          "cost": 138,
+          "day": 1,
+          "extra_manual_orders": 5,
+          "order_income": 160,
+          "point": "starter_dishes",
+          "rewards": 0,
+          "served": 8
+        },
+        {
+          "cash_in": 42,
+          "cash_out": 342,
+          "cost": 0,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 0,
+          "point": "star1",
+          "rewards": 300,
+          "served": 8
+        },
+        {
+          "cash_in": 342,
+          "cash_out": 102,
+          "cost": 240,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 0,
+          "point": "first_clone",
+          "rewards": 0,
+          "served": 8
+        },
+        {
+          "cash_in": 102,
+          "cash_out": 45,
+          "cost": 174,
+          "day": 1,
+          "extra_manual_orders": 3,
+          "order_income": 117,
+          "point": "first_auto",
+          "rewards": 0,
+          "served": 12
+        },
+        {
+          "cash_in": 45,
+          "cash_out": 369,
+          "cost": 562,
+          "day": 1,
+          "extra_manual_orders": 13,
+          "order_income": 686,
+          "point": "star2",
+          "rewards": 200,
+          "served": 37
+        },
+        {
+          "cash_in": 369,
+          "cash_out": 294,
+          "cost": 90,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 15,
+          "point": "single_video",
+          "rewards": 0,
+          "served": 38
+        },
+        {
+          "cash_in": 294,
+          "cash_out": 40,
+          "cost": 790,
+          "day": 1,
+          "extra_manual_orders": 9,
+          "order_income": 536,
+          "point": "pair_kitchen",
+          "rewards": 0,
+          "served": 49
+        },
+        {
+          "cash_in": 40,
+          "cash_out": 783,
+          "cost": 40,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 483,
+          "point": "star3",
+          "rewards": 300,
+          "served": 70
+        },
+        {
+          "cash_in": 783,
+          "cash_out": 2081,
+          "cost": 1040,
+          "day": 6,
+          "extra_manual_orders": 4,
+          "order_income": 1688,
+          "point": "star4",
+          "rewards": 650,
+          "served": 120
+        },
+        {
+          "cash_in": 2081,
+          "cash_out": 1053,
+          "cost": 1520,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 492,
+          "point": "final_ready",
+          "rewards": 0,
+          "served": 136
+        },
+        {
+          "cash_in": 1053,
+          "cash_out": 2024,
+          "cost": 0,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 971,
+          "point": "star5",
+          "rewards": 0,
+          "served": 160
+        }
+      ],
+      "scenario": "mistakes",
+      "spending": 4594,
+      "stress_loss": 0
+    },
+    {
+      "cash": 2028,
+      "days": 6,
+      "extra_manual_orders": 44,
+      "failed_orders": 0,
+      "order_revenue": 5459,
+      "rewards": 1450,
+      "rows": [
+        {
+          "cash_in": 20,
+          "cash_out": 42,
+          "cost": 138,
+          "day": 1,
+          "extra_manual_orders": 5,
+          "order_income": 160,
+          "point": "starter_dishes",
+          "rewards": 0,
+          "served": 8
+        },
+        {
+          "cash_in": 42,
+          "cash_out": 342,
+          "cost": 0,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 0,
+          "point": "star1",
+          "rewards": 300,
+          "served": 8
+        },
+        {
+          "cash_in": 0,
+          "cash_out": 43,
+          "cost": 240,
+          "day": 1,
+          "extra_manual_orders": 8,
+          "order_income": 283,
+          "point": "first_clone",
+          "rewards": 0,
+          "served": 16
+        },
+        {
+          "cash_in": 43,
+          "cash_out": 31,
+          "cost": 174,
+          "day": 1,
+          "extra_manual_orders": 4,
+          "order_income": 162,
+          "point": "first_auto",
+          "rewards": 0,
+          "served": 21
+        },
+        {
+          "cash_in": 31,
+          "cash_out": 361,
+          "cost": 527,
+          "day": 1,
+          "extra_manual_orders": 13,
+          "order_income": 657,
+          "point": "star2",
+          "rewards": 200,
+          "served": 46
+        },
+        {
+          "cash_in": 361,
+          "cash_out": 301,
+          "cost": 90,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 30,
+          "point": "single_video",
+          "rewards": 0,
+          "served": 48
+        },
+        {
+          "cash_in": 301,
+          "cash_out": 81,
+          "cost": 790,
+          "day": 1,
+          "extra_manual_orders": 10,
+          "order_income": 570,
+          "point": "pair_kitchen",
+          "rewards": 0,
+          "served": 60
+        },
+        {
+          "cash_in": 81,
+          "cash_out": 809,
+          "cost": 40,
+          "day": 1,
+          "extra_manual_orders": 0,
+          "order_income": 468,
+          "point": "star3",
+          "rewards": 300,
+          "served": 80
+        },
+        {
+          "cash_in": 809,
+          "cash_out": 2085,
+          "cost": 1040,
+          "day": 6,
+          "extra_manual_orders": 4,
+          "order_income": 1666,
+          "point": "star4",
+          "rewards": 650,
+          "served": 130
+        },
+        {
+          "cash_in": 2085,
+          "cash_out": 1057,
+          "cost": 1520,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 492,
+          "point": "final_ready",
+          "rewards": 0,
+          "served": 146
+        },
+        {
+          "cash_in": 1057,
+          "cash_out": 2028,
+          "cost": 0,
+          "day": 6,
+          "extra_manual_orders": 0,
+          "order_income": 971,
+          "point": "star5",
+          "rewards": 0,
+          "served": 170
+        }
+      ],
+      "scenario": "low_cash",
+      "spending": 4559,
+      "stress_loss": 342
+    }
+  ],
+  "baseline_early_comparison": {
+    "first_star_manual_threshold": 15,
+    "first_star_reward": 120,
+    "rows": [
+      {
+        "cash_in": 20,
+        "cash_out": 42,
+        "cost": 138,
+        "day": 1,
+        "extra_manual_orders": 5,
+        "order_income": 160,
+        "point": "starter_dishes",
+        "rewards": 0,
+        "served": 8
+      },
+      {
+        "cash_in": 42,
+        "cash_out": 330,
+        "cost": 0,
+        "day": 1,
+        "extra_manual_orders": 7,
+        "order_income": 168,
+        "point": "star1",
+        "rewards": 120,
+        "served": 15
+      },
+      {
+        "cash_in": 330,
+        "cash_out": 90,
+        "cost": 240,
+        "day": 1,
+        "extra_manual_orders": 0,
+        "order_income": 0,
+        "point": "first_clone",
+        "rewards": 0,
+        "served": 15
+      },
+      {
+        "cash_in": 90,
+        "cash_out": 33,
+        "cost": 174,
+        "day": 1,
+        "extra_manual_orders": 3,
+        "order_income": 117,
+        "point": "first_auto",
+        "rewards": 0,
+        "served": 19
+      }
+    ],
+    "note": "Only early checkpoints are compared; the baseline used a different optional popularity route after 2 stars."
+  },
+  "regressions": [
+    {
+      "test": "test_p5_first_clones",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_scale",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_graph",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_catalog_contract",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_catalog_rules",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_feature_access_authority",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_final_fifth_star",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_pacing",
+      "exit": 0,
+      "pass": true
+    },
+    {
+      "test": "test_p5_balance_pacing",
+      "exit": 0,
+      "pass": true
+    }
+  ]
+}
