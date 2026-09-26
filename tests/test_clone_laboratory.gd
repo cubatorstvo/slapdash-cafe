@@ -114,7 +114,8 @@ func run() -> void:
 	check(game.service.clone_data(identity).tempo==1.5,"Weak attempt preserves existing tempo")
 	lab.ui.close(); chair.reset()
 	check(not Policy.error(p,"lab_power_2").is_empty(),"Power upgrade respects progression")
-	check(Policy.expand(p).is_empty() and p.lab_tier==1,"First room expansion")
+	check(not Policy.expand(p).is_empty(),"Lab expansion waits for the catalogue gate")
+	p.lab_tier = 1
 	use_pot("soil"); use_pot("liquid"); use_pot("water"); nursery.hands.clear()
 	nursery.advance(12)
 	var remaining: float=nursery.pot(0).remaining

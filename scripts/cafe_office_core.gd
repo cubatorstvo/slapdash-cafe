@@ -1467,14 +1467,86 @@ func stats_page()->void:
 			button(content,"Перейти к покупке производственного стола",func():open_problem_page("stations"))
 		button(content,"Закрыть подробности",func():set_stats_focus({}))
 
+func _expansion_context(price: int) -> Dictionary:
+	var p = game.service.progress
+	var context := {"host_required":true,"is_host":not game.session.is_guest(),"price":price,"station_busy":p.busy(),"busy_reason":"Сначала заверши проверку."}
+	if not game.session.sleeping_peers.is_empty():
+		context.phase_blocked = true
+		context.phase_reason = "Сначала все должны встать с кровати."
+	return context
+
+func _shop_category_available(key: String) -> bool:
+	if game.service == null or game.service.get("feature_access") == null: return true
+	var access = game.service.feature_access
+	if not bool(access.category_access(key).get("visible", false)): return false
+	if key not in ["lab", "lounge"]: return true
+	return _catalogue_category_has_items(key)
+
+func _catalogue_bindings():
+	return load("res://scripts/progression/catalog_bindings.gd")
+
+func _catalogue_installed(item_id: String, spec: Dictionary) -> bool:
+	var p = game.service.progress
+	var kind := str(spec.get("kind", ""))
+	if kind == "lab": return int(item_id.get_slice("_", 1)) < int(p.lab_stage)
+	if kind == "lab_upgrade": return item_id in p.lab_upgrades
+	if kind == "lounge":
+		var lounge_id := str(spec.get("lounge_id", ""))
+		return lounge_id in p.lounge_upgrades if bool(spec.get("upgrade", false)) else lounge_id in p.lounge_items
+	return false
+
+func _catalogue_category_has_items(category: String) -> bool:
+	var access = game.service.feature_access
+	for group in _catalogue_bindings().ordered_groups(category):
+		if not bool(access.feature_state(str(group.feature_id)).get("unlocked", false)): continue
+		for item_id in _catalogue_bindings().group_item_ids(str(group.group_id)):
+			if not game.shop.ITEMS.has(item_id): continue
+			var state: Dictionary = access.item_access(item_id, game.shop.ITEMS[item_id], {})
+			if bool(state.get("visible", false)): return true
+	return false
+
+func _render_catalogue_groups(category: String) -> void:
+	var access = game.service.feature_access
+	var host: bool = not game.session.is_guest()
+	for group in _catalogue_bindings().ordered_groups(category):
+		if not bool(access.feature_state(str(group.feature_id)).get("unlocked", false)): continue
+		var visible: Array[String] = []
+		for raw_id in _catalogue_bindings().group_item_ids(str(group.group_id)):
+			var item_id := str(raw_id)
+			if not game.shop.ITEMS.has(item_id): continue
+			var spec: Dictionary = game.shop.ITEMS[item_id]
+			var installed := _catalogue_installed(item_id, spec)
+			var request := {"host_required":true,"is_host":host}
+			if installed: request.already_owned = true
+			if not _item_parcel(item_id, 0).is_empty(): request.pending_delivery = true
+			var state: Dictionary = access.item_access(item_id, spec, request)
+			if bool(state.get("visible", false)): visible.append(item_id)
+		if visible.is_empty(): continue
+		var title := str(group.title)
+		if not access.has_seen(str(group.feature_id)): title += " · Новое"
+		label(content, title, 21)
+		label(content, str(group.benefit), 15)
+		access.mark_seen(str(group.feature_id))
+		for item_id in visible:
+			shop_button(item_id, 0, _catalogue_installed(item_id, game.shop.ITEMS[item_id]))
+
 func shop_button(item: String, station_id: int, installed := false) -> void:
 	var p = game.service.progress
 	var spec: Dictionary = game.shop.ITEMS[item]
+	if str(spec.get("kind", "")) in ["lab", "lab_upgrade", "lounge"]:
+		var access = game.service.feature_access
+		var request := {"host_required":true, "is_host":not game.session.is_guest()}
+		if installed: request.already_owned = true
+		if not _item_parcel(item, station_id).is_empty(): request.pending_delivery = true
+		var state: Dictionary = access.item_access(item, spec, request)
+		if not bool(state.get("visible", false)): return
+		var owned: bool = installed or str(state.get("state", "")) == "owned"
+		var reason: String = "" if bool(state.get("enabled", false)) or owned else str(access.reason_text(state))
+		_product_row(content, item, station_id, owned, reason)
+		return
 	var gate: int = int(spec.get("star", 0))
 	var reason: String = ""
 	if p.stars < gate: reason = "Нужна звезда %d" % gate
-	elif spec.kind == "lab_upgrade": reason = LabPolicy.error(p, item)
-	elif spec.kind == "lounge": reason = Lounge.item_error(p, spec)
 	elif spec.kind == "station" and not game.shop.type_available(item): reason = "Сначала расширь зал"
 	_product_row(content, item, station_id, installed, reason)
 
@@ -1538,7 +1610,7 @@ func laboratory_page() -> void:
 			label(content,"Земля → капля (60) → вода → рост → удобрение в рот → рост → извлечение. Готовые этапы спокойно ждут. Темп фиксируется при добавлении капли.",16)
 			label(content,"Горшков: %d · скорость выращивания: %d%% · по %d с на каждый этап"%[LabPolicy.pot_count(p),roundi(LabPolicy.growth_speed(p)*100),ceili(75.0/LabPolicy.growth_speed(p))],18)
 		"calibration":
-			label(content,"Кресло открывается с первой звездой. Нажимай в ритм шести импульсов: хорошее прохождение даёт весь изученный предел, слабое сохраняет прежний темп. Попытка — 10.",16)
+			label(content,"Кресло появляется, когда формула уже быстрее хотя бы одного работника. Нажимай в ритм шести импульсов: хорошее прохождение даёт весь изученный предел, слабое сохраняет прежний темп. Попытка — 10.",16)
 			label(content,"Автоматика берёт отстающих по одному после завершения заказа, постепенно повышает темп и возвращает на прежнюю станцию. Приготовление на этой станции ждёт сотрудника.",16)
 	if "lab_production" in p.lab_upgrades or "lab_cal_auto" in p.lab_upgrades:
 		label(content,"АВТОМАТИКА И ОБЩИЙ ДЕНЕЖНЫЙ РЕЗЕРВ",20)
@@ -1721,11 +1793,15 @@ func _equipment_picker_text(station: Node3D) -> String:
 	return "%s    К покупке: %d · закрыто: %d" % [title, int(counts.available), int(counts.locked)]
 
 func shop_page(host: bool) -> void:
+	if not _shop_category_available(shop_category):
+		shop_category = game.service.feature_access.first_visible_category(shop_category)
+		if not _shop_category_available(shop_category): shop_category = "equipment"
 	var categories := HFlowContainer.new()
 	categories.add_theme_constant_override("h_separation", 6)
 	content.add_child(categories)
 	for entry in [["equipment","Оснащение"],["tables","Новые столы"],["rooms","Расширения"],["lab","Лаборатория"],["lounge","Мебель"],["decor","Декор"]]:
 		var key: String = str(entry[0])
+		if not _shop_category_available(key): continue
 		var choice := button(categories, str(entry[1]), _set_shop_category.bind(key))
 		choice.toggle_mode = true
 		choice.set_pressed_no_signal(shop_category == key)
@@ -1755,23 +1831,10 @@ func shop_page(host: bool) -> void:
 		"rooms": _shop_rooms(host)
 		"lab":
 			label(content, "Оборудование лаборатории", 21)
-			var branches := HFlowContainer.new()
-			content.add_child(branches)
-			for entry in [["formula","Формула"],["growing","Выращивание"],["calibration","Рекалибровка"]]:
-				var branch: String = str(entry[0])
-				var choose := button(branches, str(entry[1]), _set_lab_branch.bind(branch))
-				choose.toggle_mode = true
-				choose.set_pressed_no_signal(lab_branch == branch)
-			if lab_branch == "formula":
-				for i in range(3): shop_button("lab_%d" % i, 0, i < game.service.progress.lab_stage)
-			for id in LabPolicy.ITEMS:
-				if str(LabPolicy.ITEMS[id].branch) == lab_branch: shop_button(id, 0, id in game.service.progress.lab_upgrades)
+			_render_catalogue_groups("lab")
 		"lounge":
 			label(content, "Мебель и улучшения", 21)
-			for id in Lounge.GOODS:
-				shop_button("rest_"+id, 0, id in game.service.progress.lounge_items)
-				if id in game.service.progress.lounge_items and float(Lounge.GOODS[id].quality)>0:
-					shop_button("rest_upgrade_"+id, 0, id in game.service.progress.lounge_upgrades)
+			_render_catalogue_groups("lounge")
 		"decor":
 			label(content, "Декор кафе", 21)
 			for item in ["sign","plants","lights"]: shop_button(item, 0, item in game.service.progress.decorations or (item=="lights" and game.service.progress.garland_owned))
@@ -1787,11 +1850,17 @@ func _shop_rooms(host: bool) -> void:
 		_expansion_row(spec, host, false)
 	if p.lab_tier<2:
 		var next: Dictionary = LabPolicy.STAGES[p.lab_tier+1]
-		_expansion_row({"name":"Лаборатория · "+str(next.name),"kind":"lab_expansion","owned":false,"price":next.price,"star":next.star}, host, true)
+		var feature_id := "content.lab_expansion.%d" % (int(p.lab_tier) + 1)
+		var state: Dictionary = game.service.feature_access.access(feature_id, _expansion_context(int(next.price)))
+		if bool(state.get("visible", false)):
+			_expansion_row({"name":"Лаборатория · "+str(next.name),"kind":"lab_expansion","owned":false,"price":next.price,"star":next.star,"catalogue_reason":"" if bool(state.enabled) else game.service.feature_access.reason_text(state)}, host, true)
 	else: label(content,"Лаборатория полностью расширена",16)
 	if p.lounge_tier<2:
-		var next: Dictionary = Lounge.STAGES[p.lounge_tier+1]
-		_expansion_row({"name":"Отдых · "+str(next.name),"kind":"lounge_expansion","owned":false,"price":next.price,"star":next.star}, host, true)
+		var next_room: Dictionary = Lounge.STAGES[p.lounge_tier+1]
+		var lounge_feature := "content.lounge_expansion.%d" % (int(p.lounge_tier) + 1)
+		var lounge_state: Dictionary = game.service.feature_access.access(lounge_feature, _expansion_context(int(next_room.price)))
+		if bool(lounge_state.get("visible", false)):
+			_expansion_row({"name":"Отдых · "+str(next_room.name),"kind":"lounge_expansion","owned":false,"price":next_room.price,"star":next_room.star,"catalogue_reason":"" if bool(lounge_state.enabled) else game.service.feature_access.reason_text(lounge_state)}, host, true)
 	else: label(content,"Комната отдыха полностью расширена",16)
 
 func _expansion_row(spec: Dictionary, host: bool, sleep_gate: bool) -> void:
@@ -1800,7 +1869,7 @@ func _expansion_row(spec: Dictionary, host: bool, sleep_gate: bool) -> void:
 	var row := HBoxContainer.new()
 	card.add_child(row)
 	label(row, str(spec.name), 17)
-	var reason: String = "Открыто" if bool(spec.owned) else "Нужна звезда %d"%int(spec.star) if p.stars<int(spec.star) else "Дождись пробуждения игроков" if sleep_gate and not game.session.sleeping_peers.is_empty() else "Заверши проверку" if p.busy() else "Не хватает %d"%(int(spec.price)-p.cash) if p.cash<int(spec.price) else ""
+	var reason: String = str(spec.catalogue_reason) if spec.has("catalogue_reason") else "Открыто" if bool(spec.owned) else "Нужна звезда %d"%int(spec.star) if p.stars<int(spec.star) else "Дождись пробуждения игроков" if sleep_gate and not game.session.sleeping_peers.is_empty() else "Заверши проверку" if p.busy() else "Не хватает %d"%(int(spec.price)-p.cash) if p.cash<int(spec.price) else ""
 	var action := button(row, "Открыто" if spec.owned else "Расширить · %d"%int(spec.price), func():send({"action":"buy","kind":str(spec.kind)}), host and reason.is_empty())
 	action.custom_minimum_size.x = 200
 	if not reason.is_empty() and not spec.owned: label(card,reason,14)
@@ -1845,7 +1914,7 @@ func _product_row(parent: Node, item: String, station_id: int, installed: bool, 
 	state.custom_minimum_size.x = 205
 	state.size_flags_horizontal = Control.SIZE_FILL
 	state.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var state_text: String = "Установлено" if installed else reason if not reason.is_empty() else "%d"%int(spec.price)
+	var state_text: String = "Уже установлено." if installed else reason if not reason.is_empty() else "%d"%int(spec.price)
 	state.text = _parcel_status(parcel) if not parcel.is_empty() else state_text
 	state.add_theme_color_override("font_color", Style.GOLD if not parcel.is_empty() else Style.MINT if installed else Style.CREAM)
 	delivery_labels.append({"label":state,"item":item,"station":station_id,"fallback":state_text})
