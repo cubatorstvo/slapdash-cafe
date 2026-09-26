@@ -60,6 +60,10 @@ func run() -> void:
 	root.add_child(service)
 	var p = service.progress
 	p.stars = 2
+	p.lab_stage = 3
+	p.lab_formula_version = 1
+	p.lab_formula_tempo = 1.0
+	p.next_clone_id = 103
 	p.cash = 10000
 	p.shift = "morning"
 	var a := Station.new(2,"counter",[101])
@@ -106,7 +110,7 @@ func run() -> void:
 	director.migrate_from_game_state()
 	director.reconcile()
 	check(director.has_milestone("formula_improvement_relevant") and director.is_unlocked("recalibration"),"faster formula opens recalibration as an independent branch")
-	mark(director,"recalibration_completed",{"clone_id":101})
+	mark(director,"recalibration_completed",{"clone_id":101,"before":1.0,"after":1.2})
 
 	p.expanded = true
 	var pair := Station.new(4,"kitchen",[201,202])

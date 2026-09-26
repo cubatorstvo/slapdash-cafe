@@ -241,6 +241,9 @@ func harvest(value: Dictionary) -> void:
 	var identity: int=game.service.progress.next_clone_id
 	var error: String=game.service.create_clone(float(value.tempo),true)
 	if not error.is_empty(): notice=error; pulls.erase(int(value.id)); return
+	var pull: Dictionary = pulls.get(int(value.id), {})
+	if not pull.is_empty() and not bool(pull.get("automatic", true)):
+		game.service.record_manual_clone_growth(identity, float(value.tempo))
 	var origin:=Layout.pot_point(int(value.id))+Vector3(0,0,-1.05)
 	var route:=exit_route(identity,origin)
 	var length:=0.0

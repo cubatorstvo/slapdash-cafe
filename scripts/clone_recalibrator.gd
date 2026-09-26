@@ -134,6 +134,9 @@ func score() -> float:
 
 func begin_return(message: String) -> void:
 	if not busy(): return
+	var worker: Dictionary = game.service.clone_data(clone_id())
+	if not worker.is_empty() and float(worker.tempo) > float(state.start) + 0.00001:
+		game.service.progression_director.observe("recalibration_completed", {"clone_id":clone_id(),"before":state.start,"after":worker.tempo})
 	state.phase="returning"; state.owner=0; state.age=0.0; state.notice=message
 	var route: Array=state.get("route",[Layout.CHAIR]).duplicate()
 	route.reverse(); state.route=route

@@ -128,18 +128,6 @@ func observe_auto_served(dish: String,station_id: int) -> void:
 	progression_director.observe("auto_served", {"dish":dish,"station_id":station_id})
 	_refresh_progression()
 
-func complete_video_lesson(lesson_id: int, record: Dictionary, participants: Array) -> Array:
-	var learned: Array=super(lesson_id,record,participants)
-	if not learned.is_empty():
-		var station_ids: Array=[]
-		for participant in participants:
-			if not participant is Dictionary: continue
-			var station_id:=int(participant.get("station",0))
-			if station_id>0 and station_id not in station_ids: station_ids.append(station_id)
-		progression_director.observe("video_training_completed", {"station_count":station_ids.size()})
-		_refresh_progression()
-	return learned
-
 func rename_masterclass(id: int, value: String) -> String:
 	var error := _action_command_error("masterclass_rename")
 	if not error.is_empty(): return error

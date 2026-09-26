@@ -55,7 +55,7 @@ func serve_manual(service, station, dish: String) -> void:
 
 func install_ordered(game, item: String) -> void:
 	var p = game.service.progress
-	var before_history := p.delivery_history.size()
+	var before_history: int = p.delivery_history.size()
 	check(game.shop.order(item, 1).is_empty(), "Order starter equipment " + item)
 	check(not p.deliveries.is_empty(), "Delivery exists for " + item)
 	if p.deliveries.is_empty(): return
@@ -123,7 +123,7 @@ func run() -> void:
 	p.manual_served = 15
 	p.shift = "morning"
 	check(p.can_attempt(service.stations, service.served), "Fifteen manual services and three learned dishes unlock tasting without lab")
-	var requirements := p.star_requirements(service.stations, service.served)
+	var requirements: Array = p.star_requirements(service.stations, service.served)
 	check(requirements.size() == 2 and requirements.all(func(row): return bool(row.done)), "Zero-star checklist contains only manual work and starter dishes")
 
 	print("[4/5] Three B+ tasting dishes award 1★")
@@ -148,7 +148,7 @@ func run() -> void:
 	print("[5/5] Handoff to the laboratory chapter")
 	var next_goal: Dictionary = preload("res://scripts/cafe_journey.gd").current(p,service.stations,service.served,service.open_for_business,service)
 	check(str(next_goal.get("item","")) == "lab_0", "After 1★ the next route starts basic laboratory assembly")
-	var snapshot := service.progression_director.snapshot()
+	var snapshot: Dictionary = service.progression_director.snapshot()
 	var restored = preload("res://scripts/progression/progression_director.gd").new()
 	restored.setup(service)
 	restored.restore(snapshot, true)

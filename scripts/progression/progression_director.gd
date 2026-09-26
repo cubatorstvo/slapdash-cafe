@@ -3,6 +3,23 @@ extends "res://scripts/progression/progression_director_core.gd"
 const STARTER_DISHES := ["sausage", "potato", "wine"]
 const STARTER_EQUIPMENT := ["sauce", "plates", "pan", "jug", "cup"]
 
+func observe(event_id: StringName, payload: Dictionary = {}) -> void:
+	super(event_id, payload)
+	if event_id not in ["video_training_completed", "group_training_completed"]: return
+	if not _event_is_confirmed(str(event_id), payload): return
+	var milestone_id := _milestone_for_event(str(event_id), payload)
+	var served_id := "first_group_trained_auto_served" if event_id == "group_training_completed" else "first_video_trained_auto_served"
+	if has_milestone(served_id) or not milestones.has(milestone_id): return
+	var record: Dictionary = milestones[milestone_id]
+	if int(record.get("lesson_id", 0)) == int(payload.get("lesson_id", 0)): return
+	# Preserve the first fact, but allow a later real lesson to finish its service step.
+	var evidence: Array = record.get("confirmed_lessons", [])
+	if evidence.any(func(entry): return int(entry.get("lesson_id", 0)) == int(payload.get("lesson_id", 0))): return
+	evidence.append(payload.duplicate(true))
+	record.confirmed_lessons = evidence
+	revision += 1
+	_publish_to_progress()
+
 func restore(data: Variant, authoritative_snapshot := false) -> void:
 	if not authoritative_snapshot:
 		super(data)
@@ -41,7 +58,7 @@ func migrate_from_game_state() -> void:
 			if dish in tutorial: changed = _record_milestone("first_%s_served" % dish, {"dish":dish}, false) or changed
 	if int(p.get("stars")) >= 1: changed = _record_milestone("first_star_earned", {"stars":int(p.get("stars"))}, false) or changed
 	if int(p.get("lab_stage")) >= 3 and int(p.get("lab_formula_version")) > 0 and float(p.get("lab_formula_tempo")) >= 1.0: changed = _record_milestone("standard_formula_available", {"tempo":float(p.get("lab_formula_tempo")),"version":int(p.get("lab_formula_version"))}, false) or changed
-	var created_count := maxi(0, int(p.get("next_clone_id")) - 1)
+	var created_count := maxi(0, int(_object_value(p, "manual_clone_growth_completed", 0)))
 	if created_count >= 1: changed = _record_milestone("first_manual_clone_growth_completed", {"count":created_count}, false) or changed
 	if created_count >= 2: changed = _record_milestone("repeat_manual_clone_growth_completed", {"count":created_count}, false) or changed
 	var history: Variant = p.get("delivery_history")
@@ -54,17 +71,9 @@ func migrate_from_game_state() -> void:
 
 
 func _restore_compatibility_unlocks() -> void:
-	super()
-	# Current-format P5.3 progression is action-driven. Legacy compatibility may keep already
-	# installed content visible, but it must not introduce future systems from UI setup alone.
-	if not (has_milestone("first_video_training_completed") and has_milestone("first_video_trained_auto_served") and has_milestone("two_compatible_stations_seen")): unlocked_features.erase("group_training")
-	if not has_milestone("first_group_training_completed"):
-		unlocked_features.erase("formula_research")
-		unlocked_features.erase("formula_upgrades")
-	if not has_milestone("formula_improvement_relevant"): unlocked_features.erase("recalibration")
-	if not has_milestone("first_group_trained_auto_served") and not bool(service.progress.get("expanded")): unlocked_features.erase("kitchen_pair")
-	if not has_milestone("first_pair_kitchen_auto_served") and not bool(service.progress.get("specialized_expanded")): unlocked_features.erase("kitchen_specialty")
-	if not has_milestone("first_specialty_kitchen_auto_served") and not bool(service.progress.get("orchestration_expanded")): unlocked_features.erase("kitchen_orchestration")
+	# Current campaigns open from confirmed facts. Installed items and UI state
+	# cannot grant systems; persisted unlocks are already monotonic in reconcile().
+	pass
 
 func _starter_equipment_was_installed(history: Array) -> bool:
 	for raw_entry in history:
@@ -94,6 +103,7 @@ func _milestone_for_event(event_id: String, payload: Dictionary) -> String:
 	return super(event_id, payload)
 
 func _event_is_confirmed(event_id: String, payload: Dictionary) -> bool:
+	if event_id == "recalibration_completed": return int(payload.get("clone_id", 0)) > 0 and float(payload.get("after", 0.0)) > float(payload.get("before", 0.0)) + 0.00001
 	if event_id == "cafe_opened": return service != null and service.get("progress") != null and bool(service.progress.get("cafe_inaugurated"))
 	if event_id == "starter_equipment_installed": return int(payload.get("station_id", 0)) == 1 and str(payload.get("item", "")) in STARTER_EQUIPMENT
 	if event_id == "standard_formula_available": return service != null and service.get("progress") != null and int(service.progress.get("lab_stage")) >= 3 and int(service.progress.get("lab_formula_version")) > 0 and float(service.progress.get("lab_formula_tempo")) >= 1.0
@@ -118,7 +128,7 @@ func _formula_improvement_relevant() -> bool:
 			if crew is Array: workers.append_array(crew)
 	for worker in workers:
 		if not worker is Dictionary: continue
-		var clone_id := int(worker.get("clone_id", 0))
+		var clone_id := int(worker.get("clone_id", worker.get("id", 0)))
 		if clone_id <= 0 or seen_ids.has(clone_id): continue
 		seen_ids[clone_id] = true
 		if float(worker.get("tempo", 1.0)) < formula: return true

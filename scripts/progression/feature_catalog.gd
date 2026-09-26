@@ -47,3 +47,27 @@ static func definition(feature_id: String) -> Dictionary:
 			result.min_stars = 4
 			result.requires_milestones = ["first_specialty_kitchen_auto_served"]
 	return result
+
+static func validate() -> Array[String]:
+	# Validate the effective definitions, including the P5 overrides above.
+	var errors: Array[String] = []
+	var visiting := {}
+	var visited := {}
+	for feature_id in ordered_ids():
+		var value := definition(feature_id)
+		if str(value.get("id", "")) != feature_id: errors.append("Feature id mismatch: " + feature_id)
+		if str(value.get("unlock_rule_id", "")) != "always": errors.append("Unknown unlock rule: " + feature_id)
+		_validate_effective_cycle(feature_id, visiting, visited, errors)
+	return errors
+
+static func _validate_effective_cycle(id: String, visiting: Dictionary, visited: Dictionary, errors: Array[String]) -> void:
+	if visited.has(id): return
+	if visiting.has(id):
+		errors.append("Feature dependency cycle: " + id)
+		return
+	visiting[id] = true
+	for dependency in definition(id).get("requires_features", []):
+		if definition(str(dependency)).is_empty(): errors.append("Unknown dependency: %s -> %s" % [id, dependency])
+		else: _validate_effective_cycle(str(dependency), visiting, visited, errors)
+	visiting.erase(id)
+	visited[id] = true

@@ -55,6 +55,17 @@ func install_counter(service,p)->Node3D:
 	check(game.shop._install_parcel(parcel).is_empty(),"Production table can be installed through delivery path")
 	return service.by_id(station_id)
 
+func harvest_manual(service) -> bool:
+	var nursery = game.laboratory.nursery
+	nursery.ensure_pots()
+	var pot: Dictionary = nursery.pot(0)
+	pot.phase = "ready"; pot.tempo = 1.0; pot.formula = 1
+	nursery.pulls[0] = {"automatic":false,"owner":1}
+	var before: int = service.progress.manual_clone_growth_completed
+	nursery.harvest(pot)
+	nursery.departures.clear() # Skip only the exit animation before the lesson fixture.
+	return service.progress.manual_clone_growth_completed == before + 1
+
 func run()->void:
 	game=Scene.instantiate(); root.add_child(game); await process_frame; game.set_physics_process(false)
 	game.new_cafe(); await process_frame
@@ -76,7 +87,7 @@ func run()->void:
 	check(not bool(service.feature_state("formula_research").get("unlocked",false)),"Formula research stays hidden before 2★")
 
 	print("[2/5] First clone, table, personal lesson and auto serve")
-	check(service.create_clone(1.0,true).is_empty(),"First clone grows without research minigame")
+	check(harvest_manual(service),"First clone grows without research minigame")
 	check(has_milestone(service,"first_manual_clone_growth_completed"),"First manual growth cycle fact is recorded")
 	check(bool(service.feature_state("production_tables").get("unlocked",false)),"Production table shop unlocks after first clone")
 	check(bool(service.feature_state("rest_basics").get("unlocked",false)),"Basic sofa rest unlocks with first worker")
@@ -92,7 +103,7 @@ func run()->void:
 	check(p.journey_auto_served==1 and has_milestone(service,"first_auto_served"),"First auto fact comes from completed automatic service")
 
 	print("[3/5] Familiar cycle requires second clone knowledge")
-	check(service.create_clone(1.0,true).is_empty(),"Second clone uses the familiar 100% formula")
+	check(harvest_manual(service),"Second clone uses the familiar 100% formula")
 	check(has_milestone(service,"repeat_manual_clone_growth_completed"),"Repeat manual growth cycle fact is recorded")
 	var station_b=install_counter(service,p)
 	station_b.equipment=["jug","cup","plates","pan","sauce","rag"]; station_b.apply_equipment(); service.assign_clones(); service._refresh_progression()
@@ -120,6 +131,7 @@ func run()->void:
 	check(int(p.rest_report.get("workers",0))>=2 and has_milestone(service,"first_staff_rest_completed"),"First real night rest with workers records its progression fact")
 	var saved: Dictionary=bytes_to_var(var_to_bytes(service.save_data()))
 	check(service.load_data(saved),"Current save reloads")
+	p = service.progress
 	check(is_equal_approx(p.lab_formula_tempo,1.0) and has_milestone(service,"standard_formula_available") and has_milestone(service,"repeat_manual_clone_growth_completed"),"Formula and chapter facts survive current save/load")
 	p.stars=2; service._refresh_progression()
 	check(bool(service.feature_state("video_recording").get("unlocked",false)),"Video chapter may unlock only after 2★")

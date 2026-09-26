@@ -3,13 +3,6 @@ extends "res://scripts/cafe_service_feature_core.gd"
 const STARTER_DISH_SEQUENCE := ["sausage", "potato", "wine"]
 const STANDARD_FORMULA_TEMPO := 1.0
 
-func _ready() -> void:
-	super()
-	if progress.shift == "morning":
-		progress.shift = "open"
-		open_for_business = true
-		spawn_clock = 2.0
-
 func _ensure_standard_formula() -> void:
 	if progress.stars < 1 or progress.lab_stage < 3 or progress.lab_formula_version > 0: return
 	progress.lab_formula_tempo = STANDARD_FORMULA_TEMPO
@@ -26,14 +19,11 @@ func start_highlights(id: int, peer: int) -> String:
 	if not error.is_empty(): return error
 	return super(id, peer)
 
-func create_clone(tempo := 1.0, prepaid := false) -> String:
-	var clone_id := int(progress.next_clone_id)
-	var manual_growth: bool = progress.stars == 1 and "lab_production" not in progress.lab_upgrades
-	var result: String = super(tempo, prepaid)
-	if result.is_empty() and manual_growth:
-		progression_director.observe("manual_clone_growth_completed", {"clone_id":clone_id,"ordinal":clone_id,"tempo":tempo})
-		_refresh_progression()
-	return result
+func record_manual_clone_growth(clone_id: int, tempo: float) -> void:
+	progress.manual_clone_growth_completed += 1
+	progress.revision += 1
+	progression_director.observe("manual_clone_growth_completed", {"clone_id":clone_id,"ordinal":progress.manual_clone_growth_completed,"tempo":tempo})
+	_refresh_progression()
 
 func _starter_equipped(station: Node3D, dish: String) -> bool:
 	return Definition.missing_equipment(dish, station.equipment, station.upgrades).is_empty()
@@ -64,7 +54,7 @@ func _learned_station_ids(participants: Array, learned_clone_ids: Array) -> Arra
 	for participant in participants:
 		if not participant is Dictionary: continue
 		var clone_id := int(participant.get("clone_id", 0))
-		if clone_id > 0 and clone_id not in learned_clone_ids: continue
+		if clone_id <= 0 or clone_id not in learned_clone_ids: continue
 		var station_id := int(participant.get("station", 0))
 		if station_id > 0 and station_id not in result: result.append(station_id)
 	result.sort()
@@ -74,16 +64,24 @@ func _milestone_matches_service(milestone_id: String, station_id: int, dish: Str
 	if not progression_director.has_milestone(milestone_id): return false
 	var milestone: Variant = progression_director.milestones.get(milestone_id, {})
 	if not milestone is Dictionary: return false
-	var station_ids: Variant = milestone.get("station_ids", [])
-	if station_ids is Array and not station_ids.is_empty():
-		if station_id not in station_ids: return false
-		var taught_dish := str(milestone.get("dish", ""))
-		return taught_dish.is_empty() or taught_dish == dish
-	if milestone_id != "first_video_training_completed": return false
+	if _training_evidence_matches_service(milestone, station_id, dish): return true
+	for evidence in milestone.get("confirmed_lessons", []):
+		if evidence is Dictionary and _training_evidence_matches_service(evidence, station_id, dish): return true
+	return false
+
+func _training_evidence_matches_service(milestone: Dictionary, station_id: int, dish: String) -> bool:
+	var station_ids: Array = milestone.get("station_ids", [])
+	if station_id not in station_ids or str(milestone.get("dish", "")) != dish: return false
 	var station = by_id(station_id)
-	if station == null or not station.method_sources.has(dish): return false
-	var source: Variant = station.method_sources.get(dish, {})
-	return source is Dictionary and int(source.get("id", source.get("record_id", 0))) > 0
+	if station == null: return false
+	var source: Dictionary = station.method_sources.get(dish, {})
+	if str(source.get("kind", "")) != "video" or int(source.get("id", 0)) != int(milestone.get("record_id", 0)): return false
+	var taught_ids: Array = milestone.get("clone_ids", [])
+	var current_ids: Array = source.get("clone_ids", [])
+	if current_ids.size() != station.role_count(): return false
+	for role in range(current_ids.size()):
+		if int(current_ids[role]) not in taught_ids or int(station.crew[role].get("clone_id", 0)) != int(current_ids[role]): return false
+	return true
 
 func observe_auto_served(dish: String, station_id: int) -> void:
 	progression_director.observe("auto_served", {"dish":dish,"station_id":station_id})
@@ -111,7 +109,7 @@ func complete_video_lesson(lesson_id: int, record: Dictionary, participants: Arr
 
 func load_data(data: Dictionary) -> bool:
 	if not super(data): return false
-	if progress.shift == "morning":
+	if progress.shift == "morning" and progress.cafe_inaugurated:
 		progress.shift = "open"
 		open_for_business = true
 		spawn_clock = 2.0

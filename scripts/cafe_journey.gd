@@ -151,16 +151,6 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 			var ids: Variant=group_data.get("station_ids",[])
 			var station_id:=int(ids[0]) if ids is Array and not ids.is_empty() else 0
 			return step("scale_group_work","Закрепи групповое обучение автоподачей","Хотя бы один стол, действительно обученный в общем сеансе, должен завершить реальный автоматический заказ.","station",station_id)
-		# Formula improvement is a useful branch introduced here, but the paired kitchen is
-		# already unlocked by the completed group cycle and can be bought ahead of this hint.
-		if not p.expanded and not _p5_milestone(p,"formula_improvement_relevant"):
-			return step("scale_formula","Исследуй улучшенную формулу","Групповое обучение освоено. В лаборатории можно исследовать формулу, которая должна быть быстрее хотя бы одного существующего клона. Парная кухня уже доступна независимо от этого.","laboratory")
-		if not p.expanded and _p5_milestone(p,"formula_improvement_relevant") and not _p5_milestone(p,"first_recalibration_completed"):
-			if "lab_chair" not in p.lab_upgrades:
-				var chair:=step("scale_recalibration_chair","Установи кресло рекалибровки","Полезная формула получена — теперь раздел рекалибровки остаётся известным. Закажи кресло в лабораторном каталоге; парная кухня от этой покупки не зависит.","computer")
-				chair.item="lab_chair"
-				return chair
-			return step("scale_recalibration","Рекалибруй одного клона","Посади подходящего работника в кресло и примени улучшенную формулу. После успешной процедуры факт сохранится навсегда.","laboratory")
 		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Распространение опыта уже закреплено; теперь добавь двухролевую производственную линию.")
 		if kitchen==null: return buy(p,"kitchen",4,"Парная кухня «Мясо и макароны» вводит две согласованные роли одного способа.")
 		if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
@@ -197,7 +187,7 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 		if not _p5_milestone(p,"first_solyanka_auto_served"): return step("first_solyanka","Получи первую автоподачу солянки","Дождись реального заказа: три роли должны исполнить один согласованный способ и завершить подачу.","station",solyanka.station_id)
 		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Текущий порог кампании сохранён; финальная балансировка будет отдельным этапом.","station",solyanka.station_id)
 		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к действующей финальной проверке сочетает освоенные производственные линии.","station",solyanka.station_id)
-		if p.can_attempt(stations,served): return step("fifth_star","Кафе готово к действующей финальной проверке","Компьютер → Звёзды. Этап 5.3 доводит путь до возможности заслужить 5★; финальный экран и итоговый баланс остаются следующими этапами.","computer")
+		if p.can_attempt(stations,served): return step("fifth_star","Заслужи пятую звезду","Компьютер → Развитие → День пяти звёзд. За 6 минут обслужи минимум 18 из 24 гостей, из них 12 — на B или лучше.","computer")
 		return step("fifth_ready","Подготовь кафе к финальной смене","Компьютер → Звёзды показывает оставшиеся условия действующей проверки.","computer")
 	return super.next_step(p,stations,served,true,service)
 
