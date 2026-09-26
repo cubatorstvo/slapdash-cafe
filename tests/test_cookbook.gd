@@ -43,6 +43,25 @@ func check_plane_uv(book: Node3D) -> void:
 			check(absf(uvs[i].y) < 0.05, "local -z is UV.y=0")
 			saw_minus = true
 	check(saw_plus and saw_minus, "PlaneMesh samples both page poles")
+
+func introduce_all_recipes(game) -> void:
+	var p = game.service.progress
+	p.stars = 4
+	p.cafe_inaugurated = true
+	p.tutorial_served = ["sausage", "potato", "wine"]
+	p.lab_stage = 3
+	p.next_clone_id = maxi(p.next_clone_id, 2)
+	p.expanded = true
+	p.specialized_expanded = true
+	p.orchestration_expanded = true
+	game.service.progression_director.migrate_from_game_state()
+	game.service.progression_director.observe("group_training_completed", {"station_count":2,"station_ids":[2,3],"lesson_id":903,"record_id":903,"clone_ids":[1,2],"dish":"sausage"})
+	game.service.progression_director.observe("group_trained_auto_served", {"station_id":2,"dish":"sausage"})
+	game.service.progression_director.observe("pair_kitchen_auto_served", {"station_id":4,"dish":"meal"})
+	game.service.progression_director.observe("specialty_kitchen_auto_served", {"station_id":5,"dish":"burger"})
+	game.service._refresh_progression()
+	game.cookbook._sync_feature_pages()
+
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game)
@@ -50,6 +69,7 @@ func run() -> void:
 	game.set_physics_process(false)
 	game.service.clear_world()
 	game.service.initial_stations(true)
+	introduce_all_recipes(game)
 	game.camera.rotation.x = 0.52
 	var opening_gaze: Vector3 = -game.camera.global_basis.z
 	game.cookbook.toggle()
@@ -91,22 +111,22 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var row: Label = null
-	for child in game.cookbook.physical.pages[1].column.get_children():
+	for child in game.cookbook.physical.pages[0].column.get_children():
 		if child is Label and str(child.text).contains("Обжарить"):
 			row = child
 			break
 	check(row != null, "Recipe body lines are hover targets")
 	if row:
 		var hover := InputEventMouseMotion.new()
-		hover.position = game.cookbook.physical.page_to_screen(game.camera, 1, game.cookbook.physical.control_uv(1, row))
+		hover.position = game.cookbook.physical.page_to_screen(game.camera, 0, game.cookbook.physical.control_uv(0, row))
 		game.cookbook._input(hover)
 		await process_frame
-		check(game.cookbook.physical.pages[1].note.text != "", "Hover note appears on the physical page")
+		check(game.cookbook.physical.pages[0].note.text != "", "Hover note appears on the physical page")
 		var away := InputEventMouseMotion.new()
 		away.position = Vector2(12, 8)
 		game.cookbook._input(away)
 		await process_frame
-		check(game.cookbook.physical.pages[1].note.text == "", "Leaving the page clears the hover note")
+		check(game.cookbook.physical.pages[0].note.text == "", "Leaving the page clears the hover note")
 	game.cookbook.select("wine")
 	check(game.session.capture_player().presentation.page == "wine", "Reading page enters network presence")
 	var meal_lines: Array = preload("res://scripts/cookbook_data.gd").components("meal")
@@ -114,7 +134,7 @@ func run() -> void:
 	check(preload("res://scripts/cookbook_data.gd").RECIPES.sausage.components[0].lines[1].detail.contains("одна сосиска"), "Sausage portion detail is the plated requirement")
 	game.cookbook.close()
 	var station = game.service.by_id(1)
-	game.service.request_training(station,"potato",1)
+	station.training.open("potato",1)
 	station.training.start_pass([1])
 	game.bind_training()
 	game.menu.close()
@@ -173,7 +193,7 @@ func run() -> void:
 	station.model.presentation.book = true
 	station.model.presentation.page = "wine"
 	station.view._update_worker(station.model, 0.0, false)
-	check_reader_book(station.view.worker, station.view.book, station.view.head, false, "Counter worker")
+	check_reader_book(station.view.worker, station.view.book, station.view.head, true, "Counter worker")
 	check(is_equal_approx(station.view.head.rotation.x, 0.48), "Counter worker keeps the recorded head pitch while reading")
 	var worker_grip: Vector3 = station.view.worker.to_local(station.view.book.cover_grip(-1))
 	check(worker_grip.y > 0.7, "Worker hands reach the gaze-aligned lower cover edge")
@@ -183,7 +203,7 @@ func run() -> void:
 	game.session.leave("test")
 	check(not game.cookbook.opened, "Disconnect hides the book")
 	var kitchen = game.service.by_id(4)
-	game.service.request_training(kitchen, "meal", 1)
+	kitchen.training.open("meal", 1)
 	kitchen.training.start_pass([1, 0])
 	game.bind_training()
 	game.menu.close()
@@ -202,17 +222,17 @@ func run() -> void:
 	await process_frame
 	await process_frame
 	var live_row: Label = null
-	for child in game.cookbook.physical.pages[1].column.get_children():
+	for child in game.cookbook.physical.pages[0].column.get_children():
 		if child is Label and str(child.text).contains("Обжарить"):
 			live_row = child
 			break
 	check(live_row != null, "Live meal recipe body lines are hover targets")
 	if live_row:
 		var live_hover := InputEventMouseMotion.new()
-		live_hover.position = game.cookbook.physical.page_to_screen(game.camera, 1, game.cookbook.physical.control_uv(1, live_row))
+		live_hover.position = game.cookbook.physical.page_to_screen(game.camera, 0, game.cookbook.physical.control_uv(0, live_row))
 		game.cookbook._input(live_hover)
 		await process_frame
-		check(game.cookbook.physical.pages[1].note.text.contains("Обе стороны"), "Live meal hover uses recipe details, not empty quality notes")
+		check(game.cookbook.physical.pages[0].note.text.contains("Обе стороны"), "Live meal hover uses recipe details, not empty quality notes")
 	game.cookbook.close()
 	kitchen.model.stirred = 0.4
 	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
@@ -221,7 +241,7 @@ func run() -> void:
 	live_meal = preload("res://scripts/cookbook_data.gd").components("meal", kitchen.model)
 	check(live_meal[1].lines[2] == "Перемешать [✓]", "Finished stirring uses the check mark")
 	kitchen.training.close()
-	game.service.request_training(kitchen, "meal", 1)
+	kitchen.training.open("meal", 1)
 	kitchen.training.start_pass([1, 2])
 	game.bind_training()
 	kitchen.model.pasta = 40
@@ -232,7 +252,7 @@ func run() -> void:
 	check(live_meal[1].lines[1] == "Соль [✓]", "Dual-role kitchen keeps pasta salt through a tick")
 	kitchen.training.close()
 	var wine_station = game.service.by_id(2)
-	game.service.request_training(wine_station, "wine", 1)
+	wine_station.training.open("wine", 1)
 	wine_station.training.start_pass([1])
 	game.bind_training()
 	game.menu.close()

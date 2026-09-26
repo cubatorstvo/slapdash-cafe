@@ -47,7 +47,23 @@ func set_stars(game, stars: int) -> void:
 	if stars >= 2: p.expanded = true
 	if stars >= 3: p.specialized_expanded = true
 	if stars >= 4: p.orchestration_expanded = true
+	game.service.progression_director.migrate_from_game_state()
+	if stars >= 2:
+		game.service.progression_director.observe("group_training_completed", {"station_count":2,"station_ids":[2,3],"lesson_id":901,"record_id":901,"clone_ids":[1,2],"dish":"sausage"})
+		game.service.progression_director.observe("group_trained_auto_served", {"station_id":2,"dish":"sausage"})
+	if stars >= 3: game.service.progression_director.observe("pair_kitchen_auto_served", {"station_id":4,"dish":"meal"})
+	if stars >= 4: game.service.progression_director.observe("specialty_kitchen_auto_served", {"station_id":5,"dish":"burger"})
 	game.service._refresh_progression()
+	game.cookbook._sync_feature_pages()
+
+func assert_page_fits(page: Control, label: String) -> void:
+	for control in page.column.find_children("*", "Control", true, false):
+		if not control is Control or not control.visible: continue
+		var rect: Rect2 = control.get_global_rect()
+		check(rect.position.y >= -1.0 and rect.end.y <= float(game_page_height(page)) + 1.0, "%s keeps visible controls inside the page viewport" % label)
+
+func game_page_height(page: Control) -> int:
+	return page.get_viewport().size.y
 
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
@@ -116,6 +132,13 @@ func run() -> void:
 	check(page_has_text(left, "Огонь") and page_has_text(left, "Мешалка"), "Solyanka first components are on the left page")
 	check(page_has_text(right, "Соль") and page_has_text(right, "Общий котёл"), "Solyanka remaining components are on the right page")
 	check(left.find_button("Содержание") != null and right.find_button("Содержание") != null, "Long recipe has explicit navigation on both halves")
+	for dish in preload("res://scripts/cookbook_data.gd").ORDER:
+		game.cookbook.select(str(dish))
+		await process_frame
+		check(game.cookbook.recipe == dish, "Introduced recipe %s opens from cookbook data" % dish)
+		check(left.find_button("Закрыть") != null and right.find_button("Закрыть") != null, "Recipe %s keeps mouse navigation on both pages" % dish)
+		assert_page_fits(left, "%s left" % dish)
+		assert_page_fits(right, "%s right" % dish)
 	game.hud.show_reading_alert("Срочно: тест")
 	check(game.hud.reading_alert.visible and game.hud.reading_alert_text.text.contains("Срочно"), "Urgent event uses reserved area outside book text")
 	game.hud.show_reading_alert("")
