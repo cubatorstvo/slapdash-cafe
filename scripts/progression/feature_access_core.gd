@@ -3,6 +3,7 @@ extends RefCounted
 const FeatureCatalog = preload("res://scripts/progression/feature_catalog.gd")
 const UiEntryCatalog = preload("res://scripts/progression/ui_entry_catalog.gd")
 const AccessReasons = preload("res://scripts/progression/access_reasons.gd")
+const CatalogPurchase = preload("res://scripts/progression/catalog_purchase.gd")
 
 var service: Node
 var progression_director
@@ -86,9 +87,9 @@ func item_access(item_id: String, spec: Dictionary = {}, context: Dictionary = {
 	var locked := _first_locked(required)
 	var primary := str(required[0]) if not required.is_empty() else "shop_basic"
 	if not locked.is_empty(): return _item_result(item_id, primary, false, false, "hidden", AccessReasons.FEATURE_LOCKED, {"feature_id":locked})
-	var merged := context.duplicate(true)
-	if not merged.has("item_id"): merged.item_id = item_id
-	if not merged.has("price"): merged.price = int(spec.get("price", 0))
+	var progress = service.progress if service != null and service.get("progress") != null else null
+	if progress != null and not CatalogPurchase.introduced(progress, item_id): return _item_result(item_id, primary, false, false, "hidden", AccessReasons.FEATURE_LOCKED, {"feature_id":primary})
+	var merged := _with_catalogue_flags(item_id, spec, context)
 	var temporary := _check_temporary(merged)
 	var state := "ready" if bool(temporary.allowed) else "blocked"
 	if bool(merged.get("already_owned", false)): state = "owned"
@@ -163,7 +164,9 @@ func _check_buy(context: Dictionary) -> Dictionary:
 	var required := FeatureCatalog.item_features(item_id, spec)
 	var locked := _first_locked(required)
 	if not locked.is_empty(): return _check(false, AccessReasons.FEATURE_LOCKED, {"feature_id":locked})
-	return _check_temporary(context)
+	var progress = service.progress if service != null and service.get("progress") != null else null
+	if progress != null and not CatalogPurchase.introduced(progress, item_id): return _check(false, AccessReasons.FEATURE_LOCKED, {"feature_id":str(required[0]) if not required.is_empty() else ""})
+	return _check_temporary(_with_catalogue_flags(item_id, spec, context))
 
 func _check_station_batch(context: Dictionary) -> Dictionary:
 	var items: Variant = context.get("items", [])
@@ -191,9 +194,9 @@ func _check_temporary(context: Dictionary) -> Dictionary:
 	if bool(context.get("station_busy", context.get("busy", false))): return _check(false, AccessReasons.STATION_BUSY, {"text":str(context.get("busy_reason", ""))})
 	if bool(context.get("actor_busy", false)): return _check(false, AccessReasons.ACTOR_BUSY, {"text":str(context.get("busy_reason", ""))})
 	if bool(context.get("no_workers", false)): return _check(false, AccessReasons.NO_WORKERS, {})
+	if bool(context.get("room_too_small", false)): return _check(false, AccessReasons.ROOM_TOO_SMALL, {"text":str(context.get("room_reason", ""))})
 	if bool(context.get("missing_equipment", false)): return _check(false, AccessReasons.MISSING_EQUIPMENT, {"text":str(context.get("equipment_reason", ""))})
 	if bool(context.get("missing_upgrade", false)): return _check(false, AccessReasons.MISSING_UPGRADE, {"text":str(context.get("upgrade_reason", ""))})
-	if bool(context.get("room_too_small", false)): return _check(false, AccessReasons.ROOM_TOO_SMALL, {"text":str(context.get("room_reason", ""))})
 	if bool(context.get("no_capacity", false)): return _check(false, AccessReasons.NO_CAPACITY, {"text":str(context.get("capacity_reason", ""))})
 	if bool(context.get("training_not_ready", false)): return _check(false, AccessReasons.TRAINING_NOT_READY, {"text":str(context.get("training_reason", ""))})
 	if bool(context.get("too_far", false)): return _check(false, AccessReasons.TOO_FAR, {"text":str(context.get("distance_reason", ""))})
@@ -237,7 +240,9 @@ func _next_condition(definition: Dictionary) -> String:
 	if service != null and service.get("progress") != null: current_stars = int(service.progress.get("stars"))
 	if current_stars < stars_required: return "Получить %d★" % stars_required
 	for milestone_id in definition.get("requires_milestones", []):
-		if progression_director != null and not progression_director.has_milestone(str(milestone_id)): return _milestone_hint(str(milestone_id))
+		if progression_director != null and not progression_director.has_milestone(str(milestone_id)):
+			var locked_reason := str(definition.get("locked_reason", ""))
+			return locked_reason if not locked_reason.is_empty() else _milestone_hint(str(milestone_id))
 	return ""
 
 func _milestone_hint(milestone_id: String) -> String:
@@ -247,6 +252,17 @@ func _route_for_feature(feature_id: String) -> String:
 	for definition in UiEntryCatalog.ENTRIES.values():
 		if feature_id in definition.get("required_features", []) or feature_id in definition.get("any_features", []): return str(definition.id)
 	return "office.development"
+
+func _with_catalogue_flags(item_id: String, spec: Dictionary, context: Dictionary) -> Dictionary:
+	var merged := context.duplicate(true)
+	if not merged.has("item_id"): merged.item_id = item_id
+	if not merged.has("price"): merged.price = int(spec.get("price", 0))
+	var progress = service.progress if service != null and service.get("progress") != null else null
+	if progress == null: return merged
+	var domain := CatalogPurchase.flags(progress, item_id, spec)
+	for key in domain:
+		if not merged.has(key): merged[key] = domain[key]
+	return merged
 
 func _check(allowed: bool, reason_code: StringName, reason_args: Dictionary) -> Dictionary: return {"allowed":allowed,"reason_code":reason_code,"reason_args":reason_args.duplicate(true)}
 func _ui_result(entry_id: String, feature_id: String, introduced: bool, unlocked: bool, enabled: bool, state: String, reason_code: StringName, reason_args: Dictionary) -> Dictionary: return {"entry_id":entry_id,"feature_id":feature_id,"introduced":introduced,"unlocked":unlocked,"visible":state != "hidden","enabled":enabled,"state":state,"reason_code":reason_code,"reason_args":reason_args.duplicate(true),"revision":revision()}

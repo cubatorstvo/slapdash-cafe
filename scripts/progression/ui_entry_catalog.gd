@@ -15,9 +15,9 @@ const ENTRIES := {
 	"office.settings":{"id":"office.settings","parent_id":"","sort_order":1000,"required_features":["cafe_core"],"any_features":[],"legacy_page":"settings","auxiliary":true},
 	"shop.category.equipment":{"id":"shop.category.equipment","parent_id":"office.shop","sort_order":10,"required_features":["shop_basic"],"any_features":[]},
 	"shop.category.tables":{"id":"shop.category.tables","parent_id":"office.shop","sort_order":20,"required_features":[],"any_features":["production_tables","kitchen_pair","kitchen_specialty","kitchen_orchestration"]},
-	"shop.category.rooms":{"id":"shop.category.rooms","parent_id":"office.shop","sort_order":30,"required_features":[],"any_features":["kitchen_pair","kitchen_specialty","kitchen_orchestration","lab_growth_upgrades","rest_extended","rest_large"]},
-	"shop.category.lab":{"id":"shop.category.lab","parent_id":"office.shop","sort_order":40,"required_features":[],"any_features":["clone_lab","formula_upgrades","lab_growth_upgrades","recalibration","lab_automation"]},
-	"shop.category.lounge":{"id":"shop.category.lounge","parent_id":"office.shop","sort_order":50,"required_features":[],"any_features":["video_training","rest_basics","rest_extended","rest_large"]},
+	"shop.category.rooms":{"id":"shop.category.rooms","parent_id":"office.shop","sort_order":30,"required_features":[],"any_features":["kitchen_pair","kitchen_specialty","kitchen_orchestration","lab_growth_upgrades","lab_automation","rest_extended","rest_large","content.lab_expansion.1","content.lab_expansion.2","content.lounge_expansion.1","content.lounge_expansion.2"]},
+	"shop.category.lab":{"id":"shop.category.lab","parent_id":"office.shop","sort_order":40,"required_features":[],"any_features":["clone_lab","formula_upgrades","lab_growth_upgrades","recalibration","recalibration_tuning","lab_automation","recalibration_automation","lab_automation_large","recalibration_automation_large"]},
+	"shop.category.lounge":{"id":"shop.category.lounge","parent_id":"office.shop","sort_order":50,"required_features":[],"any_features":["video_training","rest_basics","rest_comfort","rest_extended","rest_games","rest_large","rest_atmosphere"]},
 	"shop.category.decor":{"id":"shop.category.decor","parent_id":"office.shop","sort_order":60,"required_features":["decor_basic"],"any_features":[]}
 }
 

@@ -352,7 +352,7 @@ func order(item: String, station_id: int) -> String:
 	var p = game.service.progress
 	if not ITEMS.has(item): return "Товар не найден."
 	var spec: Dictionary = ITEMS[item]
-	if p.stars < int(spec.get("star",0)): return "Откроется после звезды %d." % spec.star
+	if str(spec.get("kind","")) not in ["lab","lab_upgrade","lounge"] and p.stars < int(spec.get("star",0)): return "Откроется после звезды %d." % spec.star
 	if p.busy(): return "Сначала заверши проверку."
 	var station = game.service.by_id(station_id)
 	if spec.kind == "lounge":

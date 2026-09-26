@@ -84,10 +84,12 @@ func _purchase_access(kind: String, id: String, station_id: int) -> Dictionary:
 			var lab_tier := mini(progress.lab_tier + 1, LabProgress.STAGES.size() - 1)
 			feature_id = "content.lab_expansion.%d" % lab_tier
 			price = int(LabProgress.STAGES[lab_tier].price)
+			if progress.lab_tier >= 2: context.already_owned = true
 		"lounge_expansion":
 			var lounge_tier := mini(progress.lounge_tier + 1, LoungeProgress.STAGES.size() - 1)
 			feature_id = "content.lounge_expansion.%d" % lounge_tier
 			price = int(LoungeProgress.STAGES[lounge_tier].price)
+			if progress.lounge_tier >= 2: context.already_owned = true
 		"expansion":
 			feature_id = "kitchen_pair"
 			price = ProgressionPolicy.EXPANSION_PRICE
@@ -97,6 +99,12 @@ func _purchase_access(kind: String, id: String, station_id: int) -> Dictionary:
 		"orchestration_expansion":
 			feature_id = "kitchen_orchestration"
 			price = ProgressionPolicy.ORCHESTRATION_EXPANSION_PRICE
+	if kind in ["lab_expansion", "lounge_expansion"]:
+		context.station_busy = progress.busy()
+		context.busy_reason = "Сначала заверши проверку."
+		if game != null and game.get("session") != null and not game.session.sleeping_peers.is_empty():
+			context.phase_blocked = true
+			context.phase_reason = "Сначала все должны встать с кровати."
 	context.price = price
 	return feature_access.access(feature_id, context)
 

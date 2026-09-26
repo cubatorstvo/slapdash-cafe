@@ -2,10 +2,12 @@ extends RefCounted
 ## One shared daily bonus. Sleep poses never change productivity.
 const Layout = preload("res://scripts/lounge_layout.gd")
 const MAX_BONUS := 0.30
+const CatalogBindings = preload("res://scripts/progression/catalog_bindings.gd")
+const CatalogPurchase = preload("res://scripts/progression/catalog_purchase.gd")
 const STAGES := [
 	{"name":"Небольшая комната","price":0,"star":0},
 	{"name":"Просторная комната","price":180,"star":1},
-	{"name":"Большая комната","price":420,"star":2}
+	{"name":"Большая комната","price":420,"star":3}
 ]
 const GOODS := {
 	"sofa":{"name":"Диван на двоих","price":100,"tier":0,"quality":0.08},
@@ -31,10 +33,8 @@ static func stamp(p) -> String:
 	return "%d:%s:%s" % [p.lounge_tier,str(p.lounge_items),str(p.lounge_upgrades)]
 
 static func _feature_for(id: String) -> String:
-	if id=="television": return "video_training"
-	if id in ["bookcase","board_games","tea_station","snack_fridge","foosball","arcade","textiles"]: return "rest_extended"
-	if id in ["table_tennis","jukebox","aquarium","ambient"]: return "rest_large"
-	return "rest_basics"
+	var row: Dictionary = CatalogBindings.item("rest_" + id)
+	return str(row.feature) if not row.is_empty() else "rest_basics"
 
 static func shop_items() -> Dictionary:
 	var result := {}
@@ -47,13 +47,8 @@ static func shop_items() -> Dictionary:
 	return result
 
 static func item_error(p, spec: Dictionary) -> String:
-	var id: String = spec.lounge_id
-	if p.lounge_tier<int(GOODS[id].tier): return "Сначала расширь комнату: "+str(STAGES[int(GOODS[id].tier)].name)+"."
-	if bool(spec.upgrade):
-		if id not in p.lounge_items: return "Сначала установи сам предмет."
-		if id in p.lounge_upgrades: return "Предмет уже улучшен."
-	elif id in p.lounge_items: return "Уже установлено."
-	return ""
+	var item_id := "rest_upgrade_" + str(spec.lounge_id) if bool(spec.get("upgrade", false)) else "rest_" + str(spec.lounge_id)
+	return CatalogPurchase.structural_reason(p, item_id)
 
 static func slots(p) -> Array:
 	var result := Layout.activity_slots(p.lounge_tier,p.lounge_items)
@@ -80,10 +75,12 @@ static func report(p, workers: int) -> Dictionary:
 
 static func expand(p) -> String:
 	if p.lounge_tier>=2: return "Комната уже максимального размера."
+	var feature_id := "content.lounge_expansion.%d" % (int(p.lounge_tier) + 1)
+	if not CatalogPurchase.expansion_unlocked(p, feature_id): return "Эта возможность ещё не открыта."
 	var next: Dictionary=STAGES[p.lounge_tier+1]
-	if p.stars<int(next.star): return "Нужна звезда %d."%next.star
-	if p.busy(): return "Сначала заверши проверку."
-	if p.cash<int(next.price): return "Не хватает денег."
+	if p.has_method("busy") and p.busy(): return "Сначала заверши проверку."
+	var missing := int(next.price) - int(p.cash)
+	if missing > 0: return "Не хватает %d." % missing
 	p.cash-=int(next.price)
 	p.lounge_tier+=1
 	p.revision+=1

@@ -64,6 +64,12 @@ func migrate_from_game_state() -> void:
 	var history: Variant = p.get("delivery_history")
 	if history is Array and _starter_equipment_was_installed(history): changed = _record_milestone("first_equipment_installed", {}, false) or changed
 	if _formula_improvement_relevant(): changed = _record_milestone("formula_improvement_relevant", {"tempo":float(p.get("lab_formula_tempo"))}, false) or changed
+	var staff_count := _current_staff_count()
+	if staff_count >= 6: changed = _record_milestone("staff_6_seen", {"count":staff_count}, false) or changed
+	if staff_count >= 9: changed = _record_milestone("staff_9_seen", {"count":staff_count}, false) or changed
+	var lounge_tier := int(p.get("lounge_tier"))
+	if lounge_tier >= 1: changed = _record_milestone("lounge_expansion_1_completed", {"tier":lounge_tier}, false) or changed
+	if lounge_tier >= 2: changed = _record_milestone("lounge_expansion_2_completed", {"tier":lounge_tier}, false) or changed
 	if changed:
 		revision += 1
 		_publish_to_progress()
@@ -133,3 +139,27 @@ func _formula_improvement_relevant() -> bool:
 		seen_ids[clone_id] = true
 		if float(worker.get("tempo", 1.0)) < formula: return true
 	return false
+
+func _current_staff_count() -> int:
+	var seen := {}
+	if service != null and service.has_method("clone_options"):
+		for entry in service.clone_options():
+			if not entry is Dictionary: continue
+			var clone_id := int(entry.get("id", 0))
+			if clone_id > 0: seen[clone_id] = true
+		return seen.size()
+	if service == null or service.get("progress") == null: return 0
+	var workers: Array = []
+	var free: Variant = service.progress.get("free_workers")
+	if free is Array: workers.append_array(free)
+	var station_list: Variant = service.get("stations")
+	if station_list is Array:
+		for station in station_list:
+			if station == null: continue
+			var crew: Variant = station.get("crew")
+			if crew is Array: workers.append_array(crew)
+	for worker in workers:
+		if not worker is Dictionary: continue
+		var clone_id := int(worker.get("id", worker.get("clone_id", 0)))
+		if clone_id > 0: seen[clone_id] = true
+	return seen.size()

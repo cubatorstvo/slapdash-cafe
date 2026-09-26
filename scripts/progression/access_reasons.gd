@@ -36,8 +36,8 @@ static func text(reason_code: StringName, reason_args: Dictionary = {}) -> Strin
 		TARGET_MISSING: return "Цель больше недоступна."
 		INCOMPATIBLE_TARGET: return "Выбранный объект не подходит для этого действия."
 		STALE_SESSION: return "Эта операция уже изменилась. Обнови состояние."
-		ALREADY_OWNED: return "Установлено."
-		DELIVERY_PENDING: return "Уже в пути."
+		ALREADY_OWNED: return "Уже установлено."
+		DELIVERY_PENDING: return "Доставка уже в пути."
 		PHASE_BLOCKED: return str(reason_args.get("text", "Сначала заверши текущий этап."))
 		STATION_BUSY: return str(reason_args.get("text", "Сначала заверши текущий заказ."))
 		ACTOR_BUSY: return str(reason_args.get("text", "Сначала освободи сотрудника."))
