@@ -28,6 +28,24 @@ func snap(name: String, expected: Vector2i) -> void:
 	else:
 		print("CAPTURE: ", path)
 
+func introduce_all_recipes(game) -> void:
+	var p = game.service.progress
+	p.stars = 4
+	p.cafe_inaugurated = true
+	p.tutorial_served = ["sausage", "potato", "wine"]
+	p.lab_stage = 3
+	p.next_clone_id = maxi(p.next_clone_id, 2)
+	p.expanded = true
+	p.specialized_expanded = true
+	p.orchestration_expanded = true
+	game.service.progression_director.migrate_from_game_state()
+	game.service.progression_director.observe("group_training_completed", {"station_count":2,"station_ids":[2,3],"lesson_id":902,"record_id":902,"clone_ids":[1,2],"dish":"sausage"})
+	game.service.progression_director.observe("group_trained_auto_served", {"station_id":2,"dish":"sausage"})
+	game.service.progression_director.observe("pair_kitchen_auto_served", {"station_id":4,"dish":"meal"})
+	game.service.progression_director.observe("specialty_kitchen_auto_served", {"station_id":5,"dish":"burger"})
+	game.service._refresh_progression()
+	game.cookbook._sync_feature_pages()
+
 func run() -> void:
 	var game = preload("res://scenes/cafe.tscn").instantiate()
 	root.add_child(game)
@@ -35,8 +53,7 @@ func run() -> void:
 	game.set_physics_process(false)
 	game.menu.close()
 	game.camera.rotation.x = 0.52
-	game.service.progress.stars = 4
-	game.service.feature_access.refresh_facts()
+	introduce_all_recipes(game)
 	game.cookbook.toggle()
 	await create_timer(0.40).timeout
 	await set_view(Vector2i(1280, 800))
