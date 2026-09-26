@@ -18,8 +18,9 @@ func _p5_has_property(target, property_name: String) -> bool:
 func _p5_structural_crew_ready(station) -> bool:
 	if station == null or bool(station.manual_station): return false
 	if _p5_has_property(station, "masterclass_station") and bool(station.get("masterclass_station")): return false
-	if station.has_method("ready_crew") and not station.ready_crew(): return false
-	if not _p5_has_property(station, "crew"): return true
+	# Assigned identities determine progression. Delivery, lessons and rest only pause execution.
+	if not _p5_has_property(station, "crew"):
+		return not station.has_method("ready_crew") or station.ready_crew()
 	var crew: Variant = station.get("crew")
 	var roles := int(station.role_count())
 	if roles <= 0 or not crew is Array or crew.size() < roles: return false
@@ -74,7 +75,7 @@ func star_requirements(stations: Array, served: int) -> Array:
 		for dish in STARTER_SEQUENCE:
 			if dish in tutorial_served: learned += 1
 		return [
-			{"text":"Лично обслужено: %d / 15" % manual_served, "done":manual_served >= 15},
+			{"text":"Лично обслужено: %d / %d" % [manual_served, FIRST_STAR_MANUAL_SERVED], "done":manual_served >= FIRST_STAR_MANUAL_SERVED},
 			{"text":"Три стартовых блюда освоены: %d / 3" % learned, "done":learned == 3}
 		]
 	if stars == 1:

@@ -1171,7 +1171,7 @@ func _count_completed_customer(customer: Dictionary,station: Node3D) -> void:
 		if progress.stars==4:
 			progress.fifth_star_auto_served+=1
 			if customer.dish in Progression.ORCHESTRATION_DISHES: progress.fifth_star_solyanka_served+=1
-		if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Теперь можно развивать вторую бригаду, формулу и отдых.")
+		if progress.journey_auto_served==1: announce("Первый самостоятельный заработок клона! Подготовь вторую бригаду и обучи работников остальным блюдам.")
 		if has_method("observe_auto_served"): call("observe_auto_served",str(customer.dish),station.station_id)
 	progress.record_demand(customer.dish,"served")
 
@@ -2131,9 +2131,9 @@ func finish_manual(station: Node3D, report: Dictionary) -> void:
 		else:
 			station.finish_taster(false)
 			progress.stars = 1
-			progress.cash += 120
+			progress.cash += Progression.FIRST_STAR_REWARD
 			progress.phase = "won"
-			progress.result = "Первая звезда! +120. Собери базовую лабораторию: она даст стандартную формулу 100%. Затем вырасти первого помощника."
+			progress.result = "Первая звезда! +%d. Собери базовую лабораторию: она даст стандартную формулу 100%%. Затем вырасти первого помощника." % Progression.FIRST_STAR_REWARD
 			progress.revision += 1
 			open_for_business = progress.return_open
 			announce(progress.result)

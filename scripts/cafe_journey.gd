@@ -42,7 +42,8 @@ static func _p5_station_of_type(stations: Array, type_id: String):
 	return null
 
 static func _p5_current_b_plus(station, dish: String) -> bool:
-	if station==null or not station.ready_crew() or not station.recipes.has(dish): return false
+	if station==null or not station.recipes.has(dish): return false
+	if not _p5_has_property(station,"crew") and not station.ready_crew(): return false
 	if station.has_method("missing_recipe_equipment") and not station.missing_recipe_equipment(dish).is_empty(): return false
 	if _p5_has_property(station,"method_sources") and _p5_has_property(station,"crew"):
 		var sources: Variant=station.get("method_sources")
@@ -95,13 +96,13 @@ static func _p5_first_clones_step(p, stations: Array, served: int, service) -> D
 		if not equipment.is_empty(): return equipment
 		return masterclass_training_step(p,selected,dish,true,service)
 	if p.can_attempt(stations,served):
-		return step("second_star","Пригласи делегацию второй звезды","Компьютер → Звёзды. Фильм и телевизор не требуются: проверка смотрит на три B+ способа нынешних работников, две действующие бригады и обычные условия кампании.")
+		return step("second_star","Пригласи делегацию второй звезды","Компьютер → Развитие. Фильм и телевизор не требуются: проверка смотрит на три B+ способа нынешних работников, две действующие бригады и обычные условия кампании.")
 	if p.journey_auto_served<3:
-		return step("repeat_work","Закрепи автоматизацию · %d/3 автоподач"%p.journey_auto_served,"Это ориентир знакомства, а не условие звезды: дай двум клонам выполнить ещё реальные заказы. Проверка 2★ остаётся доступна сразу, как только выполнен список во вкладке «Звёзды».","station",second.station_id)
+		return step("repeat_work","Закрепи автоматизацию · %d/3 автоподач"%p.journey_auto_served,"Дай двум клонам выполнить ещё реальные заказы. Если список во вкладке «Развитие» уже выполнен, можно сразу пригласить проверку 2★.","station",second.station_id)
 	if p.popularity<p.STAR_POPULARITY:
 		var rest_note:=" Базовый диван уже доступен работникам; дополнительная мебель и телевизор не обязательны." if not _p5_milestone(p,"first_staff_rest_completed") else ""
-		return step("popularity","Подними популярность · %d/%d"%[p.popularity,p.STAR_POPULARITY],"Выбери доступные украшения: это обычное условие кампании."+rest_note)
-	return step("ready_crews","Подготовь две действующие бригады","Компьютер → Звёзды показывает конкретное оставшееся условие. Отдых, телевизор, исследование формулы и случайная мебель не являются скрытыми требованиями 2★.")
+		return step("popularity","Подними популярность · %d/%d"%[p.popularity,p.STAR_POPULARITY],"Компьютер → Магазин → Декор. Вывеска даёт +10, растения +20 — вместе достаточно для второй звезды."+rest_note)
+	return step("ready_crews","Подготовь две действующие бригады","Компьютер → Развитие показывает конкретное оставшееся условие. Отдых, телевизор, исследование формулы и случайная мебель не являются скрытыми требованиями 2★.")
 
 static func _p5_video_record(service, stations: Array) -> Dictionary:
 	if service==null: return {}
@@ -135,7 +136,7 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 			var compatible: Array=service.compatible_training_station_ids(int(record.get("id",0))) if service!=null and not record.is_empty() else []
 			var target_id:=int(compatible[0]) if not compatible.is_empty() else (int(counters[0].station_id) if not counters.is_empty() else 0)
 			var record_name:=str(record.get("name","Запись")) if not record.is_empty() else "сохранённую запись"
-			return step("scale_single_video","Назначь фильм одному столу","Компьютер → Столы и обучение → выбери один совместимый стол → добавь «%s» в очередь. Просмотр считается только после реальной выдачи навыка присутствовавшему работнику."%record_name,"computer",target_id)
+			return step("scale_single_video","Назначь фильм одному столу","Компьютер → Обучение → выбери один совместимый стол → добавь «%s» в очередь. Просмотр считается только после реальной выдачи навыка присутствовавшему работнику."%record_name,"computer",target_id)
 		if not _p5_milestone(p,"first_video_trained_auto_served"):
 			var trained=_p5_video_station(service,stations)
 			return step("scale_single_video_work","Дождись автоподачи после просмотра","Пусть работник, реально получивший навык у телевизора, завершит заказ. Сам запуск фильма не закрепляет этап.","station",int(trained.station_id) if trained!=null else 0)
@@ -145,26 +146,26 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 				return buy(p,"counter",slot,"Для общего просмотра нужны минимум два совместимых производственных стола.")
 			return step("scale_two_compatible","Подготовь два совместимых стола","Массовое назначение появится, когда в кафе реально есть минимум два производственных стола одного типа.","computer")
 		if not _p5_milestone(p,"first_group_training_completed"):
-			return step("scale_group_video","Обучи минимум два стола одним сеансом","Компьютер → Столы и обучение → выбери минимум два совместимых стола и один фильм. Этап засчитается только после общего просмотра и реальной выдачи навыков, не при заполнении очереди.","computer")
+			return step("scale_group_video","Обучи минимум два стола одним сеансом","Компьютер → Обучение → выбери минимум два совместимых стола и один фильм. Этап засчитается только после общего просмотра и реальной выдачи навыков, не при заполнении очереди.","computer")
 		if not _p5_milestone(p,"first_group_trained_auto_served"):
 			var group_data:=_p5_milestone_data(p,"first_group_training_completed")
 			var ids: Variant=group_data.get("station_ids",[])
 			var station_id:=int(ids[0]) if ids is Array and not ids.is_empty() else 0
 			return step("scale_group_work","Закрепи групповое обучение автоподачей","Хотя бы один стол, действительно обученный в общем сеансе, должен завершить реальный автоматический заказ.","station",station_id)
-		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Интернет-магазин → расширение. Распространение опыта уже закреплено; теперь добавь двухролевую производственную линию.")
+		if not p.expanded: return step("third_expand","Расширь зал для парной кухни · 180","Компьютер → Магазин → расширение. Распространение опыта уже закреплено; теперь добавь двухролевую производственную линию.")
 		if kitchen==null: return buy(p,"kitchen",4,"Парная кухня «Мясо и макароны» вводит две согласованные роли одного способа.")
 		if crew_count(kitchen)<kitchen.role_count(): return grow(p,stations)
 		var kitchen_equipment:=equip(p,kitchen,"meal")
 		if not kitchen_equipment.is_empty(): return kitchen_equipment
 		if not _p5_current_b_plus(kitchen,"meal"): return masterclass_training_step(p,kitchen,"meal",true,service)
 		if not _p5_milestone(p,"first_pair_kitchen_auto_served"): return step("first_meal","Получи первую автоподачу парной кухни","Дождись реального заказа: оба клона должны исполнить роли одного принятого способа «Мясо и макароны».","station",kitchen.station_id)
-		if p.journey_meals_served<p.THIRD_STAR_MEALS: return step("meal_capacity","Дай парной кухне поработать · %d/%d"%[p.journey_meals_served,p.THIRD_STAR_MEALS],"Текущие числовые пороги кампании пока сохраняются; пусть двухролевая линия выполнит ещё реальные заказы.","station",kitchen.station_id)
+		if p.journey_meals_served<p.THIRD_STAR_MEALS: return step("meal_capacity","Дай парной кухне поработать · %d/%d"%[p.journey_meals_served,p.THIRD_STAR_MEALS],"Оставь парную кухню принимать заказы. Пока она работает, можно готовить у шеф-стойки или обучать других работников.","station",kitchen.station_id)
 		if p.third_star_auto_served<p.THIRD_STAR_AUTO_SERVED: return step("scale_service","Проверь мощность кафе · %d/%d автоподач"%[p.third_star_auto_served,p.THIRD_STAR_AUTO_SERVED],"Оставь освоенные линии работать вместе. Короткая занятость на доставке не меняет структурную готовность состава.","station",kitchen.station_id)
-		if p.popularity<p.THIRD_STAR_POPULARITY: return step("third_popularity","Подними популярность · %d/%d"%[p.popularity,p.THIRD_STAR_POPULARITY],"Используй уже доступные способы развития кафе; новые числовые решения каталогов остаются следующему этапу.")
-		if p.can_attempt(stations,served): return step("third_star","Пригласи гостей на Большой обед","Компьютер → Звёзды. Проверка доступна по фактическому текущему составу, знаниям и оснащению.")
-		return step("third_ready","Подготовь три производственные линии","Компьютер → Звёзды показывает конкретное недостающее структурное условие.")
+		if p.popularity<p.THIRD_STAR_POPULARITY: return step("third_popularity","Подними популярность · %d/%d"%[p.popularity,p.THIRD_STAR_POPULARITY],"Вывеска, растения и установленная гирлянда вместе дают 45 популярности. Гирлянду достань из коробки и закрепи в четырёх точках стены. Ещё популярность приносят визиты из раздела «Развитие».")
+		if p.can_attempt(stations,served): return step("third_star","Пригласи гостей на Большой обед","Компьютер → Развитие. Проверка доступна по фактическому текущему составу, знаниям и оснащению.")
+		return step("third_ready","Подготовь три производственные линии","Компьютер → Развитие показывает конкретное недостающее структурное условие.")
 	if p.stars==3:
-		if not p.specialized_expanded: return step("specialty_expand","Открой специализированный сектор · %d"%p.SPECIALTY_EXPANSION_PRICE,"Компьютер → Интернет-магазин. После 3★ вводится бургерная и её общий физический ресурс.")
+		if not p.specialized_expanded: return step("specialty_expand","Открой специализированный сектор · %d"%p.SPECIALTY_EXPANSION_PRICE,"Компьютер → Магазин. После 3★ вводится бургерная и её общий физический ресурс.")
 		if specialty==null: return buy(p,"grill_kitchen",5,"Бургерная — следующая производственная линия после подтверждённой парной кухни.")
 		if crew_count(specialty)<specialty.role_count(): return grow(p,stations)
 		var burger_gear:=equip(p,specialty,"burger")
@@ -172,23 +173,23 @@ static func _p5_scale_step(p, stations: Array, served: int, service) -> Dictiona
 		for dish in p.SPECIALTY_DISHES:
 			if not _p5_current_b_plus(specialty,str(dish)): return masterclass_training_step(p,specialty,str(dish),true,service)
 		if not _p5_milestone(p,"first_specialty_kitchen_auto_served"): return step("first_specialty","Получи первую автоподачу бургерной","Дождись реального заказа бургерной после освоения её ролей; только завершённая подача вводит следующий слой.","station",specialty.station_id)
-		if p.fourth_star_specialty_served<p.FOURTH_STAR_SPECIALTY_SERVED: return step("specialty_capacity","Дай бургерной поработать · %d/%d"%[p.fourth_star_specialty_served,p.FOURTH_STAR_SPECIALTY_SERVED],"Текущий порог кампании сохранён до отдельной настройки каталогов и баланса.","station",specialty.station_id)
+		if p.fourth_star_specialty_served<p.FOURTH_STAR_SPECIALTY_SERVED: return step("specialty_capacity","Дай бургерной поработать · %d/%d"%[p.fourth_star_specialty_served,p.FOURTH_STAR_SPECIALTY_SERVED],"Бургерная должна обслужить шесть заказов. Оставь её работать; остальные столы продолжают зарабатывать.","station",specialty.station_id)
 		if p.fourth_star_auto_served<p.FOURTH_STAR_AUTO_SERVED: return step("specialty_scale","Проверь весь зал · %d/%d автоподач"%[p.fourth_star_auto_served,p.FOURTH_STAR_AUTO_SERVED],"Старые и новые линии должны работать с нынешними назначенными сотрудниками и их знаниями.","station",specialty.station_id)
-		if p.popularity<p.FOURTH_STAR_POPULARITY: return step("fourth_popularity","Подними популярность · %d/%d"%[p.popularity,p.FOURTH_STAR_POPULARITY],"Подготовь кафе к текущей проверке 4★.")
-		if p.can_attempt(stations,served): return step("fourth_star","Начни испытание «Три волны»","Компьютер → Звёзды. После успешной проверки откроется глава координации трёхролевой кухни.")
-		return step("fourth_ready","Подготовь специализированную линию","Компьютер → Звёзды показывает конкретное недостающее условие.")
+		if p.popularity<p.FOURTH_STAR_POPULARITY: return step("fourth_popularity","Подними популярность · %d/%d"%[p.popularity,p.FOURTH_STAR_POPULARITY],"Весь декор даёт 45 популярности. Остальное приносят визиты: критики +5 за четыре блюда A/S, мастерская +3. Компьютер → Развитие; следующее предложение появляется через два дня.")
+		if p.can_attempt(stations,served): return step("fourth_star","Начни испытание «Три волны»","Компьютер → Развитие. После успешной проверки откроется глава координации трёхролевой кухни.")
+		return step("fourth_ready","Подготовь специализированную линию","Компьютер → Развитие показывает конкретное недостающее условие.")
 	if p.stars==4:
-		if not p.orchestration_expanded: return step("orchestration_expand","Открой сектор оркестрации · %d"%p.ORCHESTRATION_EXPANSION_PRICE,"Компьютер → Интернет-магазин. После 4★ вводится кухня «Солянка» на три согласованные роли.")
+		if not p.orchestration_expanded: return step("orchestration_expand","Открой сектор оркестрации · %d"%p.ORCHESTRATION_EXPANSION_PRICE,"Компьютер → Магазин. После 4★ вводится кухня «Солянка» на три согласованные роли.")
 		if solyanka==null: return buy(p,"solyanka_kitchen",6,"Солянка завершает последовательность поздних кухонь и требует трёх текущих работников.")
 		if crew_count(solyanka)<solyanka.role_count(): return grow(p,stations)
 		var solyanka_gear:=equip(p,solyanka,"solyanka")
 		if not solyanka_gear.is_empty(): return solyanka_gear
 		if not _p5_current_b_plus(solyanka,"solyanka"): return masterclass_training_step(p,solyanka,"solyanka",true,service)
 		if not _p5_milestone(p,"first_solyanka_auto_served"): return step("first_solyanka","Получи первую автоподачу солянки","Дождись реального заказа: три роли должны исполнить один согласованный способ и завершить подачу.","station",solyanka.station_id)
-		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Текущий порог кампании сохранён; финальная балансировка будет отдельным этапом.","station",solyanka.station_id)
+		if p.fifth_star_solyanka_served<p.FIFTH_STAR_SOLYANKA_SERVED: return step("solyanka_capacity","Накидай солянку гостям · %d/%d"%[p.fifth_star_solyanka_served,p.FIFTH_STAR_SOLYANKA_SERVED],"Дай трём работникам выполнить шесть заказов солянки. Это подготовка к общей финальной смене.","station",solyanka.station_id)
 		if p.fifth_star_auto_served<p.FIFTH_STAR_AUTO_SERVED: return step("orchestration_scale","Дай всему кафе поработать · %d/%d автоподач"%[p.fifth_star_auto_served,p.FIFTH_STAR_AUTO_SERVED],"Подготовка к действующей финальной проверке сочетает освоенные производственные линии.","station",solyanka.station_id)
 		if p.can_attempt(stations,served): return step("fifth_star","Заслужи пятую звезду","Компьютер → Развитие → День пяти звёзд. За 6 минут обслужи минимум 18 из 24 гостей, из них 12 — на B или лучше.","computer")
-		return step("fifth_ready","Подготовь кафе к финальной смене","Компьютер → Звёзды показывает оставшиеся условия действующей проверки.","computer")
+		return step("fifth_ready","Подготовь кафе к финальной смене","Компьютер → Развитие показывает оставшиеся условия действующей проверки.","computer")
 	return super.next_step(p,stations,served,true,service)
 
 static func next_step(p, stations: Array, served: int, opened: bool, service=null) -> Dictionary:
@@ -212,9 +213,9 @@ static func next_step(p, stations: Array, served: int, opened: bool, service=nul
 			if not equipment.is_empty(): return equipment
 			if dish not in p.tutorial_served:
 				return step("try_" + dish, "Освой блюдо: " + str(DISH_NAMES[dish]), "Обслужи настоящий заказ этим блюдом. Требования и управление — в книге B.", "station", 1)
-	if p.manual_served < 15:
-		return step("practice", "Подготовься к дегустации · %d/15 гостей" % p.manual_served, "Закрепи три стартовых блюда. Дегустатор попросит каждое на B или лучше.", "station", 1)
-	return step("first_star", "Пригласи дегустатора", "Компьютер → Звёзды. Сосиска, картофель и вино — каждое на B или лучше. Неудачное блюдо можно повторить бесплатно.")
+	if p.manual_served < p.FIRST_STAR_MANUAL_SERVED:
+		return step("practice", "Подготовься к дегустации · %d/%d гостей" % [p.manual_served, p.FIRST_STAR_MANUAL_SERVED], "Закрепи три стартовых блюда. Дегустатор попросит каждое на B или лучше.", "station", 1)
+	return step("first_star", "Пригласи дегустатора", "Компьютер → Развитие. Сосиска, картофель и вино — каждое на B или лучше. Неудачное блюдо можно повторить бесплатно.")
 
 static func _p5_night_wrap(p, result: Dictionary) -> Dictionary:
 	if p.shift not in ["night","closing"]: return result
